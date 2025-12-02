@@ -26,7 +26,7 @@
 		{ name: 'Inscripciones', href: '/app/enrollments', icon: ClipboardIcon, roles: ['admin', 'superadmin'] },
 		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin'] },
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin'] },
-		{ name: 'Usuarios', href: '/app/users', icon: TagIcon, roles: ['admin', 'superadmin'] },
+		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['admin', 'superadmin'] },
 		// Student roles
 		{ name: 'Mi Dashboard', href: '/app/student/dashboard', icon: HomeIcon, roles: ['student'] },
 	];
