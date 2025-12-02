@@ -163,6 +163,8 @@
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pago</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Saldo</th>
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Descuento</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
 						<th scope="col" class="relative px-6 py-3">
 							<span class="sr-only">Acciones</span>
@@ -190,6 +192,16 @@
 								<div class={`text-sm font-medium ${enrollment.saldo_pendiente > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
 									{enrollment.saldo_pendiente}
 								</div>
+							</td>
+							<td class="px-6 py-4 whitespace-nowrap">
+								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300`}>
+									{enrollment.es_estudiante_interno}
+								</span>
+							</td>
+							<td class="px-6 py-4 whitespace-nowrap">
+								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full text-green-800`}>
+									{enrollment.descuento_personalizado}
+								</span>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>

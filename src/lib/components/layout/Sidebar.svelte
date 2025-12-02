@@ -5,11 +5,14 @@
 		UsersIcon, 
 		ClipboardIcon, 
 		TagIcon, 
-		XIcon
+		XIcon,
+
+		FileTextIcon
+
 	} from '$lib/icons/outline';
 	import { slide } from 'svelte/transition';
 	import Menu2Icon from '$lib/icons/outline/menu2Icon.svelte';
-	import { CreditCardIcon, HomeIcon, LogoutIcon } from '$lib/icons/solid';
+	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon } from '$lib/icons/solid';
 	import { goto } from '$app/navigation';
 
 	interface Props {
@@ -22,8 +25,8 @@
 	const navigation = [
 		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin'] },
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin'] },
-		{ name: 'Cursos', href: '/app/courses', icon: Menu2Icon, roles: ['admin', 'superadmin'] },
-		{ name: 'Inscripciones', href: '/app/enrollments', icon: ClipboardIcon, roles: ['admin', 'superadmin'] },
+		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin'] },
+		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin'] },
 		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin'] },
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin'] },
 		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['admin', 'superadmin'] },

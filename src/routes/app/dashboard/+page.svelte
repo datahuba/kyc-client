@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { studentService, courseService, enrollmentService, paymentService } from '$lib/services';
-	import type { Student, Course, Enrollment, Payment } from '$lib/interfaces';
+	import type { Enrollment, Payment } from '$lib/interfaces';
 	import { UsersIcon, ClipboardIcon, TagIcon } from '$lib/icons/outline';
 	import { CreditCardIcon } from '$lib/icons/solid';
 	import Heading from '$lib/components/ui/heading.svelte';
@@ -95,7 +95,7 @@
 					<p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.students.total}</p>
 					<p class="text-xs text-green-600 mt-1">{stats.students.active} Activos</p>
 				</div>
-				<div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-full text-blue-600 dark:text-blue-300">
+				<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
 					<UsersIcon class="size-8" />
 				</div>
 			</div>
@@ -107,7 +107,7 @@
 					<p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.courses.total}</p>
 					<p class="text-xs text-green-600 mt-1">{stats.courses.active} Activos</p>
 				</div>
-				<div class="p-3 bg-purple-100 dark:bg-purple-900 rounded-full text-purple-600 dark:text-purple-300">
+				<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
 					<TagIcon class="size-8" />
 				</div>
 			</div>
@@ -119,7 +119,7 @@
 					<p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.enrollments.total}</p>
 					<p class="text-xs text-green-600 mt-1">{stats.enrollments.active} Activas</p>
 				</div>
-				<div class="p-3 bg-orange-100 dark:bg-orange-900 rounded-full text-orange-600 dark:text-orange-300">
+				<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
 					<ClipboardIcon class="size-8" />
 				</div>
 			</div>
@@ -131,7 +131,7 @@
 					<p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{formatCurrency(stats.payments.revenue)}</p>
 					<p class="text-xs text-yellow-600 mt-1">{stats.payments.pending} Pagos Pendientes</p>
 				</div>
-				<div class="p-3 bg-green-100 dark:bg-green-900 rounded-full text-green-600 dark:text-green-300">
+				<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
 					<CreditCardIcon class="size-8" />
 				</div>
 			</div>
