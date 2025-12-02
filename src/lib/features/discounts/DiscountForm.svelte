@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { discountService, studentService } from '$lib/services';
+	import { discountService } from '$lib/services';
 	import type { CreateDiscountRequest, Discount, Student } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
@@ -11,19 +10,15 @@
 
 	interface Props {
 		discount?: Discount | null;
+		students: Student[];
 		onSuccess: () => void;
 		onCancel: () => void;
 	}
 
-	let { discount = null, onSuccess, onCancel }: Props = $props();
+	let { discount = null, students = [], onSuccess, onCancel }: Props = $props();
 
 	let isEditMode = $derived(!!discount);
 	let saving = $state(false);
-	let loading = $state(false);
-
-	let students: Student[] = $state([]);
-	let availableStudents: Student[] = $state([]);
-	let selectedStudentId = $state('');
 
 	let formData: CreateDiscountRequest = $state({
 		nombre: '',
@@ -32,17 +27,12 @@
 		activo: true
 	});
 
-	onMount(async () => {
-		loading = true;
-		try {
-			students = await studentService.getAll(0, 1000);
-			updateAvailableStudents();
-		} catch (e: any) {
-			alert('error', 'Error al cargar datos');
-		} finally {
-			loading = false;
-		}
-	});
+	let availableStudents = $derived(
+		students.length > 0 
+			? students.filter(s => !formData.lista_estudiantes.includes(s._id))
+			: []
+	);
+	let selectedStudentId = $state('');
 
 	$effect(() => {
 		if (discount) {
@@ -60,14 +50,7 @@
 				activo: true
 			};
 		}
-		updateAvailableStudents();
 	});
-
-	function updateAvailableStudents() {
-		if (students.length > 0) {
-			availableStudents = students.filter(s => !formData.lista_estudiantes.includes(s._id));
-		}
-	}
 
 	function addStudent() {
 		if (selectedStudentId && !formData.lista_estudiantes.includes(selectedStudentId)) {
@@ -104,13 +87,11 @@
 
 			formData.lista_estudiantes = [...formData.lista_estudiantes, selectedStudentId];
 			selectedStudentId = '';
-			updateAvailableStudents();
 		}
 	}
 
 	function removeStudent(studentId: string) {
 		formData.lista_estudiantes = formData.lista_estudiantes.filter(id => id !== studentId);
-		updateAvailableStudents();
 	}
 
 	function getStudentName(id: string) {
@@ -139,11 +120,6 @@
 	}
 </script>
 
-{#if loading}
-	<div class="flex justify-center py-12">
-		<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-	</div>
-{:else}
 	<form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 			<Input
@@ -232,4 +208,3 @@
 			</Button>
 		</div>
 	</form>
-{/if}

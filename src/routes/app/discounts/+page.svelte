@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { discountService } from '$lib/services';
-	import type { Discount } from '$lib/interfaces';
+	import { discountService, studentService } from '$lib/services';
+	import type { Discount, Student } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -29,6 +29,8 @@
 	// Dropdown state
 	let openDropdownId: string | null = null;
 
+	let studentsList: Student[] = [];
+
 	onMount(() => {
 		loadDiscounts();
 	});
@@ -36,7 +38,12 @@
 	async function loadDiscounts() {
 		loading = true;
 		try {
-			discounts = await discountService.getAll(skip, limit);
+			const [discountsData, studentsData] = await Promise.all([
+				discountService.getAll(skip, limit),
+				studentService.getAll(0, 1000)
+			]);
+			discounts = discountsData;
+			studentsList = studentsData;
 		} catch (e: any) {
 			error = e.message || 'Error al cargar descuentos';
 			alert('error', error);
@@ -230,6 +237,7 @@
 	>
 		<DiscountForm
 			discount={selectedDiscount}
+			students={studentsList}
 			onSuccess={handleFormSuccess}
 			onCancel={() => isFormOpen = false}
 		/>

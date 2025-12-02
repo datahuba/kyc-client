@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { paymentService, studentService, courseService } from '$lib/services';
-	import type { Payment, Student, Course } from '$lib/interfaces';
+	import { paymentService, studentService, courseService, enrollmentService } from '$lib/services';
+	import type { Payment, Student, Course, Enrollment } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -27,9 +27,11 @@
 	let showDeleteModal = false;
 	let paymentToDelete: Payment | null = null;
 	let deleteLoading = false;
-
+let openDropdownId: string | null = null;
 	// Dropdown state
-	let openDropdownId: string | null = null;
+	let enrollments: Enrollment[] = [];
+	let studentsList: Student[] = [];
+	let coursesList: Course[] = [];
 
 	onMount(() => {
 		loadData();
@@ -38,13 +40,17 @@
 	async function loadData() {
 		loading = true;
 		try {
-			const [paymentsData, studentsData, coursesData] = await Promise.all([
+			const [paymentsData, studentsData, coursesData, enrollmentsData] = await Promise.all([
 				paymentService.getAll(skip, limit),
 				studentService.getAll(0, 1000),
-				courseService.getAll(0, 1000)
+				courseService.getAll(0, 1000),
+				enrollmentService.getAll(0, 1000)
 			]);
 			
 			payments = paymentsData;
+			studentsList = studentsData;
+			coursesList = coursesData;
+			enrollments = enrollmentsData;
 			
 			studentsData.forEach(s => studentsMap[s._id] = s);
 			coursesData.forEach(c => coursesMap[c._id] = c);
@@ -282,6 +288,9 @@
 	>
 		<PaymentForm
 			payment={selectedPayment}
+			students={studentsList}
+			courses={coursesList}
+			enrollments={enrollments}
 			onSuccess={handleFormSuccess}
 			onCancel={() => isFormOpen = false}
 		/>

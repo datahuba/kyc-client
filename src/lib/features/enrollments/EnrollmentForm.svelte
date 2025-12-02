@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { enrollmentService, studentService, courseService } from '$lib/services';
-	import type { CreateEnrollmentRequest, Enrollment, Student, Course } from '$lib/interfaces';
+	import { enrollmentService } from '$lib/services';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import Select from '$lib/components/ui/select.svelte';
@@ -10,18 +8,16 @@
 
 	interface Props {
 		enrollment?: Enrollment | null;
+		students: Student[];
+		courses: Course[];
 		onSuccess: () => void;
 		onCancel: () => void;
 	}
 
-	let { enrollment = null, onSuccess, onCancel }: Props = $props();
+	let { enrollment = null, students = [], courses = [], onSuccess, onCancel }: Props = $props();
 
 	let isEditMode = $derived(!!enrollment);
 	let saving = $state(false);
-	let loading = $state(false);
-
-	let students: Student[] = $state([]);
-	let courses: Course[] = $state([]);
 
 	let formData: CreateEnrollmentRequest = $state({
 		estudiante_id: '',
@@ -37,22 +33,6 @@
 		total_a_pagar: 0,
 		total_pagado: 0,
 		saldo_pendiente: 0
-	});
-
-	onMount(async () => {
-		loading = true;
-		try {
-			const [studentsData, coursesData] = await Promise.all([
-				studentService.getAll(0, 1000),
-				courseService.getAll(0, 1000)
-			]);
-			students = studentsData;
-			courses = coursesData;
-		} catch (e: any) {
-			alert('error', 'Error al cargar datos');
-		} finally {
-			loading = false;
-		}
 	});
 
 	$effect(() => {
@@ -115,11 +95,6 @@
 	}
 </script>
 
-{#if loading}
-	<div class="flex justify-center py-12">
-		<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-	</div>
-{:else}
 	<form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 			{#if !isEditMode}
@@ -229,4 +204,4 @@
 			</Button>
 		</div>
 	</form>
-{/if}
+

@@ -5,7 +5,7 @@
 	import Input from '$lib/components/ui/input.svelte';
 	import Select from '$lib/components/ui/select.svelte';
 	import { alert } from '$lib/utils';
-	import { CheckIcon } from '$lib/icons/outline';
+	import { CheckIcon,EyeIcon,EyeOffIcon } from '$lib/icons/outline';
 
 	interface Props {
 		student?: Student | null;
@@ -18,6 +18,7 @@
 	let isEditMode = $derived(!!student);
 	let saving = $state(false);
 	let active = $state(true);
+	let showPassword = $state(false);
 
 	let formData: CreateStudentRequest = $state({
 		registro: '',
@@ -169,14 +170,29 @@
 		/>
 		
 		{#if !isEditMode}
+		<div class="relative w-full">
 			<Input
 				label="Contraseña"
 				id="password"
-				type="password"
+				type={showPassword ? 'text' : 'password'}
 				bind:value={formData.password}
 				required={!isEditMode}
 				placeholder="********"
+				class="w-full"
 			/>
+			<button
+							type="button"
+							onclick={() => (showPassword = !showPassword)}
+							class="absolute top-12 right-2 -translate-y-1/2 text-light-black transition-colors hover:text-light-four dark:text-dark-white"
+							disabled={saving}
+						>
+							{#if showPassword}
+								<EyeIcon class="h-5 w-5" />
+							{:else}
+								<EyeOffIcon class="h-5 w-5" />
+							{/if}
+						</button>
+			</div>
 		{:else}
 			<Input
 				label="Nueva Contraseña (Opcional)"

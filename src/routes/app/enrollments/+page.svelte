@@ -31,6 +31,9 @@
 	// Dropdown state
 	let openDropdownId: string | null = null;
 
+	let studentsList: Student[] = [];
+	let coursesList: Course[] = [];
+
 	onMount(() => {
 		loadData();
 	});
@@ -45,6 +48,8 @@
 			]);
 			
 			enrollments = enrollmentsData;
+			studentsList = studentsData;
+			coursesList = coursesData;
 			
 			// Create maps for easy lookup
 			studentsData.forEach(s => studentsMap[s._id] = s);
@@ -273,6 +278,8 @@
 	>
 		<EnrollmentForm
 			enrollment={selectedEnrollment}
+			students={studentsList}
+			courses={coursesList}
 			onSuccess={handleFormSuccess}
 			onCancel={() => isFormOpen = false}
 		/>

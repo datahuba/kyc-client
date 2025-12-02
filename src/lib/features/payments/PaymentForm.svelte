@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { paymentService, studentService, courseService, enrollmentService } from '$lib/services';
+	import { paymentService } from '$lib/services';
 	import type { CreatePaymentRequest, Payment, Student, Course, Enrollment } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
@@ -10,19 +9,17 @@
 
 	interface Props {
 		payment?: Payment | null;
+		students: Student[];
+		courses: Course[];
+		enrollments: Enrollment[];
 		onSuccess: () => void;
 		onCancel: () => void;
 	}
 
-	let { payment = null, onSuccess, onCancel }: Props = $props();
+	let { payment = null, students = [], courses = [], enrollments = [], onSuccess, onCancel }: Props = $props();
 
 	let isEditMode = $derived(!!payment);
 	let saving = $state(false);
-	let loading = $state(false);
-
-	let students: Student[] = $state([]);
-	let courses: Course[] = $state([]);
-	let enrollments: Enrollment[] = $state([]);
 
 	let formData: CreatePaymentRequest = $state({
 		inscripcion_id: '',
@@ -39,24 +36,6 @@
 	let editData = $state({
 		estado_pago: 'pendiente',
 		fecha_pagada: ''
-	});
-
-	onMount(async () => {
-		loading = true;
-		try {
-			const [studentsData, coursesData, enrollmentsData] = await Promise.all([
-				studentService.getAll(0, 1000),
-				courseService.getAll(0, 1000),
-				enrollmentService.getAll(0, 1000)
-			]);
-			students = studentsData;
-			courses = coursesData;
-			enrollments = enrollmentsData;
-		} catch (e: any) {
-			alert('error', 'Error al cargar datos');
-		} finally {
-			loading = false;
-		}
 	});
 
 	$effect(() => {
@@ -126,11 +105,6 @@
 	}
 </script>
 
-{#if loading}
-	<div class="flex justify-center py-12">
-		<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-	</div>
-{:else}
 	<form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 			{#if !isEditMode}
@@ -233,4 +207,3 @@
 			</Button>
 		</div>
 	</form>
-{/if}
