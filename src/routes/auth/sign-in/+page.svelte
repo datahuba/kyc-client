@@ -66,7 +66,7 @@
 					<img src="/images/logo_empty_datahub.png" alt="" />
 				</div>
 				<span class="text-3xl font-bold text-light-secondary dark:text-dark-secondary"
-					>DataHub<span class="ml-2 text-light-tertiary dark:text-dark-tertiary">Analitics</span
+					>DataHub<span class="ml-2 text-light-tertiary dark:text-dark-tertiary">Analytics</span
 					></span
 				>
 				{#if loginType}
