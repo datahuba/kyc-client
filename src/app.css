@@ -1,0 +1,67 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+
+@custom-variant dark (&:where(.dark, .dark *));
+@theme {
+	--breakpoint-*: initial;
+	--breakpoint-sm: 640px;
+	--breakpoint-md: 768px;
+	--breakpoint-lg: 1024px;
+	--breakpoint-xl: 1280px;
+	--breakpoint-2xl: 1536px;
+	--color-light-primary: #f6fbfd; /*c4e2f2*/
+	--color-light-primary_d: #e1f2f9; /*9fcfe9*/
+	--color-light-secondary: #2889bc;
+	--color-light-secondary_d: #20709a;
+	--color-light-tertiary: #0b78b1;
+	--color-light-tertiary_d: #095f8d;
+	--color-light-four: #c4e2f2;
+	--color-light-four_d: #9fcfe9;
+	--color-light-accent: #9dbe8c;
+	--color-light-accent_d: #9dbe8c;
+	--color-light-error: #fa3842;
+	--color-light-success: #16a34a;
+	--color-light-warning: #f59e0b;
+	--color-light-white: #ffffff;
+	--color-light-black: #000000;
+
+	--color-dark-background: #0f1720; /* fondo principal - azul petróleo oscuro */
+	--color-dark-surface: #1a2530; /* tarjetas, inputs, secciones */
+	--color-dark-border: #24313f; /* bordes suaves y discretos */
+
+	/* Primarios (baseados en tu primary light) */
+	--color-dark-primary: #0d2530; /* versión oscura del #f6fbfd */
+	--color-dark-primary_d: #142b3a; /* sutil más profunda */
+
+	/* Secundarios (acentos) */
+	--color-dark-secondary: #3ca7db; /* derivado de #2889bc, más luminoso en dark */
+	--color-dark-secondary_d: #2d86b0; /* variante más profunda */
+
+	/* Terciarios (acentos secundarios) */
+	--color-dark-tertiary: #4ec0f0; /* más vibrante que #0b78b1 para resaltar */
+	--color-dark-tertiary_d: #3799c4; /* versión más oscura */
+
+	/* Cuaternarios (suaves de apoyo) */
+	--color-dark-four: #223545; /* equivalente oscuro del #c4e2f2 */
+	--color-dark-four_d: #1a2a38; /* más profundo */
+
+	--color-dark-accent: #9dbe8c;
+	--color-dark-accent_d: #9dbe8c;
+	--color-dark-error: #fa3842;
+	--color-dark-success: #16a34a;
+	--color-dark-warning: #f59e0b;
+	--color-dark-white: #ffffff;
+	--color-dark-black: #000000;
+
+	--animate-wiggle: wiggle 1s ease-in-out infinite;
+	@keyframes wiggle {
+		0%,
+		100% {
+			transform: rotate(-3deg);
+		}
+		50% {
+			transform: rotate(3deg);
+		}
+	}
+}
