@@ -2,6 +2,7 @@
 	import { userStore } from '$lib/stores/userStore';
 	import { Menu2Icon, UserIcon } from '$lib/icons/outline';
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
+	import { goto } from '$app/navigation';
 
 	interface Props {
 		onOpenSidebar: () => void;
@@ -17,7 +18,7 @@
 				label: 'Mi Perfil',
         id: 'profile',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>`,
-				action: () => console.log('Profile clicked') // Navigate to profile if exists
+				action: () => goto('/app/profile')
 			},
 			{
 				label: 'Cerrar Sesión',
@@ -29,7 +30,7 @@
 		];
 	}
 
-	let isProfileOpen = false;
+	let isProfileOpen = $state(false);
 </script>
 
 <div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 sm:gap-x-6 sm:px-6 lg:px-8">

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { slide } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
-	import type { Snippet } from 'svelte';
+	import type { Component } from 'svelte';
 	import type { HTMLInputAttributes } from 'svelte/elements';
 
 	interface Props extends HTMLInputAttributes {
-		icon?: Snippet;
+		icon?: Component;
 		label?: string;
 		error?: string;
 		value?: string | number | null | undefined;

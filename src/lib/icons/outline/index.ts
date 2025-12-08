@@ -56,3 +56,4 @@ export { default as FileTypeXlsIcon } from './fileTypeXlsIcon.svelte';
 export { default as MessageIcon } from './messageIcon.svelte';
 export { default as SendIcon } from './sendIcon.svelte';
 export { default as Menu2Icon } from './menu2Icon.svelte';
+export { default as PhoneIcon } from './phoneIcon.svelte';
