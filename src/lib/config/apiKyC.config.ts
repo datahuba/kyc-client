@@ -45,12 +45,21 @@ class ApiKyC {
 		const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
 
 		try {
+			const isFormData = data instanceof FormData;
+			const isUrlSearchParams = data instanceof URLSearchParams;
 			const headers = this.buildHeaders(options);
+
+			if (isFormData) {
+				// Al enviar FormData, el navegador establece automáticamente el Content-Type con el boundary correcto
+				// por lo que debemos eliminar el Content-Type: application/json por defecto
+				const headersObj = headers as Record<string, string>;
+				delete headersObj['Content-Type'];
+			}
 
 			const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1${endpoint}`, {
 				method,
 				headers,
-				body: data ? JSON.stringify(data) : undefined,
+				body: isFormData || isUrlSearchParams ? (data as BodyInit) : data ? JSON.stringify(data) : undefined,
 				signal: controller.signal
 			});
 

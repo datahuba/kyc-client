@@ -9,27 +9,38 @@
 		label?: string;
 		error?: string;
 		value?: string | number | null | undefined;
+		files?: FileList;
 	}
 
-	let { class: className, icon, label, error, value = $bindable(), ...restProps }: Props = $props();
+	let { class: className, icon, label, error, value = $bindable(), files = $bindable(), ...restProps }: Props = $props();
 </script>
 
 <div class={className}>
 	<label
 		for={restProps.id}
-		class="grid grid-cols-[auto,_1fr] items-center gap-0.5 text-sm leading-6 font-medium text-light-two sm:text-base"
+		class="grid grid-cols-[auto,_1fr] items-center gap-0.5 text-sm leading-6 font-medium text-light-two sm:text-base dark:text-gray-300"
 	>
 		<span class="truncate"
 			>{label} <span class="text-red-500">{restProps.required && '*'} </span></span
 		>
 	</label>
 	<div class="relative {label && 'mt-1'}  {icon && 'grid grid-cols-1'}">
-		<input
-			{...restProps}
-			bind:value
-			class="block w-full rounded-md border border-light-four bg-light-one py-2 text-sm text-light-two ring-light-two transition-all placeholder:text-xs placeholder:text-light-two_d hover:ring-1 hover:ring-light-two_d focus:ring-2 focus:ring-light-two sm:text-base sm:leading-6 placeholder:sm:text-sm {icon &&
-				'col-start-1 row-start-1 pl-10'} "
-		/>
+		{#if restProps.type === 'file'}
+			<input
+				type="file"
+				{...restProps}
+				bind:files
+				class="block w-full rounded-md border border-light-four bg-light-one py-2 text-sm text-light-two ring-light-two transition-all placeholder:text-xs placeholder:text-light-two_d hover:ring-1 hover:ring-light-two_d focus:ring-2 focus:ring-light-two sm:text-base sm:leading-6 placeholder:sm:text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-gray-700 dark:file:text-gray-300 {icon &&
+					'col-start-1 row-start-1 pl-10'} "
+			/>
+		{:else}
+			<input
+				{...restProps}
+				bind:value
+				class="block w-full rounded-md border border-light-four bg-light-one py-2 text-sm text-light-two ring-light-two transition-all placeholder:text-xs placeholder:text-light-two_d hover:ring-1 hover:ring-light-two_d focus:ring-2 focus:ring-light-two sm:text-base sm:leading-6 placeholder:sm:text-sm {icon &&
+					'col-start-1 row-start-1 pl-10'} "
+			/>
+		{/if}
 		{#if icon}
 			<p class="pointer-events-none col-start-1 row-start-1 ml-3 self-center text-light-two_d">
 				{#await Promise.resolve(icon) then Icon}
