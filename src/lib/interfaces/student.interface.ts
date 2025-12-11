@@ -45,12 +45,14 @@ export interface CreateStudentRequest {
 	email: string;
 	domicilio: string;
 	es_estudiante_interno: string;
+	lista_cursos_ids?: string[];
 }
 
 export interface UpdateStudentRequest extends Partial<CreateStudentRequest> {
 	lista_cursos_ids?: string[];
 	lista_titulos_ids?: string[];
 	activo?: boolean;
+	titulo?: TituloData;
 }
 
 export interface TituloData {

@@ -12,9 +12,10 @@
 		id?: string;
 		preview?: boolean;
 		loading?: boolean;
+		initialUrl?: string | null;
 	}
 
-	let { label, accept = '*', file = null, loading = false, onFileSelect, id, preview = true }: Props = $props();
+	let { label, accept = '*', file = null, loading = false, onFileSelect, id, preview = true, initialUrl = null }: Props = $props();
 
 	let inputRef: HTMLInputElement;
 	let dragOver = $state(false);
@@ -28,11 +29,12 @@
 					previewUrl = e.target?.result as string;
 				};
 				reader.readAsDataURL(file);
-			} else if (file.type === 'application/pdf') {
-				previewUrl = URL.createObjectURL(file);
 			} else {
-				previewUrl = null;
+				// For PDFs/other files, we don't preview inline to avoid auto-downloads
+				previewUrl = null; 
 			}
+		} else if (initialUrl && !file) {
+			previewUrl = initialUrl;
 		} else {
 			previewUrl = null;
 		}
@@ -118,33 +120,49 @@
 			</div>
 		{/if}
 
-		{#if file}
+		{#if file || previewUrl}
 			<div class="relative flex w-full h-full flex-col items-center justify-center gap-3">
-				{#if previewUrl}
-					<div class="relative h-full w-full overflow-hidden rounded-lg shadow-sm">
-						{#if file.type.startsWith('image/')}
-							<img src={previewUrl} alt="Preview" class="h-full w-full object-cover" />
-						{:else if file.type === 'application/pdf'}
-							<iframe src={previewUrl} title="PDF Preview" class="h-full w-full border-0"></iframe>
+				<!-- Image Preview -->
+				{#if previewUrl && ((file && file.type.startsWith('image/')) || (!file && accept.includes('image')))}
+					<div class="relative h-full w-full overflow-hidden rounded-lg shadow-sm group/preview">
+						<img src={previewUrl} alt="Preview" class="h-full w-full object-cover transition-transform group-hover/preview:scale-105" />
+						{#if !file && initialUrl}
+							<div class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/preview:opacity-100 transition-opacity">
+								<a href={initialUrl} target="_blank" rel="noopener noreferrer" class="text-white hover:underline text-sm font-medium flex items-center gap-1" onclick={(e) => e.stopPropagation()}>
+									<DocumentAddIcon class="size-4" /> Ver original
+								</a>
+							</div>
 						{/if}
 					</div>
+				<!-- Document/PDF State -->
 				{:else}
-					<div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400">
-						{#if file.type.includes('pdf')}
+					<div class="flex flex-col items-center justify-center gap-2 p-4 text-center">
+						<div class="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
 							<DocumentAddIcon class="size-8" />
-						{:else}
-							<CheckIcon class="size-8" />
+						</div>
+						
+						{#if file}
+							<div>
+								<p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-[200px]">{file.name}</p>
+								<p class="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+							</div>
+						{:else if initialUrl}
+							<div class="flex flex-col items-center gap-2">
+								<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Archivo cargado</p>
+								<a 
+									href={initialUrl} 
+									target="_blank" 
+									rel="noopener noreferrer"
+									class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline"
+									onclick={(e) => e.stopPropagation()}
+								>
+									Ver archivo actual
+								</a>
+							</div>
 						{/if}
 					</div>
 				{/if}
 				
-				{#if !previewUrl}
-					<div class="text-center">
-						<p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-[200px]">{file.name}</p>
-						<p class="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-					</div>
-				{/if}
-
 				{#if !loading}
 					<button 
 						type="button" 

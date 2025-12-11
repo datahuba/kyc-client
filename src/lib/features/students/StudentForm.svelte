@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { studentService } from '$lib/services';
-	import type { CreateStudentRequest, Student, TituloData } from '$lib/interfaces';
+	import { studentService, courseService } from '$lib/services';
+	import type { CreateStudentRequest, Student, TituloData, Course } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import Select from '$lib/components/ui/select.svelte';
@@ -36,7 +36,8 @@
 		domicilio: '',
 		carrera: '',
 		es_estudiante_interno: 'interno',
-		password: ''
+		password: '',
+		lista_cursos_ids: []
 	});
 
 	// File States
@@ -53,6 +54,14 @@
 		año_expedicion: '',
 		universidad: ''
 	});
+	
+	let courses: Course[] = $state([]);
+
+	$effect(() => {
+		courseService.getAll().then(data => {
+			courses = data;
+		});
+	});
 
 	// Initialize form data when student prop changes
 	$effect(() => {
@@ -68,10 +77,22 @@
 				email: student.email,
 				domicilio: student.domicilio,
 				es_estudiante_interno: student.es_estudiante_interno,
-				password: ''
+				password: '',
+				lista_cursos_ids: student.lista_cursos_ids || []
 			};
 			active = student.activo;
-			// Note: We don't populate files for edit mode as they are re-uploads
+			
+			if (student.titulo) {
+				tituloData = {
+					titulo: student.titulo.titulo,
+					numero_titulo: student.titulo.numero_titulo,
+					año_expedicion: student.titulo.año_expedicion,
+					universidad: student.titulo.universidad
+				};
+			} else {
+				tituloData = { titulo: '', numero_titulo: '', año_expedicion: '', universidad: '' };
+			}
+			// Note: We don't populate files for edit mode as they are re-uploads. (Except displaying previews which is handled by prop)
 		} else {
 			// Reset form for new student
 			formData = {
@@ -85,7 +106,8 @@
 				email: '',
 				domicilio: '',
 				es_estudiante_interno: 'interno',
-				password: ''
+				password: '',
+				lista_cursos_ids: []
 			};
 			active = true;
 			tituloData = { titulo: '', numero_titulo: '', año_expedicion: '', universidad: '' };
@@ -100,10 +122,12 @@
 			let savedStudent: Student;
 
 			if (isEditMode && student) {
+				const hasTituloData = tituloData.titulo || tituloData.universidad;
 				savedStudent = await studentService.update(student._id, {
 					...formData,
 					activo: active,
-					password: formData.password || undefined
+					password: formData.password || undefined,
+					titulo: hasTituloData ? tituloData : undefined
 				});
 				alert('success', 'Estudiante actualizado correctamente');
 			} else {
@@ -212,6 +236,45 @@
 		</div>
 	</div>
 
+	<!-- Course Selection -->
+	<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+		<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-gray-700">
+			<div class="rounded-lg bg-green-50 p-2 text-green-600 dark:bg-green-900/20 dark:text-green-400">
+				<CollectionIcon class="size-6" />
+			</div>
+			<div>
+				<Heading level="h4" class="text-lg font-semibold text-gray-900 dark:text-white">Cursos Inscritos</Heading>
+				<p class="text-sm text-gray-500 dark:text-gray-400">Seleccione los cursos</p>
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border border-gray-200 rounded-lg dark:border-gray-700">
+			{#each courses as course}
+				<label class="flex items-center space-x-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors">
+					<input 
+						type="checkbox" 
+						value={course._id} 
+						checked={formData.lista_cursos_ids?.includes(course._id)}
+						onchange={(e) => {
+							const checked = e.currentTarget.checked;
+							const current = formData.lista_cursos_ids || [];
+							if (checked) {
+								formData.lista_cursos_ids = [...current, course._id];
+							} else {
+								formData.lista_cursos_ids = current.filter(id => id !== course._id);
+							}
+						}}
+						class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+					/>
+					<span class="text-sm text-gray-700 dark:text-gray-300 select-none">{course.nombre_programa}</span>
+				</label>
+			{/each}
+			{#if courses.length === 0}
+				<p class="text-sm text-gray-500 col-span-2 text-center py-4">No hay cursos disponibles.</p>
+			{/if}
+		</div>
+	</div>
+
 	<!-- Documents & Title -->
 	<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 		<!-- Documents -->
@@ -227,10 +290,10 @@
 			</div>
 			
 			<div class="grid grid-cols-2 gap-4">
-				<FileUpload label="Foto de Perfil" accept="image/*" file={photoFile} onFileSelect={(f) => photoFile = f} />
-				<FileUpload label="Carnet (PDF)" accept=".pdf" file={carnetFile} onFileSelect={(f) => carnetFile = f} />
-				<FileUpload label="Curriculum (PDF)" accept=".pdf" file={cvFile} onFileSelect={(f) => cvFile = f} />
-				<FileUpload label="Afiliación (PDF)" accept=".pdf" file={afiliacionFile} onFileSelect={(f) => afiliacionFile = f} />
+				<FileUpload label="Foto de Perfil" accept="image/*" file={photoFile} onFileSelect={(f) => photoFile = f} initialUrl={student?.foto_url} />
+				<FileUpload label="Carnet (PDF)" accept=".pdf" file={carnetFile} onFileSelect={(f) => carnetFile = f} initialUrl={student?.ci_url} />
+				<FileUpload label="Curriculum (PDF)" accept=".pdf" file={cvFile} onFileSelect={(f) => cvFile = f} initialUrl={student?.cv_url} />
+				<FileUpload label="Afiliación (PDF)" accept=".pdf" file={afiliacionFile} onFileSelect={(f) => afiliacionFile = f} initialUrl={student?.afiliacion_url} />
 			</div>
 		</div>
 
@@ -255,7 +318,7 @@
 					<Input label="Año" bind:value={tituloData.año_expedicion} placeholder="2024" />
 					<Input label="Universidad" bind:value={tituloData.universidad} placeholder="UAGRM" />
 				</div>
-				<FileUpload label="Documento de Título (PDF)" accept=".pdf" file={tituloFile} onFileSelect={(f) => tituloFile = f} />
+				<FileUpload label="Documento de Título (PDF)" accept=".pdf" file={tituloFile} onFileSelect={(f) => tituloFile = f} initialUrl={student?.titulo?.titulo_url} />
 			</div>
 		</div>
 	</div>
