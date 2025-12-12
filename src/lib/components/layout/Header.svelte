@@ -24,13 +24,18 @@
 				label: 'Cerrar Sesión',
         id: 'logout',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>`,
-				action: () => userStore.logout(),
+				action: () => logout(),
 				divider: true
 			}
 		];
 	}
 
 	let isProfileOpen = $state(false);
+
+	const logout = () => {
+		userStore.logout();
+		goto('/auth/sign-in');
+	}
 </script>
 
 <div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 sm:gap-x-6 sm:px-6 lg:px-8">

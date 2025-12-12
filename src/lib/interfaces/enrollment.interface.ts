@@ -15,15 +15,13 @@ export interface Enrollment {
 	total_a_pagar: number;
 	total_pagado: number;
 	updated_at: string;
+	formulario_inscripcion_url?: string;
 }
 
 export interface CreateEnrollmentRequest {
 	estudiante_id: string;
 	curso_id: string;
-	es_estudiante_interno: string;
-	tipo_pago: 'contado' | 'cuotas';
 	descuento_personalizado: number;
-	formulario_inscripcion_url?: string;
 }
 
 export interface UpdateEnrollmentRequest {

@@ -5,6 +5,7 @@
 	import Select from '$lib/components/ui/select.svelte';
 	import { alert } from '$lib/utils';
 	import { CheckIcon } from '$lib/icons/outline';
+	import type { Course, CreateEnrollmentRequest, Enrollment, Student } from '$lib/interfaces';
 
 	interface Props {
 		enrollment?: Enrollment | null;
@@ -22,10 +23,7 @@
 	let formData: CreateEnrollmentRequest = $state({
 		estudiante_id: '',
 		curso_id: '',
-		es_estudiante_interno: 'interno',
-		tipo_pago: 'contado',
-		descuento_personalizado: 0,
-		formulario_inscripcion_url: ''
+		descuento_personalizado: 0
 	});
 
 	let editData = $state({
@@ -40,10 +38,7 @@
 			formData = {
 				estudiante_id: enrollment.estudiante_id,
 				curso_id: enrollment.curso_id,
-				es_estudiante_interno: enrollment.es_estudiante_interno,
-				tipo_pago: enrollment.tipo_pago as 'contado' | 'cuotas',
-				descuento_personalizado: enrollment.descuento_personalizado,
-				formulario_inscripcion_url: enrollment.formulario_inscripcion_url
+				descuento_personalizado: enrollment.descuento_personalizado
 			};
 			editData = {
 				estado: enrollment.estado,
@@ -55,10 +50,7 @@
 			formData = {
 				estudiante_id: '',
 				curso_id: '',
-				es_estudiante_interno: 'interno',
-				tipo_pago: 'contado',
-				descuento_personalizado: 0,
-				formulario_inscripcion_url: ''
+				descuento_personalizado: 0
 			};
 			editData = {
 				estado: 'activo',
@@ -75,7 +67,6 @@
 			if (isEditMode && enrollment) {
 				await enrollmentService.update(enrollment._id, {
 					estado: editData.estado,
-					formulario_inscripcion_url: formData.formulario_inscripcion_url,
 					descuento_personalizado: formData.descuento_personalizado,
 					total_a_pagar: editData.total_a_pagar,
 					total_pagado: editData.total_pagado,
@@ -118,22 +109,6 @@
 						<option value={course._id}>{course.nombre_programa}</option>
 					{/each}
 				</Select>
-				<Select
-					label="Tipo de Estudiante"
-					bind:value={formData.es_estudiante_interno}
-					required
-				>
-					<option value="interno">Interno</option>
-					<option value="externo">Externo</option>
-				</Select>
-				<Select
-					label="Tipo de Pago"
-					bind:value={formData.tipo_pago}
-					required
-				>
-					<option value="contado">Contado</option>
-					<option value="cuotas">Cuotas</option>
-				</Select>
 			{:else}
 				<!-- Read-only fields for edit mode -->
 				<div class="md:col-span-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -150,12 +125,6 @@
 				type="number"
 				bind:value={formData.descuento_personalizado}
 				required
-			/>
-			<Input
-				label="URL Formulario Inscripción"
-				id="formulario_inscripcion_url"
-				bind:value={formData.formulario_inscripcion_url}
-				placeholder="https://..."
 			/>
 
 			{#if isEditMode}

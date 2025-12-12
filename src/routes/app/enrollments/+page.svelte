@@ -37,6 +37,9 @@
 	let coursesList: Course[] = [];
 
 	onMount(() => {
+		if (!$userStore.isAuthenticated) {
+			userStore.init();
+		}
 		loadData();
 	});
 
@@ -61,12 +64,20 @@
 				}
 			}
 
-			// Ejecutamos todo en paralelo
-			const [enrollmentsData, studentsData, coursesData] = await Promise.all([
-				enrollmentsPromise,
-				studentService.getAll(0, 1000),
-				courseService.getAll(0, 1000)
-			]);
+			// Ejecutamos las peticiones
+			const promises: Promise<any>[] = [enrollmentsPromise];
+			
+			// Solo admin carga lista de estudiantes
+			if ($userStore.role !== 'student') {
+				promises.push(studentService.getAll(0, 1000));
+			} else {
+				promises.push(Promise.resolve([]));
+			}
+
+			// Intentamos cargar cursos (seguro para admin, quizás restringido para student)
+			promises.push(courseService.getAll(0, 1000).catch(() => []));
+
+			const [enrollmentsData, studentsData, coursesData] = await Promise.all(promises);
 
 			enrollments = enrollmentsData;
 			studentsList = studentsData;

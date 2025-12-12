@@ -3,6 +3,7 @@ import type { Enrollment, CreateEnrollmentRequest, UpdateEnrollmentRequest } fro
 
 class EnrollmentService {
 	async getAll(skip = 0, limit = 100): Promise<Enrollment[]> {
+		//console.log("entre a traer pagos de admins");
 		return await apiKyC.get<Enrollment[]>(`/enrollments/?skip=${skip}&limit=${limit}`);
 	}
 
@@ -19,6 +20,7 @@ class EnrollmentService {
 	}
 
 	async getByStudentId(studentId: string): Promise<Enrollment[]> {
+		//console.log("entre a traer pagos de students");
 		return await apiKyC.get<Enrollment[]>(`/enrollments/student/${studentId}`);
 	}
 
