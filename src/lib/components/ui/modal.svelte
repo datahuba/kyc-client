@@ -28,7 +28,7 @@
 				>
 					<!-- Header -->
 					<div class="bg-white dark:bg-gray-800 px-4 py-3 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-						<Heading level="h3">{title}</Heading>
+						<Heading level="h5">{title}</Heading>
 						<button
 							type="button"
 							class="rounded-md bg-white dark:bg-gray-800 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"

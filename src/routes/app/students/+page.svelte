@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { studentService } from '$lib/services';
-	import type { Student } from '$lib/interfaces';
+	import { studentService, enrollmentService } from '$lib/services';
+	import type { Student, Enrollment } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -11,7 +11,7 @@
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import StudentDetails from '$lib/features/students/StudentDetails.svelte';
 	import StudentForm from '$lib/features/students/StudentForm.svelte';
-	import { PlusIcon, DotsVerticalIcon, UserIcon, CheckIcon, XIcon } from '$lib/icons/outline';
+	import { PlusIcon, DotsVerticalIcon, UserIcon, CheckIcon, XIcon, FileTextIcon } from '$lib/icons/outline';
 	import { alert } from '$lib/utils';
 	import Input from '$lib/components/ui/input.svelte';
 
@@ -37,6 +37,11 @@
 
 	// Dropdown state
 	let openDropdownId: string | null = null;
+
+	// Enrollments Modal State
+	let isEnrollmentsOpen = false;
+	let studentEnrollments: Enrollment[] = [];
+	let enrollmentsLoading = false;
 
 	async function loadStudents() {
 		loading = true;
@@ -161,6 +166,22 @@
 		openDropdownId = null;
 	}
 
+	async function handleViewEnrollments(student: Student) {
+		selectedStudent = student;
+		isEnrollmentsOpen = true;
+		enrollmentsLoading = true;
+		studentEnrollments = [];
+		openDropdownId = null;
+		try {
+			studentEnrollments = await enrollmentService.getByStudentId(student._id);
+		} catch (error) {
+			console.error(error);
+			alert('error', 'Error al cargar inscripciones del estudiante');
+		} finally {
+			enrollmentsLoading = false;
+		}
+	}
+
 	function getDropdownOptions(student: Student) {
 		const options = [
 			{
@@ -168,6 +189,12 @@
 				id: 'details',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>`,
 				action: () => handleViewDetails(student)
+			},
+			{
+				label: 'Ver Inscripciones',
+				id: 'enrollments',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`,
+				action: () => handleViewEnrollments(student)
 			},
 			{
 				label: 'Editar',
@@ -362,6 +389,65 @@
 			<div class="flex justify-end gap-3 mt-4">
 				<Button variant="secondary" onclick={() => isRejectModalOpen = false} disabled={actionLoading}>Cancelar</Button>
 				<Button variant="destructive" onclick={confirmReject} loading={actionLoading}>Rechazar</Button>
+			</div>
+		</div>
+	</Modal>
+
+	<!-- Enrollments Modal -->
+	<Modal
+		isOpen={isEnrollmentsOpen}
+		title={`Inscripciones de ${selectedStudent?.nombre || ''}`}
+		onClose={() => isEnrollmentsOpen = false}
+		maxWidth="sm:max-w-4xl"
+	>
+		<div class="p-6">
+			{#if enrollmentsLoading}
+				<div class="flex justify-center py-8">
+					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+				</div>
+			{:else if studentEnrollments.length === 0}
+				<div class="text-center py-8 text-gray-500">
+					No se encontraron inscripciones para este estudiante.
+				</div>
+			{:else}
+				<div class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+						<thead class="bg-gray-50 dark:bg-gray-800">
+							<tr>
+								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montos</th>
+								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo</th>
+								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+							</tr>
+						</thead>
+						<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+							{#each studentEnrollments as enrollment}
+								<tr>
+									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+										{new Date(enrollment.fecha_inscripcion).toLocaleDateString()}
+									</td>
+									<td class="px-6 py-4 whitespace-nowrap">
+										<div class="text-xs text-gray-500">Total: {enrollment.total_a_pagar}</div>
+										<div class="text-xs text-green-600">Pagado: {enrollment.total_pagado}</div>
+									</td>
+									<td class="px-6 py-4 whitespace-nowrap">
+										<span class={`font-medium ${enrollment.saldo_pendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>
+											{enrollment.saldo_pendiente}
+										</span>
+									</td>
+									<td class="px-6 py-4 whitespace-nowrap">
+										<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+											{enrollment.estado}
+										</span>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{/if}
+			<div class="mt-6 flex justify-end">
+				<Button variant="secondary" onclick={() => isEnrollmentsOpen = false}>Cerrar</Button>
 			</div>
 		</div>
 	</Modal>
