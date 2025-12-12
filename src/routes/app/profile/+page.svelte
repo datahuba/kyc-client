@@ -1,143 +1,308 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { userStore } from '$lib/stores/userStore';
+	import { studentService, userService } from '$lib/services';
 	import Card from '$lib/components/ui/card.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Input from '$lib/components/ui/input.svelte';
-	import Button from '$lib/components/ui/button.svelte';
-	import TextArea from '$lib/components/ui/textArea.svelte';
-	import { UserIcon, MailIcon, MapPinIcon, PhoneIcon } from '$lib/icons/outline';
+	import FileUpload from '$lib/components/ui/fileUpload.svelte';
+	import { alert } from '$lib/utils';
+	import { UserIcon, MailIcon, MapPinIcon, PhoneIcon, IdentificationIcon, AcademicCapIcon } from '$lib/icons/outline';
 	import { BriefcaseIcon } from '$lib/icons/solid';
 
-	// Dummy data
-	let userProfile = $state({
-		firstName: 'Juan',
-		lastName: 'Pérez',
-		email: 'juan.perez@example.com',
-		phone: '+591 70000000',
-		role: 'Administrador',
-		location: 'Santa Cruz, Bolivia',
-		bio: 'Desarrollador de software apasionado por crear experiencias de usuario increíbles. Me encanta el café y el código limpio.',
-		avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-		coverUrl: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80'
+	let loading = $state(true);
+	let profileData: any = $state(null);
+	let error = $state('');
+
+	$effect(() => {
+		if ($userStore.isAuthenticated && $userStore.user?._id && !profileData && !loading) {
+			loadProfile();
+		} else if ($userStore.loading) {
+			// Wait for store to load
+		} else if (!$userStore.loading && !$userStore.isAuthenticated) {
+			error = 'No valid session found';
+			loading = false;
+		}
 	});
 
-	let isEditing = $state(false);
+	async function loadProfile() {
+		// Prevent double loading
+		if (loading && profileData) return;
+		
+		loading = true;
+		error = '';
+		try {
+			const id = $userStore.user?._id;
+			const role = $userStore.role;
 
-	function handleSave() {
-		isEditing = false;
-		// Logic to save would go here
-		console.log('Saved:', userProfile);
+			if (!id) {
+				// Should be handled by effect, but safety check
+				return;
+			}
+
+			if (role === 'student') {
+				profileData = await studentService.getById(id);
+			} else {
+				profileData = await userService.getById(id);
+			}
+		} catch (e: any) {
+			console.error(e);
+			error = e.message || 'Error al cargar perfil';
+		} finally {
+			loading = false;
+		}
 	}
+
+	async function handleDocumentUpload(type: 'ci' | 'cv' | 'afiliacion' | 'titulo', file: File | null) {
+		if (!file || !$userStore.user?._id) return;
+		
+		loading = true;
+		try {
+			const id = $userStore.user._id;
+			if (type === 'ci') {
+				await studentService.uploadCarnet(id, file);
+			} else if (type === 'cv') {
+				await studentService.uploadCV(id, file);
+			} else if (type === 'afiliacion') {
+				await studentService.uploadAfiliacion(id, file);
+			} else if (type === 'titulo') {
+				// Fallback or use existing metadata if available
+				const titleData = profileData.titulo || { titulo: '', numero_titulo: '', año_expedicion: '', universidad: '' };
+				await studentService.uploadTitulo(id, file, titleData);
+			}
+			alert('success', 'Documento subido correctamente');
+			await loadProfile();
+		} catch (e: any) {
+			console.error(e);
+			alert('error', 'Error al subir documento');
+		} finally {
+			loading = false;
+		}
+	}
+
 </script>
 
 <div class="space-y-6">
-	<Heading level="h1">Mi perfil</Heading>
+	<Heading level="h1">Mi Perfil</Heading>
 
-	<!-- Cover and Avatar Section -->
-	<div class="relative mb-16 rounded-xl bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
-		<div class="h-48 w-full overflow-hidden">
-			<img 
-				src={userProfile.coverUrl} 
-				alt="Cover" 
-				class="h-full w-full object-cover"
-			/>
-		</div>
-		<div class="absolute bottom-0 left-8 translate-y-1/2 transform">
-			<div class="relative h-32 w-32 overflow-hidden rounded-full border-4 border-white dark:border-gray-800 bg-white dark:bg-gray-700">
-				<img 
-					src={userProfile.avatarUrl} 
-					alt="Avatar" 
-					class="h-full w-full object-cover"
-				/>
+	{#if loading}
+		<div class="animate-pulse space-y-6">
+			<div class="h-48 w-full bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
+			<div class="grid gap-6 md:grid-cols-3">
+				<div class="md:col-span-2 h-96 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+				<div class="h-96 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
 			</div>
 		</div>
-		<div class="flex justify-end p-4 pt-2">
-			{#if !isEditing}
-				<Button variant="outline" onclick={() => isEditing = true}>
-					Editar Perfil
-				</Button>
-			{:else}
-				<div class="flex gap-2">
-					<Button variant="ghost" onclick={() => isEditing = false}>Cancelar</Button>
-					<Button onclick={handleSave}>Guardar Cambios</Button>
-				</div>
-			{/if}
+	{:else if error}
+		<div class="p-4 bg-red-50 text-red-700 rounded-lg">
+			{error}
 		</div>
-	</div>
-
-	<div class="grid gap-6 md:grid-cols-3">
-		<!-- Main Info Column -->
-		<div class="md:col-span-2 space-y-6">
-			<Card title="Información Personal">
-				<div class="grid gap-6 md:grid-cols-2">
-					<Input 
-						label="Nombre" 
-						bind:value={userProfile.firstName} 
-						disabled={!isEditing} 
-						placeholder="Tu nombre"
-					/>
-					<Input 
-						label="Apellido" 
-						bind:value={userProfile.lastName} 
-						disabled={!isEditing} 
-						placeholder="Tu apellido"
-					/>
-					<Input 
-						label="Correo Electrónico" 
-						type="email"
-						bind:value={userProfile.email} 
-						disabled={!isEditing} 
-						icon={MailIcon}
-						placeholder="correo@ejemplo.com"
-					/>
-					<Input 
-						label="Teléfono" 
-						type="tel"
-						bind:value={userProfile.phone} 
-						disabled={!isEditing} 
-						icon={PhoneIcon}
-						placeholder="+591 ..."
-					/>
+	{:else if profileData}
+		<!-- Cover and Avatar Section (Student Only for now as User has no photo) -->
+		{#if $userStore.role === 'student'}
+			<div class="relative mb-16 rounded-xl bg-white dark:bg-gray-800 shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
+				<div class="h-32 w-full bg-gradient-to-r from-primary-500 to-light-secondary"></div>
+				<div class="absolute bottom-0 left-8 translate-y-1/2 transform">
+					<div class="relative h-24 w-24 overflow-hidden rounded-full border-4 border-white dark:border-gray-800 bg-white dark:bg-gray-700 flex items-center justify-center text-gray-400">
+						{#if profileData.foto_url}
+							<img 
+								src={profileData.foto_url} 
+								alt="Avatar" 
+								class="h-full w-full object-cover"
+							/>
+						{:else}
+							<UserIcon class="size-12" />
+						{/if}
+					</div>
 				</div>
-				<div class="mt-6">
-					<TextArea 
-						label="Biografía" 
-						bind:value={userProfile.bio} 
-						disabled={!isEditing} 
-						placeholder="Cuéntanos un poco sobre ti..."
-						rows={4}
-					/>
+				<div class="flex justify-end p-4 pt-2">
+					<div class="text-sm text-gray-500">
+						{#if profileData.activo}
+							<span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+								Activo
+							</span>
+						{:else}
+							<span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+								Inactivo
+							</span>
+						{/if}
+					</div>
 				</div>
-			</Card>
-		</div>
+			</div>
+		{/if}
 
-		<!-- Sidebar Info Column -->
-		<div class="space-y-6">
-			<Card title="Detalles">
-				<div class="space-y-4">
-					<div>
-						<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rol</label>
-						<div class="flex items-center gap-2 text-gray-900 dark:text-white">
-							<BriefcaseIcon class="size-5 text-gray-400" />
-							<span>{userProfile.role}</span>
+		<div class="grid gap-6 md:grid-cols-3">
+			<!-- Main Info Column -->
+			<div class="md:col-span-2 space-y-6">
+				<Card>
+					{#snippet header()}
+						<Heading level="h4" class="text-lg font-semibold">Información General</Heading>
+					{/snippet}
+					
+					<div class="grid gap-6 md:grid-cols-2">
+						{#if $userStore.role === 'student'}
+							<Input label="Nombre Completo" value={profileData.nombre} disabled />
+							<Input label="Registro" value={profileData.registro} disabled />
+							<Input label="Carnet" value={profileData.carnet} disabled icon={IdentificationIcon} />
+							<Input label="Extensión" value={profileData.extension} disabled />
+							<Input label="Fecha Nacimiento" value={new Date(profileData.fecha_nacimiento).toLocaleDateString()} disabled />
+							<Input label="Tipo" value={profileData.es_estudiante_interno} disabled />
+						{:else}
+							<Input label="Username" value={profileData.username} disabled />
+							<Input label="Rol" value={profileData.rol} disabled icon={BriefcaseIcon} />
+						{/if}
+						
+						<Input label="Email" value={profileData.email} disabled icon={MailIcon} class="md:col-span-2" />
+					</div>
+				</Card>
+
+				{#if $userStore.role === 'student' && profileData.titulo}
+					<Card>
+						{#snippet header()}
+							<Heading level="h4" class="text-lg font-semibold">Información Académica (Título)</Heading>
+						{/snippet}
+						<div class="grid gap-6 md:grid-cols-2">
+							<Input label="Título" value={profileData.titulo.titulo} disabled icon={AcademicCapIcon} />
+							<Input label="Nº Título" value={profileData.titulo.numero_titulo} disabled />
+							<Input label="Universidad" value={profileData.titulo.universidad} disabled />
+							<Input label="Año" value={profileData.titulo.año_expedicion} disabled />
+							<div class="md:col-span-2">
+								<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estado de Verificación</label>
+								<span class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+									profileData.titulo.estado === 'verificado' ? 'bg-green-100 text-green-800' :
+									profileData.titulo.estado === 'rechazado' ? 'bg-red-100 text-red-800' :
+									'bg-yellow-100 text-yellow-800'
+								}`}>
+									{profileData.titulo.estado || 'Pendiente'}
+								</span>
+							</div>
+						</div>
+					</Card>
+				{/if}
+			</div>
+
+			<!-- Sidebar Info Column -->
+			<div class="space-y-6">
+				<Card>
+					{#snippet header()}
+						<Heading level="h4" class="text-lg font-semibold">Contacto y Detalles</Heading>
+					{/snippet}
+					<div class="space-y-4">
+						{#if $userStore.role === 'student'}
+							<Input label="Celular" value={profileData.celular} disabled icon={PhoneIcon} />
+							<Input label="Domicilio" value={profileData.domicilio} disabled icon={MapPinIcon} />
+						{:else}
+							<Input label="Último Acceso" value={new Date(profileData.ultimo_acceso).toLocaleString()} disabled />
+						{/if}
+						<div class="pt-4 border-t border-gray-100 dark:border-gray-700 space-y-2">
+							<div>
+								<span class="text-xs text-gray-500 block">ID de Usuario</span>
+								<span class="text-sm font-mono text-gray-700 dark:text-gray-300 break-all">{profileData._id}</span>
+							</div>
+							<div>
+								<span class="text-xs text-gray-500 block">Creado el</span>
+								<span class="text-sm text-gray-700 dark:text-gray-300">{new Date(profileData.created_at).toLocaleString()}</span>
+							</div>
+							<div>
+								<span class="text-xs text-gray-500 block">Actualizado el</span>
+								<span class="text-sm text-gray-700 dark:text-gray-300">{new Date(profileData.updated_at).toLocaleString()}</span>
+							</div>
+							{#if $userStore.role !== 'student'}
+								<div>
+									<span class="text-xs text-gray-500 block">Estado</span>
+									<span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${profileData.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+										{profileData.activo ? 'Activo' : 'Inactivo'}
+									</span>
+								</div>
+							{/if}
 						</div>
 					</div>
-					<div>
-						<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ubicación</label>
-						<div class="flex items-center gap-2 text-gray-900 dark:text-white">
-							<MapPinIcon class="size-5 text-gray-400" />
-							{#if isEditing}
-								<input 
-									type="text" 
-									bind:value={userProfile.location} 
-									class="bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-blue-500 w-full"
-								/>
+				</Card>
+			</div>
+		</div>
+
+
+		{#if $userStore.role === 'student'}
+			<!-- Documents Section -->
+			<div class="space-y-6 ">
+				<div class="">
+					
+						<Heading level="h4" class="text-lg font-semibold">Documentación</Heading>
+					
+					<div class="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
+						<!-- Carnet -->
+						<div class="flex flex-col items-center p-4 ">
+							<IdentificationIcon class="size-8 text-blue-500 mb-2" />
+							<span class="text-sm font-medium text-gray-900 dark:text-white mb-2">Carnet de Identidad</span>
+							{#if profileData.ci_url}
+								<a href={profileData.ci_url} target="_blank" class="text-xs text-primary-600 hover:underline">Ver PDF</a>
 							{:else}
-								<span>{userProfile.location}</span>
+								<span class="text-xs text-red-500 mb-2">No tiene documento</span>
+								<FileUpload 
+									accept=".pdf" 
+									onFileSelect={(f) => handleDocumentUpload('ci', f)} 
+									label="Subir"
+									
+								/>
+							{/if}
+						</div>
+
+						<!-- CV -->
+						<div class="flex flex-col items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+							<svg class="size-8 text-green-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+							</svg>
+							<span class="text-sm font-medium text-gray-900 dark:text-white mb-2">Curriculum Vitae</span>
+							{#if profileData.cv_url}
+								<a href={profileData.cv_url} target="_blank" class="text-xs text-primary-600 hover:underline">Ver PDF</a>
+							{:else}
+								<span class="text-xs text-red-500 mb-2">No tiene documento</span>
+								<FileUpload 
+									accept=".pdf" 
+									onFileSelect={(f) => handleDocumentUpload('cv', f)} 
+									label="Subir"
+									
+								/>
+							{/if}
+						</div>
+
+						<!-- Afiliación -->
+						<div class="flex flex-col items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+							<svg class="size-8 text-purple-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+							</svg>
+							<span class="text-sm font-medium text-gray-900 dark:text-white mb-2">Afiliación</span>
+							{#if profileData.afiliacion_url}
+								<a href={profileData.afiliacion_url} target="_blank" class="text-xs text-primary-600 hover:underline">Ver PDF</a>
+							{:else}
+								<span class="text-xs text-red-500 mb-2">No tiene documento</span>
+								<FileUpload 
+									accept=".pdf" 
+									onFileSelect={(f) => handleDocumentUpload('afiliacion', f)} 
+									label="Subir"
+								/>
+							{/if}
+						</div>
+
+						<!-- Título -->
+						<div class="flex flex-col items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+							<AcademicCapIcon class="size-8 text-yellow-500 mb-2" />
+							<span class="text-sm font-medium text-gray-900 dark:text-white mb-2">Título Profesional</span>
+							{#if profileData.titulo?.titulo_url}
+								<a href={profileData.titulo.titulo_url} target="_blank" class="text-xs text-primary-600 hover:underline">Ver PDF</a>
+							{:else}
+								<span class="text-xs text-red-500 mb-2">No tiene documento</span>
+								<!-- Simple upload for title if metadata exists, otherwise this might fail validation on backend if it's strict, but user asked for upload. -->
+								<FileUpload 
+									accept=".pdf" 
+									onFileSelect={(f) => handleDocumentUpload('titulo', f)} 
+									label="Subir"
+								/>
 							{/if}
 						</div>
 					</div>
 				</div>
-			</Card>
-		</div>
-	</div>
+			</div>
+		{/if}
+	{/if}
 </div>

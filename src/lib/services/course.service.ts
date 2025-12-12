@@ -17,6 +17,10 @@ class CourseService {
 	async delete(id: string): Promise<Course> {
 		return await apiKyC.delete<Course>(`/courses/${id}`);
 	}
+
+	async getStudents(id: string): Promise<import('$lib/interfaces').CourseStudent[]> {
+		return await apiKyC.get<import('$lib/interfaces').CourseStudent[]>(`/courses/${id}/students`);
+	}
 }
 
 export const courseService = new CourseService();

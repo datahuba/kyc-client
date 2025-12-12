@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { courseService } from '$lib/services';
-	import type { Course } from '$lib/interfaces';
+	import type { Course, CourseStudent } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -29,6 +29,12 @@
 	// Dropdown state
 	let openDropdownId: string | null = null;
 
+	// Students Modal state
+	let showStudentsModal = false;
+	let studentsLoading = false;
+	let courseStudents: CourseStudent[] = [];
+	let selectedCourseStudents: Course | null = null;
+
 	onMount(() => {
 		loadCourses();
 	});
@@ -42,6 +48,21 @@
 			alert('error', error);
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function handleViewStudents(course: Course) {
+		selectedCourseStudents = course;
+		showStudentsModal = true;
+		studentsLoading = true;
+		courseStudents = [];
+		try {
+			courseStudents = await courseService.getStudents(course._id);
+		} catch (e: any) {
+			alert('error', 'Error al cargar estudiantes del curso');
+			console.error(e);
+		} finally {
+			studentsLoading = false;
 		}
 	}
 
@@ -93,6 +114,12 @@
 	function getDropdownOptions(course: Course) {
 		return [
 			{
+				label: 'Ver Estudiantes',
+				id: 'students',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>`,
+				action: () => handleViewStudents(course)
+			},
+			{
 				label: 'Editar',
 				id: 'edit',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>`,
@@ -128,10 +155,8 @@
 		</div>
 	{:else}
 		<!-- Desktop Table -->
-	{:else}
-		<!-- Desktop Table -->
-		<div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
-			<table class="divide-y divide-gray-200 dark:divide-gray-700 w-full table-auto">
+		<div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow">
+			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 				<thead class="bg-gray-50 dark:bg-gray-900">
 					<tr>
 						<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Código/Prog.</th>
@@ -272,4 +297,74 @@
 		}}
 		loading={deleteLoading}
 	/>
+
+	<!-- Course Students Modal -->
+	<Modal
+		isOpen={showStudentsModal}
+		title={`Estudiantes Inscritos - ${selectedCourseStudents?.nombre_programa || ''}`}
+		onClose={() => { showStudentsModal = false; selectedCourseStudents = null; }}
+		maxWidth="sm:max-w-6xl"
+	>
+		{#if studentsLoading}
+			<TableSkeleton columns={4} rows={5} />
+		{:else if courseStudents.length === 0}
+			<div class="text-center py-12">
+				<p class="text-gray-500 dark:text-gray-400">No hay estudiantes inscritos en este curso.</p>
+			</div>
+		{:else}
+			<div class="overflow-x-auto">
+				<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+					<thead class="bg-gray-50 dark:bg-gray-900">
+						<tr>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contacto</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Inscripción</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Financiero</th>
+						</tr>
+					</thead>
+					<tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+						{#each courseStudents as student}
+							<tr>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<div class="flex items-center">
+										<div class="size-10 flex-shrink-0 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+											<span class="text-lg font-medium text-primary-600">
+												{student.nombre.charAt(0).toUpperCase()}
+											</span>
+										</div>
+										<div class="ml-4">
+											<div class="text-sm font-medium text-gray-900 dark:text-white">{student.nombre}</div>
+											<div class="text-sm text-gray-500 dark:text-gray-400">CI: {student.carnet}</div>
+										</div>
+									</div>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<div class="text-sm text-gray-900 dark:text-white">{student.contacto.email}</div>
+									<div class="text-sm text-gray-500 dark:text-gray-400">{student.contacto.celular}</div>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+										${student.inscripcion.estado === 'pendiente_pago' ? 'bg-yellow-100 text-yellow-800' : 
+										  student.inscripcion.estado === 'pagado' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+										{student.inscripcion.estado}
+									</span>
+									<div class="text-xs text-gray-500 dark:text-gray-400 mt-1 capitalize">{student.inscripcion.tipo_estudiante}</div>
+									<div class="text-xs text-gray-400 mt-0.5">{new Date(student.inscripcion.fecha_inscripcion).toLocaleDateString()}</div>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<div class="text-sm text-gray-900 dark:text-white">Total: {student.financiero.total_a_pagar}</div>
+									<div class="text-xs text-green-600">Pagado: {student.financiero.total_pagado}</div>
+									<div class="text-xs text-red-500">Saldo: {student.financiero.saldo_pendiente}</div>
+									<div class="w-full bg-gray-200 rounded-full h-1.5 mt-2 dark:bg-gray-700">
+										<div class="bg-blue-600 h-1.5 rounded-full" style={`width: ${Math.min(student.financiero.avance_pago, 100)}%`}></div>
+									</div>
+									<div class="text-[10px] text-right text-gray-500 mt-0.5">{student.financiero.avance_pago.toFixed(1)}%</div>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
+	</Modal>
 </div>

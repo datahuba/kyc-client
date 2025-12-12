@@ -39,3 +39,25 @@ export interface CreateCourseRequest {
 export interface UpdateCourseRequest extends Partial<CreateCourseRequest> {
 	inscritos?: string[];
 }
+
+export interface CourseStudent {
+	estudiante_id: string;
+	nombre: string;
+	carnet: string;
+	contacto: {
+		email: string;
+		celular: string;
+	};
+	inscripcion: {
+		id: string;
+		fecha_inscripcion: string;
+		estado: string;
+		tipo_estudiante: string;
+	};
+	financiero: {
+		total_a_pagar: number;
+		total_pagado: number;
+		saldo_pendiente: number;
+		avance_pago: number;
+	};
+}

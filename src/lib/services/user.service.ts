@@ -6,6 +6,10 @@ class UserService {
 		return apiKyC.get<User[]>(`/users/?skip=${skip}&limit=${limit}`);
 	}
 
+	async getById(id: string): Promise<User> {
+		return apiKyC.get<User>(`/users/${id}`);
+	}
+
 	async create(data: CreateUserRequest): Promise<User> {
 		return apiKyC.post<User>('/users/', data);
 	}
