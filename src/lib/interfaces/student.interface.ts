@@ -62,6 +62,12 @@ export interface TituloData {
 	universidad: string;
 }
 
+export interface ChangePasswordRequest {
+	confirm_password: string;
+	current_password: string;
+	new_password: string;
+}
+
 export interface VerifyTituloData {
 	titulo?: string;
 	numero_titulo?: string;

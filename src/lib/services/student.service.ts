@@ -87,6 +87,10 @@ class StudentService {
 			}
 		});
 	}
+
+	async changePassword(data: import('$lib/interfaces').ChangePasswordRequest): Promise<void> {
+		return await apiKyC.post<void>('/students/me/change-password', data);
+	}
 }
 
 export const studentService = new StudentService();

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { enrollmentService, studentService, courseService } from '$lib/services';
+	import { userStore } from '$lib/stores/userStore';
 	import type { Enrollment, Student, Course } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
@@ -39,29 +40,42 @@
 	});
 
 	async function loadData() {
-		loading = true;
-		try {
-			const [enrollmentsData, studentsData, coursesData] = await Promise.all([
-				enrollmentService.getAll(skip, limit),
-				studentService.getAll(0, 1000), // Fetch all for mapping
-				courseService.getAll(0, 1000)   // Fetch all for mapping
-			]);
-			
-			enrollments = enrollmentsData;
-			studentsList = studentsData;
-			coursesList = coursesData;
-			
-			// Create maps for easy lookup
-			studentsData.forEach(s => studentsMap[s._id] = s);
-			coursesData.forEach(c => coursesMap[c._id] = c);
-			
-		} catch (e: any) {
-			error = e.message || 'Error al cargar inscripciones';
-			alert('error', error);
-		} finally {
-			loading = false;
+	loading = true;
+
+	try {
+		let enrollmentsPromise;
+
+		// Condición clásica
+		if ($userStore.role === 'student') {
+			enrollmentsPromise = enrollmentService.getByStudentId(
+				$userStore.user?._id || ''
+			);
+		} else {
+			enrollmentsPromise = enrollmentService.getAll(skip, limit);
 		}
+
+		// Ejecutamos todo en paralelo
+		const [enrollmentsData, studentsData, coursesData] = await Promise.all([
+			enrollmentsPromise,
+			studentService.getAll(0, 1000),
+			courseService.getAll(0, 1000)
+		]);
+
+		enrollments = enrollmentsData;
+		studentsList = studentsData;
+		coursesList = coursesData;
+
+		studentsData.forEach(s => (studentsMap[s._id] = s));
+		coursesData.forEach(c => (coursesMap[c._id] = c));
+
+	} catch (e: any) {
+		error = e.message || 'Error al cargar inscripciones';
+		alert('error', error);
+	} finally {
+		loading = false;
 	}
+}
+
 
 	function handleCreate() {
 		selectedEnrollment = null;
@@ -161,7 +175,7 @@
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Curso</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pago</th>
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Montos</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Saldo</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Descuento</th>
@@ -185,8 +199,8 @@
 								<div class="text-sm text-gray-900 dark:text-white">{new Date(enrollment.fecha_inscripcion).toLocaleDateString()}</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-sm text-gray-900 dark:text-white capitalize">{enrollment.tipo_pago}</div>
 								<div class="text-xs text-gray-500 dark:text-gray-400">Total: {enrollment.total_a_pagar}</div>
+								<div class="text-xs text-green-600 dark:text-green-400">Pagado: {enrollment.total_pagado}</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class={`text-sm font-medium ${enrollment.saldo_pendiente > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
@@ -260,8 +274,8 @@
 							<span class="font-medium text-gray-900 dark:text-white">{new Date(enrollment.fecha_inscripcion).toLocaleDateString()}</span>
 						</div>
 						<div class="flex justify-between">
-							<span class="text-gray-500 dark:text-gray-400">Pago:</span>
-							<span class="font-medium text-gray-900 dark:text-white capitalize">{enrollment.tipo_pago}</span>
+							<span class="text-gray-500 dark:text-gray-400">Total:</span>
+							<span class="font-medium text-gray-900 dark:text-white">{enrollment.total_a_pagar}</span>
 						</div>
 						<div class="flex justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Saldo:</span>

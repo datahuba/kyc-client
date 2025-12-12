@@ -21,6 +21,10 @@ class EnrollmentService {
 	async getByStudentId(studentId: string): Promise<Enrollment[]> {
 		return await apiKyC.get<Enrollment[]>(`/enrollments/student/${studentId}`);
 	}
+
+	async getByCourseId(courseId: string): Promise<Enrollment[]> {
+		return await apiKyC.get<Enrollment[]>(`/enrollments/course/${courseId}`);
+	}
 }
 
 export const enrollmentService = new EnrollmentService();
