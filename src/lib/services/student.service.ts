@@ -8,8 +8,27 @@ import type {
 } from '$lib/interfaces';
 
 class StudentService {
-	async getAll(skip = 0, limit = 100): Promise<Student[]> {
-		return await apiKyC.get<Student[]>(`/students/?skip=${skip}&limit=${limit}`);
+	async getAll(
+		skip = 0,
+		limit = 100,
+		filters?: {
+			q?: string;
+			activo?: boolean;
+			estado_titulo?: string;
+			curso_id?: string;
+		}
+	): Promise<Student[]> {
+		const params = new URLSearchParams({
+			skip: skip.toString(),
+			limit: limit.toString()
+		});
+
+		if (filters?.q) params.append('q', filters.q);
+		if (filters?.activo !== undefined) params.append('activo', filters.activo.toString());
+		if (filters?.estado_titulo) params.append('estado_titulo', filters.estado_titulo);
+		if (filters?.curso_id) params.append('curso_id', filters.curso_id);
+
+		return await apiKyC.get<Student[]>(`/students/?${params.toString()}`);
 	}
 
 	async getById(id: string): Promise<Student> {

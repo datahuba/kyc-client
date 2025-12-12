@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { studentService, enrollmentService } from '$lib/services';
-	import type { Student, Enrollment } from '$lib/interfaces';
+	import { studentService, enrollmentService, courseService } from '$lib/services';
+	import type { Student, Enrollment, Course } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -43,10 +43,34 @@
 	let studentEnrollments: Enrollment[] = [];
 	let enrollmentsLoading = false;
 
+	// Filters
+	let filters = {
+		q: '',
+		activo: 'all', // 'all', 'true', 'false'
+		estado_titulo: 'all',
+		curso_id: ''
+	};
+	let debounceTimer: any;
+	let allCourses: Course[] = [];
+
+	async function loadCourses() {
+		try {
+			allCourses = await courseService.getAll(0, 1000);
+		} catch (error) {
+			console.error('Error fetching courses for filter', error);
+		}
+	}
+
 	async function loadStudents() {
 		loading = true;
 		try {
-			const data = await studentService.getAll(page * limit, limit);
+			const filterParams: any = {};
+			if (filters.q) filterParams.q = filters.q;
+			if (filters.activo !== 'all') filterParams.activo = filters.activo === 'true';
+			if (filters.estado_titulo !== 'all') filterParams.estado_titulo = filters.estado_titulo;
+			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
+
+			const data = await studentService.getAll(page * limit, limit, filterParams);
 			console.log("students", data);
 			students = data;
 		} catch (error) {
@@ -57,8 +81,20 @@
 		}
 	}
 
+	function handleFilterChange() {
+		loadStudents();
+	}
+
+	function handleSearchInput() {
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => {
+			loadStudents();
+		}, 300);
+	}
+
 	onMount(() => {
 		loadStudents();
+		loadCourses();
 	});
 
 	function handleCreate() {
@@ -244,6 +280,71 @@
 		</Button>
 	</div>
 
+	<!-- Filters -->
+	<div class="grid grid-cols-1 md:grid-cols-5 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+		<!-- Search -->
+		<div class="md:col-span-2">
+			<label for="search" class="sr-only">Buscar</label>
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+					<svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+					</svg>
+				</div>
+				<input
+					type="text"
+					id="search"
+					bind:value={filters.q}
+					class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+					placeholder="Buscar por nombre, CI, registro..."
+					oninput={handleSearchInput}
+				/>
+			</div>
+		</div>
+		
+		<!-- Estado -->
+		<div>
+			<select
+				bind:value={filters.activo}
+				onchange={handleFilterChange}
+				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			>
+				<option value="all">Todos los estados</option>
+				<option value="true">Activo</option>
+				<option value="false">Inactivo</option>
+			</select>
+		</div>
+
+		<!-- Título -->
+		<div>
+			<select
+				bind:value={filters.estado_titulo}
+				onchange={handleFilterChange}
+				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			>
+				<option value="all">Todos los títulos</option>
+				<option value="pendiente">Pendiente</option>
+				<option value="verificado">Verificado</option>
+				<option value="rechazado">Rechazado</option>
+				<option value="sin_titulo">Sin Título</option>
+			</select>
+		</div>
+
+		<!-- Curso -->
+		<div>
+			<select
+				bind:value={filters.curso_id}
+				onchange={handleFilterChange}
+				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			>
+				<option value="">Todos los cursos</option>
+				{#each allCourses as course}
+					<option value={course._id}>{course.nombre_programa} ({course.codigo})</option>
+				{/each}
+			</select>
+		</div>
+	</div>
+
 	{#if loading}
 		<TableSkeleton columns={6} rows={5} />
 	{:else}
@@ -253,6 +354,7 @@
 					<tr>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estudiante</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registro</th>
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carnet</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domicilio</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
@@ -283,6 +385,9 @@
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm text-gray-900 dark:text-white">{student.registro}</div>
 								<div class="text-sm text-gray-500">{student.es_estudiante_interno}</div>
+							</td>
+							<td class="px-6 py-4 whitespace-nowrap">
+								<div class="text-sm text-gray-900 dark:text-white">{student.carnet}</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm text-gray-900 dark:text-white">{student.celular}</div>
