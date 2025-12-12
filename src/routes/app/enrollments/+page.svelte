@@ -9,6 +9,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
+	import Select from '$lib/components/ui/select.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
 	import { alert } from '$lib/utils';
@@ -39,42 +40,52 @@
 		loadData();
 	});
 
+	let selectedCourseId = 'all';
+
 	async function loadData() {
-	loading = true;
+		loading = true;
 
-	try {
-		let enrollmentsPromise;
+		try {
+			let enrollmentsPromise;
 
-		// Condición clásica
-		if ($userStore.role === 'student') {
-			enrollmentsPromise = enrollmentService.getByStudentId(
-				$userStore.user?._id || ''
-			);
-		} else {
-			enrollmentsPromise = enrollmentService.getAll(skip, limit);
+			// Condición clásica
+			if ($userStore.role === 'student') {
+				enrollmentsPromise = enrollmentService.getByStudentId(
+					$userStore.user?._id || ''
+				);
+			} else {
+				if (selectedCourseId && selectedCourseId !== 'all') {
+					enrollmentsPromise = enrollmentService.getByCourseId(selectedCourseId);
+				} else {
+					enrollmentsPromise = enrollmentService.getAll(skip, limit);
+				}
+			}
+
+			// Ejecutamos todo en paralelo
+			const [enrollmentsData, studentsData, coursesData] = await Promise.all([
+				enrollmentsPromise,
+				studentService.getAll(0, 1000),
+				courseService.getAll(0, 1000)
+			]);
+
+			enrollments = enrollmentsData;
+			studentsList = studentsData;
+			coursesList = coursesData;
+
+			studentsData.forEach(s => (studentsMap[s._id] = s));
+			coursesData.forEach(c => (coursesMap[c._id] = c));
+
+		} catch (e: any) {
+			error = e.message || 'Error al cargar inscripciones';
+			alert('error', error);
+		} finally {
+			loading = false;
 		}
-
-		// Ejecutamos todo en paralelo
-		const [enrollmentsData, studentsData, coursesData] = await Promise.all([
-			enrollmentsPromise,
-			studentService.getAll(0, 1000),
-			courseService.getAll(0, 1000)
-		]);
-
-		enrollments = enrollmentsData;
-		studentsList = studentsData;
-		coursesList = coursesData;
-
-		studentsData.forEach(s => (studentsMap[s._id] = s));
-		coursesData.forEach(c => (coursesMap[c._id] = c));
-
-	} catch (e: any) {
-		error = e.message || 'Error al cargar inscripciones';
-		alert('error', error);
-	} finally {
-		loading = false;
 	}
-}
+
+	function handleCourseFilter() {
+		loadData();
+	}
 
 
 	function handleCreate() {
@@ -158,7 +169,23 @@
 			{/snippet}
 			Nueva Inscripción
 		</Button>
+		
 	</div>
+
+	{#if $userStore.role !== 'student'}
+		<div class="w-full md:w-1/3">
+			<Select 
+				label="Filtrar por Curso" 
+				bind:value={selectedCourseId} 
+				onchange={handleCourseFilter}
+			>
+				<option value="all">Todos los cursos</option>
+				{#each coursesList as course}
+					<option value={course._id}>{course.nombre_programa}</option>
+				{/each}
+			</Select>
+		</div>
+	{/if}
 
 	{#if loading}
 		<TableSkeleton columns={6} rows={5} />
