@@ -11,8 +11,9 @@
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import StudentDetails from '$lib/features/students/StudentDetails.svelte';
 	import StudentForm from '$lib/features/students/StudentForm.svelte';
-	import { PlusIcon, DotsVerticalIcon, UserIcon } from '$lib/icons/outline';
+	import { PlusIcon, DotsVerticalIcon, UserIcon, CheckIcon, XIcon } from '$lib/icons/outline';
 	import { alert } from '$lib/utils';
+	import Input from '$lib/components/ui/input.svelte';
 
 	let students: Student[] = [];
 	let loading = true;
@@ -26,6 +27,13 @@
 	let isDeleteModalOpen = false;
 	let studentToDelete: Student | null = null;
 	let deleteLoading = false;
+	
+	// Verify/Reject State
+	let isVerifyModalOpen = false;
+	let isRejectModalOpen = false;
+	let studentToAction: Student | null = null;
+	let actionLoading = false;
+	let rejectReason = '';
 
 	// Dropdown state
 	let openDropdownId: string | null = null;
@@ -85,6 +93,44 @@
 		}
 	}
 
+	async function confirmVerify() {
+		if (!studentToAction) return;
+		actionLoading = true;
+		try {
+			// We verify with empty data assuming current data is correct for this quick action
+			await studentService.verifyTitulo(studentToAction._id, {});
+			alert('success', 'Título verificado correctamente');
+			isVerifyModalOpen = false;
+			loadStudents();
+		} catch (error: any) {
+			alert('error', error.message || 'Error al verificar título');
+		} finally {
+			actionLoading = false;
+			studentToAction = null;
+		}
+	}
+
+	async function confirmReject() {
+		if (!studentToAction) return;
+		if (!rejectReason.trim()) {
+			alert('error', 'Debe ingresar un motivo de rechazo');
+			return;
+		}
+		actionLoading = true;
+		try {
+			await studentService.rejectTitulo(studentToAction._id, rejectReason);
+			alert('success', 'Título rechazado correctamente');
+			isRejectModalOpen = false;
+			loadStudents();
+		} catch (error: any) {
+			alert('error', error.message || 'Error al rechazar título');
+		} finally {
+			actionLoading = false;
+			studentToAction = null;
+			rejectReason = '';
+		}
+	}
+
 	function handleFormSuccess() {
 		isFormOpen = false;
 		loadStudents();
@@ -102,8 +148,21 @@
 		}
 	}
 
+	function handleVerifyClick(student: Student) {
+		studentToAction = student;
+		isVerifyModalOpen = true;
+		openDropdownId = null;
+	}
+
+	function handleRejectClick(student: Student) {
+		studentToAction = student;
+		rejectReason = '';
+		isRejectModalOpen = true;
+		openDropdownId = null;
+	}
+
 	function getDropdownOptions(student: Student) {
-		return [
+		const options = [
 			{
 				label: 'Ver Detalles',
 				id: 'details',
@@ -124,6 +183,26 @@
 				divider: true
 			}
 		];
+
+		if (student.titulo && student.titulo.estado !== 'verificado') {
+			options.splice(1, 0, {
+				label: 'Verificar Título',
+				id: 'verify',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+				action: () => handleVerifyClick(student)
+			} as any);
+		}
+
+		if (student.titulo && student.titulo.estado !== 'rechazado') {
+			options.splice(options.length - 1, 0, {
+				label: 'Rechazar Título',
+				id: 'reject',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+				action: () => handleRejectClick(student)
+			} as any);
+		}
+
+		return options;
 	}
 </script>
 
@@ -249,4 +328,41 @@
 		onCancel={() => isDeleteModalOpen = false}
 		loading={deleteLoading}
 	/>
+
+	<!-- Verify Confirmation Modal -->
+	<ModalConfirm
+		isOpen={isVerifyModalOpen}
+		message={`¿Confirma que desea VERIFICAR el título del estudiante ${studentToAction?.nombre}?`}
+		onConfirm={confirmVerify}
+		onCancel={() => isVerifyModalOpen = false}
+		loading={actionLoading}
+	/>
+
+	<!-- Reject Input Modal -->
+	<Modal
+		isOpen={isRejectModalOpen}
+		title="Rechazar Título"
+		onClose={() => isRejectModalOpen = false}
+		maxWidth="sm:max-w-lg"
+	>
+		<div class="space-y-4 p-4">
+			<p class="text-sm text-gray-500">
+				Por favor ingrese el motivo por el cual se rechaza el título del estudiante <b>{studentToAction?.nombre}</b>.
+			</p>
+			<div>
+				<label for="rejectReason" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Motivo del rechazo</label>
+				<textarea
+					id="rejectReason"
+					bind:value={rejectReason}
+					rows="3"
+					class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
+					placeholder="Ej: Documento ilegible, datos incorrectos..."
+				></textarea>
+			</div>
+			<div class="flex justify-end gap-3 mt-4">
+				<Button variant="secondary" onclick={() => isRejectModalOpen = false} disabled={actionLoading}>Cancelar</Button>
+				<Button variant="destructive" onclick={confirmReject} loading={actionLoading}>Rechazar</Button>
+			</div>
+		</div>
+	</Modal>
 </div>

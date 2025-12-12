@@ -27,7 +27,7 @@
 	>
 		<BlurOverlay class="overflow-y-auto rounded-md">
 			<div
-				class="relative mt-auto transform overflow-hidden rounded-lg bg-light-one px-4 pt-5 text-left shadow-xl transition-all sm:w-full sm:max-w-lg sm:p-6"
+				class="relative mt-auto transform overflow-hidden rounded-lg bg-light-primary px-4 pt-5 text-left shadow-xl transition-all sm:w-full sm:max-w-lg sm:p-6 dark:bg-dark-primary"
 			>
 				<div class="absolute top-0 right-0 hidden pt-4 pr-4 sm:block">
 					<Button type="button" variant="ghost" onclick={() => onCancel()}>
@@ -38,7 +38,7 @@
 				</div>
 				<div class="sm:flex sm:items-start">
 					<div
-						class="mx-auto flex size-12 shrink-0 items-center justify-center rounded-full bg-light-one text-light-three sm:mx-0 sm:size-10 dark:bg-dark-one dark:text-dark-three"
+						class="mx-auto flex size-12 shrink-0 items-center justify-center rounded-full bg-light-primary text-light-three sm:mx-0 sm:size-10 dark:bg-dark-primary dark:text-dark-three"
 					>
 						<AlertTriangleIcon class="size-10" />
 					</div>
