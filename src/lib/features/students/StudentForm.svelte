@@ -106,7 +106,7 @@
 				email: '',
 				domicilio: '',
 				es_estudiante_interno: 'interno',
-				// password: '',
+				password: '',
 				//lista_cursos_ids: []
 			};
 			active = true;
@@ -126,7 +126,7 @@
 				savedStudent = await studentService.update(student._id, {
 					...formData,
 					activo: active,
-					// password: formData.password || undefined,
+					password: formData.password || undefined,
 					titulo: hasTituloData ? tituloData : undefined
 				});
 				alert('success', 'Estudiante actualizado correctamente');
@@ -221,18 +221,27 @@
 				<option value="externo">Externo</option>
 			</Select>
 			
-			<!-- <div class="relative w-full">
-				{#if !isEditMode}
+			{#if isEditMode}
+				<div class="relative w-full">
 					<div class="relative">
-						<Input label="Contraseña" id="password" type={showPassword ? 'text' : 'password'} bind:value={formData.password} required={!isEditMode} placeholder="********" />
-						<button type="button" onclick={() => (showPassword = !showPassword)} class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
+						<Input 
+							label="Nueva Contraseña" 
+							id="password" 
+							type={showPassword ? 'text' : 'password'} 
+							bind:value={formData.password} 
+							placeholder="Opcional (para cambiar)" 
+						/>
+						<button 
+							type="button" 
+							onclick={() => (showPassword = !showPassword)} 
+							class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+							tabindex="-1"
+						>
 							{#if showPassword} <EyeIcon class="size-5" /> {:else} <EyeOffIcon class="size-5" /> {/if}
 						</button>
 					</div>
-				{:else}
-					<Input label="Nueva Contraseña" id="password" type="password" bind:value={formData.password} placeholder="Opcional" />
-				{/if}
-			</div> -->
+				</div>
+			{/if}
 		</div>
 	</div>
 
