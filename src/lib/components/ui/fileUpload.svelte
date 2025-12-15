@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { slide } from 'svelte/transition';
-	import { PhotographIcon, DocumentAddIcon, XIcon, CheckIcon, LoaderIcon } from '$lib/icons/outline';
-	import Button from './button.svelte';
+	import { PhotographIcon, DocumentAddIcon, XIcon, LoaderIcon } from '$lib/icons/outline';
 
 	interface Props {
 		label: string;

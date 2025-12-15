@@ -8,3 +8,4 @@ export { default as ModalConfirm } from './modalConfirm.svelte';
 export { default as TextArea } from './textArea.svelte';
 export { default as DropdownMenu } from './dropdownMenu.svelte';
 export { default as BlurOverlay } from './blurOverlay.svelte';
+export { default as FileUpload } from './fileUpload.svelte';

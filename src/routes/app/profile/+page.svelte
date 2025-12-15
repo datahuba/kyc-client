@@ -5,12 +5,12 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Input from '$lib/components/ui/input.svelte';
-	import FileUpload from '$lib/components/ui/fileUpload.svelte';
 	import { alert } from '$lib/utils';
 	import { UserIcon, MailIcon, MapPinIcon, PhoneIcon, IdentificationIcon, AcademicCapIcon } from '$lib/icons/outline';
 	import { BriefcaseIcon } from '$lib/icons/solid';
+	import { FileUpload } from '$lib/components/ui';
 
-	let loading = $state(true);
+	let loading = $state(false);
 	let profileData: any = $state(null);
 	let error = $state('');
 
@@ -26,24 +26,39 @@
 	});
 
 	async function loadProfile() {
+		const id = $userStore.user?._id;
+		const role = $userStore.role;
+
 		// Prevent double loading
-		if (loading && profileData) return;
+		if (loading) return;
+
+		// If we already have profile data and it matches the current user, don't reload unless necessary
+		if (profileData && profileData._id === id) return;
+
+		if (!id || !role) {
+			if (!$userStore.loading) {
+				error = 'No valid session found';
+			}
+			return;
+		}
+
+		// Optimization: For admin/staff roles, the userStore already has the necessary data.
+		// We skip the API call entirely for instant loading.
+		if (['admin', 'superadmin', 'secretary'].includes(role)) {
+			profileData = $userStore.user;
+			loading = false;
+			return;
+		}
 		
+		// For students, we need to fetch the full student profile (grades, docs, etc.)
 		loading = true;
 		error = '';
 		try {
-			const id = $userStore.user?._id;
-			const role = $userStore.role;
-
-			if (!id) {
-				// Should be handled by effect, but safety check
-				return;
-			}
-
 			if (role === 'student') {
 				profileData = await studentService.getById(id);
 			} else {
-				profileData = await userService.getById(id);
+				// Fallback; should ideally use userStore as well
+				profileData = $userStore.user; 
 			}
 		} catch (e: any) {
 			console.error(e);
