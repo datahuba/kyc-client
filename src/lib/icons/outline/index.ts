@@ -3,6 +3,7 @@ export { default as ArrowUptIcon } from './arrowUpIcon.svelte';
 export { default as BrandLineIcon } from './brandLineIcon.svelte';
 export { default as CheckIcon } from './checkIcon.svelte';
 export { default as ChevronLeftIcon } from './chevronLeftIcon.svelte';
+export { default as ChevronRightIcon } from './chevronRightIcon.svelte';
 export { default as CircleCheckIcon } from './circleCheckIcon.svelte';
 export { default as ClipboardIcon } from './clipboardIcon.svelte';
 export { default as CodeIcon } from './codeIcon.svelte';

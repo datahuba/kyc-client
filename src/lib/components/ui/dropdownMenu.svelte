@@ -28,7 +28,7 @@
 {#if isOpen}
 	<div
 		use:clickOutside={() => close()}
-		class="z-20 rounded-md bg-red-500 w-72 shadow-lg ring-1 ring-light-four focus:outline-none {className}"
+		class="z-20 rounded-md bg-light-primary shadow-lg ring-1 ring-light-four focus:outline-none {className}"
 		role="menu"
 		aria-orientation="vertical"
 		tabindex="-1"

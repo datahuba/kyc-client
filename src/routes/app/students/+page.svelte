@@ -14,11 +14,14 @@
 	import { PlusIcon, DotsVerticalIcon, UserIcon, CheckIcon, XIcon, FileTextIcon } from '$lib/icons/outline';
 	import { alert } from '$lib/utils';
 	import Input from '$lib/components/ui/input.svelte';
+	import { Pagination } from '$lib/components/ui';
 
-	let students: Student[] = [];
-	let loading = true;
-	let page = 0;
-	let limit = 100;
+	let students: Student[] = $state([]);
+	let loading = $state(true);
+	let page = $state(1);
+	let limit = $state(10);
+	let totalItems = $state(0);
+	let totalPages = $state(1);
 
 	// Modal State
 	let isFormOpen = false;
@@ -70,9 +73,18 @@
 			if (filters.estado_titulo !== 'all') filterParams.estado_titulo = filters.estado_titulo;
 			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
 
-			const data = await studentService.getAll(page * limit, limit, filterParams);
-			console.log("students", data);
-			students = data;
+			const response = await studentService.getAll(page, limit, filterParams);
+			console.log("students response", response);
+			
+			if (response && response.data) {
+				students = response.data;
+				totalItems = response.meta.totalItems;
+				totalPages = response.meta.totalPages;
+			} else {
+				// Fallback if structure is different
+				students = [];
+				totalItems = 0;
+			}
 		} catch (error) {
 			console.error(error);
 			alert('error', 'Error al cargar estudiantes');
@@ -88,8 +100,20 @@
 	function handleSearchInput() {
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => {
+			page = 1; // Reset to page 1 on search
 			loadStudents();
 		}, 300);
+	}
+
+	function handlePageChange(newPage: number) {
+		page = newPage;
+		loadStudents();
+	}
+
+	function handleLimitChange(newLimit: number) {
+		limit = newLimit;
+		page = 1; // Reset to first page
+		loadStudents();
 	}
 
 	onMount(() => {
@@ -420,6 +444,15 @@
 				</tbody>
 			</table>
 		</div>
+		
+		<Pagination
+			currentPage={page}
+			{totalPages}
+			{totalItems}
+			{limit}
+			onPageChange={handlePageChange}
+			onLimitChange={handleLimitChange}
+		/>
 	{/if}
 
 	<!-- Create/Edit Modal -->
