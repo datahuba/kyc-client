@@ -2,9 +2,29 @@ import { apiKyC } from '$lib/config';
 import type { Enrollment, CreateEnrollmentRequest, UpdateEnrollmentRequest } from '$lib/interfaces';
 
 class EnrollmentService {
-	async getAll(skip = 0, limit = 100): Promise<Enrollment[]> {
-		//console.log("entre a traer pagos de admins");
-		return await apiKyC.get<Enrollment[]>(`/enrollments/?skip=${skip}&limit=${limit}`);
+	async getAll(
+		page = 1,
+		per_page = 10,
+		filters?: {
+			q?: string;
+			estado?: string;
+			curso_id?: string;
+			estudiante_id?: string;
+		}
+	): Promise<import('$lib/interfaces/response.interface').PaginatedResponse<Enrollment>> {
+		const params = new URLSearchParams({
+			page: page.toString(),
+			per_page: per_page.toString()
+		});
+
+		if (filters?.q) params.append('q', filters.q);
+		if (filters?.estado) params.append('estado', filters.estado);
+		if (filters?.curso_id) params.append('curso_id', filters.curso_id);
+		if (filters?.estudiante_id) params.append('estudiante_id', filters.estudiante_id);
+
+		return await apiKyC.get<import('$lib/interfaces/response.interface').PaginatedResponse<Enrollment>>(
+			`/enrollments/?${params.toString()}`
+		);
 	}
 
 	async create(data: CreateEnrollmentRequest): Promise<Enrollment> {

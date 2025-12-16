@@ -12,24 +12,28 @@
 	import DiscountForm from '$lib/features/discounts/DiscountForm.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
+	import { Pagination } from '$lib/components/ui';
 
-	let discounts: Discount[] = [];
-	let loading = false;
-	let error = '';
-	let skip = 0;
-	let limit = 100;
+	let discounts: Discount[] = $state([]);
+	let loading = $state(false);
+	let error = $state('');
+	
+	let page = $state(1);
+	let limit = $state(10);
+	let totalItems = $state(0);
+	let totalPages = $state(1);
 
 	// Modal state
-	let isFormOpen = false;
-	let selectedDiscount: Discount | null = null;
-	let showDeleteModal = false;
-	let discountToDelete: Discount | null = null;
-	let deleteLoading = false;
+	let isFormOpen = $state(false);
+	let selectedDiscount: Discount | null = $state(null);
+	let showDeleteModal = $state(false);
+	let discountToDelete: Discount | null = $state(null);
+	let deleteLoading = $state(false);
 
 	// Dropdown state
-	let openDropdownId: string | null = null;
+	let openDropdownId: string | null = $state(null);
 
-	let studentsList: Student[] = [];
+	let studentsList: Student[] = $state([]);
 
 	onMount(() => {
 		loadDiscounts();
@@ -38,18 +42,46 @@
 	async function loadDiscounts() {
 		loading = true;
 		try {
-			const [discountsData, studentsData] = await Promise.all([
-				discountService.getAll(skip, limit),
-				studentService.getAll(0, 1000)
-			]);
-			discounts = discountsData;
-			studentsList = studentsData;
+			// Populate students list if needed (for form)
+			// Assuming we still need it for assigning students to discounts
+			if (studentsList.length === 0) {
+				const studentsRes = await studentService.getAll(1, 100);
+				studentsList = studentsRes.data;
+			}
+			
+			const result = await discountService.getAll(page, limit);
+			
+			const response = result as any; // Cast to handle PaginatedResponse structure
+			if (response && response.data) {
+				discounts = response.data;
+				totalItems = response.meta.totalItems;
+				totalPages = response.meta.totalPages;
+			} else if (Array.isArray(response)) {
+				// Fallback
+				discounts = response;
+				totalItems = response.length;
+				totalPages = 1;
+			} else {
+				discounts = [];
+				totalItems = 0;
+			}
 		} catch (e: any) {
 			error = e.message || 'Error al cargar descuentos';
 			alert('error', error);
 		} finally {
 			loading = false;
 		}
+	}
+
+	function handlePageChange(newPage: number) {
+		page = newPage;
+		loadDiscounts();
+	}
+
+	function handleLimitChange(newLimit: number) {
+		limit = newLimit;
+		page = 1;
+		loadDiscounts();
 	}
 
 	function handleCreate() {
@@ -128,7 +160,7 @@
 	</div>
 
 	{#if loading}
-		<TableSkeleton columns={5} rows={5} />
+		<TableSkeleton columns={5} rows={10} />
 	{:else if discounts.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
 			<p class="text-gray-500 dark:text-gray-400">No hay descuentos registrados.</p>
@@ -185,6 +217,18 @@
 				</tbody>
 			</table>
 		</div>
+
+
+	{#if !loading && discounts.length > 0}
+		<Pagination
+			currentPage={page}
+			{totalPages}
+			{totalItems}
+			{limit}
+			onPageChange={handlePageChange}
+			onLimitChange={handleLimitChange}
+		/>
+	{/if}
 
 		<!-- Mobile Cards -->
 		<div class="md:hidden grid grid-cols-1 gap-4">

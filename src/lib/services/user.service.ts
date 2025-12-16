@@ -2,8 +2,17 @@ import { apiKyC } from '../config/apiKyC.config';
 import type { User, CreateUserRequest, UpdateUserRequest } from '../interfaces';
 
 class UserService {
-	async getAll(skip: number = 0, limit: number = 100): Promise<User[]> {
-		return apiKyC.get<User[]>(`/users/?skip=${skip}&limit=${limit}`);
+	async getAll(
+		page = 1,
+		per_page = 10
+	): Promise<import('$lib/interfaces/response.interface').PaginatedResponse<User>> {
+		const params = new URLSearchParams({
+			page: page.toString(),
+			per_page: per_page.toString()
+		});
+		return apiKyC.get<import('$lib/interfaces/response.interface').PaginatedResponse<User>>(
+			`/users/?${params.toString()}`
+		);
 	}
 
 	async getById(id: string): Promise<User> {

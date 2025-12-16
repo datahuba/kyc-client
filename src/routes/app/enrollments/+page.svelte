@@ -14,27 +14,41 @@
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
+	import { Pagination } from '$lib/components/ui';
 
-	let enrollments: Enrollment[] = [];
-	let studentsMap: Record<string, Student> = {};
-	let coursesMap: Record<string, Course> = {};
-	let loading = false;
-	let error = '';
-	let skip = 0;
-	let limit = 100;
+	let enrollments: Enrollment[] = $state([]);
+	let studentsMap: Record<string, Student> = $state({});
+	let coursesMap: Record<string, Course> = $state({});
+	let loading = $state(false);
+	let error = $state('');
+
+	// Pagination state
+	let page = $state(1);
+	let limit = $state(10);
+	let totalItems = $state(0);
+	let totalPages = $state(1);
+
+	// Filter state
+	let filters = {
+		q: '',
+		estado: 'all',
+		curso_id: 'all',
+		estudiante_id: 'all'
+	};
+	let debounceTimer: any;
 
 	// Modal state
-	let isFormOpen = false;
-	let selectedEnrollment: Enrollment | null = null;
-	let showDeleteModal = false;
-	let enrollmentToDelete: Enrollment | null = null;
-	let deleteLoading = false;
+	let isFormOpen = $state(false);
+	let selectedEnrollment: Enrollment | null = $state(null);
+	let showDeleteModal = $state(false);
+	let enrollmentToDelete: Enrollment | null = $state(null);
+	let deleteLoading = $state(false);
 
 	// Dropdown state
-	let openDropdownId: string | null = null;
+	let openDropdownId: string | null = $state(null);
 
-	let studentsList: Student[] = [];
-	let coursesList: Course[] = [];
+	let studentsList: Student[] = $state([]);
+	let coursesList: Course[] = $state([]);
 
 	onMount(() => {
 		if (!$userStore.isAuthenticated) {
@@ -43,48 +57,60 @@
 		loadData();
 	});
 
-	let selectedCourseId = 'all';
-
 	async function loadData() {
 		loading = true;
 
 		try {
-			let enrollmentsPromise;
+			// Populate lists for filters (Admin only) or mapping names
+			// We load a batch for the filters. 
+			// In a real large app we would use async select with search, but for now we load first 1000
+			if (studentsList.length === 0 && $userStore.role !== 'student') {
+				const studentsRes = await studentService.getAll(1, 100); // Load enough to populate map
+				studentsList = studentsRes.data;
+				studentsRes.data.forEach(s => (studentsMap[s._id] = s));
+			}
 
-			// Condición clásica
+			if (coursesList.length === 0) {
+				const coursesRes = await courseService.getAll(1, 100);
+				coursesList = coursesRes.data;
+				coursesRes.data.forEach(c => (coursesMap[c._id] = c));
+			}
+
+			// Main query
+			let enrollmentsPromise;
 			if ($userStore.role === 'student') {
-				enrollmentsPromise = enrollmentService.getByStudentId(
-					$userStore.user?._id || ''
-				);
+				enrollmentsPromise = enrollmentService.getByStudentId($userStore.user?._id || '');
 			} else {
-				if (selectedCourseId && selectedCourseId !== 'all') {
-					enrollmentsPromise = enrollmentService.getByCourseId(selectedCourseId);
+				const filterParams: any = {};
+				if (filters.q) filterParams.q = filters.q;
+				if (filters.estado !== 'all') filterParams.estado = filters.estado;
+				if (filters.curso_id !== 'all') filterParams.curso_id = filters.curso_id;
+				if (filters.estudiante_id !== 'all') filterParams.estudiante_id = filters.estudiante_id;
+
+				enrollmentsPromise = enrollmentService.getAll(page, limit, filterParams);
+			}
+
+			const result = await enrollmentsPromise;
+
+			if ($userStore.role === 'student') {
+				// Existing behavior for student: returns array directly
+				// We might need to handle pagination for student in future if API changes
+				// For now assuming array
+				enrollments = Array.isArray(result) ? result : (result as any).data; 
+				// Manually populate maps for student view if needed, or rely on them being populated above?
+				// Student view usually only needs course map.
+			} else {
+				// Admin view: returns paginated response
+				const response = result as any; // Cast for now
+				if (response && response.data) {
+					enrollments = response.data;
+					totalItems = response.meta.totalItems;
+					totalPages = response.meta.totalPages;
 				} else {
-					enrollmentsPromise = enrollmentService.getAll(skip, limit);
+					enrollments = [];
+					totalItems = 0;
 				}
 			}
-
-			// Ejecutamos las peticiones
-			const promises: Promise<any>[] = [enrollmentsPromise];
-			
-			// Solo admin carga lista de estudiantes
-			if ($userStore.role !== 'student') {
-				promises.push(studentService.getAll(0, 1000));
-			} else {
-				promises.push(Promise.resolve([]));
-			}
-
-			// Intentamos cargar cursos (seguro para admin, quizás restringido para student)
-			promises.push(courseService.getAll(0, 1000).catch(() => []));
-
-			const [enrollmentsData, studentsData, coursesData] = await Promise.all(promises);
-
-			enrollments = enrollmentsData;
-			studentsList = studentsData;
-			coursesList = coursesData;
-
-			studentsData.forEach(s => (studentsMap[s._id] = s));
-			coursesData.forEach(c => (coursesMap[c._id] = c));
 
 		} catch (e: any) {
 			error = e.message || 'Error al cargar inscripciones';
@@ -94,7 +120,27 @@
 		}
 	}
 
-	function handleCourseFilter() {
+	function handleFilterChange() {
+		page = 1;
+		loadData();
+	}
+
+	function handleSearchInput() {
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => {
+			page = 1;
+			loadData();
+		}, 300);
+	}
+
+	function handlePageChange(newPage: number) {
+		page = newPage;
+		loadData();
+	}
+
+	function handleLimitChange(newLimit: number) {
+		limit = newLimit;
+		page = 1;
 		loadData();
 	}
 
@@ -182,26 +228,79 @@
 			Nueva Inscripción
 		</Button>
 		{/if}
-		
 	</div>
 
 	{#if $userStore.role !== 'student'}
-		<div class="w-full md:w-1/3">
-			<Select 
-				label="Filtrar por Curso" 
-				bind:value={selectedCourseId} 
-				onchange={handleCourseFilter}
-			>
-				<option value="all">Todos los cursos</option>
-				{#each coursesList as course}
-					<option value={course._id}>{course.nombre_programa}</option>
-				{/each}
-			</Select>
+		<!-- Filters -->
+		<div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+			<!-- Start Search -->
+			<div class="md:col-span-1">
+				<label for="search" class="sr-only">Buscar</label>
+				<div class="relative">
+					<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+						<svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+							<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+						</svg>
+					</div>
+					<input
+						type="text"
+						id="search"
+						bind:value={filters.q}
+						class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+						placeholder="Buscar..."
+						oninput={handleSearchInput}
+					/>
+				</div>
+			</div>
+			
+			<!-- Estado -->
+			<div>
+				<select
+					bind:value={filters.estado}
+					onchange={handleFilterChange}
+					class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+				>
+					<option value="all">Todos los estados</option>
+					<option value="pendiente_pago">Pendiente Pago</option>
+					<option value="activo">Activo</option>
+					<option value="suspendido">Suspendido</option>
+					<option value="completado">Completado</option>
+					<option value="cancelado">Cancelado</option>
+				</select>
+			</div>
+
+			<!-- Curso -->
+			<div>
+				<select
+					bind:value={filters.curso_id}
+					onchange={handleFilterChange}
+					class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+				>
+					<option value="all">Todos los cursos</option>
+					{#each coursesList as course}
+						<option value={course._id}>{course.nombre_programa}</option>
+					{/each}
+				</select>
+			</div>
+
+			<!-- Estudiante -->
+			<div>
+				<select
+					bind:value={filters.estudiante_id}
+					onchange={handleFilterChange}
+					class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+				>
+					<option value="all">Todos los estudiantes</option>
+					{#each studentsList as student}
+						<option value={student._id}>{student.nombre}</option>
+					{/each}
+				</select>
+			</div>
 		</div>
 	{/if}
 
 	{#if loading}
-		<TableSkeleton columns={6} rows={5} />
+		<TableSkeleton columns={6} rows={10} />
 	{:else if enrollments.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
 			<p class="text-gray-500 dark:text-gray-400">No hay inscripciones registradas.</p>
@@ -282,6 +381,17 @@
 				</tbody>
 			</table>
 		</div>
+
+		{#if $userStore.role !== 'student'}
+			<Pagination
+				currentPage={page}
+				{totalPages}
+				{totalItems}
+				{limit}
+				onPageChange={handlePageChange}
+				onLimitChange={handleLimitChange}
+			/>
+		{/if}
 
 		<!-- Mobile Cards -->
 		<div class="md:hidden grid grid-cols-1 gap-4">

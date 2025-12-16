@@ -58,7 +58,7 @@
 
 	async function loadCourses() {
 		try {
-			allCourses = await courseService.getAll(0, 1000);
+			allCourses = (await courseService.getAll(0, 100)).data;
 		} catch (error) {
 			console.error('Error fetching courses for filter', error);
 		}
@@ -370,7 +370,7 @@
 	</div>
 
 	{#if loading}
-		<TableSkeleton columns={6} rows={5} />
+		<TableSkeleton columns={6} rows={10} />
 	{:else}
 		<div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow">
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">

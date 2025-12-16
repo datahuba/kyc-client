@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { paymentService } from '$lib/services';
-	import type { Payment } from '$lib/interfaces';
+	import { paymentService, studentService, courseService } from '$lib/services';
+	import type { Payment, Student, Course } from '$lib/interfaces';
 	import { userStore } from '$lib/stores/userStore';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
@@ -10,6 +10,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import PaymentForm from '$lib/features/payments/PaymentForm.svelte';
+	import { Pagination } from '$lib/components/ui';
 	import { 
 		PlusIcon, 
 		DotsVerticalIcon, 
@@ -20,44 +21,116 @@
 	import { alert, formatDate, formatCurrency } from '$lib/utils';
 	import Select from '$lib/components/ui/select.svelte';
 
-	let payments: Payment[] = [];
-	let loading = true;
-	let page = 0;
-	let limit = 100;
-	let filterEstado = '';
+	let payments: Payment[] = $state([]);
+	let loading = $state(true);
+	
+	// Pagination
+	let page = $state(1);
+	let limit = $state(10);
+	let totalItems = $state(0);
+	let totalPages = $state(1);
+
+	// Filters
+	let filters = {
+		q: '',
+		estado: '',
+		curso_id: '',
+		estudiante_id: ''
+	};
+	let debounceTimer: any;
+
+	// Helper lists for filters
+	let studentsList: Student[] = $state([]);
+	let coursesList: Course[] = $state([]);
 
 	// State
-	let isCreateModalOpen = false;
-	let isApproveModalOpen = false;
-	let isRejectModalOpen = false;
+	let isCreateModalOpen = $state(false);
+	let isApproveModalOpen = $state(false);
+	let isRejectModalOpen = $state(false);
 	
-	let paymentToAction: Payment | null = null;
-	let actionLoading = false;
-	let rejectReason = '';
+	let paymentToAction: Payment | null = $state(null);
+	let actionLoading = $state(false);
+	let rejectReason = $state('');
 
 	// Dropdown
-	let openDropdownId: string | null = null;
-	let selectedPayment: Payment | null = null;
+	let openDropdownId: string | null = $state(null);
+	let selectedPayment: Payment | null = $state(null);
 
 	// Computed
-	$: isAdmin = $userStore.role === 'admin' || $userStore.role === 'superadmin';
-	$: isStudent = $userStore.role === 'student';
+	let isAdmin = $derived($userStore.role === 'admin' || $userStore.role === 'superadmin');
+	let isStudent = $derived($userStore.role === 'student');
 
 	async function loadPayments() {
 		loading = true;
 		try {
-			// Pass filter if exists
-			const data = await paymentService.getAll(page * limit, limit, filterEstado || undefined);
-			payments = data;
-		} catch (error) {
+			// Populate lists for filters (Admin only)
+			if (isAdmin && studentsList.length === 0) {
+				const studentsRes = await studentService.getAll(1, 100);
+				studentsList = studentsRes.data;
+			}
+			if (coursesList.length === 0) {
+				const coursesRes = await courseService.getAll(1, 100);
+				coursesList = coursesRes.data;
+			}
+
+			const filterParams: any = {};
+			if (filters.q) filterParams.q = filters.q;
+			if (filters.estado) filterParams.estado = filters.estado;
+			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
+			if (filters.estudiante_id) filterParams.estudiante_id = filters.estudiante_id;
+
+			const result = await paymentService.getAll(page, limit, filterParams); 
+			
+			// Handle response structure depending if it returns array (student) or PaginatedResponse
+			// If student/role restricted, it might return array directly based on implementation details of previous modules
+			// but we designed PaymentService.getAll to return PaginatedResponse.
+			// Let's assume consistent PaginatedResponse unless backend behaves differently for students
+			
+			// Checking result structure just in case
+			const response = result as any;
+			if (response && Array.isArray(response)) {
+				// Fallback if backend returns array
+				payments = response;
+				totalItems = response.length;
+				totalPages = 1;
+			} else if (response && response.data) {
+				payments = response.data;
+				totalItems = response.meta.totalItems;
+				totalPages = response.meta.totalPages;
+			} else {
+				payments = [];
+				totalItems = 0;
+			}
+
+		} catch (error: any) {
 			console.error(error);
-			alert('error', 'Error al cargar pagos');
+			alert('error', error.message || 'Error al cargar pagos');
 		} finally {
 			loading = false;
 		}
 	}
 
 	function handleFilterChange() {
+		page = 1;
+		loadPayments();
+	}
+
+	function handleSearchInput() {
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => {
+			page = 1;
+			loadPayments();
+		}, 300);
+	}
+
+	function handlePageChange(newPage: number) {
+		page = newPage;
+		loadPayments();
+	}
+
+	function handleLimitChange(newLimit: number) {
+		limit = newLimit;
+		page = 1;
 		loadPayments();
 	}
 
@@ -175,19 +248,6 @@
 		</div>
 		
 		<div class="flex gap-3 w-full md:w-auto">
-			<div class="w-40">
-				<select 
-					bind:value={filterEstado} 
-					onchange={handleFilterChange}
-					class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm h-10"
-				>
-					<option value="">Todos</option>
-					<option value="pendiente">Pendientes</option>
-					<option value="aprobado">Aprobados</option>
-					<option value="rechazado">Rechazados</option>
-				</select>
-			</div>
-			
 			{#if isStudent}
 				<Button onclick={() => isCreateModalOpen = true}>
 					{#snippet leftIcon()} <PlusIcon class="size-5" /> {/snippet}
@@ -201,8 +261,75 @@
 		</div>
 	</div>
 
+	<!-- Filters -->
+	<div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+		<!-- Search -->
+		<div class="md:col-span-1">
+			<label for="search" class="sr-only">Buscar</label>
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+					<svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+					</svg>
+				</div>
+				<input
+					type="text"
+					id="search"
+					bind:value={filters.q}
+					class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+					placeholder="Buscar..."
+					oninput={handleSearchInput}
+				/>
+			</div>
+		</div>
+		
+		<!-- Estado -->
+		<div>
+			<select
+				bind:value={filters.estado}
+				onchange={handleFilterChange}
+				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			>
+				<option value="">Todos los estados</option>
+				<option value="pendiente">Pendiente</option>
+				<option value="aprobado">Aprobado</option>
+				<option value="rechazado">Rechazado</option>
+			</select>
+		</div>
+
+		{#if isAdmin}
+			<!-- Curso -->
+			<div>
+				<select
+					bind:value={filters.curso_id}
+					onchange={handleFilterChange}
+					class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+				>
+					<option value="">Todos los cursos</option>
+					{#each coursesList as course}
+						<option value={course._id}>{course.nombre_programa}</option>
+					{/each}
+				</select>
+			</div>
+
+			<!-- Estudiante -->
+			<div>
+				<select
+					bind:value={filters.estudiante_id}
+					onchange={handleFilterChange}
+					class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+				>
+					<option value="">Todos los estudiantes</option>
+					{#each studentsList as student}
+						<option value={student._id}>{student.nombre}</option>
+					{/each}
+				</select>
+			</div>
+		{/if}
+	</div>
+
 	{#if loading && payments.length === 0}
-		<TableSkeleton columns={7} rows={5} />
+		<TableSkeleton columns={7} rows={10} />
 	{:else}
 		<div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow">
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -277,6 +404,15 @@
 				</table>
 		
 		</div>
+
+		<Pagination
+			currentPage={page}
+			{totalPages}
+			{totalItems}
+			{limit}
+			onPageChange={handlePageChange}
+			onLimitChange={handleLimitChange}
+		/>
 	{/if}
 
 	<!-- Create Payment Modal -->

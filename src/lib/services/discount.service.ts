@@ -2,8 +2,17 @@ import { apiKyC } from '$lib/config';
 import type { Discount, CreateDiscountRequest, UpdateDiscountRequest } from '$lib/interfaces';
 
 class DiscountService {
-	async getAll(skip = 0, limit = 100): Promise<Discount[]> {
-		return await apiKyC.get<Discount[]>(`/discounts/?skip=${skip}&limit=${limit}`);
+	async getAll(
+		page = 1,
+		per_page = 10
+	): Promise<import('$lib/interfaces/response.interface').PaginatedResponse<Discount>> {
+		const params = new URLSearchParams({
+			page: page.toString(),
+			per_page: per_page.toString()
+		});
+		return await apiKyC.get<import('$lib/interfaces/response.interface').PaginatedResponse<Discount>>(
+			`/discounts/?${params.toString()}`
+		);
 	}
 
 	async create(data: CreateDiscountRequest): Promise<Discount> {

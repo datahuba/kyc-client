@@ -12,28 +12,42 @@
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
+	import { Pagination } from '$lib/components/ui';
 
-	let courses: Course[] = [];
-	let loading = false;
-	let error = '';
-	let skip = 0;
-	let limit = 100;
+	let courses: Course[] = $state([]);
+	let loading = $state(false);
+	let error = $state('');
+	
+	// Pagination state
+	let page = $state(1);
+	let limit = $state(10);
+	let totalItems = $state(0);
+	let totalPages = $state(1);
+
+	// Filter state
+	let filters = {
+		q: '',
+		activo: 'all', // 'all', 'true', 'false'
+		tipo_curso: 'all',
+		modalidad: 'all'
+	};
+	let debounceTimer: any;
 
 	// Modal state
-	let isFormOpen = false;
-	let selectedCourse: Course | null = null;
-	let showDeleteModal = false;
-	let courseToDelete: Course | null = null;
-	let deleteLoading = false;
+	let isFormOpen = $state(false);
+	let selectedCourse: Course | null = $state(null);
+	let showDeleteModal = $state(false);
+	let courseToDelete: Course | null = $state(null);
+	let deleteLoading = $state(false);
 
 	// Dropdown state
-	let openDropdownId: string | null = null;
+	let openDropdownId: string | null = $state(null);
 
 	// Students Modal state
-	let showStudentsModal = false;
-	let studentsLoading = false;
-	let courseStudents: CourseStudent[] = [];
-	let selectedCourseStudents: Course | null = null;
+	let showStudentsModal = $state(false);
+	let studentsLoading = $state(false);
+	let courseStudents: CourseStudent[] = $state([]);
+	let selectedCourseStudents: Course | null = $state(null);
 
 	onMount(() => {
 		loadCourses();
@@ -42,13 +56,52 @@
 	async function loadCourses() {
 		loading = true;
 		try {
-			courses = await courseService.getAll(skip, limit);
+			const filterParams: any = {};
+			if (filters.q) filterParams.q = filters.q;
+			if (filters.activo !== 'all') filterParams.activo = filters.activo === 'true';
+			if (filters.tipo_curso !== 'all') filterParams.tipo_curso = filters.tipo_curso;
+			if (filters.modalidad !== 'all') filterParams.modalidad = filters.modalidad;
+
+			const response = await courseService.getAll(page, limit, filterParams);
+			
+			if (response && response.data) {
+				courses = response.data;
+				totalItems = response.meta.totalItems;
+				totalPages = response.meta.totalPages;
+			} else {
+				courses = [];
+				totalItems = 0;
+			}
 		} catch (e: any) {
 			error = e.message || 'Error al cargar cursos';
 			alert('error', error);
 		} finally {
 			loading = false;
 		}
+	}
+
+	function handleFilterChange() {
+		page = 1;
+		loadCourses();
+	}
+
+	function handleSearchInput() {
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => {
+			page = 1;
+			loadCourses();
+		}, 300);
+	}
+
+	function handlePageChange(newPage: number) {
+		page = newPage;
+		loadCourses();
+	}
+
+	function handleLimitChange(newLimit: number) {
+		limit = newLimit;
+		page = 1;
+		loadCourses();
 	}
 
 	async function handleViewStudents(course: Course) {
@@ -136,7 +189,7 @@
 	}
 </script>
 
-<div class="space-y-6">
+	<div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<Heading level="h1">Cursos</Heading>
 		<Button onclick={handleCreate}>
@@ -147,8 +200,75 @@
 		</Button>
 	</div>
 
+	<!-- Filters -->
+	<div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+		<!-- Search -->
+		<div class="md:col-span-1">
+			<label for="search" class="sr-only">Buscar</label>
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+					<svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+					</svg>
+				</div>
+				<input
+					type="text"
+					id="search"
+					bind:value={filters.q}
+					class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+					placeholder="Buscar código o nombre..."
+					oninput={handleSearchInput}
+				/>
+			</div>
+		</div>
+		
+		<!-- Estado -->
+		<div>
+			<select
+				bind:value={filters.activo}
+				onchange={handleFilterChange}
+				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			>
+				<option value="all">Todos los estados</option>
+				<option value="true">Activo</option>
+				<option value="false">Inactivo</option>
+			</select>
+		</div>
+
+		<!-- Tipo -->
+		<div>
+			<select
+				bind:value={filters.tipo_curso}
+				onchange={handleFilterChange}
+				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			>
+				<option value="all">Todos los tipos</option>
+				<option value="curso">Curso</option>
+				<option value="taller">Taller</option>
+				<option value="diplomado">Diplomado</option>
+				<option value="maestria">Maestría</option>
+				<option value="doctorado">Doctorado</option>
+				<option value="otro">Otro</option>
+			</select>
+		</div>
+
+		<!-- Modalidad -->
+		<div>
+			<select
+				bind:value={filters.modalidad}
+				onchange={handleFilterChange}
+				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			>
+				<option value="all">Todas las modalidades</option>
+				<option value="presencial">Presencial</option>
+				<option value="virtual">Virtual</option>
+				<option value="híbrido">Híbrido</option>
+			</select>
+		</div>
+	</div>
+
 	{#if loading}
-		<TableSkeleton columns={6} rows={5} />
+		<TableSkeleton columns={6} rows={10} />
 	{:else if courses.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
 			<p class="text-gray-500 dark:text-gray-400">No hay cursos registrados.</p>
@@ -226,6 +346,15 @@
 				</tbody>
 			</table>
 		</div>
+		
+		<Pagination
+			currentPage={page}
+			{totalPages}
+			{totalItems}
+			{limit}
+			onPageChange={handlePageChange}
+			onLimitChange={handleLimitChange}
+		/>
 
 		<!-- Mobile Cards -->
 		<div class="md:hidden grid grid-cols-1 gap-4">

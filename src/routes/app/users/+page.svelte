@@ -12,22 +12,26 @@
 	import UserForm from '$lib/features/users/UserForm.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
+	import { Pagination } from '$lib/components/ui';
 
-	let users: User[] = [];
-	let loading = false;
-	let error = '';
-	let skip = 0;
-	let limit = 100;
+	let users: User[] = $state([]);
+	let loading = $state(false);
+	let error = $state('');
+	
+	let page = $state(1);
+	let limit = $state(10);
+	let totalItems = $state(0);
+	let totalPages = $state(1);
 
 	// Modal state
-	let isFormOpen = false;
-	let selectedUser: User | null = null;
-	let showDeleteModal = false;
-	let userToDelete: User | null = null;
-	let deleteLoading = false;
+	let isFormOpen = $state(false);
+	let selectedUser: User | null = $state(null);
+	let showDeleteModal = $state(false);
+	let userToDelete: User | null = $state(null);
+	let deleteLoading = $state(false);
 
 	// Dropdown state
-	let openDropdownId: string | null = null;
+	let openDropdownId: string | null = $state(null);
 
 	onMount(() => {
 		loadUsers();
@@ -36,13 +40,38 @@
 	async function loadUsers() {
 		loading = true;
 		try {
-			users = await userService.getAll(skip, limit);
+			const result = await userService.getAll(page, limit);
+			
+			const response = result as any;
+			if (response && response.data) {
+				users = response.data;
+				totalItems = response.meta.totalItems;
+				totalPages = response.meta.totalPages;
+			} else if (Array.isArray(response)) {
+				users = response;
+				totalItems = response.length;
+				totalPages = 1;
+			} else {
+				users = [];
+				totalItems = 0;
+			}
 		} catch (e: any) {
 			error = e.message || 'Error al cargar usuarios';
 			alert('error', error);
 		} finally {
 			loading = false;
 		}
+	}
+
+	function handlePageChange(newPage: number) {
+		page = newPage;
+		loadUsers();
+	}
+
+	function handleLimitChange(newLimit: number) {
+		limit = newLimit;
+		page = 1;
+		loadUsers();
 	}
 
 	function handleCreate() {
@@ -121,7 +150,7 @@
 	</div>
 
 	{#if loading}
-		<TableSkeleton columns={5} rows={5} />
+		<TableSkeleton columns={5} rows={10} />
 	{:else if users.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
 			<p class="text-gray-500 dark:text-gray-400">No hay usuarios registrados.</p>
@@ -152,7 +181,7 @@
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-									{user.rol}
+									{user.role}
 								</span>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
@@ -180,6 +209,18 @@
 				</tbody>
 			</table>
 		</div>
+
+
+	{#if !loading && users.length > 0}
+		<Pagination
+			currentPage={page}
+			{totalPages}
+			{totalItems}
+			{limit}
+			onPageChange={handlePageChange}
+			onLimitChange={handleLimitChange}
+		/>
+	{/if}
 
 		<!-- Mobile Cards -->
 		<div class="md:hidden grid grid-cols-1 gap-4">
