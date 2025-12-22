@@ -385,7 +385,7 @@
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carnet</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domicilio</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+						
 						<th scope="col" class="relative px-6 py-3">
 							<span class="sr-only">Acciones</span>
 						</th>
@@ -412,7 +412,7 @@
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm text-gray-900 dark:text-white">{student.registro}</div>
-								<div class="text-sm text-gray-500">{student.es_estudiante_interno}</div>
+								
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm text-gray-900 dark:text-white">{student.carnet}</div>
@@ -423,11 +423,7 @@
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm text-gray-900 dark:text-white">{student.domicilio}</div>
 							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${student.activo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
-									{student.activo ? 'Activo' : 'Inactivo'}
-								</span>
-							</td>
+							
 							<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
 								<button onclick={() => toggleDropdown(student._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
 									<DotsVerticalIcon class="size-5" />

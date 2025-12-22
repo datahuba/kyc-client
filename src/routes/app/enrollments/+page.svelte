@@ -314,9 +314,10 @@
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Curso</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Montos</th>
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pagado</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Saldo</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
+					
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">D. Curso</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">D. Personal</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
@@ -330,7 +331,6 @@
 						<tr>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm font-medium text-gray-900 dark:text-white">{getStudentName(enrollment.estudiante_id)}</div>
-								<div class="text-xs text-gray-500 dark:text-gray-400">{enrollment.es_estudiante_interno}</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm text-gray-900 dark:text-white">{getCourseName(enrollment.curso_id)}</div>
@@ -340,6 +340,10 @@
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-xs text-gray-500 dark:text-gray-400">Total: {enrollment.total_a_pagar}</div>
+								
+							</td>
+							<td class="px-6 py-4 whitespace-nowrap">
+							
 								<div class="text-xs text-green-600 dark:text-green-400">Pagado: {enrollment.total_pagado}</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
@@ -347,11 +351,7 @@
 									{enrollment.saldo_pendiente}
 								</div>
 							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300`}>
-									{enrollment.es_estudiante_interno}
-								</span>
-							</td>
+							
 							<td class="px-6 py-4 whitespace-nowrap">
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full text-green-800`}>
 									{enrollment.descuento_curso_aplicado || 0}%
@@ -359,7 +359,7 @@
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full text-green-800`}>
-									${enrollment.descuento_personalizado || 0}
+									Bs. {" "}{enrollment.descuento_personalizado || 0}
 								</span>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">

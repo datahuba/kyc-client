@@ -394,59 +394,7 @@
 				</div>
 
 				<!-- Sidebar -->
-				<div class="space-y-6">
-					<!-- Documentación -->
-					<Card>
-						{#snippet header()}
-							<Heading level="h4" class="text-lg font-semibold">Documentación</Heading>
-						{/snippet}
-						
-						<div class="space-y-3">
-							<!-- Carnet de Identidad -->
-							<DocumentRow
-								title="Carnet de Identidad"
-								icon={IdentificationIcon}
-								url={profileData.ci_url}
-								uploading={uploadingDoc === 'ci'}
-								onUpload={(f) => handleDocumentUpload('ci', f)}
-							/>
-
-							<!-- Curriculum Vitae -->
-							<DocumentRow
-								title="Curriculum Vitae"
-								icon={DocumentAddIcon} 
-								url={profileData.cv_url}
-								uploading={uploadingDoc === 'cv'}
-								onUpload={(f) => handleDocumentUpload('cv', f)}
-							/>
-
-							<!-- Afiliación -->
-							<DocumentRow
-								title="Afiliación"
-								icon={DocumentAddIcon}
-								url={profileData.afiliacion_url}
-								uploading={uploadingDoc === 'afiliacion'}
-								onUpload={(f) => handleDocumentUpload('afiliacion', f)}
-							/>
-
-							<!-- Título -->
-							<DocumentRow
-								title="Título Profesional"
-								icon={AcademicCapIcon}
-								url={profileData.titulo?.titulo_url}
-								status={profileData.titulo?.estado}
-								uploading={uploadingDoc === 'titulo'}
-								disabled={profileData.titulo?.estado === 'verificado'}
-								onUpload={(f) => handleDocumentUpload('titulo', f)}
-							/>
-							{#if profileData.titulo?.estado === 'verificado'}
-								<p class="text-xs text-gray-500 dark:text-gray-400 pl-2">
-									* No se puede actualizar un título verificado
-								</p>
-							{/if}
-						</div>
-					</Card>
-
+				<div class="space-y-6">				
 					<!-- Información del Sistema -->
 					<Card>
 						{#snippet header()}

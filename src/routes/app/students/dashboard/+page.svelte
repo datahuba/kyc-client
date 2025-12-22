@@ -58,7 +58,7 @@
 		{ 
 			title: 'Mi Perfil', 
 			icon: UserIcon, 
-			href: '/app/perfil',
+			href: '/app/profile',
 			
 		},
 		{ 

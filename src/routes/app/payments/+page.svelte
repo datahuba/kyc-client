@@ -185,6 +185,7 @@
 			isRejectModalOpen = false;
 			loadPayments();
 		} catch (error: any) {
+			actionLoading = false;
 			alert('error', error.message || 'Error al rechazar pago');
 		} finally {
 			actionLoading = false;
@@ -460,10 +461,6 @@
 					class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
 					placeholder="Ej: Comprobante ilegible, monto incorrecto..."
 				></textarea>
-			</div>
-			<div class="flex justify-end gap-3 mt-4">
-				<Button variant="secondary" onclick={() => isRejectModalOpen = false} disabled={actionLoading}>Cancelar</Button>
-				<Button variant="destructive" onclick={confirmReject} loading={actionLoading}>Rechazar</Button>
 			</div>
 			<div class="flex justify-end gap-3 mt-4">
 				<Button variant="secondary" onclick={() => isRejectModalOpen = false} disabled={actionLoading}>Cancelar</Button>
