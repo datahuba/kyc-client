@@ -190,7 +190,7 @@
 								<div class="text-sm text-gray-900 dark:text-white">{discount.porcentaje}%</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-sm text-gray-900 dark:text-white">{discount.lista_estudiantes.length} estudiantes</div>
+								<div class="text-sm text-gray-900 dark:text-white">{discount.lista_estudiantes?.length ?? 0} estudiantes</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${discount.activo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
@@ -258,7 +258,7 @@
 					<div class="space-y-2 text-sm">
 						<div class="flex justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Beneficiarios:</span>
-							<span class="font-medium text-gray-900 dark:text-white">{discount.lista_estudiantes.length}</span>
+							<span class="font-medium text-gray-900 dark:text-white">{discount.lista_estudiantes?.length ?? 0}</span>
 						</div>
 						<div class="flex justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Estado:</span>
