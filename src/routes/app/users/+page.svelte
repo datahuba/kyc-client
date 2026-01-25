@@ -13,6 +13,13 @@
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
+	import { userStore } from '$lib/stores/userStore';
+
+	let currentUser: any = null;
+
+	userStore.subscribe(state => {
+	currentUser = state.user;
+	});
 
 	let users: User[] = $state([]);
 	let loading = $state(false);
@@ -141,7 +148,11 @@
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<Heading level="h1">Usuarios</Heading>
-		<Button onclick={handleCreate}>
+		<Button onclick={handleCreate}
+				disabled={currentUser?.role !== 'superadmin'}
+  				title={currentUser?.role !== 'superadmin'
+    				? 'Solo el Super Administrador puede crear usuarios'
+    				: 'Crear nuevo usuario'}>
 			{#snippet leftIcon()}
 				<PlusIcon class="size-5" />
 			{/snippet}
