@@ -22,34 +22,51 @@
 
 	onMount(async () => {
 		try {
-			const [students, courses, enrollments, payments] = await Promise.all([
-				studentService.getAll(0, 1000),
-				courseService.getAll(0, 1000),
-				enrollmentService.getAll(0, 100), // Limit recent fetch? Or fetch all for stats?
-				paymentService.getAll(0, 100)
+			const [
+				studentsRes,
+				coursesRes,
+				enrollmentsRes,
+				paymentsRes
+			] = await Promise.all([
+				studentService.getAll(),
+				courseService.getAll(),
+				enrollmentService.getAll(1, 100),
+				paymentService.getAll(1, 100)
 			]);
 
-			// Calculate Stats
-			stats.students.total = students.length;
+			const students = studentsRes.data ?? [];
+			const courses = coursesRes.data ?? [];
+			const enrollments = enrollmentsRes.data ?? [];
+			const payments = paymentsRes.data ?? [];
+
+			// ===== STATS =====
+			stats.students.total = studentsRes.meta?.totalItems ?? students.length;
 			stats.students.active = students.filter(s => s.activo).length;
 
-			stats.courses.total = courses.length;
+			stats.courses.total = coursesRes.meta?.totalItems ?? courses.length;
 			stats.courses.active = courses.filter(c => c.activo).length;
 
-			stats.enrollments.total = enrollments.length;
+			stats.enrollments.total = enrollmentsRes.meta?.totalItems ?? enrollments.length;
 			stats.enrollments.active = enrollments.filter(e => e.estado === 'activo').length;
 
-			stats.payments.total = payments.length;
+			stats.payments.total = paymentsRes.meta?.totalItems ?? payments.length;
 			stats.payments.pending = payments.filter(p => p.estado_pago === 'pendiente').length;
 			stats.payments.revenue = payments
-				.filter(p => p.estado_pago === 'pagado' || p.estado_pago === 'aprobado') // Assuming 'aprobado' or 'pagado'
+				.filter(p => p.estado_pago === 'aprobado' || p.estado_pago === 'pagado')
 				.reduce((sum, p) => sum + p.cantidad_pago, 0);
 
-			// Process Recent Activity
-			// Map IDs to Names for display
-			const studentsMap = students.reduce((acc, s) => ({ ...acc, [s._id]: s.nombre }), {} as Record<string, string>);
-			const coursesMap = courses.reduce((acc, c) => ({ ...acc, [c._id]: c.nombre_programa }), {} as Record<string, string>);
+			// ===== MAPS =====
+			const studentsMap = students.reduce(
+				(acc, s) => ({ ...acc, [s._id]: s.nombre }),
+				{} as Record<string, string>
+			);
 
+			const coursesMap = courses.reduce(
+				(acc, c) => ({ ...acc, [c._id]: c.nombre_programa }),
+				{} as Record<string, string>
+			);
+
+			// ===== RECENTS =====
 			recentEnrollments = enrollments
 				.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 				.slice(0, 5)
@@ -65,7 +82,7 @@
 				.map(p => ({
 					...p,
 					studentName: studentsMap[p.estudiante_id] || 'Desconocido',
-					courseName: coursesMap[p.curso_id] || 'Desconocido'
+					courseName: coursesMap[p.curso_id] || '—'
 				}));
 
 		} catch (error) {
@@ -74,6 +91,7 @@
 			loading = false;
 		}
 	});
+
 
 	function formatCurrency(amount: number) {
 		return new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(amount);
@@ -143,7 +161,7 @@
 			<Card>
 				<div class="flex justify-between items-center mb-4">
 					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Inscripciones Recientes</h3>
-					<button onclick={() => goto('/app/enrollments')} class="text-sm text-primary-600 hover:text-primary-500">Ver todas</button>
+					<a href="/app/enrollments" class="text-sm text-primary-600 hover:text-primary-500">Ver todas</a>
 				</div>
 				<div class="overflow-x-auto">
 					<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -176,7 +194,7 @@
 			<Card>
 				<div class="flex justify-between items-center mb-4">
 					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Pagos Recientes</h3>
-					<button onclick={() => goto('/app/payments')} class="text-sm text-primary-600 hover:text-primary-500">Ver todos</button>
+					<a href="/app/payments" class="text-sm text-primary-600 hover:text-primary-500">Ver todos</a>
 				</div>
 				<div class="overflow-x-auto">
 					<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
