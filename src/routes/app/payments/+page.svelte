@@ -237,6 +237,29 @@
 			default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
 		}
 	}
+
+
+	// Función para descargar CSV
+	function downloadCSV() {
+	if (payments.length === 0) return;
+	const headers = ['Fecha', 'Concepto', 'Monto', 'Nº Transacción', isAdmin ? 'Estudiante' : '', 'Estado'];
+	const rows = payments.map(p => [
+		formatDate(p.created_at),
+		p.concepto,
+		p.cantidad_pago,
+		p.numero_transaccion,
+		isAdmin ? p.estudiante_id : '',
+		p.estado_pago
+	]);
+	const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+	const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement("a");
+	link.setAttribute("href", url);
+	link.setAttribute("download", `pagos_${new Date().toISOString()}.csv`);
+	link.click();
+	}
+
 </script>
 
 <div class="space-y-6">
@@ -258,6 +281,9 @@
 			
 			<Button variant="secondary" onclick={loadPayments} loading={loading}>
 				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
+			</Button>
+			<Button onclick={downloadCSV} loading={loading}>
+				Exportar CSV
 			</Button>
 		</div>
 	</div>
