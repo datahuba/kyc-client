@@ -506,27 +506,27 @@
 			<div class="space-y-6 p-4">
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Estudiante ID</label>
+						<span class="block text-xs font-medium text-gray-500 uppercase">Estudiante ID</span>
 						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{selectedPayment.estudiante_id}</p>
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Fecha</label>
+						<span class="block text-xs font-medium text-gray-500 uppercase">Fecha</span>
 						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{formatDate(selectedPayment.created_at)}</p>
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Concepto</label>
+						<span class="block text-xs font-medium text-gray-500 uppercase">Concepto</span>
 						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{selectedPayment.concepto}</p>
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Monto</label>
+						<span class="block text-xs font-medium text-gray-500 uppercase">Monto</span>
 						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{formatCurrency(selectedPayment.cantidad_pago)}</p>
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Nº Transacción</label>
+						<span class="block text-xs font-medium text-gray-500 uppercase">Nº Transacción</span>
 						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{selectedPayment.numero_transaccion}</p>
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Estado</label>
+						<span class="block text-xs font-medium text-gray-500 uppercase">Estado</span>
 						<span class={`mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedPayment.estado_pago)}`}>
 							{selectedPayment.estado_pago}
 						</span>
@@ -534,7 +534,7 @@
 				</div>
 
 				<div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Comprobante</label>
+					<span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Comprobante</span>
 					{#if selectedPayment.comprobante_url}
 						<div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900 flex justify-center items-center min-h-[200px]">
 							{#if selectedPayment.comprobante_url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) || selectedPayment.comprobante_url.includes('cloudinary')} 
