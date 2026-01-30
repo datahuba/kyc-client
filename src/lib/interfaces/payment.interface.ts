@@ -17,6 +17,12 @@ export interface CreatePaymentFormData {
 	file: File;
 	inscripcion_id: string;
 	numero_transaccion: string;
+	remitente: string;
+	fecha_comprobante: string; // YYYY-MM-DD
+	monto_comprobante: number;
+	banco: string;
+	glosa?: string;
+	cuenta_destino: string;
 	descuento_aplicado?: number;
 }
 

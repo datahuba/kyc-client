@@ -25,6 +25,14 @@
 	let file: File | null = $state(null);
 	let qrUrl = $state('');
 
+	let remitente = $state('');
+	let fecha_comprobante = $state('');
+	let monto_comprobante = $state(0);
+	let banco = $state('');
+	let glosa = $state('');
+	let cuenta_destino = $state('');
+
+
 	onMount(async () => {
 		try {
 			// Fetch payment config concurrently with enrollments if possible, but sequential is fine for now
@@ -55,7 +63,13 @@
 			const payload: CreatePaymentFormData = {
 				inscripcion_id: selectedEnrollmentId,
 				numero_transaccion: transactionNumber,
-				file: file
+				file: file,
+				remitente,
+				fecha_comprobante,
+				monto_comprobante,
+				banco,
+				glosa,
+				cuenta_destino
 			};
 
 			await paymentService.create(payload);
@@ -93,6 +107,13 @@
 	</div>
 
 	<Input label="Número de Transacción" bind:value={transactionNumber} required placeholder="Ej: 12345678" />
+	<Input label="Remitente" bind:value={remitente} required placeholder="Nombre del remitente" />
+	<Input label="Fecha del Comprobante" type="date" bind:value={fecha_comprobante} required />
+	<Input label="Monto del Comprobante" type="number" min="0" step="0.01" bind:value={monto_comprobante} required />
+	<Input label="Banco" bind:value={banco} required placeholder="Banco emisor" />
+	<Input label="Glosa" bind:value={glosa} placeholder="Opcional: detalle del pago" />
+	<Input label="Cuenta Destino" bind:value={cuenta_destino} required placeholder="Cuenta destino" />
+
 	<div class="flex items-center md:flex-row flex-col justify-center gap-4">
 
 	
