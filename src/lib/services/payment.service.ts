@@ -32,7 +32,18 @@ class PaymentService {
 		formData.append('file', data.file);
 		formData.append('inscripcion_id', data.inscripcion_id);
 		formData.append('numero_transaccion', data.numero_transaccion);
-		
+
+		// --- NUEVOS CAMPOS ---
+        formData.append('remitente', data.remitente);
+        formData.append('banco', data.banco);
+        formData.append('monto_comprobante', data.monto_comprobante.toString());
+        formData.append('fecha_comprobante', data.fecha_comprobante);
+		formData.append('cuenta_destino', data.cuenta_destino);
+
+		// if (data.glosa) {
+        //     formData.append('glosa', data.glosa);
+        // }
+
 		if (data.descuento_aplicado) {
 			formData.append('descuento_aplicado', data.descuento_aplicado.toString());
 		}

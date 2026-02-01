@@ -11,6 +11,12 @@ export interface Payment {
 	inscripcion_id: string;
 	numero_transaccion: string;
 	updated_at: string;
+	// Campos nuevos opcionales para no romper los pagos viejos
+    banco?: string;
+    remitente?: string;
+    cuenta_destino?: string;
+    monto_comprobante?: number;
+    fecha_comprobante?: string;
 }
 
 export interface CreatePaymentFormData {
@@ -18,6 +24,12 @@ export interface CreatePaymentFormData {
 	inscripcion_id: string;
 	numero_transaccion: string;
 	descuento_aplicado?: number;
+	// Nuevos campos obligatorios para la creación
+    remitente: string;
+    banco: string;
+    monto_comprobante: number;
+    fecha_comprobante: string;
+    cuenta_destino: string;
 }
 
 export interface UpdatePaymentRequest extends Partial<CreatePaymentFormData> {

@@ -242,8 +242,15 @@
 	// Función para descargar CSV
 	function downloadCSV() {
 	if (payments.length === 0) return;
-	const headers = ['Fecha', 'Concepto', 'Monto', 'Nº Transacción', isAdmin ? 'Estudiante' : '', 'Estado'];
+	const headers = ['Remitente','Banco','Monto Comprobante','Fecha Comprobante','Cuenta Destino', 'Fecha de Registro', 
+						'Concepto', 'Monto/Cuota', 'Nº Transacción', isAdmin ? 'Estudiante' : '', 'Estado'];
 	const rows = payments.map(p => [
+		p.remitente || 'No disponible',
+		p.banco || 'No disponible',
+		p.monto_comprobante || '0.00',
+		p.fecha_comprobante || '---',
+		p.cuenta_destino || '---',
+
 		formatDate(p.created_at),
 		p.concepto,
 		p.cantidad_pago,
@@ -273,7 +280,7 @@
 		
 		<div class="flex gap-3 w-full md:w-auto">
 			{#if isStudent}
-				<Button onclick={() => isCreateModalOpen = true}>
+				<Button onclick={() => isCreateModalOpen = true} loading={loading}>
 					{#snippet leftIcon()} <PlusIcon class="size-5" /> {/snippet}
 					Registrar Pago
 				</Button>
@@ -362,9 +369,14 @@
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 					<thead class="bg-gray-50 dark:bg-gray-800">
 						<tr>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banco</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Comprobante</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Comprobante</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta destino</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Registro</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto/Cuota</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nº Transacción</th>
 							{#if isAdmin}
 								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estudiante</th>
@@ -376,6 +388,21 @@
 					<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
 						{#each payments as payment}
 							<tr>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+									{payment.remitente || 'No disponible'}
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+									{payment.banco || 'No disponible'}
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+									{payment.monto_comprobante ? formatCurrency(payment.monto_comprobante) : '0.00'}
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+									{payment.fecha_comprobante || '---'}
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+									{payment.cuenta_destino || '---'}
+								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
 									{formatDate(payment.created_at)}
 								</td>
@@ -510,13 +537,46 @@
 						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{selectedPayment.estudiante_id}</p>
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Fecha</label>
-						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{formatDate(selectedPayment.created_at)}</p>
+						<label class="block text-xs font-medium text-gray-500 uppercase">Remitente</label>
+						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">
+							{selectedPayment.remitente || 'No disponible'}
+						</p>
 					</div>
 					<div>
+						<label class="block text-xs font-medium text-gray-500 uppercase">Banco</label>
+						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">
+							{selectedPayment.banco || 'No registrado'}
+						</p>
+					</div>
+
+					<div>
+						<label class="block text-xs font-medium text-gray-500 uppercase">Monto Comprobante (Bs)</label>
+						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">
+							{selectedPayment.monto_comprobante ? formatCurrency(selectedPayment.monto_comprobante) : '---'}
+						</p>
+					</div>
+					
+					<div>
+						<label class="block text-xs font-medium text-gray-500 uppercase">Fecha Comprobante</label>
+						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">
+							{selectedPayment.fecha_comprobante || '---'}
+						</p>
+					</div>
+					
+					<div>
+						<label class="block text-xs font-medium text-gray-500 uppercase">Cuenta Destino</label>
+						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">
+							{selectedPayment.cuenta_destino || '---'}
+						</p>
+					</div>
+					<!-- <div>
+						<label class="block text-xs font-medium text-gray-500 uppercase">Fecha</label>
+						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{formatDate(selectedPayment.created_at)}</p>
+					</div> -->
+					<!-- <div>
 						<label class="block text-xs font-medium text-gray-500 uppercase">Concepto</label>
 						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{selectedPayment.concepto}</p>
-					</div>
+					</div> -->
 					<div>
 						<label class="block text-xs font-medium text-gray-500 uppercase">Monto</label>
 						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{formatCurrency(selectedPayment.cantidad_pago)}</p>
