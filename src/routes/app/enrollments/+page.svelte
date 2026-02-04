@@ -12,9 +12,10 @@
 	import Select from '$lib/components/ui/select.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
-	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
+	import { alert,formatDate, formatCurrency } from '$lib/utils';
+	
 
 	let enrollments: Enrollment[] = $state([]);
 	let studentsMap: Record<string, Student> = $state({});
@@ -191,6 +192,8 @@
 	}
 
 	function getDropdownOptions(enrollment: Enrollment) {
+		// Si es estudiante, devolvemos una lista vacía o solo con "Ver"
+        if ($userStore.role === 'student') return [];
 		return [
 			{
 				label: 'Editar',
@@ -215,6 +218,18 @@
 	function getCourseName(id: string) {
 		return coursesMap[id]?.nombre_programa || 'Desconocido';
 	}
+
+	function getStatusColor(status: string) {
+		switch (status) {
+			case 'activo': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+			case 'pendiente_pago': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+			case 'suspendido': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+			case 'completado': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+			case 'cancelado': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
+			default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
+		}
+	}
+
 </script>
 
 <div class="space-y-6">
@@ -318,8 +333,8 @@
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pagado</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Saldo</th>
 					
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">D. Curso</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">D. Personal</th>
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dto. Curso</th>
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dto. Personal</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
 						<th scope="col" class="relative px-6 py-3">
 							<span class="sr-only">Acciones</span>
@@ -336,19 +351,18 @@
 								<div class="text-sm text-gray-900 dark:text-white">{getCourseName(enrollment.curso_id)}</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-sm text-gray-900 dark:text-white">{new Date(enrollment.fecha_inscripcion).toLocaleDateString()}</div>
+								<div class="text-sm text-gray-600 dark:text-white">{formatDate(enrollment.fecha_inscripcion)}</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-xs text-gray-500 dark:text-gray-400">Total: {enrollment.total_a_pagar}</div>
-								
+								<div class="text-xs text-gray-600 dark:text-gray-400">Total: {formatCurrency(enrollment.total_a_pagar)}</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 							
-								<div class="text-xs text-green-600 dark:text-green-400">Pagado: {enrollment.total_pagado}</div>
+								<div class="text-xs text-green-600 dark:text-green-400">Pagado: {formatCurrency(enrollment.total_pagado)}</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
-								<div class={`text-sm font-medium ${enrollment.saldo_pendiente > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-									{enrollment.saldo_pendiente}
+								<div class={`text-sm font-medium ${formatCurrency(enrollment.saldo_pendiente).includes('0.00') ? 'text-red-600 dark:text-red-400' : 'text-red-600 dark:text-red-400'}`}>
+									{formatCurrency(enrollment.saldo_pendiente)}
 								</div>
 							</td>
 							
@@ -359,29 +373,31 @@
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full text-green-800`}>
-									Bs. {" "}{enrollment.descuento_personalizado || 0}
+									{formatCurrency(enrollment.descuento_personalizado || 0)}
 								</span>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
-								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
+								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(enrollment.estado)}`}>
 									{enrollment.estado}
 								</span>
 							</td>
-							<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-								<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-									<DotsVerticalIcon class="size-5" />
-								</button>
-								{#if openDropdownId === enrollment._id}
-									<div class="absolute right-0 mt-2 w-48 z-10">
-										<DropdownMenu 
-											options={getDropdownOptions(enrollment)} 
-											isOpen={true} 
-											width="w-48" 
-											class="origin-top-right right-0"
-										/>
-									</div>
-								{/if}
-							</td>
+							{#if $userStore.role !== 'student'}
+								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+									<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+										<DotsVerticalIcon class="size-5" />
+									</button>
+									{#if openDropdownId === enrollment._id}
+										<div class="absolute right-0 mt-2 w-48 z-10">
+											<DropdownMenu 
+												options={getDropdownOptions(enrollment)} 
+												isOpen={true} 
+												width="w-48" 
+												class="origin-top-right right-0"
+											/>
+										</div>
+									{/if}
+								</td>
+							{/if}
 						</tr>
 					{/each}
 				</tbody>
@@ -427,21 +443,21 @@
 					<div class="space-y-2 text-sm">
 						<div class="flex justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Fecha:</span>
-							<span class="font-medium text-gray-900 dark:text-white">{new Date(enrollment.fecha_inscripcion).toLocaleDateString()}</span>
+							<span class="font-medium text-gray-900 dark:text-white">{formatDate(enrollment.fecha_inscripcion)}</span>
 						</div>
 						<div class="flex justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Total:</span>
-							<span class="font-medium text-gray-900 dark:text-white">{enrollment.total_a_pagar}</span>
+							<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(enrollment.total_a_pagar)}</span>
 						</div>
 						<div class="flex justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Saldo:</span>
 							<span class={`font-medium ${enrollment.saldo_pendiente > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-								{enrollment.saldo_pendiente}
+								{formatCurrency(enrollment.saldo_pendiente)}
 							</span>
 						</div>
 						<div class="flex justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Estado:</span>
-							<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
+							<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(enrollment.estado)}`}>
 								{enrollment.estado}
 							</span>
 						</div>

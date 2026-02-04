@@ -1,4 +1,4 @@
-	<script lang="ts">
+<script lang="ts">
 	import { enrollmentService, discountService } from '$lib/services';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
@@ -7,6 +7,7 @@
 	import { CheckIcon } from '$lib/icons/outline';
 	import type { Course, CreateEnrollmentRequest, Enrollment, Student, Discount } from '$lib/interfaces';
 	import { onMount } from 'svelte';
+
 
 	interface Props {
 		enrollment?: Enrollment | null;
@@ -56,9 +57,9 @@
 			};
 			editData = {
 				estado: enrollment.estado,
-				total_a_pagar: enrollment.total_a_pagar,
-				total_pagado: enrollment.total_pagado,
-				saldo_pendiente: enrollment.saldo_pendiente
+				total_a_pagar: Number(enrollment.total_a_pagar.toFixed(2)),
+				total_pagado: Number(enrollment.total_pagado.toFixed(2)),
+				saldo_pendiente: Number(enrollment.saldo_pendiente.toFixed(2))
 			};
 		} else {
 			formData = {

@@ -11,8 +11,9 @@
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
 	import { alert } from '$lib/utils';
-	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
+	import { PlusIcon, DotsVerticalIcon, DownloadIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
+	import { formatCurrency, formatDate } from '$lib/utils';
 
 	let courses: Course[] = $state([]);
 	let loading = $state(false);
@@ -187,6 +188,58 @@
 			}
 		];
 	}
+
+	// Export students list per course to CSV
+    function exportCourseStudentsToCSV() {
+        // 1. Validar que tengamos datos
+        if (!courseStudents || courseStudents.length === 0) {
+            alert('error', 'No hay estudiantes inscritos para exportar.');
+            return;
+        }
+
+        // 2. Encabezados del CSV
+        const headers = ["Estudiante", "CI", "Email", "Celular", "Estado", "Tipo", "Fecha Inscripcion", "Total", "Pagado", "Saldo"];
+        
+        try {
+            // 3. Mapear los datos según tu estructura: student.contacto, student.inscripcion, etc.
+            const rows = courseStudents.map(s => [
+                `"${s.nombre}"`,
+                s.carnet,
+                s.contacto.email,
+                s.contacto.celular,
+                s.inscripcion.estado,
+                s.inscripcion.tipo_estudiante,
+                formatDate(s.inscripcion.fecha_inscripcion),
+                s.financiero.total_a_pagar,
+                s.financiero.total_pagado,
+                s.financiero.saldo_pendiente
+            ]);
+
+            // 4. Formato CSV con soporte de tildes
+            const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+            const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            
+            // 5. Nombre dinámico: Inscritos_NombrePrograma_2026.csv
+            const year = new Date().getFullYear();
+            const courseNameClean = (selectedCourseStudents?.nombre_programa || 'curso').replace(/\s+/g, '_');
+            const fileName = `Inscritos_${courseNameClean}_${year}.csv`;
+
+            // 6. Descarga
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+        } catch (error) {
+            console.error("Error al exportar:", error);
+            alert('error', 'Ocurrió un error al generar el archivo CSV');
+        }
+    }
+
 </script>
 
 	<div class="space-y-6">
@@ -429,6 +482,17 @@
 				<p class="text-gray-500 dark:text-gray-400">No hay estudiantes inscritos en este curso.</p>
 			</div>
 		{:else}
+			<div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Total: <span class="font-bold text-gray-900 dark:text-white">{courseStudents.length} inscritos</span>
+                </p>
+                <Button variant="secondary" onclick={exportCourseStudentsToCSV} class="flex items-center gap-2 text-sm">
+					{#snippet leftIcon()}
+						<DownloadIcon class="size-4" />
+					{/snippet}
+					Descargar CSV
+                </Button>
+            </div>
 			<div class="overflow-x-auto">
 				<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 					<thead class="bg-gray-50 dark:bg-gray-900">
@@ -466,12 +530,12 @@
 										{student.inscripcion.estado}
 									</span>
 									<div class="text-xs text-gray-500 dark:text-gray-400 mt-1 capitalize">{student.inscripcion.tipo_estudiante}</div>
-									<div class="text-xs text-gray-400 mt-0.5">{new Date(student.inscripcion.fecha_inscripcion).toLocaleDateString()}</div>
+									<div class="text-xs text-gray-400 mt-0.5">{formatDate(student.inscripcion.fecha_inscripcion)}</div>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
-									<div class="text-sm text-gray-900 dark:text-white">Total: {student.financiero.total_a_pagar}</div>
-									<div class="text-xs text-green-600">Pagado: {student.financiero.total_pagado}</div>
-									<div class="text-xs text-red-500">Saldo: {student.financiero.saldo_pendiente}</div>
+									<div class="text-sm text-gray-900 dark:text-white">Total: {formatCurrency(student.financiero.total_a_pagar)}</div>
+									<div class="text-xs text-green-600">Pagado: {formatCurrency(student.financiero.total_pagado)}</div>
+									<div class="text-xs text-red-500">Saldo: {formatCurrency(student.financiero.saldo_pendiente)}</div>
 									<div class="w-full bg-gray-200 rounded-full h-1.5 mt-2 dark:bg-gray-700">
 										<div class="bg-blue-600 h-1.5 rounded-full" style={`width: ${Math.min(student.financiero.avance_pago, 100)}%`}></div>
 									</div>

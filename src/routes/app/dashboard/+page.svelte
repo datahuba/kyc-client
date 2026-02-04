@@ -8,6 +8,7 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import { goto } from '$app/navigation';
 	import DashboardSkeleton from '$lib/components/skeletons/DashboardSkeleton.svelte';
+	import { formatDate } from '$lib/utils';
 
 	let loading = true;
 	let stats = {
@@ -107,7 +108,8 @@
 		<!-- Stats Grid -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 			<!-- Students Card -->
-			<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between">
+			 <a href="/app/students" class="block">
+			<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg">
 				<div>
 					<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Estudiantes</p>
 					<p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.students.total}</p>
@@ -117,9 +119,11 @@
 					<UsersIcon class="size-8" />
 				</div>
 			</div>
+			 </a>
 
 			<!-- Courses Card -->
-			<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between">
+			<a href="/app/courses" class="block">
+			<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg">
 				<div>
 					<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Cursos</p>
 					<p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.courses.total}</p>
@@ -129,9 +133,11 @@
 					<TagIcon class="size-8" />
 				</div>
 			</div>
+			</a>
 
 			<!-- Enrollments Card -->
-			<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between">
+			<a href="/app/enrollments" class="block">
+			<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg">
 				<div>
 					<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Inscripciones</p>
 					<p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.enrollments.total}</p>
@@ -141,9 +147,11 @@
 					<ClipboardIcon class="size-8" />
 				</div>
 			</div>
+			</a>
 
 			<!-- Revenue Card -->
-			<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between">
+			<a href="/app/payments" class="block">
+			<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg">
 				<div>
 					<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Ingresos</p>
 					<p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{formatCurrency(stats.payments.revenue)}</p>
@@ -153,15 +161,16 @@
 					<CreditCardIcon class="size-8" />
 				</div>
 			</div>
+			</a>
 		</div>
 
 		<!-- Recent Activity Section -->
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 			<!-- Recent Enrollments -->
 			<Card>
 				<div class="flex justify-between items-center mb-4">
 					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Inscripciones Recientes</h3>
-					<a href="/app/enrollments" class="text-sm text-primary-600 hover:text-primary-500">Ver todas</a>
+					<a href="/app/enrollments" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105">Ver todas</a>
 				</div>
 				<div class="overflow-x-auto">
 					<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -178,7 +187,7 @@
 									<td class="px-4 py-3 text-sm text-gray-900 dark:text-white">{enrollment.studentName}</td>
 									<td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{enrollment.courseName}</td>
 									<td class="px-4 py-3 text-sm text-right text-gray-500 dark:text-gray-400">
-										{new Date(enrollment.created_at).toLocaleDateString()}
+										{formatDate(enrollment.created_at)}
 									</td>
 								</tr>
 							{/each}
@@ -194,7 +203,7 @@
 			<Card>
 				<div class="flex justify-between items-center mb-4">
 					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Pagos Recientes</h3>
-					<a href="/app/payments" class="text-sm text-primary-600 hover:text-primary-500">Ver todos</a>
+					<a href="/app/payments" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105">Ver todos</a>
 				</div>
 				<div class="overflow-x-auto">
 					<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">

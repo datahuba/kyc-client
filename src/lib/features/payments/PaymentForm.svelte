@@ -116,7 +116,7 @@
             <Input label="Nombre del Remitente" bind:value={remitente} required placeholder="Como figura en el voucher" />
             
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Banco</label>
+                <label for="banco" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Banco</label>
                 <select bind:value={banco} required class="w-full rounded-md border-gray-300 dark:bg-gray-700 dark:text-white sm:text-sm">
                     <option value="">Seleccione Banco</option>
                     {#each bancosDisponibles as b} <option value={b}>{b}</option> {/each}
@@ -126,12 +126,12 @@
             <Input label="Monto Pagado (Bs)" type="number" step="0.01" bind:value={montoComprobante} required placeholder="0.00" />
             
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha del Voucher</label>
+                <label for="fechaComprobante" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha del Voucher</label>
                 <input type="date" bind:value={fechaComprobante} required class="w-full rounded-md border-gray-300 dark:bg-gray-700 dark:text-white sm:text-sm" />
             </div>
 
             <div class="md:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cuenta Destino (Nuestra Institución)</label>
+                <label for="cuentaDestino" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cuenta Destino (Nuestra Institución)</label>
                 <select bind:value={cuentaDestino} required class="w-full rounded-md border-gray-300 dark:bg-gray-700 dark:text-white sm:text-sm">
                     <option value="">¿A qué cuenta realizó el pago?</option>
                     {#each cuentasInstitucion as c} <option value={c}>{c}</option> {/each}
@@ -153,7 +153,7 @@
         {/if}
 
         <div class="flex-[2] space-y-1">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Archivo del Comprobante</label>
+            <label for="comprobante" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Archivo del Comprobante</label>
             <FileUpload
                 id="comprobante"
                 accept="image/*,application/pdf"

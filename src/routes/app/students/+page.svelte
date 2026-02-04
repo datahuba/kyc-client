@@ -11,10 +11,12 @@
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import StudentDetails from '$lib/features/students/StudentDetails.svelte';
 	import StudentForm from '$lib/features/students/StudentForm.svelte';
-	import { PlusIcon, DotsVerticalIcon, UserIcon, CheckIcon, XIcon, FileTextIcon } from '$lib/icons/outline';
+	import { PlusIcon, DotsVerticalIcon, UserIcon, CheckIcon, XIcon, FileTextIcon, DownloadIcon } from '$lib/icons/outline';
 	import { alert } from '$lib/utils';
 	import Input from '$lib/components/ui/input.svelte';
 	import { Pagination } from '$lib/components/ui';
+	import { formatDate, formatCurrency } from '$lib/utils';
+	import PlaneIcon from '$lib/icons/outline/planeIcon.svelte';
 
 	let students: Student[] = $state([]);
 	let loading = $state(true);
@@ -295,17 +297,70 @@
 
 		return options;
 	}
+
+	function downloadStudentsCSV() {
+        // 1. Usamos la variable 'students' que ya tiene los datos cargados en la tabla
+        if (!students || students.length === 0) {
+            alert('error', 'No hay datos en la tabla para descargar');
+            return;
+        }
+
+        // 2. Definir encabezados (ajustados a tu tabla actual)
+        const headers = ["Estudiante", "Email", "Registro", "Carnet", "Contacto", "Domicilio", "Estado", "Título" ];
+        
+        try {
+            // 3. Mapear los datos de la variable reactiva 'students'
+            const rows = students.map(s => [
+                `"${s.nombre}"`,      
+                s.email || 'N/A',
+                s.registro || 'N/A',
+                s.carnet || 'N/A',
+                s.celular || 'N/A',   
+                `"${s.domicilio || 'N/A'}"`,
+				s.activo ? 'Activo' : 'Inactivo',
+				s.titulo ? s.titulo.estado : 'Sin Título'
+            ]);
+
+            // 4. Generar contenido con soporte para tildes (BOM UTF-8)
+            const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+            const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            // 5. Crear link y disparar descarga
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `lista_estudiantes_${new Date().getTime()}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link); // Limpieza
+            URL.revokeObjectURL(url);
+            
+        } catch (error) {
+            console.error("Error al exportar CSV:", error);
+            alert('error', 'Ocurrió un error al generar el archivo');
+        }
+    }
+
 </script>
 
 <div class="space-y-6">
-	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+	<div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
 		<Heading level="h1">Estudiantes</Heading>
-		<Button onclick={handleCreate}>
-			{#snippet leftIcon()}
-				<PlusIcon class="size-5" />
-			{/snippet}
-			Nuevo Estudiante
-		</Button>
+		<div class="flex gap-3 ml-auto">
+			<Button onclick={downloadStudentsCSV} variant="secondary">
+				{#snippet leftIcon()}
+					<DownloadIcon class="size-5" />
+				{/snippet}
+				Descargar CSV
+			</Button>
+			<Button onclick={handleCreate}>
+				{#snippet leftIcon()}
+					<PlusIcon class="size-5" />
+				{/snippet}
+				Nuevo Estudiante
+			</Button>
+		</div>
+		
 	</div>
 
 	<!-- Filters -->
@@ -565,12 +620,12 @@
 										{new Date(enrollment.fecha_inscripcion).toLocaleDateString()}
 									</td>
 									<td class="px-6 py-4 whitespace-nowrap">
-										<div class="text-xs text-gray-500">Total: {enrollment.total_a_pagar}</div>
-										<div class="text-xs text-green-600">Pagado: {enrollment.total_pagado}</div>
+										<div class="text-xs text-gray-500">Total: {formatCurrency(enrollment.total_a_pagar)}</div>
+										<div class="text-xs text-green-600">Pagado: {formatCurrency(enrollment.total_pagado)}</div>
 									</td>
 									<td class="px-6 py-4 whitespace-nowrap">
 										<span class={`font-medium ${enrollment.saldo_pendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>
-											{enrollment.saldo_pendiente}
+											{formatCurrency(enrollment.saldo_pendiente)}
 										</span>
 									</td>
 									<td class="px-6 py-4 whitespace-nowrap">

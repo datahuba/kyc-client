@@ -82,7 +82,7 @@
 				{#each studentShortcuts as shortcut}
 					<button 
 						onclick={() => goto(shortcut.href)}
-						class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 text-left w-full group"
+						class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm hover:scale-105 transition-transform hover:shadow-lg text-left w-full group cursor-pointer"
 					>
 						<div class={`inline-flex p-3 rounded-lg bg-light-secondary text-light-primary mb-4 group-hover:scale-105 transition-transform`}>
 							<shortcut.icon class="size-8" />

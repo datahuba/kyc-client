@@ -16,10 +16,12 @@
 		DotsVerticalIcon, 
 		CheckIcon, 
 		XIcon, 
-		RefreshIcon 
+		RefreshIcon,
+		DownloadIcon
 	} from '$lib/icons/outline';
 	import { alert, formatDate, formatCurrency } from '$lib/utils';
 	import Select from '$lib/components/ui/select.svelte';
+	
 
 	let payments: Payment[] = $state([]);
 	let loading = $state(true);
@@ -247,7 +249,7 @@
 	const rows = payments.map(p => [
 		p.remitente || 'No disponible',
 		p.banco || 'No disponible',
-		p.monto_comprobante || '0.00',
+		formatCurrency(p.monto_comprobante ?? 0) || '0.00',
 		p.fecha_comprobante || '---',
 		p.cuenta_destino || '---',
 
@@ -279,19 +281,19 @@
 		</div>
 		
 		<div class="flex gap-3 w-full md:w-auto">
+			<Button variant="secondary" onclick={loadPayments} loading={loading}>
+				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
+			</Button>
+			<Button variant="secondary" onclick={downloadCSV} loading={loading}>
+				{#snippet leftIcon()} <DownloadIcon class="size-5" /> {/snippet}
+				Descargar CSV
+			</Button>
 			{#if isStudent}
 				<Button onclick={() => isCreateModalOpen = true} loading={loading}>
 					{#snippet leftIcon()} <PlusIcon class="size-5" /> {/snippet}
 					Registrar Pago
 				</Button>
 			{/if}
-			
-			<Button variant="secondary" onclick={loadPayments} loading={loading}>
-				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
-			</Button>
-			<Button onclick={downloadCSV} loading={loading}>
-				Exportar CSV
-			</Button>
 		</div>
 	</div>
 
@@ -363,24 +365,24 @@
 	</div>
 
 	{#if loading && payments.length === 0}
-		<TableSkeleton columns={7} rows={10} />
+		<TableSkeleton columns={10} rows={10} />
 	{:else}
 		<div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow">
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 					<thead class="bg-gray-50 dark:bg-gray-800">
 						<tr>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nº Transacción</th>
+							<!-- {#if isAdmin}
+								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estudiante ID</th>
+							{/if} -->
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banco</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Comprobante</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Comprobante</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta destino</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Registro</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
+							<!-- <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th> -->
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto/Cuota</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nº Transacción</th>
-							{#if isAdmin}
-								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estudiante</th>
-							{/if}
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
 							<th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
 						</tr>
@@ -388,43 +390,43 @@
 					<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
 						{#each payments as payment}
 							<tr>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
+									{payment.numero_transaccion}
+								</td>
+								<!-- {#if isAdmin}
+									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white"> -->
+										<!-- We might not have student name populated in payment object, checking interface... -->
+										<!-- Interface implies just `estudiante_id`. If backend populates it, great. If not, we show ID or need to fetch. -->
+										<!-- Assuming backend populates or we just show ID for MVP unless we want to fetch user. -->
+										<!-- For now, check if student_id is an object or string. Interface says string. -->
+										<!-- Display ID or '...' if simple string. -->
+										<!-- {payment.estudiante_id} 
+									</td>
+								{/if} -->
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
 									{payment.remitente || 'No disponible'}
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
 									{payment.banco || 'No disponible'}
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
 									{payment.monto_comprobante ? formatCurrency(payment.monto_comprobante) : '0.00'}
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-									{payment.fecha_comprobante || '---'}
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
+									{formatDate(payment.fecha_comprobante || '---')}
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
 									{payment.cuenta_destino || '---'}
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-									{formatDate(payment.created_at)}
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
+									{formatDate(payment.created_at || '---')}
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+								<!-- <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-white">
 									{payment.concepto}
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+								</td> -->
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
 									{formatCurrency(payment.cantidad_pago)}
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-									{payment.numero_transaccion}
-								</td>
-								{#if isAdmin}
-									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-										<!-- We might not have student name populated in payment object, checking interface... -->
-										<!-- Interface implies just `estudiante_id`. If backend populates it, great. If not, we show ID or need to fetch. -->
-										<!-- Assuming backend populates or we just show ID for MVP unless we want to fetch user. -->
-										<!-- For now, check if student_id is an object or string. Interface says string. -->
-										<!-- Display ID or '...' if simple string. -->
-										{payment.estudiante_id} 
-									</td>
-								{/if}
 								<td class="px-6 py-4 whitespace-nowrap">
 									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(payment.estado_pago)}`}>
 										{payment.estado_pago}
@@ -449,7 +451,7 @@
 						{/each}
 						{#if payments.length === 0}
 							<tr>
-								<td colspan={isAdmin ? 7 : 6} class="px-6 py-4 text-center text-sm text-gray-500">
+								<td colspan={isAdmin ? 7 : 6} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
 									No se encontraron pagos.
 								</td>
 							</tr>
@@ -533,60 +535,58 @@
 			<div class="space-y-6 p-4">
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Estudiante ID</label>
-						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{selectedPayment.estudiante_id}</p>
+						<label for="estdianteID" class="block text-xs font-medium text-gray-900 uppercase">Estudiante ID</label>
+						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="estudianteID">{selectedPayment.estudiante_id}</p>
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Remitente</label>
-						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">
-							{selectedPayment.remitente || 'No disponible'}
-						</p>
+						<label for="remitente" class="block text-xs font-medium text-gray-900 uppercase">Remitente</label>
+						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="remitente">{selectedPayment.remitente || 'No disponible'}</p>
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Banco</label>
-						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">
+						<label for="banco" class="block text-xs font-medium text-gray-900 uppercase">Banco</label>
+						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="banco">
 							{selectedPayment.banco || 'No registrado'}
 						</p>
 					</div>
 
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Monto Comprobante (Bs)</label>
-						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">
+						<label for="montoComprobante" class="block text-xs font-medium text-gray-900 uppercase">Monto Comprobante (Bs)</label>
+						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="montoComprobante">
 							{selectedPayment.monto_comprobante ? formatCurrency(selectedPayment.monto_comprobante) : '---'}
 						</p>
 					</div>
 					
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Fecha Comprobante</label>
-						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">
-							{selectedPayment.fecha_comprobante || '---'}
+						<label for="fechaComprobante" class="block text-xs font-medium text-gray-900 uppercase">Fecha Comprobante</label>
+						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="fechaComprobante">
+							{selectedPayment.fecha_comprobante ? formatDate(selectedPayment.fecha_comprobante) : '---'}
 						</p>
 					</div>
 					
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Cuenta Destino</label>
-						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">
+						<label for="cuentaDestino" class="block text-xs font-medium text-gray-900 uppercase">Cuenta Destino</label>
+						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="cuentaDestino">
 							{selectedPayment.cuenta_destino || '---'}
 						</p>
 					</div>
 					<!-- <div>
 						<label class="block text-xs font-medium text-gray-500 uppercase">Fecha</label>
-						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{formatDate(selectedPayment.created_at)}</p>
+						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1">{formatDate(selectedPayment.created_at)}</p>
 					</div> -->
 					<!-- <div>
 						<label class="block text-xs font-medium text-gray-500 uppercase">Concepto</label>
-						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{selectedPayment.concepto}</p>
+						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1">{selectedPayment.concepto}</p>
 					</div> -->
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Monto</label>
-						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{formatCurrency(selectedPayment.cantidad_pago)}</p>
+						<label for="monto" class="block text-xs font-medium text-gray-900 uppercase">Monto/Cuota</label>
+						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="monto">{formatCurrency(selectedPayment.cantidad_pago)}</p>
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Nº Transacción</label>
-						<p class="text-sm font-medium text-gray-900 dark:text-white mt-1">{selectedPayment.numero_transaccion}</p>
+						<label for="numeroTransaccion" class="block text-xs font-medium text-gray-900 uppercase">Nº Transacción</label>
+						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="numeroTransaccion">{selectedPayment.numero_transaccion}</p>
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Estado</label>
+						<label for="estado" class="block text-xs font-medium text-gray-900 uppercase">Estado</label>
 						<span class={`mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedPayment.estado_pago)}`}>
 							{selectedPayment.estado_pago}
 						</span>
@@ -594,7 +594,7 @@
 				</div>
 
 				<div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Comprobante</label>
+					<label for="comprobante" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Comprobante</label>
 					{#if selectedPayment.comprobante_url}
 						<div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900 flex justify-center items-center min-h-[200px]">
 							{#if selectedPayment.comprobante_url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) || selectedPayment.comprobante_url.includes('cloudinary')} 
