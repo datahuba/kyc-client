@@ -10,7 +10,7 @@
 		QrCodeIcon,
 		FileTextIcon
 	} from '$lib/icons/outline';
-	import { slide } from 'svelte/transition';
+	import { slide, fade } from 'svelte/transition';
 	import Menu2Icon from '$lib/icons/outline/menu2Icon.svelte';
 	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon } from '$lib/icons/solid';
 	import { goto } from '$app/navigation';
@@ -21,6 +21,9 @@
 	}
 
 	let { isOpen, onClose }: Props = $props();
+
+	// Estado para colapsar en Desktop
+	let isCollapsed = $state(false);
 
 	const navigation = [
 				// Student roles
@@ -69,32 +72,44 @@
 
 <!-- Mobile sidebar backdrop -->
 {#if isOpen}
-	<div 
+	<button 
 		class="fixed inset-0 z-40 bg-gray-900/80 backdrop-blur-sm lg:hidden"
 		onclick={onClose}
-		transition:slide={{ duration: 200, axis: 'y' }} 
-	></div>
+		onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClose(); }}
+		aria-label="Close sidebar"
+		type="button"
+		transition:slide={{ duration: 200, axis: 'y' }}
+	></button>
 {/if}
 
 <!-- Sidebar -->
-<div class={`
-	fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
+<div class={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
 	transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
-	${isOpen ? 'translate-x-0' : '-translate-x-full'}
-`}>
+	${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+    ${isCollapsed ? 'lg:w-20' : 'w-72'}
+	`}>
+	
 	<div class="flex h-16 items-center justify-between px-6 border-b border-gray-200 dark:border-gray-800">
-		<span class="text-xl font-bold text-light-tertiary dark:text-light-tertiary">KyC</span>
+		{#if !isCollapsed}
+            <span class="text-xl font-bold text-light-tertiary dark:text-light-tertiary" in:fade>KyC</span>
+        {/if}
 		<button 
-			type="button" 
-			class="-m-2.5 p-2.5 text-gray-700 dark:text-gray-200 lg:hidden"
-			onclick={onClose}
-		>
-			<span class="sr-only">Cerrar sidebar</span>
-			<XIcon class="size-6" />
-		</button>
+            type="button" 
+            class="hidden lg:block -m-2.5 p-2.5 text-gray-500 hover:text-primary-600 transition-colors"
+            onclick={() => isCollapsed = !isCollapsed}
+        >
+            <Menu2Icon class="size-6" />
+        </button>
+		<button 
+            type="button" 
+            class="-m-2.5 p-2.5 text-gray-700 dark:text-gray-200 lg:hidden"
+            onclick={onClose}
+        >
+            <XIcon class="size-6" />
+        </button>
 	</div>
 
-	<div class="flex flex-col gap-y-5 overflow-y-auto px-6 pb-4 pt-8 h-[calc(100vh-4rem)]">
+	<div class="flex flex-col gap-y-5 overflow-y-auto px-4 pb-4 pt-8 h-[calc(100vh-4rem)] scrollbar-hide">
 		<nav class="flex flex-1 flex-col">
 			<ul role="list" class="flex flex-1 flex-col gap-y-7">
 				<li>
@@ -103,34 +118,58 @@
 							<li>
 								<a
 									href={item.href}
+									title={isCollapsed ? item.name : ''}
 									class={`
-										group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold
-										${isCurrent(item.href)
-											? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400'
-											: 'text-gray-700 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'}
-									`}
+                                        group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all
+                                        ${isCollapsed ? 'justify-center px-0' : 'px-2'}
+                                        ${isCurrent(item.href)
+                                            ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400'
+                                            : 'text-gray-700 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'}
+                                    `}
 								>
 									{#snippet icon()}
 										<item.icon class={`size-6 shrink-0 ${isCurrent(item.href) ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 group-hover:text-primary-600 dark:group-hover:text-primary-400'}`} />
 									{/snippet}
 									{@render icon()}
-									{item.name}
+									{#if !isCollapsed}
+                                        <span in:fade={{ duration: 100 }}>{item.name}</span>
+                                    {/if}
 								</a>
 							</li>
 						{/each}
 					</ul>
 				</li>
-				
 				<li class="mt-auto">
-					<button
-						onclick={logout}
-						class="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-red-600 dark:hover:text-red-400 w-full text-left"
-					>
-						<LogoutIcon class="size-6 shrink-0 text-gray-400 group-hover:text-red-600 dark:group-hover:text-red-400" />
-						Cerrar Sesión
-					</button>
-				</li>
+                    <button
+                        onclick={logout}
+                        title={isCollapsed ? 'Cerrar Sesión' : ''}
+                        class={`
+                            group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 
+                            hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-red-600 dark:hover:text-red-400 w-full text-left transition-all
+                            ${isCollapsed ? 'justify-center px-0' : 'px-2'}
+                        `}
+                    >
+                        <LogoutIcon class="size-6 shrink-0 text-gray-400 group-hover:text-red-600 dark:group-hover:text-red-400" />
+                        {#if !isCollapsed}
+                            <span in:fade={{ duration: 100 }}>Cerrar Sesión</span>
+                        {/if}
+                    </button>
+                </li>
 			</ul>
 		</nav>
 	</div>
 </div>
+
+	
+
+
+<style>
+    /* Ocultar scrollbar pero permitir scroll */
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+</style>
