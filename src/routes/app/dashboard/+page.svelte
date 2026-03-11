@@ -21,6 +21,21 @@
 	let recentEnrollments: (Enrollment & { studentName?: string, courseName?: string })[] = [];
 	let recentPayments: (Payment & { studentName?: string, courseName?: string })[] = [];
 
+	interface CourseBreakdown {
+		id: string;
+		nombre: string;
+		codigo: string;
+		tipo: string;
+		modalidad: string;
+		activo: boolean;
+		inscritos: number;
+		inscritosActivos: number;
+		ingresos: number;
+		saldoPendiente: number;
+		pagosPendientes: number;
+	}
+	let courseBreakdown: CourseBreakdown[] = [];
+
 	onMount(async () => {
 		try {
 			const [
@@ -85,6 +100,36 @@
 					studentName: studentsMap[p.estudiante_id] || 'Desconocido',
 					courseName: coursesMap[p.curso_id] || '—'
 				}));
+
+			// ===== DESGLOSE POR CURSO =====
+			courseBreakdown = courses.map(course => {
+				const courseEnrollments = enrollments.filter(e => e.curso_id === course._id);
+				const coursePayments = payments.filter(p => p.curso_id === course._id);
+
+				const inscritos = courseEnrollments.length;
+				const inscritosActivos = courseEnrollments.filter(e => e.estado === 'activo').length;
+				const ingresos = coursePayments
+					.filter(p => p.estado_pago === 'aprobado' || p.estado_pago === 'pagado')
+					.reduce((sum, p) => sum + p.cantidad_pago, 0);
+				const saldoPendiente = courseEnrollments
+					.reduce((sum, e) => sum + (e.saldo_pendiente ?? 0), 0);
+				const pagosPendientes = coursePayments
+					.filter(p => p.estado_pago === 'pendiente').length;
+
+				return {
+					id: course._id,
+					nombre: course.nombre_programa,
+					codigo: course.codigo,
+					tipo: course.tipo_curso,
+					modalidad: course.modalidad,
+					activo: course.activo,
+					inscritos,
+					inscritosActivos,
+					ingresos,
+					saldoPendiente,
+					pagosPendientes
+				};
+			}).sort((a, b) => b.inscritos - a.inscritos);
 
 		} catch (error) {
 			console.error('Error loading dashboard data:', error);
@@ -237,5 +282,75 @@
 				</div>
 			</Card>
 		</div>
+
+		<!-- Course Breakdown Section -->
+		<div>
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Desglose por Curso</h2>
+				<a href="/app/courses" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105">Ver cursos</a>
+			</div>
+
+			{#if courseBreakdown.length === 0}
+				<Card>
+					<p class="text-center text-gray-500 py-6">No hay cursos registrados</p>
+				</Card>
+			{:else}
+				<div class="grid grid-cols-1 gap-4">
+					{#each courseBreakdown as course}
+						<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 hover:shadow-md transition-shadow">
+							<!-- Header row -->
+							<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+								<div class="flex items-center gap-3">
+									<div>
+										<span class="text-base font-semibold text-gray-900 dark:text-white">{course.nombre}</span>
+										<span class="ml-2 text-xs text-gray-400 dark:text-gray-500">({course.codigo})</span>
+									</div>
+									<span class={`px-2 py-0.5 text-xs font-medium rounded-full ${course.activo ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+										{course.activo ? 'Activo' : 'Inactivo'}
+									</span>
+								</div>
+								<div class="flex items-center gap-2">
+									<span class="px-2 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 capitalize">{course.tipo}</span>
+									<span class="px-2 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 capitalize">{course.modalidad}</span>
+								</div>
+							</div>
+
+							<!-- Stats row -->
+							<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+								<!-- Inscritos -->
+								<a href={`/app/enrollments?curso_id=${course.id}`} class="group text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
+									<p class="text-2xl font-bold text-blue-700 dark:text-blue-300">{course.inscritos}</p>
+									<p class="text-xs text-blue-600 dark:text-blue-400 mt-0.5">Inscritos</p>
+									{#if course.inscritosActivos < course.inscritos}
+										<p class="text-xs text-blue-500 dark:text-blue-500 mt-0.5">{course.inscritosActivos} activos</p>
+									{/if}
+								</a>
+
+								<!-- Ingresos -->
+								<a href={`/app/payments?curso_id=${course.id}`} class="text-center p-3 rounded-lg bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors">
+									<p class="text-lg font-bold text-green-700 dark:text-green-300 leading-tight">{formatCurrency(course.ingresos)}</p>
+									<p class="text-xs text-green-600 dark:text-green-400 mt-0.5">Recaudado</p>
+								</a>
+
+								<!-- Saldo pendiente -->
+								<div class="text-center p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20">
+									<p class="text-lg font-bold text-orange-700 dark:text-orange-300 leading-tight">{formatCurrency(course.saldoPendiente)}</p>
+									<p class="text-xs text-orange-600 dark:text-orange-400 mt-0.5">Por cobrar</p>
+								</div>
+
+								<!-- Pagos pendientes de aprobar -->
+								<a href={`/app/payments`} class="text-center p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors">
+									<p class="text-2xl font-bold text-yellow-700 dark:text-yellow-300">{course.pagosPendientes}</p>
+									<p class="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">
+										{course.pagosPendientes === 1 ? 'Pago pendiente' : 'Pagos pendientes'}
+									</p>
+								</a>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
 	{/if}
 </div>
