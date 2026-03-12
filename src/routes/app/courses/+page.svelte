@@ -26,12 +26,12 @@
 	let totalPages = $state(1);
 
 	// Filter state
-	let filters = {
+	let filters = $state({
 		q: '',
 		activo: 'all', // 'all', 'true', 'false'
 		tipo_curso: 'all',
 		modalidad: 'all'
-	};
+	});
 	let debounceTimer: any;
 
 	// Modal state
@@ -299,7 +299,7 @@
 				<option value="curso">Curso</option>
 				<option value="taller">Taller</option>
 				<option value="diplomado">Diplomado</option>
-				<option value="maestria">Maestría</option>
+				<option value="maestría">Maestría</option>
 				<option value="doctorado">Doctorado</option>
 				<option value="otro">Otro</option>
 			</select>

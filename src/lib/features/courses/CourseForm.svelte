@@ -145,9 +145,12 @@
 			<option value="">Seleccione un tipo de curso</option>						
 			{#each [
 				{ value: 'curso', label: 'Curso' },
-				{ value: 'diplomado', label: 'Diplomado' },
 				{ value: 'taller', label: 'Taller' },
-				{ value: 'seminario', label: 'Seminario' }
+				{ value: 'diplomado', label: 'Diplomado' },
+				{ value: 'maestría', label: 'Maestría' },
+				{ value: 'doctorado', label: 'Doctorado' },
+				{ value: 'seminario', label: 'Seminario' },
+				{ value: 'otro', label: 'Otro' }
 			] as tipo_curso}
 				<option value={tipo_curso.value}>{tipo_curso.label}</option>
 			{/each}
