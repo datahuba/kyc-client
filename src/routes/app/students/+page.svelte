@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page as appPage } from '$app/stores';
 	import { studentService, enrollmentService, courseService } from '$lib/services';
 	import type { Student, Enrollment, Course } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
@@ -49,12 +50,12 @@
 	let enrollmentsLoading :boolean= $state(false);
 
 	// Filters
-	let filters = {
+	let filters = $state({
 		q: '',
 		activo: 'all', // 'all', 'true', 'false'
 		estado_titulo: 'all',
 		curso_id: ''
-	};
+	});
 	let debounceTimer: any;
 	let allCourses: Course[] = $state([]);
 
@@ -122,9 +123,19 @@
 		loadStudents();
 	}
 
-	onMount(() => {
+	onMount(async () => {
+		// Pre-load courses so the select renders with the correct option from URL param
+		try {
+			const coursesRes = await courseService.getAll(1, 100);
+			allCourses = coursesRes.data;
+		} catch (e) { console.error('Error loading courses', e); }
+
+		// Now set filter from URL — options are already populated
+		const cursoIdParam = $appPage.url.searchParams.get('curso_id');
+		if (cursoIdParam) {
+			filters.curso_id = cursoIdParam;
+		}
 		loadStudents();
-		loadCourses();
 	});
 
 	function handleCreate() {
@@ -298,48 +309,60 @@
 		return options;
 	}
 
-	function downloadStudentsCSV() {
-        // 1. Usamos la variable 'students' que ya tiene los datos cargados en la tabla
-        if (!students || students.length === 0) {
-            alert('error', 'No hay datos en la tabla para descargar');
-            return;
-        }
+	let csvLoading = $state(false);
 
-        // 2. Definir encabezados (ajustados a tu tabla actual)
-        const headers = ["Estudiante", "Email", "Registro", "Carnet", "Contacto", "Domicilio", "Estado", "Título" ];
-        
-        try {
-            // 3. Mapear los datos de la variable reactiva 'students'
-            const rows = students.map(s => [
-                `"${s.nombre}"`,      
-                s.email || 'N/A',
-                s.registro || 'N/A',
-                s.carnet || 'N/A',
-                s.celular || 'N/A',   
-                `"${s.domicilio || 'N/A'}"`,
+	async function downloadStudentsCSV() {
+		csvLoading = true;
+		try {
+			// Fetch ALL students matching current filters (up to 1000)
+			const filterParams: any = {};
+			if (filters.q) filterParams.q = filters.q;
+			if (filters.activo !== 'all') filterParams.activo = filters.activo === 'true';
+			if (filters.estado_titulo !== 'all') filterParams.estado_titulo = filters.estado_titulo;
+			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
+
+			const res = await studentService.getAll(1, 1000, filterParams);
+			const allStudents = res.data ?? [];
+
+			if (allStudents.length === 0) {
+				alert('error', 'No hay datos para descargar');
+				return;
+			}
+
+			const headers = ['Estudiante', 'Email', 'Registro', 'Carnet', 'Contacto', 'Domicilio', 'Estado', 'Título'];
+			const rows = allStudents.map(s => [
+				`"${s.nombre}"`,
+				s.email || 'N/A',
+				s.registro || 'N/A',
+				s.carnet || 'N/A',
+				s.celular || 'N/A',
+				`"${s.domicilio || 'N/A'}"`,
 				s.activo ? 'Activo' : 'Inactivo',
 				s.titulo ? s.titulo.estado : 'Sin Título'
-            ]);
+			]);
 
-            // 4. Generar contenido con soporte para tildes (BOM UTF-8)
-            const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-            const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            
-            // 5. Crear link y disparar descarga
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = `lista_estudiantes_${new Date().getTime()}.csv`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link); // Limpieza
-            URL.revokeObjectURL(url);
-            
-        } catch (error) {
-            console.error("Error al exportar CSV:", error);
-            alert('error', 'Ocurrió un error al generar el archivo');
-        }
-    }
+			const courseName = filters.curso_id
+				? (allCourses.find(c => c._id === filters.curso_id)?.codigo ?? filters.curso_id)
+				: 'todos';
+			const filename = `estudiantes_${courseName}_${new Date().getTime()}.csv`;
+
+			const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');
+			const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = filename;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+		} catch (error) {
+			console.error('Error al exportar CSV:', error);
+			alert('error', 'Ocurrió un error al generar el archivo');
+		} finally {
+			csvLoading = false;
+		}
+	}
 
 </script>
 
@@ -347,7 +370,7 @@
 	<div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
 		<Heading level="h1">Estudiantes</Heading>
 		<div class="flex gap-3 ml-auto">
-			<Button onclick={downloadStudentsCSV} variant="secondary">
+			<Button onclick={downloadStudentsCSV} variant="secondary" loading={csvLoading}>
 				{#snippet leftIcon()}
 					<DownloadIcon class="size-5" />
 				{/snippet}
@@ -360,8 +383,10 @@
 				Nuevo Estudiante
 			</Button>
 		</div>
-		
 	</div>
+
+	<!-- Active course filter chip -->
+	<!-- (removed — filter indicator is now integrated in the select below) -->
 
 	<!-- Filters -->
 	<div class="grid grid-cols-1 md:grid-cols-5 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
@@ -414,17 +439,39 @@
 		</div>
 
 		<!-- Curso -->
-		<div>
-			<select
-				bind:value={filters.curso_id}
-				onchange={handleFilterChange}
-				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-			>
-				<option value="">Todos los cursos</option>
-				{#each allCourses as course}
-					<option value={course._id}>{course.nombre_programa} ({course.codigo})</option>
-				{/each}
-			</select>
+		<div class="flex flex-col gap-1">
+			<div class="relative">
+				<select
+					bind:value={filters.curso_id}
+					onchange={handleFilterChange}
+					class="block w-full rounded-md border-0 py-1.5 pr-8 text-gray-900 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6
+						{filters.curso_id
+							? 'ring-2 ring-inset ring-primary-500 bg-primary-50 font-medium text-primary-900 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500'
+							: 'ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-white dark:ring-gray-600'}"
+				>
+					<option value="">Todos los cursos</option>
+					{#each allCourses as course}
+						<option value={course._id}>{course.nombre_programa} ({course.codigo})</option>
+					{/each}
+				</select>
+				{#if filters.curso_id}
+					<button
+						type="button"
+						onclick={() => { filters.curso_id = ''; page = 1; handleFilterChange(); }}
+						class="absolute right-7 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors z-10"
+						title="Quitar filtro de curso"
+						aria-label="Quitar filtro de curso"
+					>
+						<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+					</button>
+				{/if}
+			</div>
+			{#if filters.curso_id}
+				<span class="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400">
+					<svg class="size-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
+					Filtro activo
+				</span>
+			{/if}
 		</div>
 	</div>
 

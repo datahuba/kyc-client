@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page as appPage } from '$app/stores';
 	import { paymentService, studentService, courseService } from '$lib/services';
 	import type { Payment, Student, Course } from '$lib/interfaces';
 	import { userStore } from '$lib/stores/userStore';
@@ -33,12 +34,12 @@
 	let totalPages = $state(1);
 
 	// Filters
-	let filters = {
+	let filters = $state({
 		q: '',
 		estado: '',
 		curso_id: '',
 		estudiante_id: ''
-	};
+	});
 	let debounceTimer: any;
 
 	// Helper lists for filters
@@ -61,6 +62,9 @@
 	// Computed
 	let isAdmin = $derived($userStore.role === 'admin' || $userStore.role === 'superadmin');
 	let isStudent = $derived($userStore.role === 'student');
+	let coursesMap = $derived(
+		coursesList.reduce((acc, c) => ({ ...acc, [c._id]: c }), {} as Record<string, typeof coursesList[0]>)
+	);
 
 	async function loadPayments() {
 		loading = true;
@@ -136,7 +140,20 @@
 		loadPayments();
 	}
 
-	onMount(() => {
+	onMount(async () => {
+		// Pre-load courses (and students for admin) so the select renders with the correct option
+		const results = await Promise.all([
+			courseService.getAll(1, 100),
+			isAdmin ? studentService.getAll(1, 100) : Promise.resolve(null)
+		]);
+		coursesList = results[0].data;
+		if (results[1]) studentsList = (results[1] as any).data;
+
+		// Now set filter from URL — options are already populated, so select reflects correctly
+		const cursoIdParam = $appPage.url.searchParams.get('curso_id');
+		if (cursoIdParam) {
+			filters.curso_id = cursoIdParam;
+		}
 		loadPayments();
 	});
 
@@ -241,32 +258,61 @@
 	}
 
 
-	// Función para descargar CSV
-	function downloadCSV() {
-	if (payments.length === 0) return;
-	const headers = ['Remitente','Banco','Monto Comprobante','Fecha Comprobante','Cuenta Destino', 'Fecha de Registro', 
-						'Concepto', 'Monto/Cuota', 'Nº Transacción', isAdmin ? 'Estudiante' : '', 'Estado'];
-	const rows = payments.map(p => [
-		p.remitente || 'No disponible',
-		p.banco || 'No disponible',
-		formatCurrency(p.monto_comprobante ?? 0) || '0.00',
-		p.fecha_comprobante || '---',
-		p.cuenta_destino || '---',
+	let csvLoading = $state(false);
 
-		formatDate(p.created_at),
-		p.concepto,
-		p.cantidad_pago,
-		p.numero_transaccion,
-		isAdmin ? p.estudiante_id : '',
-		p.estado_pago
-	]);
-	const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-	const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-	const url = URL.createObjectURL(blob);
-	const link = document.createElement("a");
-	link.setAttribute("href", url);
-	link.setAttribute("download", `pagos_${new Date().toISOString()}.csv`);
-	link.click();
+	// Función para descargar CSV (todos los registros con filtros actuales)
+	async function downloadCSV() {
+		csvLoading = true;
+		try {
+			const filterParams: any = {};
+			if (filters.q) filterParams.q = filters.q;
+			if (filters.estado) filterParams.estado = filters.estado;
+			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
+			if (filters.estudiante_id) filterParams.estudiante_id = filters.estudiante_id;
+
+			const res = await paymentService.getAll(1, 1000, filterParams) as any;
+			const allPayments: Payment[] = Array.isArray(res) ? res : (res?.data ?? []);
+
+			if (allPayments.length === 0) {
+				alert('error', 'No hay datos para descargar');
+				return;
+			}
+
+			const courseName = filters.curso_id
+				? (coursesList.find(c => c._id === filters.curso_id)?.codigo ?? filters.curso_id)
+				: 'todos';
+			const filename = `pagos_${courseName}_${new Date().toISOString().slice(0,10)}.csv`;
+
+			const headers = ['Remitente','Banco','Monto Comprobante','Fecha Comprobante','Cuenta Destino','Fecha Registro','Concepto','Monto/Cuota','Nº Transacción', isAdmin ? 'Estudiante ID' : '', 'Curso', 'Estado'];
+			const rows = allPayments.map(p => [
+				p.remitente || 'No disponible',
+				p.banco || 'No disponible',
+				formatCurrency(p.monto_comprobante ?? 0),
+				p.fecha_comprobante || '---',
+				p.cuenta_destino || '---',
+				formatDate(p.created_at),
+				p.concepto,
+				p.cantidad_pago,
+				p.numero_transaccion,
+				isAdmin ? p.estudiante_id : '',
+				`"${coursesMap[p.curso_id]?.nombre_programa ?? '—'}"`,
+				p.estado_pago
+			]);
+
+			const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');
+			const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.setAttribute('href', url);
+			link.setAttribute('download', filename);
+			link.click();
+			URL.revokeObjectURL(url);
+		} catch (error) {
+			console.error('Error al exportar CSV:', error);
+			alert('error', 'Error al generar el archivo');
+		} finally {
+			csvLoading = false;
+		}
 	}
 
 </script>
@@ -284,7 +330,7 @@
 			<Button variant="secondary" onclick={loadPayments} loading={loading}>
 				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
 			</Button>
-			<Button variant="secondary" onclick={downloadCSV} loading={loading}>
+			<Button variant="secondary" onclick={downloadCSV} loading={csvLoading}>
 				{#snippet leftIcon()} <DownloadIcon class="size-5" /> {/snippet}
 				Descargar CSV
 			</Button>
@@ -335,17 +381,39 @@
 
 		{#if isAdmin}
 			<!-- Curso -->
-			<div>
-				<select
-					bind:value={filters.curso_id}
-					onchange={handleFilterChange}
-					class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-				>
-					<option value="">Todos los cursos</option>
-					{#each coursesList as course}
-						<option value={course._id}>{course.nombre_programa}</option>
-					{/each}
-				</select>
+			<div class="flex flex-col gap-1">
+				<div class="relative">
+					<select
+						bind:value={filters.curso_id}
+						onchange={handleFilterChange}
+						class="block w-full rounded-md border-0 py-1.5 pr-8 text-gray-900 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6
+							{filters.curso_id
+								? 'ring-2 ring-inset ring-primary-500 bg-primary-50 font-medium text-primary-900 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500'
+								: 'ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-white dark:ring-gray-600'}"
+					>
+						<option value="">Todos los cursos</option>
+						{#each coursesList as course}
+							<option value={course._id}>{course.nombre_programa}</option>
+						{/each}
+						</select>
+					{#if filters.curso_id}
+						<button
+							type="button"
+							onclick={() => { filters.curso_id = ''; page = 1; handleFilterChange(); }}
+							class="absolute right-7 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors z-10"
+							title="Quitar filtro de curso"
+							aria-label="Quitar filtro de curso"
+						>
+							<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+						</button>
+					{/if}
+				</div>
+				{#if filters.curso_id}
+					<span class="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400">
+						<svg class="size-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
+						Filtro activo
+					</span>
+				{/if}
 			</div>
 
 			<!-- Estudiante -->
@@ -364,6 +432,8 @@
 		{/if}
 	</div>
 
+
+
 	{#if loading && payments.length === 0}
 		<TableSkeleton columns={10} rows={10} />
 	{:else}
@@ -372,10 +442,8 @@
 					<thead class="bg-gray-50 dark:bg-gray-800">
 						<tr>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nº Transacción</th>
-							<!-- {#if isAdmin}
-								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estudiante ID</th>
-							{/if} -->
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banco</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Comprobante</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Comprobante</th>
@@ -393,16 +461,21 @@
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
 									{payment.numero_transaccion}
 								</td>
-								<!-- {#if isAdmin}
-									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white"> -->
-										<!-- We might not have student name populated in payment object, checking interface... -->
-										<!-- Interface implies just `estudiante_id`. If backend populates it, great. If not, we show ID or need to fetch. -->
-										<!-- Assuming backend populates or we just show ID for MVP unless we want to fetch user. -->
-										<!-- For now, check if student_id is an object or string. Interface says string. -->
-										<!-- Display ID or '...' if simple string. -->
-										<!-- {payment.estudiante_id} 
-									</td>
-								{/if} -->
+								<td class="px-6 py-4 text-sm max-w-[200px]">
+									{#if coursesMap[payment.curso_id]}
+										<button
+											type="button"
+											onclick={() => { filters.curso_id = payment.curso_id; page = 1; handleFilterChange(); }}
+											class="inline-flex flex-col items-start text-left group"
+											title="Filtrar por este curso"
+										>
+											<span class="text-gray-900 dark:text-white font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight">{coursesMap[payment.curso_id].nombre_programa}</span>
+											<span class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{coursesMap[payment.curso_id].codigo}</span>
+										</button>
+									{:else}
+										<span class="text-gray-400 dark:text-gray-500 text-xs">—</span>
+									{/if}
+								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
 									{payment.remitente || 'No disponible'}
 								</td>
