@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/userStore';
-	import { 
-		UsersIcon, 
-		ClipboardIcon, 
-		TagIcon, 
+	import {
+		UsersIcon,
+		ClipboardIcon,
+		TagIcon,
 		XIcon,
 		KeyIcon,
 		QrCodeIcon,
-		FileTextIcon
+		FileTextIcon,
+		AcademicCapIcon
 	} from '$lib/icons/outline';
 	import { slide, fade } from 'svelte/transition';
 	import Menu2Icon from '$lib/icons/outline/menu2Icon.svelte';
@@ -32,6 +33,7 @@
 		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin'] },
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin'] },
 		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin'] },
+		{ name: 'Classroom', href: '/app/classroom', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'student'] },
 		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'student'] },
 		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'student'] },
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin'] },

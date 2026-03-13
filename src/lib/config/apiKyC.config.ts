@@ -9,6 +9,42 @@ interface RequestOptions {
 	customHeaders?: HeadersInit;
 }
 
+function extractErrorMessage(errorBody: unknown): string {
+	if (!errorBody || typeof errorBody !== 'object') {
+		return 'Error en la solicitud';
+	}
+
+	const body = errorBody as {
+		message?: string;
+		detail?: string | Array<{ msg?: string } | string>;
+	};
+
+	if (typeof body.message === 'string' && body.message.trim()) {
+		return body.message;
+	}
+
+	if (typeof body.detail === 'string' && body.detail.trim()) {
+		return body.detail;
+	}
+
+	if (Array.isArray(body.detail) && body.detail.length > 0) {
+		const firstDetail = body.detail[0];
+		if (typeof firstDetail === 'string' && firstDetail.trim()) {
+			return firstDetail;
+		}
+		if (
+			typeof firstDetail === 'object' &&
+			firstDetail !== null &&
+			typeof firstDetail.msg === 'string' &&
+			firstDetail.msg.trim()
+		) {
+			return firstDetail.msg;
+		}
+	}
+
+	return 'Error en la solicitud';
+}
+
 class ApiKyC {
 	// Método para construir headers con autenticación
 	private buildHeaders(options: RequestOptions = {}): HeadersInit {
@@ -83,11 +119,7 @@ class ApiKyC {
 					}
 				}
 
-				throw new AppError(
-					errorBody.message || 'Error en la solicitud',
-					errorType,
-					response.status
-				);
+				throw new AppError(extractErrorMessage(errorBody), errorType, response.status);
 			}
 
 			return response.json();
