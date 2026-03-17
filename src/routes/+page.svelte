@@ -6,12 +6,14 @@
 
   // Subscribe to user store
   let isAuthenticated = false;
-  let loginType: 'admin' | 'student' | null = null;
+  let loginType: 'admin' | 'academic' | null = null;
+  let academicRole: 'teacher' | 'student' | null = null;
   let user: any = null;
 
   userStore.subscribe(state => {
     isAuthenticated = state.isAuthenticated;
     loginType = state.loginType;
+    academicRole = state.academicRole;
     user = state.user;
   });
 
@@ -19,16 +21,20 @@
     userStore.init();
     
     if (isAuthenticated && user) {
-        const route = getRouteByRole(user.role);
+        const route = getRouteByRole(user.role, loginType, academicRole);
         goto(route);
     } else if (!isAuthenticated && loginType) {
         goto('/auth/sign-in');
     }
   });
 
-  function handleSelectRole(type: 'admin' | 'student') {
-    userStore.setLoginType(type);
-    goto('/auth/sign-in');
+  function handleSelectRole(type: 'admin' | 'academic') {
+    if (type === 'academic') {
+      goto('/auth/academic-selection');
+    } else {
+      userStore.setLoginType(type);
+      goto('/auth/sign-in');
+    }
   }
 </script>
 
@@ -58,7 +64,9 @@
       <div class="mb-6 flex justify-between items-end border-b border-slate-200 pb-4">
         <div>
           <h2 class="text-2xl font-bold text-slate-800">Bienvenido, {user?.username || 'Usuario'}</h2>
-          <p class="text-slate-500 text-sm mt-1">Has iniciado sesión como {loginType === 'student' ? 'Estudiante' : 'Administrativo'}.</p>
+          <p class="text-slate-500 text-sm mt-1">
+            Has iniciado sesión como {loginType === 'academic' ? (academicRole === 'teacher' ? 'Docente' : 'Estudiante') : 'Administrativo'}.
+          </p>
         </div>
       </div>
 
@@ -84,10 +92,10 @@
         <p class="text-light-black/70 dark:text-dark-white/70 text-lg">Selecciona tu tipo de cuenta para continuar</p>
     </div>
 
-    <div class="flex flex-wrap gap-4 justify-center max-w-2xl mx-auto px-4">
+    <div class="flex flex-wrap gap-4 justify-center max-w-3xl mx-auto px-4">
 
     <button 
-        onclick={() => handleSelectRole('student')}
+        onclick={() => handleSelectRole('academic')}
         class="group relative overflow-hidden px-8 py-4 rounded-lg bg-light-primary dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-light-secondary dark:hover:border-light-secondary transition-all duration-300 hover:shadow-lg hover:shadow-light-four hover:-translate-y-1"
     >
 
@@ -96,12 +104,11 @@
 
         <div class="relative z-10 flex items-center gap-3">
             <svg class="w-6 h-6 text-gray-700 dark:text-gray-300 group-hover:text-white transition-colors duration-300 group-hover:scale-110 group-hover:rotate-12 transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-                <path d="M6 12v5c3 3 9 3 12 0v-5" />
+                <path d="M12 6.253v13m0-13C6.5 6.253 3 9.585 3 13.667c0 5.202 9 11.053 9 11.053s9-5.851 9-11.053c0-4.082-3.5-7.414-9-7.414z" />
             </svg>
             
             <span class="text-lg font-semibold text-gray-800 dark:text-gray-200 group-hover:text-white transition-colors duration-300">
-                Estudiante
+                Académico
             </span>
         </div>
     </button>

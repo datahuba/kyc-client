@@ -2,7 +2,7 @@ import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { authService } from '$lib/services/auth.service';
 import type { UserResponse, LoginCredentials, Role } from '$lib/interfaces';
-import { AUTH_TOKEN_EXPIRY_KEY, AUTH_TOKEN_KEY, LOGIN_TYPE_KEY, USER_DATA_KEY } from '$lib/constants';
+import { AUTH_TOKEN_EXPIRY_KEY, AUTH_TOKEN_KEY, LOGIN_TYPE_KEY, USER_DATA_KEY, ACADEMIC_ROLE_KEY } from '$lib/constants';
 
 interface UserState {
 	user: UserResponse | null;
@@ -10,7 +10,8 @@ interface UserState {
 	isAuthenticated: boolean;
 	loading: boolean;
 	error: string | null;
-	loginType: 'admin' | 'student' | null;
+	loginType: 'admin' | 'academic' | null;
+	academicRole: 'teacher' | 'student' | null; // Only used when loginType is 'academic'
 	role: Role;
 }
 
@@ -21,6 +22,7 @@ const initialState: UserState = {
 	loading: false,
 	error: null,
 	loginType: null,
+	academicRole: null,
 	role: null
 };
 
@@ -30,7 +32,7 @@ function createUserStore() {
 	return {
 		subscribe,
 		
-		setLoginType: (type: 'admin' | 'student' | null) => {
+		setLoginType: (type: 'admin' | 'academic' | null) => {
 			update(state => ({ ...state, loginType: type }));
 			if (browser) {
 				if (type) {
@@ -41,8 +43,19 @@ function createUserStore() {
 			}
 		},
 
+		setAcademicRole: (academicRole: 'teacher' | 'student' | null) => {
+			update(state => ({ ...state, academicRole }));
+			if (browser) {
+				if (academicRole) {
+					localStorage.setItem(ACADEMIC_ROLE_KEY, academicRole);
+				} else {
+					localStorage.removeItem(ACADEMIC_ROLE_KEY);
+				}
+			}
+		},
+
 		login: async (credentials: LoginCredentials) => {
-			let currentType: 'admin' | 'student' | null = null;
+			let currentType: 'admin' | 'academic' | null = null;
 			
 			update(state => {
 				currentType = state.loginType;
@@ -51,7 +64,7 @@ function createUserStore() {
 
 			try {
 				let loginResponse;
-				if (currentType === 'student') {
+				if (currentType === 'academic') {
 					loginResponse = await authService.loginStudent(credentials);
 				} else {
 					// Default to admin if not specified or explicitly admin
@@ -95,11 +108,12 @@ function createUserStore() {
 				localStorage.removeItem(AUTH_TOKEN_KEY);
 				localStorage.removeItem(USER_DATA_KEY);
 				localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
+				localStorage.removeItem(ACADEMIC_ROLE_KEY);
 			}
 			set(initialState);
 			// Restore login type if it exists in local storage so the UI knows where to go
 			if (browser) {
-				const loginType = localStorage.getItem(LOGIN_TYPE_KEY) as 'admin' | 'student' | null;
+				const loginType = localStorage.getItem(LOGIN_TYPE_KEY) as 'admin' | 'academic' | null;
 				if (loginType) {
 					update(state => ({ ...state, loginType }));
 				}
@@ -110,7 +124,8 @@ function createUserStore() {
 			if (browser) {
 				const token = localStorage.getItem(AUTH_TOKEN_KEY);
 				const userData = localStorage.getItem(USER_DATA_KEY);
-				const loginType = localStorage.getItem(LOGIN_TYPE_KEY) as 'admin' | 'student' | null;
+				const loginType = localStorage.getItem(LOGIN_TYPE_KEY) as 'admin' | 'academic' | null;
+				const academicRole = localStorage.getItem(ACADEMIC_ROLE_KEY) as 'teacher' | 'student' | null;
 				
 				if (token && userData) {
 					try {
@@ -122,16 +137,17 @@ function createUserStore() {
 							loading: false,
 							error: null,
 							loginType,
+							academicRole,
 							role: user.role
 						});
 					} catch (e) {
 						console.error('Error parsing user data from local storage', e);
 						localStorage.removeItem(AUTH_TOKEN_KEY);
 						localStorage.removeItem(USER_DATA_KEY);
-						set({ ...initialState, loginType });
+						set({ ...initialState, loginType, academicRole });
 					}
 				} else {
-					set({ ...initialState, loginType });
+					set({ ...initialState, loginType, academicRole });
 				}
 			}
 		}

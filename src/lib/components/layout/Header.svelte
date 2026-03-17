@@ -11,6 +11,15 @@
 	let { onOpenSidebar }: Props = $props();
 
 	let user = $derived($userStore.user);
+	let loginType = $derived($userStore.loginType);
+	let academicRole = $derived($userStore.academicRole);
+
+	function getUserTypeLabel(): string {
+		if (loginType === 'academic') {
+			return academicRole === 'teacher' ? 'Docente' : 'Estudiante';
+		}
+		return 'Administrativo';
+	}
 	
 	function getProfileOptions() {
 		return [
@@ -49,7 +58,11 @@
 	</button>
 
 	<div class="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-		<div class="flex flex-1"></div>
+		<div class="flex flex-1 items-center">
+			<span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+				{getUserTypeLabel()}
+			</span>
+		</div>
 		<div class="flex items-center gap-x-4 lg:gap-x-6">
 			<!-- Profile dropdown -->
 			<div class="relative">

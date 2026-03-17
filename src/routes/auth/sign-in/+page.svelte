@@ -15,14 +15,16 @@
 	let password = '';
 	let errorMessage = '';
 	let isLoading = false;
-	let loginType: 'admin' | 'student' | null = null;
+	let loginType: 'admin' | 'academic' | null = null;
+	let academicRole: 'teacher' | 'student' | null = null;
 
 	onMount(() => {
 		userStore.subscribe(state => {
 			loginType = state.loginType;
+			academicRole = state.academicRole;
 		});
 		
-		const storedType = localStorage.getItem('login_type');
+		const storedType = localStorage.getItem('kyc-login_type');
 		if (!storedType && !loginType) {
 			goto('/');
 		}
@@ -35,7 +37,7 @@
 			await userStore.login({ username, password });
 			const state = get(userStore);
 			if (state.user) {
-				const route = getRouteByRole(state.role);
+				const route = getRouteByRole(state.role, state.loginType, state.academicRole);
 				goto(route);
 			} else {
 				goto('/');
@@ -52,6 +54,13 @@
 		if (event.key === 'Enter') {
 			handleSubmit();
 		}
+	}
+
+	function getLoginTypeLabel(): string {
+		if (loginType === 'academic') {
+			return academicRole === 'teacher' ? 'Docente' : 'Estudiante (Académico)';
+		}
+		return loginType === 'admin' ? 'Administrativo' : 'Usuario';
 	}
 </script>
 
@@ -71,7 +80,7 @@
 				>
 				{#if loginType}
 					<span class="mt-2 text-lg font-medium text-light-black/60 dark:text-dark-white/60">
-						{loginType === 'student' ? 'Estudiante' : 'Administrativo'}
+						{getLoginTypeLabel()}
 					</span>
 				{/if}
 			</div>
@@ -170,6 +179,7 @@
 					type="button"
 					onclick={() => {
 						userStore.setLoginType(null);
+						userStore.setAcademicRole(null);
 						goto('/');
 					}}
 					class="text-sm font-medium text-light-secondary hover:text-light-secondary_d dark:text-dark-secondary dark:hover:text-dark-secondary_d underline"
