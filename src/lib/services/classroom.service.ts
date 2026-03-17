@@ -35,6 +35,11 @@ class ClassroomService {
 		return normalizeListIds(data);
 	}
 
+	async getAll(): Promise<Classroom[]> {
+		const data = await apiKyC.get<(Classroom & { id?: string })[]>('/classroom/');
+		return normalizeListIds(data);
+	}
+
 	async getById(classroomId: string): Promise<Classroom> {
 		const data = await apiKyC.get<Classroom & { id?: string }>(`/classroom/${classroomId}`);
 		return normalizeId(data);

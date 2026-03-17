@@ -15,6 +15,10 @@ class UserService {
 		);
 	}
 
+	async getTeachers(): Promise<User[]> {
+		return apiKyC.get<User[]>('/users/teachers');
+	}
+
 	async getById(id: string): Promise<User> {
 		return apiKyC.get<User>(`/users/${id}`);
 	}

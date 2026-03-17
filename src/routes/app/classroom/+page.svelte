@@ -5,11 +5,17 @@
 
 	onMount(() => {
 		const loginType = $userStore.loginType;
-		if (loginType === 'student') {
-			goto('/app/classroom/estudiante', { replaceState: true });
-		} else {
-			// admin / superadmin → vista docente
+		const academicRole = $userStore.academicRole;
+
+		if (loginType === 'admin') {
+			// Administrativo → vista de administración (crear clases, enlazar docentes)
+			goto('/app/classroom/admin', { replaceState: true });
+		} else if (loginType === 'academic' && academicRole === 'teacher') {
+			// Docente → vista docente
 			goto('/app/classroom/docente', { replaceState: true });
+		} else {
+			// Estudiante → vista estudiante
+			goto('/app/classroom/estudiante', { replaceState: true });
 		}
 	});
 </script>
