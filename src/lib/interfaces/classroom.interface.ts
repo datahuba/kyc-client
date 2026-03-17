@@ -20,12 +20,14 @@ export interface CreateClassroomRequest {
 	nombre: string;
 	descripcion?: string;
 	course_id?: string;
+	teacher_user_id?: string;
 }
 
 export interface UpdateClassroomRequest {
 	nombre?: string;
 	descripcion?: string;
 	activo?: boolean;
+	teacher_user_id?: string;
 }
 
 export interface ClassroomEnrolledStudent {

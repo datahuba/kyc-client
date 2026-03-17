@@ -16,6 +16,14 @@
 	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon } from '$lib/icons/solid';
 	import { goto } from '$app/navigation';
 
+	interface NavigationItem {
+		name: string;
+		href: string;
+		icon: any;
+		roles: string[];
+		loginTypes: ('admin' | 'academic')[];
+	}
+
 	interface Props {
 		isOpen: boolean;
 		onClose: () => void;
@@ -26,39 +34,53 @@
 	// Estado para colapsar en Desktop
 	let isCollapsed = $state(false);
 
-	const navigation = [
-				// Student roles
-		{ name: 'Mi Dashboard', href: '/app/students/dashboard', icon: HomeIcon, roles: ['student'] },
+	const navigation: NavigationItem[] = [
+		// Student roles (Academic)
+		{ name: 'Mi Dashboard', href: '/app/students/dashboard', icon: HomeIcon, roles: ['student'], loginTypes: ['academic'] },
 		// Admin roles
-		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin'] },
-		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin'] },
-		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin'] },
-		{ name: 'Classroom', href: '/app/classroom', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'student'] },
-		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'student'] },
-		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'student'] },
-		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin'] },
-		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['admin', 'superadmin'] },
-		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin'] },
-		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student'] },
+		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		{ name: 'Classroom', href: '/app/classroom', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'student'], loginTypes: ['admin', 'academic'] },
+		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
+		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
+		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student'], loginTypes: ['academic'] },
 	];
 
 	// Filter navigation based on user role
-	// Assuming userStore.user.role is available. If not, show all or handle gracefully.
-	// For now, I'll show all if role is missing or filter if present.
-	// Actually, let's just show all for now or basic filter.
-	// The userStore has loginType which is 'student' or 'admin'.
-	// But the user object has 'role'.
+	// The userStore has loginType which is 'admin' or 'academic'.
+	// For academic, we also have academicRole which is 'teacher' or 'student'
 	
-	let userRole = $derived($userStore?.role || 'student'); // Default to student if not loaded? Or admin?
-	// Better to check loginType
+	let userRole = $derived($userStore?.role || 'student');
 	let loginType = $derived($userStore.loginType);
+	let academicRole = $derived($userStore.academicRole);
 
 	let filteredNavigation = $derived(navigation.filter(item => {
-		if (loginType === 'student') {
-			return item.roles.includes('student');
-		} else {
+		// Check if item supports this login type
+		if (!item.loginTypes.includes(loginType)) {
+			return false;
+		}
+
+		// Additional role filtering based on academicRole
+		if (loginType === 'academic') {
+			// For academic login, if academicRole is 'teacher', show all items for 'student' role
+			// (because teachers are treated as students in the DB but with special classroom permissions)
+			// If academicRole is 'student', filter to only student items
+			if (academicRole === 'teacher') {
+				return item.roles.includes('student') || item.roles.includes('admin') || item.roles.includes('superadmin');
+			} else {
+				// student in academic
+				return item.roles.includes('student');
+			}
+		} else if (loginType === 'admin') {
 			return item.roles.includes('admin') || item.roles.includes('superadmin');
 		}
+
+		return false;
 	}));
 
 	function isCurrent(href: string) {
