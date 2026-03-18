@@ -1,10 +1,12 @@
 export type Role = 'admin' | 'superadmin' | 'secretary' | 'student' | null;
+export type UserType = 'user' | 'student';
 
 export interface User {
 	_id: string;
 	username: string;
 	email: string;
 	role: Role;
+	user_type?: UserType; // 'user' for admin/teacher, 'student' for students
 	activo: boolean;
 	ultimo_acceso: string;
 	created_at: string;

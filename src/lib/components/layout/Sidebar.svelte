@@ -42,13 +42,13 @@
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
-		{ name: 'Classroom', href: '/app/classroom', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'student'], loginTypes: ['admin', 'academic'] },
+		{ name: 'Classroom', href: '/app/classroom', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'student', 'docente'], loginTypes: ['admin', 'academic'] },
 		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
-		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student'], loginTypes: ['academic'] },
+		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	];
 
 	// Filter navigation based on user role
@@ -67,13 +67,11 @@
 
 		// Additional role filtering based on academicRole
 		if (loginType === 'academic') {
-			// For academic login, if academicRole is 'teacher', show all items for 'student' role
-			// (because teachers are treated as students in the DB but with special classroom permissions)
-			// If academicRole is 'student', filter to only student items
 			if (academicRole === 'teacher') {
-				return item.roles.includes('student') || item.roles.includes('admin') || item.roles.includes('superadmin');
+				// Docente: solo ve ítems con rol 'docente'
+				return item.roles.includes('docente');
 			} else {
-				// student in academic
+				// Estudiante: solo ve ítems con rol 'student'
 				return item.roles.includes('student');
 			}
 		} else if (loginType === 'admin') {

@@ -15,10 +15,22 @@
 	import { PlusIcon } from '$lib/icons/outline';
 
 	onMount(() => {
-		if ($userStore.loginType === 'student') {
+		const isAcademicStudent =
+			$userStore.loginType === 'academic' && $userStore.academicRole === 'student';
+		const isAcademicTeacher =
+			$userStore.loginType === 'academic' && $userStore.academicRole === 'teacher';
+		const isAdmin = $userStore.loginType === 'admin';
+
+		if (isAcademicStudent) {
 			goto('/app/classroom/estudiante', { replaceState: true });
 			return;
 		}
+
+		if (!isAcademicTeacher && !isAdmin) {
+			goto('/app/classroom', { replaceState: true });
+			return;
+		}
+
 		loadClasses();
 	});
 

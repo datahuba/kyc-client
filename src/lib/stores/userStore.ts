@@ -56,18 +56,20 @@ function createUserStore() {
 
 		login: async (credentials: LoginCredentials) => {
 			let currentType: 'admin' | 'academic' | null = null;
+			let currentAcademicRole: 'teacher' | 'student' | null = null;
 			
 			update(state => {
 				currentType = state.loginType;
+				currentAcademicRole = state.academicRole;
 				return { ...state, loading: true, error: null };
 			});
 
 			try {
 				let loginResponse;
-				if (currentType === 'academic') {
+				if (currentType === 'academic' && currentAcademicRole === 'student') {
 					loginResponse = await authService.loginStudent(credentials);
 				} else {
-					// Default to admin if not specified or explicitly admin
+					// Admin, superadmin y docente (colección User) usan /auth/login
 					loginResponse = await authService.login(credentials);
 				}
 				
@@ -77,8 +79,57 @@ function createUserStore() {
 					localStorage.setItem(AUTH_TOKEN_KEY, token);
 				}
 
-				// Fetch user details
+				// Fetch user details to sync with actual user type on server
 				const user = await authService.getMe();
+				
+				// Debug logging
+				console.log('🔍 DEBUG LOGIN:');
+				console.log('  user:', user);
+				console.log('  user.user_type:', user.user_type);
+				console.log('  user.role:', user.role);
+				
+				// IMPORTANTE: Sincronizar loginType y academicRole basado en user_type del servidor
+				let syncedLoginType: 'admin' | 'academic' | null = null;
+				let syncedAcademicRole: 'teacher' | 'student' | null = null;
+				
+				if (user.user_type === 'student') {
+					// Es estudiante
+					syncedLoginType = 'academic';
+					syncedAcademicRole = 'student';
+					console.log('  ✅ Sincronizado como ESTUDIANTE');
+				} else if (user.user_type === 'user') {
+					// Es admin o docente
+					if (user.role === 'admin' || user.role === 'superadmin') {
+						syncedLoginType = 'admin';
+						syncedAcademicRole = null;
+						console.log('  ✅ Sincronizado como ADMIN');
+					} else {
+						// Docente
+						syncedLoginType = 'academic';
+						syncedAcademicRole = 'teacher';
+						console.log('  ✅ Sincronizado como DOCENTE');
+					}
+				} else {
+					console.log('  ❌ user_type NO RECONOCIDO:', user.user_type);
+					// Fallback: mantener los valores actuales
+					syncedLoginType = currentType;
+					syncedAcademicRole = currentAcademicRole;
+				}
+				
+				// Guardar sincronizado en localStorage
+				if (browser) {
+					if (syncedLoginType) {
+						localStorage.setItem(LOGIN_TYPE_KEY, syncedLoginType);
+						console.log(`  ✅ localStorage[${LOGIN_TYPE_KEY}] = ${syncedLoginType}`);
+					}
+					if (syncedAcademicRole) {
+						localStorage.setItem(ACADEMIC_ROLE_KEY, syncedAcademicRole);
+						console.log(`  ✅ localStorage[${ACADEMIC_ROLE_KEY}] = ${syncedAcademicRole}`);
+					} else {
+						localStorage.removeItem(ACADEMIC_ROLE_KEY);
+						console.log(`  ✅ localStorage[${ACADEMIC_ROLE_KEY}] REMOVED`);
+					}
+				}
 
 				update(state => ({
 					...state,
@@ -86,8 +137,14 @@ function createUserStore() {
 					token,
 					isAuthenticated: true,
 					loading: false,
-					role: user.role
+					role: user.role,
+					loginType: syncedLoginType,
+					academicRole: syncedAcademicRole
 				}));
+				
+				console.log('  📊 Store actualizado:');
+				console.log(`    loginType: ${syncedLoginType}`);
+				console.log(`    academicRole: ${syncedAcademicRole}`);
 				
 				if (browser) {
 					localStorage.setItem(USER_DATA_KEY, JSON.stringify(user));
@@ -108,14 +165,15 @@ function createUserStore() {
 				localStorage.removeItem(AUTH_TOKEN_KEY);
 				localStorage.removeItem(USER_DATA_KEY);
 				localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
-				localStorage.removeItem(ACADEMIC_ROLE_KEY);
+				// Keep LOGIN_TYPE_KEY and ACADEMIC_ROLE_KEY for quick re-login with same role
 			}
 			set(initialState);
-			// Restore login type if it exists in local storage so the UI knows where to go
+			// Restore login type and academic role so user can re-login with same role selection
 			if (browser) {
 				const loginType = localStorage.getItem(LOGIN_TYPE_KEY) as 'admin' | 'academic' | null;
-				if (loginType) {
-					update(state => ({ ...state, loginType }));
+				const academicRole = localStorage.getItem(ACADEMIC_ROLE_KEY) as 'teacher' | 'student' | null;
+				if (loginType || academicRole) {
+					update(state => ({ ...state, loginType, academicRole }));
 				}
 			}
 		},
