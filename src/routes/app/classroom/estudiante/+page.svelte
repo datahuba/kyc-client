@@ -12,8 +12,12 @@
 
 	// Guard: solo estudiantes
 	onMount(() => {
-		if ($userStore.loginType !== 'student') {
-			goto('/app/classroom/docente', { replaceState: true });
+		const isAcademicStudent =
+			$userStore.loginType === 'academic' && $userStore.academicRole === 'student';
+
+		if (!isAcademicStudent) {
+			// Delegate role-based redirect to /app/classroom/+page.js
+			goto('/app/classroom', { replaceState: true });
 			return;
 		}
 		loadClasses();

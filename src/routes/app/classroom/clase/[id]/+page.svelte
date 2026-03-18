@@ -34,7 +34,7 @@
 
 	// ─── params & role ─────────────────────────────────────────────────────
 	let classroomId = $derived($page.params.id as string);
-	let isTeacher = $derived($userStore.loginType !== 'student');
+	let isTeacher = $derived($userStore.loginType === 'admin' || $userStore.academicRole === 'teacher');
 
 	// ─── tabs ──────────────────────────────────────────────────────────────
 	type Tab = 'muro' | 'materiales' | 'tareas' | 'examenes' | 'calificaciones' | 'estudiantes';
@@ -45,6 +45,29 @@
 		submission: Submission | null;
 		status: SubmissionStatus;
 	};
+
+	// Tabs para docentes y estudiantes
+	let visibleTabs = $derived.by(() => {
+		if (isTeacher) {
+			return [
+				{ id: 'muro' as const, label: 'Muro' },
+				{ id: 'materiales' as const, label: 'Materiales' },
+				{ id: 'tareas' as const, label: 'Tareas' },
+				{ id: 'examenes' as const, label: 'Exámenes' },
+				{ id: 'calificaciones' as const, label: 'Calificaciones' },
+				{ id: 'estudiantes' as const, label: 'Estudiantes' }
+			];
+		} else {
+			// Estudiantes solo ven: Muro, Materiales, Tareas, Exámenes, Calificaciones
+			return [
+				{ id: 'muro' as const, label: 'Muro' },
+				{ id: 'materiales' as const, label: 'Materiales' },
+				{ id: 'tareas' as const, label: 'Tareas' },
+				{ id: 'examenes' as const, label: 'Exámenes' },
+				{ id: 'calificaciones' as const, label: 'Calificaciones' }
+			];
+		}
+	});
 
 	const tabs: { id: Tab; label: string }[] = [
 		{ id: 'muro', label: 'Muro' },
@@ -137,6 +160,12 @@
 	}
 
 	async function switchTab(tab: Tab) {
+		// Proteger contra acceso no autorizado al tab de estudiantes
+		if (tab === 'estudiantes' && !isTeacher) {
+			alert('error', 'No tienes acceso a esta sección');
+			return;
+		}
+
 		if (!isValidObjectId(classroomId)) return;
 		activeTab = tab;
 		loadingTab = true;
@@ -437,7 +466,7 @@
 
 	<div class="border-b border-gray-200 dark:border-gray-700">
 		<nav class="-mb-px flex gap-x-6 overflow-x-auto" aria-label="Tabs">
-			{#each tabs as tab}
+			{#each visibleTabs as tab}
 				<button
 					onclick={() => switchTab(tab.id)}
 					class={`whitespace-nowrap py-3 px-1 border-b-2 text-sm font-medium transition-colors
