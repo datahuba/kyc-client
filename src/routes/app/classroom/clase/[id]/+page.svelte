@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import { page } from '$app/stores';
-	import { goto, replaceState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { userStore } from '$lib/stores/userStore';
 	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
 	import { classroomService } from '$lib/services';
@@ -150,12 +150,12 @@
 		loadClassroom();
 	});
 
-	// Reacciona a cambios en ?tab= aunque el componente no se remonte
-	// (SvelteKit no remonta si solo cambia el search param)
+	// Reacciona a cambios en ?tab= (solo trackea $page.url, no activeTab).
+	// untrack() evita que activeTab sea dependencia del effect y cause resets.
 	$effect(() => {
 		const tabParam = $page.url.searchParams.get('tab') as Tab | null;
 		const target: Tab = (tabParam && VALID_TABS.includes(tabParam)) ? tabParam : 'muro';
-		if (target !== activeTab && isValidObjectId(classroomId)) {
+		if (target !== untrack(() => activeTab) && isValidObjectId(classroomId)) {
 			switchTab(target);
 		}
 	});
@@ -186,12 +186,6 @@
 		}
 
 		if (!isValidObjectId(classroomId)) return;
-
-		// Sincronizar URL para que el $effect no vuelva a disparar switchTab
-		const currentTab = $page.url.searchParams.get('tab');
-		if (currentTab !== tab) {
-			replaceState(`?tab=${tab}`, {});
-		}
 
 		activeTab = tab;
 		loadingTab = true;
@@ -493,15 +487,15 @@
 	<div class="border-b border-gray-200 dark:border-gray-700">
 		<nav class="-mb-px flex gap-x-6 overflow-x-auto" aria-label="Tabs">
 			{#each visibleTabs as tab}
-				<button
-					onclick={() => switchTab(tab.id)}
+				<a
+					href="?tab={tab.id}"
 					class={`whitespace-nowrap py-3 px-1 border-b-2 text-sm font-medium transition-colors
 						${activeTab === tab.id
 							? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
 							: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'}`}
 				>
 					{tab.label}
-				</button>
+				</a>
 			{/each}
 		</nav>
 	</div>
