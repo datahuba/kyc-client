@@ -87,7 +87,10 @@ export interface Submission {
 	feedback?: string;
 	submitted_at?: string;
 	graded_at?: string;
+	attempt_count?: number;
 }
+
+export const MAX_SUBMISSION_ATTEMPTS = 3;
 
 export interface Grade {
 	assignment_id: string;
