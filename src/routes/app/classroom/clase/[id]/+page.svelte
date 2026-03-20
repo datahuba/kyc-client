@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
+	import { goto, replaceState } from '$app/navigation';
 	import { userStore } from '$lib/stores/userStore';
 	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
 	import { classroomService } from '$lib/services';
@@ -186,6 +186,13 @@
 		}
 
 		if (!isValidObjectId(classroomId)) return;
+
+		// Sincronizar URL para que el $effect no vuelva a disparar switchTab
+		const currentTab = $page.url.searchParams.get('tab');
+		if (currentTab !== tab) {
+			replaceState(`?tab=${tab}`, {});
+		}
+
 		activeTab = tab;
 		loadingTab = true;
 		try {
