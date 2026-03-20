@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/userStore';
+	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
 	import {
 		UsersIcon,
 		ClipboardIcon,
@@ -15,6 +16,16 @@
 	import Menu2Icon from '$lib/icons/outline/menu2Icon.svelte';
 	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon } from '$lib/icons/solid';
 	import { goto } from '$app/navigation';
+
+	// Secciones de la clase mostradas al docente en el sidebar
+	const classroomSections = [
+		{ id: 'muro',           label: 'Muro' },
+		{ id: 'materiales',     label: 'Materiales' },
+		{ id: 'tareas',         label: 'Tareas' },
+		{ id: 'examenes',       label: 'Exámenes' },
+		{ id: 'calificaciones', label: 'Calificaciones' },
+		{ id: 'estudiantes',    label: 'Estudiantes' },
+	];
 
 	interface NavigationItem {
 		name: string;
@@ -161,6 +172,44 @@
 						{/each}
 					</ul>
 				</li>
+
+				<!-- Contexto de clase activa (solo docente) -->
+				{#if academicRole === 'teacher' && $activeClassroomStore.id}
+					<li transition:slide={{ duration: 200 }}>
+						{#if !isCollapsed}
+							<div class="px-2 mb-1" in:fade={{ duration: 100 }}>
+								<p class="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Clase actual</p>
+								<p class="text-xs font-medium text-gray-700 dark:text-gray-300 truncate mt-0.5" title={$activeClassroomStore.nombre ?? ''}>
+									{$activeClassroomStore.nombre}
+								</p>
+							</div>
+						{/if}
+						<ul role="list" class="-mx-2 space-y-0.5">
+							{#each classroomSections as section}
+								{@const href = `/app/classroom/clase/${$activeClassroomStore.id}?tab=${section.id}`}
+								{@const isActive = $page.url.pathname.startsWith(`/app/classroom/clase/${$activeClassroomStore.id}`) && ($page.url.searchParams.get('tab') ?? 'muro') === section.id}
+								<li>
+									<a
+										{href}
+										title={isCollapsed ? section.label : ''}
+										class={`
+											group flex gap-x-3 rounded-md py-1.5 text-sm font-medium transition-all
+											${isCollapsed ? 'justify-center px-0' : 'px-2 pl-4'}
+											${isActive
+												? 'text-primary-600 dark:text-primary-400 bg-gray-50 dark:bg-gray-800'
+												: 'text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'}
+										`}
+									>
+										<span class={`size-1.5 mt-2 rounded-full shrink-0 ${isActive ? 'bg-primary-500' : 'bg-gray-300 dark:bg-gray-600 group-hover:bg-primary-400'}`}></span>
+										{#if !isCollapsed}
+											<span in:fade={{ duration: 100 }}>{section.label}</span>
+										{/if}
+									</a>
+								</li>
+							{/each}
+						</ul>
+					</li>
+				{/if}
 				<li class="mt-auto">
                     <button
                         onclick={logout}

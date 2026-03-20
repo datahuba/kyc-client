@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { classroomService } from '$lib/services';
 	import type { Assignment, Submission } from '$lib/interfaces';
+	import { MAX_SUBMISSION_ATTEMPTS } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import { alert } from '$lib/utils';
 	import { UploadIcon } from '$lib/icons/outline';
@@ -17,6 +18,10 @@
 	let textContent = $state(existing?.text_content ?? '');
 	let selectedFile = $state<File | null>(null);
 	let loading = $state(false);
+
+	let attemptsUsed = $derived(existing?.attempt_count ?? 0);
+	let attemptsLeft = $derived(MAX_SUBMISSION_ATTEMPTS - attemptsUsed);
+	let limitReached = $derived(attemptsUsed >= MAX_SUBMISSION_ATTEMPTS);
 
 	const ALLOWED_TYPES = [
 		'application/pdf',
@@ -64,54 +69,81 @@
 </script>
 
 <form onsubmit={handleSubmit} class="space-y-4">
+	<!-- Contador de intentos -->
 	{#if existing}
-		<div class="text-xs bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md px-3 py-2 text-yellow-800 dark:text-yellow-300">
-			Ya tienes una entrega registrada. Al enviar de nuevo, se reemplazará.
+		{#if limitReached}
+			<div class="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 px-3 py-2">
+				<p class="text-sm font-medium text-red-800 dark:text-red-300">Límite de entregas alcanzado</p>
+				<p class="text-xs text-red-600 dark:text-red-400 mt-0.5">
+					Has utilizado los {MAX_SUBMISSION_ATTEMPTS} intentos permitidos para esta actividad.
+					{#if existing.score != null}
+						Tu nota: <strong>{existing.score}</strong>
+					{/if}
+				</p>
+			</div>
+		{:else}
+			<div class="rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 px-3 py-2">
+				<p class="text-xs text-yellow-800 dark:text-yellow-300">
+					Intento {attemptsUsed} de {MAX_SUBMISSION_ATTEMPTS} usado.
+					Te {attemptsLeft === 1 ? 'queda 1 intento' : `quedan ${attemptsLeft} intentos`}.
+					Al enviar de nuevo, se reemplazará la entrega anterior.
+				</p>
+			</div>
+		{/if}
+	{:else}
+		<div class="rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 px-3 py-2">
+			<p class="text-xs text-blue-700 dark:text-blue-300">
+				Tienes {MAX_SUBMISSION_ATTEMPTS} intentos para esta actividad.
+			</p>
 		</div>
 	{/if}
 
-	<!-- Texto -->
-	<div>
-		<label for="sub-text" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-			Respuesta / Comentario
-		</label>
-		<textarea
-			id="sub-text"
-			bind:value={textContent}
-			rows="5"
-			maxlength="5000"
-			placeholder="Escribe tu respuesta aquí..."
-			class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-		></textarea>
-	</div>
+	{#if !limitReached}
+		<!-- Texto -->
+		<div>
+			<label for="sub-text" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+				Respuesta / Comentario
+			</label>
+			<textarea
+				id="sub-text"
+				bind:value={textContent}
+				rows="5"
+				maxlength="5000"
+				placeholder="Escribe tu respuesta aquí..."
+				class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			></textarea>
+		</div>
 
-	<!-- Archivo -->
-	<div>
-		<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-			Archivo adjunto (opcional)
-		</label>
-		<label
-			class="flex items-center gap-3 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 cursor-pointer hover:border-primary-400 transition-colors"
-		>
-			<UploadIcon class="size-5 text-gray-400" />
-			<span class="text-sm text-gray-600 dark:text-gray-400">
-				{selectedFile ? selectedFile.name : existing?.file_url ? 'Reemplazar archivo actual' : 'Seleccionar archivo (PDF, Word, imagen)'}
-			</span>
-			<input
-				type="file"
-				class="sr-only"
-				accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
-				onchange={handleFileChange}
-			/>
-		</label>
-	</div>
+		<!-- Archivo -->
+		<div>
+			<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+				Archivo adjunto (opcional)
+			</label>
+			<label
+				class="flex items-center gap-3 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 cursor-pointer hover:border-primary-400 transition-colors"
+			>
+				<UploadIcon class="size-5 text-gray-400" />
+				<span class="text-sm text-gray-600 dark:text-gray-400">
+					{selectedFile ? selectedFile.name : existing?.file_url ? 'Reemplazar archivo actual' : 'Seleccionar archivo (PDF, Word, imagen)'}
+				</span>
+				<input
+					type="file"
+					class="sr-only"
+					accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+					onchange={handleFileChange}
+				/>
+			</label>
+		</div>
+	{/if}
 
 	<div class="flex justify-end gap-3 pt-2">
 		<Button variant="secondary" type="button" onclick={onCancel} disabled={loading}>
-			Cancelar
+			{limitReached ? 'Cerrar' : 'Cancelar'}
 		</Button>
-		<Button type="submit" {loading}>
-			{existing ? 'Actualizar Entrega' : 'Enviar Entrega'}
-		</Button>
+		{#if !limitReached}
+			<Button type="submit" {loading}>
+				{existing ? 'Actualizar Entrega' : 'Enviar Entrega'}
+			</Button>
+		{/if}
 	</div>
 </form>

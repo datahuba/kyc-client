@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { userStore } from '$lib/stores/userStore';
+	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
 	import { classroomService } from '$lib/services';
 	import type {
 		Assignment,
@@ -138,6 +139,8 @@
 		return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
 	}
 
+	const VALID_TABS: Tab[] = ['muro', 'materiales', 'tareas', 'examenes', 'calificaciones', 'estudiantes'];
+
 	onMount(() => {
 		if (!isValidObjectId(classroomId)) {
 			alert('error', 'ID de clase inválido');
@@ -147,11 +150,27 @@
 		loadClassroom();
 	});
 
+	// Reacciona a cambios en ?tab= aunque el componente no se remonte
+	// (SvelteKit no remonta si solo cambia el search param)
+	$effect(() => {
+		const tabParam = $page.url.searchParams.get('tab') as Tab | null;
+		const target: Tab = (tabParam && VALID_TABS.includes(tabParam)) ? tabParam : 'muro';
+		if (target !== activeTab && isValidObjectId(classroomId)) {
+			switchTab(target);
+		}
+	});
+
+	onDestroy(() => {
+		activeClassroomStore.set({ id: null, nombre: null });
+	});
+
 	async function loadClassroom() {
 		if (!isValidObjectId(classroomId)) return;
 		loadingMain = true;
 		try {
 			classroom = await classroomService.getById(classroomId);
+			// Alimentar el store para que el sidebar muestre el contexto
+			activeClassroomStore.set({ id: classroomId, nombre: classroom.nombre });
 		} catch (e: any) {
 			alert('error', e.message || 'No se pudo cargar la clase');
 		} finally {
