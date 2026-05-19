@@ -3,7 +3,7 @@ name: Deploy Frontend to VPS
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   deploy:
@@ -19,6 +19,6 @@ jobs:
           script: |
             cd /var/www/frontend
             git stash
-            git pull origin master
+            git pull origin main
             cd /var/www
             docker compose up -d --build frontend
