@@ -28,7 +28,7 @@ class UserService {
 	}
 
 	async update(id: string, data: UpdateUserRequest): Promise<User> {
-		return apiKyC.put<User>('/users/${id}', data);
+		return apiKyC.put<User>(`/users/${id}`, data);
 	}
 
 	async delete(id: string): Promise<User> {
