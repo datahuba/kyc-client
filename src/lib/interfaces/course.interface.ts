@@ -26,8 +26,8 @@ export interface CreateCourseRequest {
 	modalidad: string;
 	costo_total_interno: number;
 	matricula_interno: number;
-	costo_total_externo: number;
-	matricula_externo: number;
+	costo_total_externo?: number | null;
+	matricula_externo?: number | null;
 	cantidad_cuotas: number;
 	descuento_curso: number;
 	observacion?: string;

@@ -33,6 +33,9 @@
 		icon: any;
 		roles: string[];
 		loginTypes: ('admin' | 'academic')[];
+		external?: boolean;
+		target?: string;
+		rel?: string;
 	}
 
 	interface Props {
@@ -53,7 +56,7 @@
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
-		{ name: 'Classroom', href: '/app/classroom', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'student', 'docente'], loginTypes: ['admin', 'academic'] },
+		{ name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
 		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
@@ -71,6 +74,11 @@
 	let academicRole = $derived($userStore.academicRole);
 
 	let filteredNavigation = $derived(navigation.filter(item => {
+		// Defensive guard: admins/superadmins must only see admin items
+		if (userRole === 'admin' || userRole === 'superadmin') {
+			return item.loginTypes.includes('admin') && (item.roles.includes('admin') || item.roles.includes('superadmin'));
+		}
+
 		// Check if item supports this login type
 		if (!item.loginTypes.includes(loginType)) {
 			return false;
@@ -78,6 +86,12 @@
 
 		// Additional role filtering based on academicRole
 		if (loginType === 'academic') {
+			// Explicit guard: Aula Virtual is only for academic users
+			if (item.name === 'Aula Virtual UAGRM') {
+				if (academicRole === 'teacher') return item.roles.includes('docente');
+				return item.roles.includes('student');
+			}
+
 			if (academicRole === 'teacher') {
 				// Docente: solo ve ítems con rol 'docente'
 				return item.roles.includes('docente');
@@ -93,6 +107,7 @@
 	}));
 
 	function isCurrent(href: string) {
+		if (href.startsWith('http://') || href.startsWith('https://')) return false;
 		return $page.url.pathname.startsWith(href);
 	}
 
@@ -149,10 +164,12 @@
 					<ul role="list" class="-mx-2 space-y-1">
 						{#each filteredNavigation as item}
 							<li>
-								<a
-									href={item.href}
-									title={isCollapsed ? item.name : ''}
-									class={`
+							<a
+								href={item.href}
+								target={item.external ? (item.target ?? '_blank') : undefined}
+								rel={item.external ? (item.rel ?? 'noopener noreferrer') : undefined}
+								title={isCollapsed ? item.name : ''}
+								class={`
                                         group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all
                                         ${isCollapsed ? 'justify-center px-0' : 'px-2'}
                                         ${isCurrent(item.href)

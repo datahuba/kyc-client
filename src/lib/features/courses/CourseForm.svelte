@@ -29,8 +29,8 @@
 		modalidad: 'presencial',
 		costo_total_interno: 0,
 		matricula_interno: 0,
-		costo_total_externo: 0,
-		matricula_externo: 0,
+		costo_total_externo: null,
+		matricula_externo: null,
 		cantidad_cuotas: 1,
 		descuento_curso: 0,
 		descuento_id: '',
@@ -56,10 +56,10 @@
 				nombre_programa: course.nombre_programa,
 				tipo_curso: course.tipo_curso,
 				modalidad: course.modalidad,
-				costo_total_interno: course.costo_total_interno,
-				matricula_interno: course.matricula_interno,
-				costo_total_externo: course.costo_total_externo,
-				matricula_externo: course.matricula_externo,
+			costo_total_interno: course.costo_total_interno,
+			matricula_interno: course.matricula_interno,
+			costo_total_externo: course.costo_total_externo ?? null,
+			matricula_externo: course.matricula_externo ?? null,
 				cantidad_cuotas: course.cantidad_cuotas,
 				descuento_curso: course.descuento_curso,
 				// Assuming course interface assumes descuento_id might be missing in old data
@@ -80,8 +80,8 @@
 				modalidad: 'presencial',
 				costo_total_interno: 0,
 				matricula_interno: 0,
-				costo_total_externo: 0,
-				matricula_externo: 0,
+				costo_total_externo: null,
+				matricula_externo: null,
 				cantidad_cuotas: 1,
 				descuento_curso: 0,
 				descuento_id: '',
@@ -99,6 +99,14 @@
 			const payload = { ...formData };
 			if (!payload.descuento_id) {
 				delete payload.descuento_id;
+			}
+
+			// Si costos externos están vacíos, normalizar a 0 para permitir limpiar valores previos
+			if (payload.costo_total_externo === null || payload.costo_total_externo === undefined || payload.costo_total_externo === '') {
+				payload.costo_total_externo = 0;
+			}
+			if (payload.matricula_externo === null || payload.matricula_externo === undefined || payload.matricula_externo === '') {
+				payload.matricula_externo = 0;
 			}
 			
 			if (isEditMode && course) {
@@ -214,14 +222,12 @@
 					id="costo_total_externo"
 					type="number"
 					bind:value={formData.costo_total_externo}
-					required
 				/>
 				<Input
 					label="Matrícula"
 					id="matricula_externo"
 					type="number"
 					bind:value={formData.matricula_externo}
-					required
 				/>
 			</div>
 		</div>
