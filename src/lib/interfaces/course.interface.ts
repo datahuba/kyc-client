@@ -1,3 +1,8 @@
+export interface Modulo {
+	nombre: string;
+	costo: number;
+}
+
 export interface Course {
 	_id: string;
 	activo: boolean;
@@ -17,6 +22,7 @@ export interface Course {
 	observacion: string;
 	tipo_curso: string;
 	updated_at: string;
+	modulos?: Modulo[]; // <--- ¡Añadimos los Módulos aquí!
 }
 
 export interface CreateCourseRequest {
@@ -35,6 +41,7 @@ export interface CreateCourseRequest {
 	fecha_fin: string;
 	activo: boolean;
 	descuento_id?: string;
+	modulos?: Modulo[]; // <--- ¡Y aquí también!
 }
 
 export interface UpdateCourseRequest extends Partial<CreateCourseRequest> {
