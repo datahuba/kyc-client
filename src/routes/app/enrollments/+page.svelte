@@ -212,9 +212,14 @@
 	}
 
 	function getStudentName(id: string) {
+		// Si es el estudiante viendo su propio panel, sacamos el nombre de su sesión
+		if ($userStore.role === 'student' && $userStore.user) {
+			return $userStore.user.nombre || $userStore.user.username || $userStore.user.email || 'Mi Usuario';
+		}
+		// Si es el administrador, lo busca en la base de datos como siempre
 		return studentsMap[id]?.nombre || 'Desconocido';
 	}
-
+	
 	function getCourseName(id: string) {
 		return coursesMap[id]?.nombre_programa || 'Desconocido';
 	}
