@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	// IMPORTANTE: Añadí courseService aquí para poder consultar el curso
 	import { enrollmentService, paymentService, paymentConfigService, courseService } from '$lib/services';
 	import type { Enrollment, CreatePaymentFormData } from '$lib/interfaces';
 	import { userStore } from '$lib/stores/userStore';
@@ -58,31 +57,36 @@
 		}
 	});
 
-	// MAGIA FULL-STACK: Vigilar cuando el alumno selecciona una inscripción
-	$effect(() => {
-		if (selectedEnrollmentId) {
-			const enrollment = enrollments.find(e => e._id === selectedEnrollmentId);
-			// Si la inscripción tiene el ID del curso, vamos a buscar sus módulos
-			if (enrollment && (enrollment as any).curso_id) {
-				loadingCourse = true;
-				courseService.getById((enrollment as any).curso_id).then(res => {
-					selectedCourse = res.data || res;
-					
-					// Autocompletar el monto automáticamente si está vacío y hay módulos
-					if (montoComprobante === null && selectedCourse?.modulos?.length > 0) {
-						montoComprobante = selectedCourse.modulos[0].costo;
-					}
-				}).catch(err => {
-					console.error("No se pudo cargar el curso", err);
-				}).finally(() => {
-					loadingCourse = false;
-				});
-			}
-		} else {
+	// Función segura que SOLO se dispara cuando el usuario cambia la opción del menú
+	async function handleEnrollmentChange() {
+		if (!selectedEnrollmentId) {
 			selectedCourse = null;
 			montoComprobante = null;
+			return;
 		}
-	});
+
+		const enrollment = enrollments.find(e => e._id === selectedEnrollmentId);
+		if (enrollment && (enrollment as any).curso_id) {
+			loadingCourse = true;
+			try {
+				const res = await courseService.getById((enrollment as any).curso_id);
+				selectedCourse = res.data || res;
+				
+				// Autocompletar solo si la casilla de dinero está vacía
+				if (montoComprobante === null || montoComprobante === 0) {
+					if (selectedCourse?.modulos?.length > 0) {
+						montoComprobante = selectedCourse.modulos[0].costo;
+					} else if (selectedCourse?.matricula_interno) {
+						montoComprobante = selectedCourse.matricula_interno;
+					}
+				}
+			} catch (err) {
+				console.error("No se pudo cargar el curso", err);
+			} finally {
+				loadingCourse = false;
+			}
+		}
+	}
 
 	async function handleSubmit() {
 		if (!selectedEnrollmentId || !transactionNumber || !file || !remitente || !banco || montoComprobante === null || !cuentaDestino || !fechaComprobante) {
@@ -124,6 +128,7 @@
             <select
                 id="enrollment"
                 bind:value={selectedEnrollmentId}
+                onchange={handleEnrollmentChange}
                 required
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
             >
@@ -136,7 +141,7 @@
             </select>
         {/if}
 
-		<!-- CAJITA DE AYUDA VISUAL (Aparece cuando selecciona un curso) -->
+		<!-- CAJITA DE AYUDA VISUAL -->
 		{#if loadingCourse}
 			<p class="text-xs text-gray-500 mt-2 animate-pulse">Cargando detalles del curso...</p>
 		{:else if selectedCourse && selectedCourse.modulos && selectedCourse.modulos.length > 0}
