@@ -56,8 +56,13 @@
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
-		{ name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
-		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
+		
+        // ---- ACCESOS EXTERNOS UAGRM ----
+        { name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
+		{ name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
+		// --------------------------------
+
+        { name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
@@ -66,9 +71,6 @@
 	];
 
 	// Filter navigation based on user role
-	// The userStore has loginType which is 'admin' or 'academic'.
-	// For academic, we also have academicRole which is 'teacher' or 'student'
-	
 	let userRole = $derived($userStore?.role || 'student');
 	let loginType = $derived($userStore.loginType);
 	let academicRole = $derived($userStore.academicRole);
@@ -86,8 +88,8 @@
 
 		// Additional role filtering based on academicRole
 		if (loginType === 'academic') {
-			// Explicit guard: Aula Virtual is only for academic users
-			if (item.name === 'Aula Virtual UAGRM') {
+			// Explicit guard: Los botones de la UAGRM se muestran según su rol académico
+			if (item.name === 'Aula Virtual UAGRM' || item.name === 'Perfil de Notas UAGRM') {
 				if (academicRole === 'teacher') return item.roles.includes('docente');
 				return item.roles.includes('student');
 			}
@@ -247,9 +249,6 @@
 		</nav>
 	</div>
 </div>
-
-	
-
 
 <style>
     /* Ocultar scrollbar pero permitir scroll */
