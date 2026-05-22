@@ -57,37 +57,42 @@
 		}
 	});
 
-	// SOLUCIÓN: Usamos una función directa en lugar de $effect para evitar el bucle infinito de Svelte
-	async function handleEnrollmentChange() {
-		if (!selectedEnrollmentId) {
-			selectedCourse = null;
-			montoComprobante = null;
-			return;
-		}
+// --- VARIABLES ESPÍA ---
+	let prevEnrollmentId = $state('');
 
-		const enrollment = enrollments.find(e => e._id === selectedEnrollmentId);
-		if (enrollment && (enrollment as any).curso_id) {
-			loadingCourse = true;
-			try {
-				const res = await courseService.getById((enrollment as any).curso_id);
-				selectedCourse = res.data || res;
-				
-				// Autocompletar el monto automáticamente si está vacío
-				if (montoComprobante === null) {
-					if (selectedCourse?.modulos?.length > 0) {
-						montoComprobante = selectedCourse.modulos[0].costo;
-					} else {
-						// Fallback por si es un curso viejo que no tiene módulos
-						montoComprobante = selectedCourse.costo_total_interno / (selectedCourse.cantidad_cuotas || 1);
-					}
+	// MAGIA FULL-STACK: Vigilar cuando el alumno selecciona una inscripción (A prueba de bucles)
+	$effect(() => {
+		// Solo ejecutamos esto SI de verdad cambió el ID del curso seleccionado
+		if (selectedEnrollmentId !== prevEnrollmentId) {
+			prevEnrollmentId = selectedEnrollmentId; // Actualizamos al espía
+			
+			if (selectedEnrollmentId) {
+				const enrollment = enrollments.find(e => e._id === selectedEnrollmentId);
+				if (enrollment && (enrollment as any).curso_id) {
+					loadingCourse = true;
+					courseService.getById((enrollment as any).curso_id).then(res => {
+						selectedCourse = res.data || res;
+						
+						// Autocompletar el monto solo si está vacío
+						if (!montoComprobante) {
+							if (selectedCourse?.modulos?.length > 0) {
+								montoComprobante = selectedCourse.modulos[0].costo;
+							} else {
+								montoComprobante = selectedCourse.costo_total_interno / (selectedCourse.cantidad_cuotas || 1);
+							}
+						}
+					}).catch(err => {
+						console.error("No se pudo cargar el curso", err);
+					}).finally(() => {
+						loadingCourse = false;
+					});
 				}
-			} catch (err) {
-				console.error("No se pudo cargar el curso", err);
-			} finally {
-				loadingCourse = false;
+			} else {
+				selectedCourse = null;
+				montoComprobante = null;
 			}
 		}
-	}
+	});
 
 	async function handleSubmit() {
 		if (!selectedEnrollmentId || !transactionNumber || !file || !remitente || !banco || montoComprobante === null || !cuentaDestino || !fechaComprobante) {
@@ -129,10 +134,10 @@
             <select
                 id="enrollment"
                 bind:value={selectedEnrollmentId}
-                onchange={handleEnrollmentChange}
                 required
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
             >
+			
                 <option value="">Seleccione una inscripción</option>
                 {#each enrollments as enrollment}
                     <option value={enrollment._id}>
