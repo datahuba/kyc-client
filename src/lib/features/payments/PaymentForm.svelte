@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { enrollmentService, paymentService, paymentConfigService, courseService } from '$lib/services';
+	import { enrollmentService, paymentService, paymentConfigService } from '$lib/services';
 	import type { Enrollment, CreatePaymentFormData } from '$lib/interfaces';
 	import { userStore } from '$lib/stores/userStore';
 	import Button from '$lib/components/ui/button.svelte';
@@ -29,14 +29,11 @@
     let remitente = $state('');
     let banco = $state('');
     let montoComprobante = $state<number | null>(null);
-    let fechaComprobante = $state(new Date().toISOString().split('T')[0]);
+    let fechaComprobante = $state(new Date().toISOString().split('T')[0]); // Fecha actual
     let cuentaDestino = $state('');
 
-	// --- ESTADOS PARA LA AYUDA VISUAL DEL CURSO ---
-	let selectedCourse = $state<any>(null);
-	let loadingCourse = $state(false);
-
-	const bancosDisponibles = ["Banco Unión", "BNB", "Mercantil Santa Cruz", "Banco Bisa", "Banco Ganadero", "Banco Económico", "Otro"];
+	// Listas de ayuda para los select
+    const bancosDisponibles = ["Banco Unión", "BNB", "Mercantil Santa Cruz", "Banco Bisa", "Banco Ganadero", "Banco Económico", "Otro"];
     const cuentasInstitucion = ["Cta. Corriente BNB - 1234567", "Cta. Ahorros Unión - 9876543"];
 
 	onMount(async () => {
@@ -57,43 +54,6 @@
 		}
 	});
 
-// --- VARIABLES ESPÍA ---
-	let prevEnrollmentId = $state('');
-
-	// MAGIA FULL-STACK: Vigilar cuando el alumno selecciona una inscripción (A prueba de bucles)
-	$effect(() => {
-		// Solo ejecutamos esto SI de verdad cambió el ID del curso seleccionado
-		if (selectedEnrollmentId !== prevEnrollmentId) {
-			prevEnrollmentId = selectedEnrollmentId; // Actualizamos al espía
-			
-			if (selectedEnrollmentId) {
-				const enrollment = enrollments.find(e => e._id === selectedEnrollmentId);
-				if (enrollment && (enrollment as any).curso_id) {
-					loadingCourse = true;
-					courseService.getById((enrollment as any).curso_id).then(res => {
-						selectedCourse = res.data || res;
-						
-						// Autocompletar el monto solo si está vacío
-						if (!montoComprobante) {
-							if (selectedCourse?.modulos?.length > 0) {
-								montoComprobante = selectedCourse.modulos[0].costo;
-							} else {
-								montoComprobante = selectedCourse.costo_total_interno / (selectedCourse.cantidad_cuotas || 1);
-							}
-						}
-					}).catch(err => {
-						console.error("No se pudo cargar el curso", err);
-					}).finally(() => {
-						loadingCourse = false;
-					});
-				}
-			} else {
-				selectedCourse = null;
-				montoComprobante = null;
-			}
-		}
-	});
-
 	async function handleSubmit() {
 		if (!selectedEnrollmentId || !transactionNumber || !file || !remitente || !banco || montoComprobante === null || !cuentaDestino || !fechaComprobante) {
 			alert('error', 'Todos los campos son obligatorios');
@@ -106,7 +66,7 @@
 				inscripcion_id: selectedEnrollmentId,
 				numero_transaccion: transactionNumber,
 				file: file,
-				remitente,
+                remitente,
                 banco,
                 monto_comprobante: montoComprobante!,
                 fecha_comprobante: fechaComprobante,
@@ -137,7 +97,6 @@
                 required
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
             >
-			
                 <option value="">Seleccione una inscripción</option>
                 {#each enrollments as enrollment}
                     <option value={enrollment._id}>
@@ -146,27 +105,6 @@
                 {/each}
             </select>
         {/if}
-
-		<!-- CAJITA DE AYUDA VISUAL -->
-		{#if loadingCourse}
-			<p class="text-xs text-gray-500 mt-2 animate-pulse">Cargando detalles del curso...</p>
-		{:else if selectedCourse}
-			<div class="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md flex gap-3 items-start">
-				<span class="text-blue-500 text-lg leading-none">ℹ️</span>
-				<div class="text-sm text-blue-800 dark:text-blue-300">
-					<p class="font-bold mb-1">Guía de Pagos del Curso:</p>
-					<ul class="list-disc pl-4 space-y-1 text-xs">
-						<li>Matrícula Inicial: <strong>{selectedCourse.matricula_interno || 0} Bs.</strong></li>
-						{#if selectedCourse.modulos && selectedCourse.modulos.length > 0}
-							<li>Costo por Módulo ({selectedCourse.cantidad_cuotas} cuotas): <strong>{selectedCourse.modulos[0].costo} Bs.</strong></li>
-						{:else}
-							<li>Monto sugerido por cuota: <strong>{(selectedCourse.costo_total_interno / (selectedCourse.cantidad_cuotas || 1)).toFixed(2)} Bs.</strong></li>
-						{/if}
-					</ul>
-					<p class="mt-2 text-xs italic opacity-80">El monto sugerido se ha autocompletado abajo, pero puedes modificarlo.</p>
-				</div>
-			</div>
-		{/if}
     </div>
 
     <div class="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700 space-y-4">
