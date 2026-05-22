@@ -57,7 +57,7 @@
 		}
 	});
 
-	// Función segura que SOLO se dispara cuando el usuario cambia la opción del menú
+	// SOLUCIÓN: Usamos una función directa en lugar de $effect para evitar el bucle infinito de Svelte
 	async function handleEnrollmentChange() {
 		if (!selectedEnrollmentId) {
 			selectedCourse = null;
@@ -72,12 +72,13 @@
 				const res = await courseService.getById((enrollment as any).curso_id);
 				selectedCourse = res.data || res;
 				
-				// Autocompletar solo si la casilla de dinero está vacía
-				if (montoComprobante === null || montoComprobante === 0) {
+				// Autocompletar el monto automáticamente si está vacío
+				if (montoComprobante === null) {
 					if (selectedCourse?.modulos?.length > 0) {
 						montoComprobante = selectedCourse.modulos[0].costo;
-					} else if (selectedCourse?.matricula_interno) {
-						montoComprobante = selectedCourse.matricula_interno;
+					} else {
+						// Fallback por si es un curso viejo que no tiene módulos
+						montoComprobante = selectedCourse.costo_total_interno / (selectedCourse.cantidad_cuotas || 1);
 					}
 				}
 			} catch (err) {
@@ -144,16 +145,20 @@
 		<!-- CAJITA DE AYUDA VISUAL -->
 		{#if loadingCourse}
 			<p class="text-xs text-gray-500 mt-2 animate-pulse">Cargando detalles del curso...</p>
-		{:else if selectedCourse && selectedCourse.modulos && selectedCourse.modulos.length > 0}
+		{:else if selectedCourse}
 			<div class="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md flex gap-3 items-start">
 				<span class="text-blue-500 text-lg leading-none">ℹ️</span>
 				<div class="text-sm text-blue-800 dark:text-blue-300">
 					<p class="font-bold mb-1">Guía de Pagos del Curso:</p>
 					<ul class="list-disc pl-4 space-y-1 text-xs">
-						<li>Matrícula Inicial: <strong>{selectedCourse.matricula_interno} Bs.</strong></li>
-						<li>Costo por Módulo ({selectedCourse.cantidad_cuotas} cuotas): <strong>{selectedCourse.modulos[0].costo} Bs.</strong></li>
+						<li>Matrícula Inicial: <strong>{selectedCourse.matricula_interno || 0} Bs.</strong></li>
+						{#if selectedCourse.modulos && selectedCourse.modulos.length > 0}
+							<li>Costo por Módulo ({selectedCourse.cantidad_cuotas} cuotas): <strong>{selectedCourse.modulos[0].costo} Bs.</strong></li>
+						{:else}
+							<li>Monto sugerido por cuota: <strong>{(selectedCourse.costo_total_interno / (selectedCourse.cantidad_cuotas || 1)).toFixed(2)} Bs.</strong></li>
+						{/if}
 					</ul>
-					<p class="mt-2 text-xs italic opacity-80">El monto sugerido se ha autocompletado abajo, pero puedes modificarlo si pagarás otro monto.</p>
+					<p class="mt-2 text-xs italic opacity-80">El monto sugerido se ha autocompletado abajo, pero puedes modificarlo.</p>
 				</div>
 			</div>
 		{/if}
