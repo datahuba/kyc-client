@@ -75,10 +75,21 @@
 	let loginType = $derived($userStore.loginType);
 	let academicRole = $derived($userStore.academicRole);
 
+	function hasRoleAccess(itemRoles: string[], role: string | null | undefined): boolean {
+		if (!role) return false;
+		if (role === 'superadmin') return itemRoles.includes('superadmin') || itemRoles.includes('admin');
+		if (role === 'admin') return itemRoles.includes('admin');
+		return itemRoles.includes(role);
+	}
+
 	let filteredNavigation = $derived(navigation.filter(item => {
 		// Defensive guard: admins/superadmins must only see admin items
 		if (userRole === 'admin' || userRole === 'superadmin') {
-			return item.loginTypes.includes('admin') && (item.roles.includes('admin') || item.roles.includes('superadmin'));
+			return item.loginTypes.includes('admin') && hasRoleAccess(item.roles, userRole);
+		}
+
+		if (!loginType) {
+			return false;
 		}
 
 		// Check if item supports this login type
@@ -102,7 +113,7 @@
 				return item.roles.includes('student');
 			}
 		} else if (loginType === 'admin') {
-			return item.roles.includes('admin') || item.roles.includes('superadmin');
+			return hasRoleAccess(item.roles, userRole);
 		}
 
 		return false;

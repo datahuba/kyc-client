@@ -94,6 +94,7 @@
 			<option value="admin">Admin</option>
 			<option value="superadmin">Superadmin</option>
 			<option value="secretary">Secretaria</option>
+			<option value="docente">Docente</option>
 		</Select>
 
 		{#if !isEditMode}
