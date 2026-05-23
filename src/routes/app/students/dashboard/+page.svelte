@@ -108,13 +108,16 @@
 								<p class="font-medium text-gray-900 dark:text-white">{studentData.carnet}</p>
 							</div>
 						</div>
-						<div class="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-							<div class="size-10 rounded-full bg-light-tertiary dark:bg-light-tertiary flex items-center justify-center text-light-primary">
+						<div class="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden">
+							<div class="size-10 shrink-0 rounded-full bg-light-tertiary dark:bg-light-tertiary flex items-center justify-center text-light-primary">
 								<TagIcon class="size-5" />
 							</div>
-							<div>
+							<div class="min-w-0 flex-1">
 								<p class="text-xs text-gray-500 dark:text-gray-400">Registro</p>
-								<p class="font-medium text-gray-900 dark:text-white">{studentData.registro}</p>
+								<!-- Aplicada la clase 'break-all' para auto-ajustar correos largos de forma estética -->
+								<p class="font-medium text-gray-900 dark:text-white break-all" title={studentData.registro}>
+									{studentData.registro}
+								</p>
 							</div>
 						</div>
 					</div>

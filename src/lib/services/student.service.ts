@@ -48,6 +48,10 @@ class StudentService {
 		return await apiKyC.post<{ success_count: number; errors: string[] }>('/students/import/excel', formData);
 	}
 
+    async bulkDelete(ids: string[]): Promise<{ message: string; deleted_count: number }> {
+		return await apiKyC.post<{ message: string; deleted_count: number }>('/students/bulk-delete', { ids });
+	}
+
 	async update(id: string, data: UpdateStudentRequest): Promise<Student> {
 		return await apiKyC.put<Student>(`/students/${id}`, data);
 	}

@@ -55,6 +55,11 @@
 	let importLoading = $state(false);
 	let importReport: { success_count: number; errors: string[] } | null = $state(null);
 
+	// SELECCIÓN MÚLTIPLE Y BORRADO EN LOTE STATE (NUEVO)
+	let selectedStudentIds: string[] = $state([]);
+	let showBulkDeleteModal = $state(false);
+	let bulkDeleteLoading = $state(false);
+
 	// Filters
 	let filters = $state({
 		q: '',
@@ -64,6 +69,51 @@
 	});
 	let debounceTimer: any;
 	let allCourses: Course[] = $state([]);
+
+	// Computed: Verificar si el rol es SuperAdmin para controles de borrado masivo
+	let isSuperAdmin = $derived($userStore.role === 'superadmin');
+
+	// Computed: Verificar si todos los estudiantes de la página actual están seleccionados
+	let isAllSelected = $derived(
+		students.length > 0 && students.every(s => selectedStudentIds.includes(s._id))
+	);
+
+	function toggleSelectAll() {
+		if (isAllSelected) {
+			// Deseleccionar los estudiantes de la página actual
+			selectedStudentIds = selectedStudentIds.filter(id => !students.some(s => s._id === id));
+		} else {
+			// Seleccionar todos los estudiantes de la página actual sin duplicar
+			const currentIds = students.map(s => s._id);
+			selectedStudentIds = [...new Set([...selectedStudentIds, ...currentIds])];
+		}
+	}
+
+	function toggleSelectStudent(id: string) {
+		if (selectedStudentIds.includes(id)) {
+			selectedStudentIds = selectedStudentIds.filter(item => item !== id);
+		} else {
+			selectedStudentIds = [...selectedStudentIds, id];
+		}
+	}
+
+	async function handleBulkDelete() {
+		if (selectedStudentIds.length === 0) return;
+		bulkDeleteLoading = true;
+		try {
+			const response = await studentService.bulkDelete(selectedStudentIds);
+			alert('success', response.message || `Se eliminaron ${selectedStudentIds.length} estudiantes.`);
+			
+			// Actualización reactiva instantánea SPA (Filtramos localmente los borrados)
+			students = students.filter(s => !selectedStudentIds.includes(s._id));
+			selectedStudentIds = []; // Limpiar selección
+			showBulkDeleteModal = false;
+		} catch (e: any) {
+			alert('error', e.message || 'Error al realizar la eliminación masiva');
+		} finally {
+			bulkDeleteLoading = false;
+		}
+	}
 
 	async function loadCourses() {
 		try {
@@ -379,7 +429,7 @@
 		}
 	}
 
-	// --- LOGICA DE IMPORTACION DESDE EXCEL (NUEVO) ---
+	// --- LOGICA DE IMPORTACION DESDE EXCEL ---
 	async function handleImportExcelSubmit() {
 		if (!importFile) {
 			alert('error', 'Por favor, seleccione un archivo de Excel');
@@ -392,12 +442,11 @@
 			importReport = response;
 			if (response.success_count > 0) {
 				alert('success', `¡Se importaron ${response.success_count} estudiantes con éxito!`);
-				loadStudents(); // Recargar reactivamente la lista
+				loadStudents(); 
 			}
 			if (response.errors.length > 0) {
 				alert('error', `Se detectaron ${response.errors.length} problemas en las filas.`);
 			} else {
-				// Si todo salió 100% perfecto, cerramos la modal
 				isImportModalOpen = false;
 				importFile = null;
 			}
@@ -408,7 +457,6 @@
 		}
 	}
 
-	// Descargar plantilla de ejemplo autogenerada en CSV
 	function downloadTemplateCSV() {
 		const headers = ["Nombre Completo", "Registro Academico", "Carnet de Identidad", "Extension", "Email", "Celular", "Domicilio", "Tipo Estudiante"];
 		const sampleRow = ["Juan Perez Gomez", "", "1234567", "SC", "juan.perez@email.com", "77012345", "Calle Falsa 123", "interno"];
@@ -545,10 +593,22 @@
 	{#if loading}
 		<TableSkeleton columns={6} rows={10} />
 	{:else}
-		<div class="w-full overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+		<div class="w-full overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm animate-fade-in">
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 				<thead class="bg-gray-50 dark:bg-gray-800">
 					<tr>
+						<!-- Checkbox Maestro para el SuperAdmin -->
+						{#if isSuperAdmin}
+							<th scope="col" class="px-6 py-3 text-left w-10">
+								<input
+									type="checkbox"
+									checked={isAllSelected}
+									onchange={toggleSelectAll}
+									class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 h-4 w-4 dark:bg-gray-700 cursor-pointer"
+								/>
+							</th>
+						{/if}
+
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estudiante</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registro</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carnet</th>
@@ -561,7 +621,19 @@
 				</thead>
 				<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
 					{#each students as student (student._id)}
-						<tr>
+						<tr class={selectedStudentIds.includes(student._id) ? 'bg-primary-50/40 dark:bg-primary-950/20 transition-colors' : 'transition-colors'}>
+							<!-- Checkbox Individual para el SuperAdmin -->
+							{#if isSuperAdmin}
+								<td class="px-6 py-4 whitespace-nowrap">
+									<input
+										type="checkbox"
+										checked={selectedStudentIds.includes(student._id)}
+										onchange={() => toggleSelectStudent(student._id)}
+										class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 h-4 w-4 dark:bg-gray-700 cursor-pointer"
+									/>
+								</td>
+							{/if}
+
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="flex items-center">
 									<div class="h-10 w-10 shrink-0">
@@ -755,7 +827,7 @@
 		</div>
 	</Modal>
 
-	<!-- Import Modal (NUEVO) -->
+	<!-- Import Modal -->
 	<Modal
 		isOpen={isImportModalOpen}
 		title="Importación Masiva de Estudiantes (Excel)"
@@ -828,4 +900,30 @@
 			</div>
 		</div>
 	</Modal>
+
+	<!-- BARRA DE ACCIONES FLOTANTE DE SELECCIÓN MÚLTIPLE (NUEVO) -->
+	{#if selectedStudentIds.length > 0 && isSuperAdmin}
+		<div class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900/95 dark:bg-gray-950/95 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-6 z-50 border border-gray-800 dark:border-gray-700 backdrop-blur-sm transition-all duration-300">
+			<span class="text-sm font-semibold tracking-wider">
+				{selectedStudentIds.length} estudiantes seleccionados
+			</span>
+			<div class="flex gap-2">
+				<Button variant="secondary" class="text-xs py-1 px-3 bg-gray-800 text-white hover:bg-gray-700 border-0 transition-colors" onclick={() => selectedStudentIds = []}>
+					Deseleccionar
+				</Button>
+				<Button variant="destructive" class="text-xs py-1 px-3 font-semibold" onclick={() => showBulkDeleteModal = true}>
+					Eliminar Selección
+				</Button>
+			</div>
+		</div>
+	{/if}
+
+	<!-- MODAL CONFIRMACIÓN ELIMINACIÓN MASIVA (NUEVO) -->
+	<ModalConfirm
+		isOpen={showBulkDeleteModal}
+		message={`¿Estás absolutamente seguro de que deseas eliminar a los ${selectedStudentIds.length} estudiantes seleccionados? Esta acción es irreversible y eliminará en cascada todas sus inscripciones y pagos asociados.`}
+		onConfirm={handleBulkDelete}
+		onCancel={() => showBulkDeleteModal = false}
+		loading={bulkDeleteLoading}
+	/>
 </div>
