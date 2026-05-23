@@ -49,6 +49,12 @@
 	let studentEnrollments: Enrollment[] = $state([]);
 	let enrollmentsLoading :boolean= $state(false);
 
+	// IMPORTACIÓN EXCEL STATE
+	let isImportModalOpen: boolean = $state(false);
+	let importFile: File | null = $state(null);
+	let importLoading = $state(false);
+	let importReport: { success_count: number; errors: string[] } | null = $state(null);
+
 	// Filters
 	let filters = $state({
 		q: '',
@@ -164,8 +170,6 @@
 			await studentService.delete(idToDelete);
 			alert('success', 'Estudiante eliminado correctamente');
 			isDeleteModalOpen = false;
-			
-			// ACTUALIZACIÓN REACTIVA INSTANTÁNEA EN LOCAL
 			students = students.filter(s => s._id !== idToDelete);
 		} catch (error: any) {
 			alert('error', error.message || 'Error al eliminar estudiante');
@@ -184,7 +188,6 @@
 			alert('success', 'Título verificado correctamente');
 			isVerifyModalOpen = false;
 			
-			// ACTUALIZACIÓN REACTIVA INSTANTÁNEA DEL TÍTULO
 			students = students.map(s => 
 				s._id === idToVerify 
 					? { ...s, titulo: s.titulo ? { ...s.titulo, estado: 'verificado' } : undefined } 
@@ -212,7 +215,6 @@
 			alert('success', 'Título rechazado correctamente');
 			isRejectModalOpen = false;
 			
-			// ACTUALIZACIÓN REACTIVA INSTANTÁNEA DEL RECHAZO
 			students = students.map(s => 
 				s._id === idToReject 
 					? { ...s, titulo: s.titulo ? { ...s.titulo, estado: 'rechazado' } : undefined } 
@@ -377,18 +379,73 @@
 		}
 	}
 
+	// --- LOGICA DE IMPORTACION DESDE EXCEL (NUEVO) ---
+	async function handleImportExcelSubmit() {
+		if (!importFile) {
+			alert('error', 'Por favor, seleccione un archivo de Excel');
+			return;
+		}
+		importLoading = true;
+		importReport = null;
+		try {
+			const response = await studentService.importFromExcel(importFile);
+			importReport = response;
+			if (response.success_count > 0) {
+				alert('success', `¡Se importaron ${response.success_count} estudiantes con éxito!`);
+				loadStudents(); // Recargar reactivamente la lista
+			}
+			if (response.errors.length > 0) {
+				alert('error', `Se detectaron ${response.errors.length} problemas en las filas.`);
+			} else {
+				// Si todo salió 100% perfecto, cerramos la modal
+				isImportModalOpen = false;
+				importFile = null;
+			}
+		} catch (e: any) {
+			alert('error', e.message || 'Error al procesar la importación del archivo');
+		} finally {
+			importLoading = false;
+		}
+	}
+
+	// Descargar plantilla de ejemplo autogenerada en CSV
+	function downloadTemplateCSV() {
+		const headers = ["Nombre Completo", "Registro Academico", "Carnet de Identidad", "Extension", "Email", "Celular", "Domicilio", "Tipo Estudiante"];
+		const sampleRow = ["Juan Perez Gomez", "", "1234567", "SC", "juan.perez@email.com", "77012345", "Calle Falsa 123", "interno"];
+		const csvContent = [headers, sampleRow].map(e => e.join(",")).join("\n");
+		const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+		link.href = url;
+		link.download = "plantilla_estudiantes.csv";
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+		alert('success', 'Plantilla descargada. Rellénala y súbela en formato Excel o CSV.');
+	}
+
 </script>
 
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
 		<Heading level="h1">Estudiantes</Heading>
-		<div class="flex gap-3 ml-auto">
+		<div class="flex flex-wrap gap-3 ml-auto w-full sm:w-auto justify-end">
 			<Button onclick={downloadStudentsCSV} variant="secondary" loading={csvLoading}>
 				{#snippet leftIcon()}
 					<DownloadIcon class="size-5" />
 				{/snippet}
 				Descargar CSV
 			</Button>
+
+			<!-- Botón de Importación de Excel -->
+			<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; }} variant="secondary">
+				{#snippet leftIcon()}
+					<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+				{/snippet}
+				Importar Excel
+			</Button>
+
 			<Button onclick={handleCreate}>
 				{#snippet leftIcon()}
 					<PlusIcon class="size-5" />
@@ -478,7 +535,9 @@
 			</div>
 			{#if filters.curso_id}
 				<span class="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400">
-					<svg class="size-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></span>
+					<svg class="size-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
+					Filtro activo
+				</span>
 			{/if}
 		</div>
 	</div>
@@ -692,6 +751,80 @@
 			{/if}
 			<div class="mt-6 flex justify-end">
 				<Button variant="secondary" onclick={() => isEnrollmentsOpen = false}>Cerrar</Button>
+			</div>
+		</div>
+	</Modal>
+
+	<!-- Import Modal (NUEVO) -->
+	<Modal
+		isOpen={isImportModalOpen}
+		title="Importación Masiva de Estudiantes (Excel)"
+		onClose={() => { if (!importLoading) isImportModalOpen = false; }}
+		maxWidth="sm:max-w-2xl"
+	>
+		<div class="p-6 space-y-6">
+			<div class="text-sm text-gray-500 dark:text-gray-400 space-y-2">
+				<p>
+					Sube una hoja de cálculo con la lista de estudiantes para registrarlos en lote de manera automática.
+				</p>
+				<ul class="list-disc pl-5 space-y-1 text-xs text-gray-400 dark:text-gray-500">
+					<li>La contraseña inicial por defecto de cada estudiante será su **Carnet de Identidad (CI)** [26].</li>
+					<li><b>Regla de Negocio:</b> Si una fila no tiene <b>Registro</b>, se utilizará su <b>Email</b> como usuario de acceso para su login.</li>
+				</ul>
+			</div>
+
+			<div class="flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-100 dark:border-gray-700">
+				<span class="text-sm font-medium text-gray-700 dark:text-gray-300">¿No tienes el formato de la plantilla?</span>
+				<Button onclick={downloadTemplateCSV} variant="secondary" class="text-xs py-1 px-3">
+					Descargar Plantilla
+				</Button>
+			</div>
+
+			<!-- Input para Subir Archivo -->
+			<div class="space-y-1">
+				<label for="import-file" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Selecciona el archivo (.xlsx o .xls)</label>
+				<input
+					id="import-file"
+					type="file"
+					accept=".xlsx, .xls, .csv"
+					onchange={(e) => {
+						const files = (e.target as HTMLInputElement).files;
+						if (files && files.length > 0) {
+							importFile = files[0];
+						}
+					}}
+					class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:text-gray-400 dark:file:bg-gray-700 dark:file:text-white"
+				/>
+			</div>
+
+			<!-- Reporte de Resultados / Errores de Procesamiento -->
+			{#if importReport}
+				<div class="border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-3 max-h-60 overflow-y-auto">
+					<h4 class="text-sm font-bold text-gray-800 dark:text-white">Reporte de Procesamiento:</h4>
+					<p class="text-xs text-green-600 dark:text-green-400 font-semibold">
+						✓ {importReport.success_count} estudiantes importados y creados con éxito en la base de datos.
+					</p>
+					
+					{#if importReport.errors.length > 0}
+						<div class="space-y-1">
+							<p class="text-xs text-red-600 dark:text-red-400 font-semibold">⚠️ Se detectaron {importReport.errors.length} problemas en el archivo:</p>
+							<ul class="list-disc pl-5 text-[11px] text-red-500 space-y-1">
+								{#each importReport.errors as err}
+									<li>{err}</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
+			<div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+				<Button variant="secondary" onclick={() => isImportModalOpen = false} disabled={importLoading}>
+					Cancelar
+				</Button>
+				<Button onclick={handleImportExcelSubmit} loading={importLoading} disabled={!importFile}>
+					Procesar Importación
+				</Button>
 			</div>
 		</div>
 	</Modal>
