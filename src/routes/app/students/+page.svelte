@@ -3,12 +3,12 @@
 	import { page as appPage } from '$app/stores';
 	import { studentService, enrollmentService, courseService } from '$lib/services';
 	import type { Student, Enrollment, Course } from '$lib/interfaces';
+	import { userStore } from '$lib/stores/userStore';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
-	import Card from '$lib/components/ui/card.svelte';
-	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
-	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
+	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
+	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import StudentDetails from '$lib/features/students/StudentDetails.svelte';
 	import StudentForm from '$lib/features/students/StudentForm.svelte';
@@ -88,7 +88,6 @@
 				totalItems = response.meta.totalItems;
 				totalPages = response.meta.totalPages;
 			} else {
-				// Fallback if structure is different
 				students = [];
 				totalItems = 0;
 			}
@@ -124,13 +123,11 @@
 	}
 
 	onMount(async () => {
-		// Pre-load courses so the select renders with the correct option from URL param
 		try {
 			const coursesRes = await courseService.getAll(1, 100);
 			allCourses = coursesRes.data;
 		} catch (e) { console.error('Error loading courses', e); }
 
-		// Now set filter from URL — options are already populated
 		const cursoIdParam = $appPage.url.searchParams.get('curso_id');
 		if (cursoIdParam) {
 			filters.curso_id = cursoIdParam;
@@ -162,11 +159,14 @@
 	async function confirmDelete() {
 		if (!studentToDelete) return;
 		deleteLoading = true;
+		const idToDelete = studentToDelete._id;
 		try {
-			await studentService.delete(studentToDelete._id);
+			await studentService.delete(idToDelete);
 			alert('success', 'Estudiante eliminado correctamente');
 			isDeleteModalOpen = false;
-			loadStudents();
+			
+			// ACTUALIZACIÓN REACTIVA INSTANTÁNEA EN LOCAL
+			students = students.filter(s => s._id !== idToDelete);
 		} catch (error: any) {
 			alert('error', error.message || 'Error al eliminar estudiante');
 		} finally {
@@ -178,12 +178,18 @@
 	async function confirmVerify() {
 		if (!studentToAction) return;
 		actionLoading = true;
+		const idToVerify = studentToAction._id;
 		try {
-			// We verify with empty data assuming current data is correct for this quick action
-			await studentService.verifyTitulo(studentToAction._id, {});
+			await studentService.verifyTitulo(idToVerify, {});
 			alert('success', 'Título verificado correctamente');
 			isVerifyModalOpen = false;
-			loadStudents();
+			
+			// ACTUALIZACIÓN REACTIVA INSTANTÁNEA DEL TÍTULO
+			students = students.map(s => 
+				s._id === idToVerify 
+					? { ...s, titulo: s.titulo ? { ...s.titulo, estado: 'verificado' } : undefined } 
+					: s
+			);
 		} catch (error: any) {
 			alert('error', error.message || 'Error al verificar título');
 		} finally {
@@ -199,11 +205,19 @@
 			return;
 		}
 		actionLoading = true;
+		const idToReject = studentToAction._id;
+		const reason = rejectReason;
 		try {
-			await studentService.rejectTitulo(studentToAction._id, rejectReason);
+			await studentService.rejectTitulo(idToReject, reason);
 			alert('success', 'Título rechazado correctamente');
 			isRejectModalOpen = false;
-			loadStudents();
+			
+			// ACTUALIZACIÓN REACTIVA INSTANTÁNEA DEL RECHAZO
+			students = students.map(s => 
+				s._id === idToReject 
+					? { ...s, titulo: s.titulo ? { ...s.titulo, estado: 'rechazado' } : undefined } 
+					: s
+			);
 		} catch (error: any) {
 			alert('error', error.message || 'Error al rechazar título');
 		} finally {
@@ -314,7 +328,6 @@
 	async function downloadStudentsCSV() {
 		csvLoading = true;
 		try {
-			// Fetch ALL students matching current filters (up to 1000)
 			const filterParams: any = {};
 			if (filters.q) filterParams.q = filters.q;
 			if (filters.activo !== 'all') filterParams.activo = filters.activo === 'true';
@@ -385,9 +398,6 @@
 		</div>
 	</div>
 
-	<!-- Active course filter chip -->
-	<!-- (removed — filter indicator is now integrated in the select below) -->
-
 	<!-- Filters -->
 	<div class="grid grid-cols-1 md:grid-cols-5 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
 		<!-- Search -->
@@ -450,7 +460,7 @@
 							: 'ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-white dark:ring-gray-600'}"
 				>
 					<option value="">Todos los cursos</option>
-					{#each allCourses as course}
+					{#each allCourses as course (course._id)}
 						<option value={course._id}>{course.nombre_programa} ({course.codigo})</option>
 					{/each}
 				</select>
@@ -468,9 +478,7 @@
 			</div>
 			{#if filters.curso_id}
 				<span class="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400">
-					<svg class="size-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-					Filtro activo
-				</span>
+					<svg class="size-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></span>
 			{/if}
 		</div>
 	</div>
@@ -478,7 +486,6 @@
 	{#if loading}
 		<TableSkeleton columns={6} rows={10} />
 	{:else}
-		<!-- <div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow"> -->
 		<div class="w-full overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 				<thead class="bg-gray-50 dark:bg-gray-800">
@@ -488,14 +495,13 @@
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carnet</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domicilio</th>
-						
 						<th scope="col" class="relative px-6 py-3">
 							<span class="sr-only">Acciones</span>
 						</th>
 					</tr>
 				</thead>
 				<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-					{#each students as student}
+					{#each students as student (student._id)}
 						<tr>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="flex items-center">
@@ -505,7 +511,6 @@
 										{:else}
 										<span><UserIcon class="size-10"/></span>
 										{/if}
-										
 									</div>
 									<div class="ml-4">
 										<div class="text-sm font-medium text-gray-900 dark:text-white">{student.nombre}</div>
@@ -515,7 +520,6 @@
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm text-gray-900 dark:text-white">{student.registro}</div>
-								
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm text-gray-900 dark:text-white">{student.carnet}</div>
@@ -526,7 +530,6 @@
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm text-gray-900 dark:text-white">{student.domicilio}</div>
 							</td>
-							
 							<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
 								<button onclick={() => toggleDropdown(student._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
 									<DotsVerticalIcon class="size-5" />
@@ -662,7 +665,7 @@
 							</tr>
 						</thead>
 						<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-							{#each studentEnrollments as enrollment}
+							{#each studentEnrollments as enrollment (enrollment._id)}
 								<tr>
 									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
 										{new Date(enrollment.fecha_inscripcion).toLocaleDateString()}
