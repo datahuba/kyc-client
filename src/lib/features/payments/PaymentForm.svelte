@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { enrollmentService, paymentService, paymentConfigService } from '$lib/services';
-	import type { Enrollment, CreatePaymentFormData } from '$lib/interfaces';
+	import { page as appPage } from '$app/stores';
+	import { enrollmentService, paymentService, paymentConfigService, courseService } from '$lib/services';
+	import type { Student, Enrollment, Course } from '$lib/interfaces';
 	import { userStore } from '$lib/stores/userStore';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
@@ -17,6 +18,7 @@
 	let { onSuccess, onCancel }: Props = $props();
 
 	let enrollments: Enrollment[] = $state([]);
+	let coursesList: Course[] = $state([]);
 	let loading = $state(true);
 	let saving = $state(false);
 	
@@ -26,6 +28,7 @@
 	let qrUrl = $state('');
 
 	// --- ESTADOS DE PAGO ---
+    let concepto = $state(''); // 'Matrícula' o 'Módulo'
     let remitente = $state('');
     let banco = $state('');
     let montoComprobante = $state<number | null>(null);
@@ -36,11 +39,26 @@
     const bancosDisponibles = ["Banco Unión", "BNB", "Mercantil Santa Cruz", "Banco Bisa", "Banco Ganadero", "Banco Económico", "Otro"];
     const cuentasInstitucion = ["Cta. Corriente BNB - 1234567", "Cta. Ahorros Unión - 9876543"];
 
+	// Control reactivo: ocultar opción de matrícula si ya fue cancelada
+	let showMatriculaOption = $derived(
+		selectedEnrollmentId 
+			? !enrollments.find(e => e._id === selectedEnrollmentId)?.matricula_pagada 
+			: true
+	);
+
 	onMount(async () => {
 		try {
-			const config = await paymentConfigService.get();
+			// Cargar configuración de QR y cursos
+			const [config, coursesRes] = await Promise.all([
+				paymentConfigService.get(),
+				courseService.getAll(1, 100)
+			]);
+
 			if (config && config.qr_url) {
 				qrUrl = config.qr_url;
+			}
+			if (coursesRes && coursesRes.data) {
+				coursesList = coursesRes.data;
 			}
 			
 			if ($userStore.user?._id) {
@@ -54,15 +72,48 @@
 		}
 	});
 
+	// Efecto reactivo Svelte 5: Calcula y bloquea el monto exacto según el concepto elegido
+	$effect(() => {
+		if (!selectedEnrollmentId) {
+			montoComprobante = null;
+			concepto = '';
+			return;
+		}
+
+		const enrollment = enrollments.find(e => e._id === selectedEnrollmentId);
+		if (!enrollment) return;
+
+		const course = coursesList.find(c => c._id === enrollment.curso_id);
+		if (!course) return;
+
+		// Determinar si el estudiante aplica a costos internos o externos
+		const isInterno = enrollment.es_estudiante_interno === 'interno';
+
+		if (concepto === 'Matrícula') {
+			montoComprobante = isInterno ? course.matricula_interno : course.matricula_externo;
+		} else if (concepto === 'Módulo') {
+			// El costo total en tus cursos ya representa únicamente el total de los módulos,
+			// por lo que solo debemos dividirlo directamente entre la cantidad de cuotas.
+			const total = isInterno ? course.costo_total_interno : course.costo_total_externo;
+			const cuotas = course.cantidad_cuotas || 1;
+			
+			// Redondeo seguro a 2 decimales
+			montoComprobante = Math.round((total / cuotas) * 100) / 100;
+		} else {
+			montoComprobante = null;
+		}
+	});
+
 	async function handleSubmit() {
-		if (!selectedEnrollmentId || !transactionNumber || !file || !remitente || !banco || montoComprobante === null || !cuentaDestino || !fechaComprobante) {
+		if (!selectedEnrollmentId || !transactionNumber || !file || !remitente || !banco || montoComprobante === null || !cuentaDestino || !fechaComprobante || !concepto) {
 			alert('error', 'Todos los campos son obligatorios');
 			return;
 		}
 
 		saving = true;
 		try {
-			const payload: CreatePaymentFormData = {
+			// Añadimos el concepto elegido y el monto fijo al payload de envío
+			const payload: any = {
 				inscripcion_id: selectedEnrollmentId,
 				numero_transaccion: transactionNumber,
 				file: file,
@@ -70,7 +121,9 @@
                 banco,
                 monto_comprobante: montoComprobante!,
                 fecha_comprobante: fechaComprobante,
-                cuenta_destino: cuentaDestino
+                cuenta_destino: cuentaDestino,
+				concepto, // 'Matrícula' o 'Módulo'
+				cantidad_pago: montoComprobante!
 			};
 
 			await paymentService.create(payload);
@@ -86,26 +139,47 @@
 </script>
 
 <form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-    <div>
-        <label for="enrollment" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Inscripción</label>
-        {#if loading}
-            <div class="h-10 w-full animate-pulse rounded-md bg-gray-200 dark:bg-gray-700"></div>
-        {:else}
-            <select
-                id="enrollment"
-                bind:value={selectedEnrollmentId}
-                required
-                class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-            >
-                <option value="">Seleccione una inscripción</option>
-                {#each enrollments as enrollment}
-                    <option value={enrollment._id}>
-                        {enrollment.created_at.split('T')[0]} - Saldo: {enrollment.saldo_pendiente} Bs.
-                    </option>
-                {/each}
-            </select>
-        {/if}
-    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+		<!-- Selección de Inscripción -->
+		<div>
+			<label for="enrollment" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Inscripción / Programa</label>
+			{#if loading}
+				<div class="h-10 w-full animate-pulse rounded-md bg-gray-200 dark:bg-gray-700"></div>
+			{:else}
+				<select
+					id="enrollment"
+					bind:value={selectedEnrollmentId}
+					required
+					class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
+				>
+					<option value="">Seleccione una inscripción</option>
+					{#each enrollments as enrollment}
+						<option value={enrollment._id}>
+							{coursesList.find(c => c._id === enrollment.curso_id)?.codigo || 'Prog'} - Saldo: {enrollment.saldo_pendiente} Bs.
+						</option>
+					{/each}
+				</select>
+			{/if}
+		</div>
+
+		<!-- Concepto de Pago Inteligente -->
+		<div>
+			<label for="concepto" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Concepto de Pago</label>
+			<select
+				id="concepto"
+				bind:value={concepto}
+				required
+				disabled={!selectedEnrollmentId}
+				class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm disabled:bg-gray-100 dark:disabled:bg-gray-800"
+			>
+				<option value="">Seleccione Concepto</option>
+				{#if showMatriculaOption}
+					<option value="Matrícula">Matrícula</option>
+				{/if}
+				<option value="Módulo">Módulo / Cuota de Programa</option>
+			</select>
+		</div>
+	</div>
 
     <div class="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700 space-y-4">
         <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Detalles del Depósito/Transferencia</h3>
@@ -121,7 +195,17 @@
                 </select>
             </div>
 
-            <Input label="Monto Pagado (Bs)" type="number" step="0.01" bind:value={montoComprobante} required placeholder="0.00" />
+			<!-- Campo de Monto Bloqueado (Readonly) si ya se seleccionó un concepto para evitar digitaciones erróneas -->
+            <Input 
+				label="Monto Pagado (Bs)" 
+				type="number" 
+				step="0.01" 
+				bind:value={montoComprobante} 
+				required 
+				readonly={!!concepto}
+				class={concepto ? 'bg-gray-100 dark:bg-gray-800 font-semibold text-primary-600' : ''}
+				placeholder="Seleccione concepto primero" 
+			/>
             
             <div>
                 <label for="fechaComprobante" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha del Voucher</label>
