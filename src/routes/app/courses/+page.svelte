@@ -139,10 +139,15 @@
 	async function handleDelete() {
 		if (!courseToDelete) return;
 		deleteLoading = true;
+		
+		// Guardamos el ID en una constante local segura para evitar que Svelte
+		// rastree reactivamente el objeto 'courseToDelete' después de limpiarlo.
+		const idToDelete = courseToDelete._id;
+		
 		try {
-			await courseService.delete(courseToDelete._id);
+			await courseService.delete(idToDelete);
 			alert('success', 'Curso eliminado correctamente');
-			courses = courses.filter(c => c._id !== courseToDelete!._id);
+			courses = courses.filter(c => c._id !== idToDelete);
 			showDeleteModal = false;
 		} catch (e: any) {
 			alert('error', e.message || 'Error al eliminar curso');
@@ -191,17 +196,14 @@
 
 	// Export students list per course to CSV
     function exportCourseStudentsToCSV() {
-        // 1. Validar que tengamos datos
         if (!courseStudents || courseStudents.length === 0) {
             alert('error', 'No hay estudiantes inscritos para exportar.');
             return;
         }
 
-        // 2. Encabezados del CSV
         const headers = ["Estudiante", "CI", "Email", "Celular", "Estado", "Tipo", "Fecha Inscripcion", "Total", "Pagado", "Saldo"];
         
         try {
-            // 3. Mapear los datos según tu estructura: student.contacto, student.inscripcion, etc.
             const rows = courseStudents.map(s => [
                 `"${s.nombre}"`,
                 s.carnet,
@@ -215,16 +217,13 @@
                 s.financiero.saldo_pendiente
             ]);
 
-            // 4. Formato CSV con soporte de tildes
             const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
             const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
             
-            // 5. Nombre dinámico: Inscritos_NombrePrograma_2026.csv
             const year = new Date().getFullYear();
             const courseNameClean = (selectedCourseStudents?.nombre_programa || 'curso').replace(/\s+/g, '_');
             const fileName = `Inscritos_${courseNameClean}_${year}.csv`;
 
-            // 6. Descarga
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
@@ -242,7 +241,7 @@
 
 </script>
 
-	<div class="space-y-6">
+<div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<Heading level="h1">Cursos</Heading>
 		<Button onclick={handleCreate}>
@@ -344,7 +343,7 @@
 					</tr>
 				</thead>
 				<tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-					{#each courses as course}
+					{#each courses as course (course._id)}
 						<tr>
 							<td class="px-3 py-4 whitespace-nowrap">
 								<div class="text-sm font-medium text-gray-900 dark:text-white">{course.codigo}</div>
@@ -399,7 +398,7 @@
 
 		<!-- Mobile Cards -->
 		<div class="md:hidden grid grid-cols-1 gap-4">
-			{#each courses as course}
+			{#each courses as course (course._id)}
 				<Card>
 					<div class="flex items-center justify-between mb-4">
 						<div>
@@ -459,7 +458,7 @@
 
 	<ModalConfirm
 		isOpen={showDeleteModal}
-		message={`¿Estás seguro de que deseas eliminar el curso ${courseToDelete?.nombre_programa}? Esta acción no se puede deshacer.`}
+		message={`¿Estás seguro de que deseas eliminar el curso ${courseToDelete?.nombre_programa || ''}? Esta acción no se puede deshacer.`}
 		onConfirm={handleDelete}
 		onCancel={() => {
 			showDeleteModal = false;
