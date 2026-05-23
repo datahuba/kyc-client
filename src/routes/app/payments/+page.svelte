@@ -87,15 +87,8 @@
 
 			const result = await paymentService.getAll(page, limit, filterParams); 
 			
-			// Handle response structure depending if it returns array (student) or PaginatedResponse
-			// If student/role restricted, it might return array directly based on implementation details of previous modules
-			// but we designed PaymentService.getAll to return PaginatedResponse.
-			// Let's assume consistent PaginatedResponse unless backend behaves differently for students
-			
-			// Checking result structure just in case
 			const response = result as any;
 			if (response && Array.isArray(response)) {
-				// Fallback if backend returns array
 				payments = response;
 				totalItems = response.length;
 				totalPages = 1;
@@ -141,7 +134,6 @@
 	}
 
 	onMount(async () => {
-		// Pre-load courses (and students for admin) so the select renders with the correct option
 		const results = await Promise.all([
 			courseService.getAll(1, 100),
 			isAdmin ? studentService.getAll(1, 100) : Promise.resolve(null)
@@ -149,7 +141,6 @@
 		coursesList = results[0].data;
 		if (results[1]) studentsList = (results[1] as any).data;
 
-		// Now set filter from URL — options are already populated, so select reflects correctly
 		const cursoIdParam = $appPage.url.searchParams.get('curso_id');
 		if (cursoIdParam) {
 			filters.curso_id = cursoIdParam;
@@ -178,11 +169,16 @@
 	async function confirmApprove() {
 		if (!paymentToAction) return;
 		actionLoading = true;
+		
+		const idToApprove = paymentToAction._id;
+		
 		try {
-			await paymentService.approve(paymentToAction._id);
+			await paymentService.approve(idToApprove);
 			alert('success', 'Pago aprobado correctamente');
 			isApproveModalOpen = false;
-			loadPayments();
+			
+			// ACTUALIZACIÓN REACTIVA INSTANTÁNEA SIN RECARGAR RED
+			payments = payments.map(p => p._id === idToApprove ? { ...p, estado_pago: 'aprobado' } : p);
 		} catch (error: any) {
 			alert('error', error.message || 'Error al aprobar pago');
 		} finally {
@@ -198,11 +194,17 @@
 			return;
 		}
 		actionLoading = true;
+		
+		const idToReject = paymentToAction._id;
+		const reason = rejectReason;
+		
 		try {
-			await paymentService.reject(paymentToAction._id, rejectReason);
+			await paymentService.reject(idToReject, reason);
 			alert('success', 'Pago rechazado correctamente');
 			isRejectModalOpen = false;
-			loadPayments();
+			
+			// ACTUALIZACIÓN REACTIVA INSTANTÁNEA SIN RECARGAR RED
+			payments = payments.map(p => p._id === idToReject ? { ...p, estado_pago: 'rechazado' } : p);
 		} catch (error: any) {
 			actionLoading = false;
 			alert('error', error.message || 'Error al rechazar pago');
@@ -260,7 +262,6 @@
 
 	let csvLoading = $state(false);
 
-	// Función para descargar CSV (todos los registros con filtros actuales)
 	async function downloadCSV() {
 		csvLoading = true;
 		try {
@@ -392,7 +393,7 @@
 								: 'ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-white dark:ring-gray-600'}"
 					>
 						<option value="">Todos los cursos</option>
-						{#each coursesList as course}
+						{#each coursesList as course (course._id)}
 							<option value={course._id}>{course.nombre_programa}</option>
 						{/each}
 						</select>
@@ -424,7 +425,7 @@
 					class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
 				>
 					<option value="">Todos los estudiantes</option>
-					{#each studentsList as student}
+					{#each studentsList as student (student._id)}
 						<option value={student._id}>{student.nombre}</option>
 					{/each}
 				</select>
@@ -456,7 +457,7 @@
 						</tr>
 					</thead>
 					<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-						{#each payments as payment}
+						{#each payments as payment (payment._id)}
 							<tr>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
 									{payment.numero_transaccion}
@@ -524,7 +525,7 @@
 						{/each}
 						{#if payments.length === 0}
 							<tr>
-								<td colspan={isAdmin ? 7 : 6} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
+								<td colspan={isAdmin ? 10 : 9} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
 									No se encontraron pagos.
 								</td>
 							</tr>

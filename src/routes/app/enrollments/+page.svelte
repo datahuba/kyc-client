@@ -14,7 +14,7 @@
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
-	import { alert,formatDate, formatCurrency } from '$lib/utils';
+	import { alert, formatDate, formatCurrency } from '$lib/utils';
 	
 
 	let enrollments: Enrollment[] = $state([]);
@@ -63,10 +63,8 @@
 
 		try {
 			// Populate lists for filters (Admin only) or mapping names
-			// We load a batch for the filters. 
-			// In a real large app we would use async select with search, but for now we load first 1000
 			if (studentsList.length === 0 && $userStore.role !== 'student') {
-				const studentsRes = await studentService.getAll(1, 100); // Load enough to populate map
+				const studentsRes = await studentService.getAll(1, 100); 
 				studentsList = studentsRes.data;
 				studentsRes.data.forEach(s => (studentsMap[s._id] = s));
 			}
@@ -94,15 +92,9 @@
 			const result = await enrollmentsPromise;
 
 			if ($userStore.role === 'student') {
-				// Existing behavior for student: returns array directly
-				// We might need to handle pagination for student in future if API changes
-				// For now assuming array
 				enrollments = Array.isArray(result) ? result : (result as any).data; 
-				// Manually populate maps for student view if needed, or rely on them being populated above?
-				// Student view usually only needs course map.
 			} else {
-				// Admin view: returns paginated response
-				const response = result as any; // Cast for now
+				const response = result as any; 
 				if (response && response.data) {
 					enrollments = response.data;
 					totalItems = response.meta.totalItems;
@@ -165,10 +157,14 @@
 	async function handleDelete() {
 		if (!enrollmentToDelete) return;
 		deleteLoading = true;
+		
+		// Guardamos el ID en una constante local para prevenir fallos en la reactividad
+		const idToDelete = enrollmentToDelete._id;
+		
 		try {
-			await enrollmentService.delete(enrollmentToDelete._id);
+			await enrollmentService.delete(idToDelete);
 			alert('success', 'Inscripción eliminada correctamente');
-			enrollments = enrollments.filter(e => e._id !== enrollmentToDelete!._id);
+			enrollments = enrollments.filter(e => e._id !== idToDelete);
 			showDeleteModal = false;
 		} catch (e: any) {
 			alert('error', e.message || 'Error al eliminar inscripción');
@@ -192,7 +188,6 @@
 	}
 
 	function getDropdownOptions(enrollment: Enrollment) {
-		// Si es estudiante, devolvemos una lista vacía o solo con "Ver"
         if ($userStore.role === 'student') return [];
 		return [
 			{
@@ -212,11 +207,9 @@
 	}
 
 	function getStudentName(id: string) {
-		// Si es el estudiante viendo su propio panel, sacamos el nombre de su sesión
 		if ($userStore.role === 'student' && $userStore.user) {
 			return $userStore.user.nombre || $userStore.user.username || $userStore.user.email || 'Mi Usuario';
 		}
-		// Si es el administrador, lo busca en la base de datos como siempre
 		return studentsMap[id]?.nombre || 'Desconocido';
 	}
 	
@@ -240,13 +233,13 @@
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<Heading level="h1">Inscripciones</Heading>
-	{#if $userStore.role !== 'student'}
-		<Button onclick={handleCreate}>
-			{#snippet leftIcon()}
-				<PlusIcon class="size-5" />
-			{/snippet}
-			Nueva Inscripción
-		</Button>
+		{#if $userStore.role !== 'student'}
+			<Button onclick={handleCreate}>
+				{#snippet leftIcon()}
+					<PlusIcon class="size-5" />
+				{/snippet}
+				Nueva Inscripción
+			</Button>
 		{/if}
 	</div>
 
@@ -320,74 +313,77 @@
 	{/if}
 
 	{#if loading}
-		<TableSkeleton columns={6} rows={10} />
+		<TableSkeleton columns={9} rows={10} />
 	{:else if enrollments.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
 			<p class="text-gray-500 dark:text-gray-400">No hay inscripciones registradas.</p>
 		</div>
 	{:else}
 		<!-- Desktop Table -->
-		<div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow">
-			<table class=" divide-y divide-gray-200 dark:divide-gray-700 w-full table-auto">
+		<div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
+			<table class="divide-y divide-gray-200 dark:divide-gray-700 w-full table-auto">
 				<thead class="bg-gray-50 dark:bg-gray-900">
 					<tr>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Curso</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pagado</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Saldo</th>
-					
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dto. Curso</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dto. Personal</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
-						<th scope="col" class="relative px-6 py-3">
-							<span class="sr-only">Acciones</span>
-						</th>
+						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
+						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Curso</th>
+						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
+						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pagado</th>
+						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Saldo</th>
+						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dto. Curso</th>
+						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dto. Personal</th>
+						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
+						{#if $userStore.role !== 'student'}
+							<th scope="col" class="relative px-4 py-3">
+								<span class="sr-only">Acciones</span>
+							</th>
+						{/if}
 					</tr>
 				</thead>
 				<tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-					{#each enrollments as enrollment}
+					{#each enrollments as enrollment (enrollment._id)}
 						<tr>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-sm font-medium text-gray-900 dark:text-white">{getStudentName(enrollment.estudiante_id)}</div>
+							<td class="px-4 py-4">
+								<div class="text-sm font-medium text-gray-900 dark:text-white max-w-[180px] break-words">
+									{getStudentName(enrollment.estudiante_id)}
+								</div>
 							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-sm text-gray-900 dark:text-white">{getCourseName(enrollment.curso_id)}</div>
+							<td class="px-4 py-4">
+								<div class="text-sm text-gray-900 dark:text-white max-w-[280px] break-words" title={getCourseName(enrollment.curso_id)}>
+									{getCourseName(enrollment.curso_id)}
+								</div>
 							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
+							<td class="px-4 py-4 whitespace-nowrap">
 								<div class="text-sm text-gray-600 dark:text-white">{formatDate(enrollment.fecha_inscripcion)}</div>
 							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-xs text-gray-600 dark:text-gray-400">Total: {formatCurrency(enrollment.total_a_pagar)}</div>
+							<td class="px-4 py-4 whitespace-nowrap">
+								<div class="text-xs text-gray-600 dark:text-gray-400">{formatCurrency(enrollment.total_a_pagar)}</div>
 							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-							
-								<div class="text-xs text-green-600 dark:text-green-400">Pagado: {formatCurrency(enrollment.total_pagado)}</div>
+							<td class="px-4 py-4 whitespace-nowrap">
+								<div class="text-xs text-green-600 dark:text-green-400">{formatCurrency(enrollment.total_pagado)}</div>
 							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class={`text-sm font-medium ${formatCurrency(enrollment.saldo_pendiente).includes('0.00') ? 'text-red-600 dark:text-red-400' : 'text-red-600 dark:text-red-400'}`}>
+							<td class="px-4 py-4 whitespace-nowrap">
+								<div class="text-sm font-semibold text-red-600 dark:text-red-400">
 									{formatCurrency(enrollment.saldo_pendiente)}
 								</div>
 							</td>
-							
-							<td class="px-6 py-4 whitespace-nowrap">
-								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full text-green-800`}>
+							<td class="px-4 py-4 whitespace-nowrap text-center">
+								<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full text-green-800 bg-green-50">
 									{enrollment.descuento_curso_aplicado || 0}%
 								</span>
 							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full text-green-800`}>
+							<td class="px-4 py-4 whitespace-nowrap text-center">
+								<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full text-green-800 bg-green-50">
 									{formatCurrency(enrollment.descuento_personalizado || 0)}
 								</span>
 							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
+							<td class="px-4 py-4 whitespace-nowrap">
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(enrollment.estado)}`}>
 									{enrollment.estado}
 								</span>
 							</td>
 							{#if $userStore.role !== 'student'}
-								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+								<td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium relative">
 									<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
 										<DotsVerticalIcon class="size-5" />
 									</button>
@@ -422,7 +418,7 @@
 
 		<!-- Mobile Cards -->
 		<div class="md:hidden grid grid-cols-1 gap-4">
-			{#each enrollments as enrollment}
+			{#each enrollments as enrollment (enrollment._id)}
 				<Card>
 					<div class="flex items-center justify-between mb-4">
 						<div>
