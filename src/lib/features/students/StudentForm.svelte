@@ -69,6 +69,7 @@
 			formData = {
 				registro: student.registro,
 				carnet: student.carnet || '',
+				password: '',
 				nombre: student.nombre,
 				extension: student.extension,
 				fecha_nacimiento: student.fecha_nacimiento.split('T')[0],
@@ -220,28 +221,28 @@
 				<option value="interno">Interno</option>
 				<option value="externo">Externo</option>
 			</Select>
-			
-			{#if isEditMode}
-				<div class="relative w-full">
-					<div class="relative">
-						<Input 
-							label="Nueva Contraseña" 
-							id="password" 
-							type={showPassword ? 'text' : 'password'} 
-							bind:value={formData.password} 
-							placeholder="Opcional (para cambiar)" 
-						/>
-						<button 
-							type="button" 
-							onclick={() => (showPassword = !showPassword)} 
-							class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-							tabindex="-1"
-						>
-							{#if showPassword} <EyeIcon class="size-5" /> {:else} <EyeOffIcon class="size-5" /> {/if}
-						</button>
-					</div>
+
+			<div class="relative w-full">
+				<div class="relative">
+					<Input
+						label={isEditMode ? 'Nueva Contraseña' : 'Contraseña'}
+						id="password"
+						type={showPassword ? 'text' : 'password'}
+						bind:value={formData.password}
+						required={!isEditMode}
+						minlength={5}
+						placeholder={isEditMode ? 'Opcional (para cambiar)' : 'Mínimo 5 caracteres'}
+					/>
+					<button
+						type="button"
+						onclick={() => (showPassword = !showPassword)}
+						class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+						tabindex="-1"
+					>
+						{#if showPassword} <EyeIcon class="size-5" /> {:else} <EyeOffIcon class="size-5" /> {/if}
+					</button>
 				</div>
-			{/if}
+			</div>
 		</div>
 	</div>
 
