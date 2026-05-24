@@ -2,6 +2,10 @@ import { apiKyC } from '$lib/config';
 import type { Course, CreateCourseRequest, UpdateCourseRequest } from '$lib/interfaces';
 
 class CourseService {
+	async getById(id: string): Promise<Course> {
+		return await apiKyC.get<Course>(`/courses/${id}`);
+	}
+
 	async getAll(
 		page = 1,
 		per_page = 10,

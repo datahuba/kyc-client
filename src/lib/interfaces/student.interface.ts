@@ -38,6 +38,7 @@ export interface CreateStudentRequest {
 	registro: string;
 	carnet: string;
 	password: string;
+	course_id: string;
 	nombre: string;
 	extension: string;
 	fecha_nacimiento: string;

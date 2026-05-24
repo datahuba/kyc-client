@@ -37,6 +37,7 @@
 		carrera: '',
 		es_estudiante_interno: 'interno',
 		password: '',
+		course_id: '',
 		lista_cursos_ids: []
 	});
 
@@ -56,10 +57,16 @@
 	});
 	
 	let courses: Course[] = $state([]);
+	let selectedCourseName = $derived(courses.find((course) => course._id === formData.course_id)?.nombre_programa || '');
+
+	function courseOptionLabel(course: Course): string {
+		const baseLabel = `${course.codigo} · ${course.nombre_programa}`;
+		return baseLabel.length > 46 ? `${baseLabel.slice(0, 46)}...` : baseLabel;
+	}
 
 	$effect(() => {
-		courseService.getAll().then(data => {
-			courses = data;
+		courseService.getAll(1, 100, { activo: true }).then((response) => {
+			courses = response.data;
 		});
 	});
 
@@ -70,6 +77,7 @@
 				registro: student.registro,
 				carnet: student.carnet || '',
 				password: '',
+				course_id: student.lista_cursos_ids?.[0] || '',
 				nombre: student.nombre,
 				extension: student.extension,
 				fecha_nacimiento: student.fecha_nacimiento.split('T')[0],
@@ -99,6 +107,7 @@
 			formData = {
 				registro: '',
 				carnet: '',
+				course_id: '',
 				nombre: '',
 				extension: '',
 				fecha_nacimiento: '',
@@ -220,6 +229,17 @@
 			<Select label="Tipo de Estudiante" bind:value={formData.es_estudiante_interno} required>
 				<option value="interno">Interno</option>
 				<option value="externo">Externo</option>
+			</Select>
+			<Select
+				label="Curso / Programa"
+				bind:value={formData.course_id}
+				required={!isEditMode}
+				title={selectedCourseName}
+			>
+				<option value="" disabled selected>Seleccione un curso activo</option>
+				{#each courses as course}
+					<option value={course._id} title={course.nombre_programa}>{courseOptionLabel(course)}</option>
+				{/each}
 			</Select>
 
 			<div class="relative w-full">

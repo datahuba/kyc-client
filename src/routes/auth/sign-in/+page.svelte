@@ -9,6 +9,7 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { getRouteByRole } from '$lib/utils/navigation';
+	import { LOGIN_TYPE_KEY } from '$lib/constants';
 
 	let showPassword = false;
 	let username = '';
@@ -19,15 +20,19 @@
 	let academicRole: 'teacher' | 'student' | null = null;
 
 	onMount(() => {
-		userStore.subscribe(state => {
+		userStore.init();
+
+		const unsubscribe = userStore.subscribe(state => {
 			loginType = state.loginType;
 			academicRole = state.academicRole;
 		});
 		
-		const storedType = localStorage.getItem('kyc-login_type');
+		const storedType = localStorage.getItem(LOGIN_TYPE_KEY);
 		if (!storedType && !loginType) {
 			goto('/');
 		}
+
+		return unsubscribe;
 	});
 
 	async function handleSubmit() {
