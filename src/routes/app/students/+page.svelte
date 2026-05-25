@@ -583,9 +583,8 @@
 			</div>
 			{#if filters.curso_id}
 				<span class="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400">
-					<svg class="size-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-					Filtro activo
-				</span>
+					<svg class="size-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></span
+				>
 			{/if}
 		</div>
 	</div>
@@ -722,10 +721,10 @@
 		{/if}
 	</Modal>
 
-	<!-- Delete Confirmation Modal -->
+	<!-- Delete Confirmation Modal (CORREGIDO CON MENSAJE DE AUDITORÍA) -->
 	<ModalConfirm
 		isOpen={isDeleteModalOpen}
-		message={`¿Estás seguro de que deseas eliminar al estudiante ${studentToDelete?.nombre}? Esta acción no se puede deshacer.`}
+		message={`¿Estás seguro de que deseas eliminar al estudiante ${studentToDelete?.nombre}? El sistema borrará sus inscripciones y solo purgará sus pagos pendientes, conservando aprobados y cancelados por fines de auditoría.`}
 		onConfirm={confirmDelete}
 		onCancel={() => isDeleteModalOpen = false}
 		loading={deleteLoading}
@@ -901,7 +900,7 @@
 		</div>
 	</Modal>
 
-	<!-- BARRA DE ACCIONES FLOTANTE DE SELECCIÓN MÚLTIPLE (NUEVO) -->
+	<!-- BARRA DE ACCIONES FLOTANTE DE SELECCIÓN MÚLTIPLE -->
 	{#if selectedStudentIds.length > 0 && isSuperAdmin}
 		<div class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900/95 dark:bg-gray-950/95 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-6 z-50 border border-gray-800 dark:border-gray-700 backdrop-blur-sm transition-all duration-300">
 			<span class="text-sm font-semibold tracking-wider">
@@ -918,10 +917,10 @@
 		</div>
 	{/if}
 
-	<!-- MODAL CONFIRMACIÓN ELIMINACIÓN MASIVA (NUEVO) -->
+	<!-- MODAL CONFIRMACIÓN ELIMINACIÓN MASIVA (CORREGIDO CON MENSAJE DE AUDITORÍA) -->
 	<ModalConfirm
 		isOpen={showBulkDeleteModal}
-		message={`¿Estás absolutamente seguro de que deseas eliminar a los ${selectedStudentIds.length} estudiantes seleccionados? Esta acción es irreversible y eliminará en cascada todas sus inscripciones y pagos asociados.`}
+		message={`¿Estás absolutamente seguro de que deseas eliminar a los ${selectedStudentIds.length} estudiantes seleccionados? El sistema borrará sus inscripciones y solo purgará sus pagos en estado pendiente, reteniendo aprobados y rechazados por normativas de auditoría.`}
 		onConfirm={handleBulkDelete}
 		onCancel={() => showBulkDeleteModal = false}
 		loading={bulkDeleteLoading}
