@@ -158,12 +158,11 @@
 		if (!enrollmentToDelete) return;
 		deleteLoading = true;
 		
-		// Guardamos el ID en una constante local para prevenir fallos en la reactividad
 		const idToDelete = enrollmentToDelete._id;
 		
 		try {
 			await enrollmentService.delete(idToDelete);
-			alert('success', 'Inscripción eliminada correctamente');
+			alert('success', 'Inscripción eliminada correctamente. Referencias limpiadas.');
 			enrollments = enrollments.filter(e => e._id !== idToDelete);
 			showDeleteModal = false;
 		} catch (e: any) {
@@ -188,22 +187,31 @@
 	}
 
 	function getDropdownOptions(enrollment: Enrollment) {
+		// Estudiantes no ven acciones administrativas
         if ($userStore.role === 'student') return [];
-		return [
+		
+		// Opciones base (visibles para ADMIN y SUPERADMIN)
+		const options: any[] = [
 			{
 				label: 'Editar',
 				id: 'edit',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>`,
 				action: () => handleEdit(enrollment)
-			},
-			{
-				label: 'Eliminar',
-				id: 'delete',
-				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`,
-				action: () => confirmDelete(enrollment),
-				divider: true
 			}
 		];
+
+		// Opción destructiva (visible SOLO para SUPERADMIN)
+		if ($userStore.role === 'superadmin') {
+			options.push({
+				label: 'Eliminar',
+				id: 'delete',
+				icon: `<svg class="size-5" text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`,
+				action: () => confirmDelete(enrollment),
+				divider: true
+			});
+		}
+
+		return options;
 	}
 
 	function getStudentName(id: string) {
@@ -486,7 +494,7 @@
 
 	<ModalConfirm
 		isOpen={showDeleteModal}
-		message={`¿Estás seguro de que deseas eliminar esta inscripción? Esta acción no se puede deshacer.`}
+		message={`¿Estás seguro de que deseas eliminar esta inscripción? El estudiante y sus pagos registrados se mantendrán en el sistema por motivos de auditoría, pero perderá el acceso y progreso académico de este curso.`}
 		onConfirm={handleDelete}
 		onCancel={() => {
 			showDeleteModal = false;
