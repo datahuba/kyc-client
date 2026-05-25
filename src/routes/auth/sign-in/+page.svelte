@@ -8,7 +8,6 @@
 	import { userStore } from '$lib/stores/userStore';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
-	import { getRouteByRole } from '$lib/utils/navigation';
 
 	let showPassword = false;
 	let username = '';
@@ -36,9 +35,10 @@
 		try {
 			await userStore.login({ username, password });
 			const state = get(userStore);
+			
 			if (state.user) {
-				const route = getRouteByRole(state.role, state.loginType, state.academicRole);
-				goto(route);
+				// ISSUE K: Redirección Condicional Basada en Roles
+				goto('/app/dashboard');
 			} else {
 				goto('/');
 			}
