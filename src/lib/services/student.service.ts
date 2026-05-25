@@ -43,10 +43,14 @@ class StudentService {
 	}
 
     async importFromExcel(file: File): Promise<{ success_count: number; errors: string[] }> {
-		const formData = new FormData();
-		formData.append('file', file);
-		return await apiKyC.post<{ success_count: number; errors: string[] }>('/students/import/excel', formData);
-	}
+	const formData = new FormData();
+	formData.append('file', file);
+	return await apiKyC.post<{ success_count: number; errors: string[] }>(
+		'/students/import/excel', 
+		formData, 
+		{ customTimeout: 120000 } // 120000 ms = 2 minutos (Evita cancelaciones a los 30s)
+	);
+}
 
     async bulkDelete(ids: string[]): Promise<{ message: string; deleted_count: number }> {
 		return await apiKyC.post<{ message: string; deleted_count: number }>('/students/bulk-delete', { ids });
