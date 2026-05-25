@@ -21,7 +21,7 @@
 		class="grid grid-cols-[auto,_1fr] items-center gap-0.5 text-sm leading-6 font-medium text-light-two sm:text-base dark:text-gray-300"
 	>
 		<span class="truncate"
-			>{label} <span class="text-red-500">{restProps.required && '*'} </span></span
+			>{label} <span class="text-red-500">{restProps.required ? '*' : ''} </span></span
 		>
 	</label>
 	<div class="relative {label && 'mt-1'}  {icon && 'grid grid-cols-1'}">

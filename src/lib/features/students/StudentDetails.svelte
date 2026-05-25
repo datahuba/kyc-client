@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Student, TituloData } from '$lib/interfaces';
-	import { studentService } from '$lib/services';
+	import { studentService, courseService } from '$lib/services';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
@@ -20,6 +20,8 @@
 	let verifying = $state(false);
 	let rejecting = $state(false);
 	let rejectionReason = $state('');
+	let studentCourseNames = $state<string[]>([]);
+	let loadingCourses = $state(false);
 
 	// Title verification data
 	let verifyData: TituloData = $state({
@@ -39,6 +41,30 @@
 				universidad: student.titulo.universidad
 			};
 		}
+	});
+
+	$effect(() => {
+		async function loadStudentCourses() {
+			if (!student?.lista_cursos_ids?.length) {
+				studentCourseNames = [];
+				return;
+			}
+
+			loadingCourses = true;
+			try {
+				const courses = await Promise.all(
+					student.lista_cursos_ids.map((courseId) => courseService.getById(courseId))
+				);
+				studentCourseNames = courses.map((course) => `${course.codigo} · ${course.nombre_programa}`);
+			} catch (error) {
+				console.error('Error loading student courses:', error);
+				studentCourseNames = [];
+			} finally {
+				loadingCourses = false;
+			}
+		}
+
+		loadStudentCourses();
 	});
 
 	async function handleVerify() {
@@ -195,7 +221,7 @@
 				<p class="text-sm text-gray-500 dark:text-gray-400">Registro y carrera</p>
 			</div>
 		</div>
-		<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+		<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
 			<div>
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Registro</label>
 				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">{student.registro}</p>
@@ -204,6 +230,19 @@
 			<div>
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</label>
 				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white capitalize">{student.es_estudiante_interno}</p>
+			</div>
+
+			<div class="md:col-span-2">
+				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Curso / Programa</label>
+				{#if loadingCourses}
+					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Cargando cursos...</p>
+				{:else if studentCourseNames.length > 0}
+					<p class="mt-1 text-base font-medium text-gray-900 dark:text-white break-words" title={studentCourseNames.join(' | ')}>
+						{studentCourseNames.join(' | ')}
+					</p>
+				{:else}
+					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Sin curso asignado</p>
+				{/if}
 			</div>
 		</div>
 	</div>
