@@ -7,6 +7,7 @@ import { AUTH_TOKEN_KEY } from '$lib/constants';
 interface RequestOptions {
 	requireAuth?: boolean;
 	customHeaders?: HeadersInit;
+	customTimeout?: number; // ISSUE J: Permitir sobreescribir el timeout en llamadas pesadas
 }
 
 function extractErrorMessage(errorBody: unknown): string {
@@ -78,7 +79,9 @@ class ApiKyC {
 		options: RequestOptions = {}
 	): Promise<T> {
 		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
+		// ISSUE J: Usar timeout customizado si se especifica, de lo contrario usar el por defecto
+		const timeoutDuration = options.customTimeout ?? API_CONFIG.TIMEOUT;
+		const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
 
 		try {
 			const isFormData = data instanceof FormData;
