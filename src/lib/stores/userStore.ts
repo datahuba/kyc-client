@@ -29,6 +29,43 @@ const initialState: UserState = {
 function createUserStore() {
 	const { subscribe, set, update } = writable<UserState>(initialState);
 
+	function clearAuthStorage() {
+		if (!browser) return;
+		localStorage.removeItem(AUTH_TOKEN_KEY);
+		localStorage.removeItem(USER_DATA_KEY);
+		localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
+	}
+
+	function validatePortalAccess(
+		currentType: 'admin' | 'academic' | null,
+		currentAcademicRole: 'teacher' | 'student' | null,
+		user: UserResponse
+	): string | null {
+		const isAdminUser = user.role === 'admin' || user.role === 'superadmin';
+		const isStudentUser = user.user_type === 'student';
+		const isTeacherUser = user.user_type === 'user' && !isAdminUser;
+
+		if (currentType === 'admin') {
+			return isAdminUser
+				? null
+				: 'Estas credenciales no corresponden al portal Administrativo. Usa el portal Académico.';
+		}
+
+		if (currentType === 'academic' && currentAcademicRole === 'teacher') {
+			return isTeacherUser
+				? null
+				: 'Estas credenciales no corresponden al portal de Docentes. Usa el portal correcto.';
+		}
+
+		if (currentType === 'academic' && currentAcademicRole === 'student') {
+			return isStudentUser
+				? null
+				: 'Estas credenciales no corresponden al portal de Estudiantes. Usa el portal correcto.';
+		}
+
+		return 'Primero selecciona un portal de acceso válido.';
+	}
+
 	return {
 		subscribe,
 		
@@ -81,6 +118,24 @@ function createUserStore() {
 
 				// Fetch user details to sync with actual user type on server
 				const user = await authService.getMe();
+
+				const portalMismatchMessage = validatePortalAccess(currentType, currentAcademicRole, user);
+
+				if (portalMismatchMessage) {
+					clearAuthStorage();
+
+					update(state => ({
+						...state,
+						user: null,
+						token: null,
+						isAuthenticated: false,
+						loading: false,
+						error: portalMismatchMessage,
+						role: null
+					}));
+
+					throw new Error(portalMismatchMessage);
+				}
 				
 				// Debug logging
 				console.log('🔍 DEBUG LOGIN:');
@@ -151,6 +206,7 @@ function createUserStore() {
 				}
 
 			} catch (error: unknown) {
+				clearAuthStorage();
 				update(state => ({
 					...state,
 					loading: false,

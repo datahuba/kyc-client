@@ -37,6 +37,7 @@
 		carrera: '',
 		es_estudiante_interno: 'interno',
 		password: '',
+		course_id: '',
 		lista_cursos_ids: []
 	});
 
@@ -56,10 +57,16 @@
 	});
 	
 	let courses: Course[] = $state([]);
+	let selectedCourseName = $derived(courses.find((course) => course._id === formData.course_id)?.nombre_programa || '');
+
+	function courseOptionLabel(course: Course): string {
+		const baseLabel = `${course.codigo} · ${course.nombre_programa}`;
+		return baseLabel.length > 46 ? `${baseLabel.slice(0, 46)}...` : baseLabel;
+	}
 
 	$effect(() => {
-		courseService.getAll().then(data => {
-			courses = data;
+		courseService.getAll(1, 100, { activo: true }).then((response) => {
+			courses = response.data;
 		});
 	});
 
@@ -69,6 +76,8 @@
 			formData = {
 				registro: student.registro,
 				carnet: student.carnet || '',
+				password: '',
+				course_id: student.lista_cursos_ids?.[0] || '',
 				nombre: student.nombre,
 				extension: student.extension,
 				fecha_nacimiento: student.fecha_nacimiento.split('T')[0],
@@ -98,6 +107,7 @@
 			formData = {
 				registro: '',
 				carnet: '',
+				course_id: '',
 				nombre: '',
 				extension: '',
 				fecha_nacimiento: '',
@@ -220,28 +230,39 @@
 				<option value="interno">Interno</option>
 				<option value="externo">Externo</option>
 			</Select>
-			
-			{#if isEditMode}
-				<div class="relative w-full">
-					<div class="relative">
-						<Input 
-							label="Nueva Contraseña" 
-							id="password" 
-							type={showPassword ? 'text' : 'password'} 
-							bind:value={formData.password} 
-							placeholder="Opcional (para cambiar)" 
-						/>
-						<button 
-							type="button" 
-							onclick={() => (showPassword = !showPassword)} 
-							class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-							tabindex="-1"
-						>
-							{#if showPassword} <EyeIcon class="size-5" /> {:else} <EyeOffIcon class="size-5" /> {/if}
-						</button>
-					</div>
+			<Select
+				label="Curso / Programa"
+				bind:value={formData.course_id}
+				required={!isEditMode}
+				title={selectedCourseName}
+			>
+				<option value="" disabled selected>Seleccione un curso activo</option>
+				{#each courses as course}
+					<option value={course._id} title={course.nombre_programa}>{courseOptionLabel(course)}</option>
+				{/each}
+			</Select>
+
+			<div class="relative w-full">
+				<div class="relative">
+					<Input
+						label={isEditMode ? 'Nueva Contraseña' : 'Contraseña'}
+						id="password"
+						type={showPassword ? 'text' : 'password'}
+						bind:value={formData.password}
+						required={!isEditMode}
+						minlength={5}
+						placeholder={isEditMode ? 'Opcional (para cambiar)' : 'Mínimo 5 caracteres'}
+					/>
+					<button
+						type="button"
+						onclick={() => (showPassword = !showPassword)}
+						class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+						tabindex="-1"
+					>
+						{#if showPassword} <EyeIcon class="size-5" /> {:else} <EyeOffIcon class="size-5" /> {/if}
+					</button>
 				</div>
-			{/if}
+			</div>
 		</div>
 	</div>
 

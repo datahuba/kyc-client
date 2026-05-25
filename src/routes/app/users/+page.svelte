@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { userService } from '$lib/services';
-	import type { User } from '$lib/interfaces';
+	import type { Role, User } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -15,10 +15,10 @@
 	import { Pagination } from '$lib/components/ui';
 	import { userStore } from '$lib/stores/userStore';
 
-	let currentUser: any = null;
+	let currentUser: any = $state(null);
 
 	userStore.subscribe(state => {
-	currentUser = state.user;
+		currentUser = state.user;
 	});
 
 	let users: User[] = $state([]);
@@ -40,6 +40,11 @@
 	// Dropdown state
 	let openDropdownId: string | null = $state(null);
 
+	type UserApiResponse = User & {
+		rol?: unknown;
+		role?: unknown;
+	};
+
 	onMount(() => {
 		loadUsers();
 	});
@@ -51,11 +56,11 @@
 			
 			const response = result as any;
 			if (response && response.data) {
-				users = response.data;
+				users = normalizeUsers(response.data);
 				totalItems = response.meta.totalItems;
 				totalPages = response.meta.totalPages;
 			} else if (Array.isArray(response)) {
-				users = response;
+				users = normalizeUsers(response);
 				totalItems = response.length;
 				totalPages = 1;
 			} else {
@@ -68,6 +73,47 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	function normalizeUsers(value: unknown): User[] {
+		if (!Array.isArray(value)) return [];
+
+		return value
+			.map(normalizeUser)
+			.filter((user): user is User => Boolean(user));
+	}
+
+	function normalizeUser(user: UserApiResponse | null | undefined): User | null {
+		if (!user) return null;
+
+		return {
+			...user,
+			role: resolveUserRole(user)
+		} as User;
+	}
+
+	function resolveUserRole(user: UserApiResponse): Role {
+		const rawRole = user.role ?? user.rol;
+
+		if (typeof rawRole === 'string' && rawRole.trim()) {
+			return rawRole as Role;
+		}
+
+		return null;
+	}
+
+	function getRoleLabel(role: Role): string {
+		if (!role) return 'Sin rol';
+
+		const labels: Record<string, string> = {
+			admin: 'Admin',
+			superadmin: 'Superadmin',
+			secretary: 'Secretaria',
+			docente: 'Docente',
+			student: 'Estudiante'
+		};
+
+		return labels[role] ?? role;
 	}
 
 	function handlePageChange(newPage: number) {
@@ -91,19 +137,28 @@
 		isFormOpen = true;
 	}
 
-	function confirmDelete(user: User) {
+	function confirmDelete(user: User | null | undefined) {
+		if (!user?._id) return;
 		userToDelete = user;
 		showDeleteModal = true;
 		openDropdownId = null;
 	}
 
 	async function handleDelete() {
-		if (!userToDelete) return;
+		if (deleteLoading) return;
+
+		const deletedUserId = userToDelete?._id;
+		if (!deletedUserId) {
+			showDeleteModal = false;
+			userToDelete = null;
+			return;
+		}
+
 		deleteLoading = true;
 		try {
-			await userService.delete(userToDelete._id);
+			await userService.delete(deletedUserId);
 			alert('success', 'Usuario eliminado correctamente');
-			users = users.filter(u => u._id !== userToDelete!._id);
+			users = users.filter((user) => user?._id !== deletedUserId);
 			showDeleteModal = false;
 		} catch (e: any) {
 			alert('error', e.message || 'Error al eliminar usuario');
@@ -192,7 +247,7 @@
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-									{user.role}
+									{getRoleLabel(user.role)}
 								</span>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
@@ -261,7 +316,7 @@
 					<div class="space-y-2 text-sm">
 						<div class="flex justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Rol:</span>
-							<span class="font-medium text-gray-900 dark:text-white">{user.role}</span>
+							<span class="font-medium text-gray-900 dark:text-white">{getRoleLabel(user.role)}</span>
 						</div>
 						<div class="flex justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Estado:</span>
