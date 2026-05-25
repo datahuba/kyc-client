@@ -49,8 +49,9 @@
 	let isCollapsed = $state(false);
 
 	const navigation: NavigationItem[] = [
-		// Student roles (Academic)
-		{ name: 'Mi Dashboard', href: '/app/students/dashboard', icon: HomeIcon, roles: ['student'], loginTypes: ['academic'] },
+		// Student roles (Academic) - CORREGIDO href
+		{ name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student'], loginTypes: ['academic'] },
+		
 		// Admin roles
 		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
@@ -121,7 +122,7 @@
 
 	function isCurrent(href: string) {
 		if (href.startsWith('http://') || href.startsWith('https://')) return false;
-		return $page.url.pathname.startsWith(href);
+		return $page.url.pathname === href || ($page.url.pathname.startsWith(href) && href !== '/app/dashboard');
 	}
 
 	function logout() {
