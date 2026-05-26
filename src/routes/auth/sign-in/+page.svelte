@@ -42,8 +42,20 @@
 			const state = get(userStore);
 			
 			if (state.user) {
-				// ISSUE K: Redirección Condicional Basada en Roles
-				goto('/app/dashboard');
+				// Resolver rol de forma altamente defensiva
+				const userRole = state.role || state.user?.rol || state.user?.role || '';
+				const currentAcademicRole = state.academicRole || '';
+
+				// ISSUE M: Enrutador Conmutador Inteligente Post-Auth de la UAGRM
+				if (userRole === 'student' || currentAcademicRole === 'student') {
+					goto('/app/dashboard'); // Estudiante va a su respectivo Dashboard académico
+				} else if (userRole === 'teacher' || userRole === 'docente' || currentAcademicRole === 'teacher') {
+					goto('/app/dashboard'); // Docente va a su respectivo Dashboard académico
+				} else if (userRole === 'cpd') {
+					goto('/app/students'); // CPD no tiene acceso financiero, inicia directo en gestión de estudiantes
+				} else {
+					goto('/app/dashboard'); // MAE, Cobranzas, Admin y SuperAdmin globales
+				}
 			} else {
 				goto('/');
 			}

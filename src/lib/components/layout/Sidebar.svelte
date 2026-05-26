@@ -48,15 +48,16 @@
 	// Estado para colapsar en Desktop
 	let isCollapsed = $state(false);
 
+	// ISSUE M: Mapeo de navegación granular basado en la nueva jerarquía de la UAGRM
 	const navigation: NavigationItem[] = [
-		// Student roles (Academic) - CORREGIDO href
+		// Student roles (Academic)
 		{ name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student'], loginTypes: ['academic'] },
 		
-		// Admin roles
-		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
-		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
-		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
-		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		// Admin/Staff roles (Se condiciona el acceso en base a la jerarquía de la UAGRM)
+		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza'], loginTypes: ['admin'] },
+		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza'], loginTypes: ['admin'] },
+		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
+		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
 		
         // ---- ACCESOS EXTERNOS UAGRM ----
         { name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
@@ -65,56 +66,41 @@
 
         { name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
-		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
-		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
-		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
+		
+		// CORREGIDO BUG SINTÁCTICO: Se reemplazó el Enum por el componente visual 'UsersIcon'
+		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] }, 
+		
+		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
 		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	];
 
 	// Filter navigation based on user role
-	let userRole = $derived($userStore?.role || 'student');
+	let userRole = $derived($userStore?.role || $userStore?.user?.rol || 'student');
 	let loginType = $derived($userStore.loginType);
 	let academicRole = $derived($userStore.academicRole);
 
-	function hasRoleAccess(itemRoles: string[], role: string | null | undefined): boolean {
-		if (!role) return false;
-		if (role === 'superadmin') return itemRoles.includes('superadmin') || itemRoles.includes('admin');
-		if (role === 'admin') return itemRoles.includes('admin');
-		return itemRoles.includes(role);
-	}
-
+	// ISSUE M: Filtro reactivo estricto para roles administrativos de la UAGRM
 	let filteredNavigation = $derived(navigation.filter(item => {
-		// Defensive guard: admins/superadmins must only see admin items
-		if (userRole === 'admin' || userRole === 'superadmin') {
-			return item.loginTypes.includes('admin') && hasRoleAccess(item.roles, userRole);
+		// 1. Si el usuario pertenece al personal administrativo/staff de Postgrado
+		if (['admin', 'superadmin', 'mae', 'cpd', 'cobranza'].includes(userRole)) {
+			// Debe coincidir con el login tipo 'admin' y el ítem debe autorizar su rol específico
+			return item.loginTypes.includes('admin') && item.roles.includes(userRole);
 		}
 
-		if (!loginType) {
-			return false;
-		}
-
-		// Check if item supports this login type
-		if (!item.loginTypes.includes(loginType)) {
-			return false;
-		}
-
-		// Additional role filtering based on academicRole
+		// 2. Si el login es académico (Estudiantes y Docentes)
 		if (loginType === 'academic') {
-			// Explicit guard: Los botones de la UAGRM se muestran según su rol académico
+			// Caso especial: Accesos externos de la UAGRM
 			if (item.name === 'Aula Virtual UAGRM' || item.name === 'Perfil de Notas UAGRM') {
 				if (academicRole === 'teacher') return item.roles.includes('docente');
 				return item.roles.includes('student');
 			}
 
 			if (academicRole === 'teacher') {
-				// Docente: solo ve ítems con rol 'docente'
 				return item.roles.includes('docente');
 			} else {
-				// Estudiante: solo ve ítems con rol 'student'
 				return item.roles.includes('student');
 			}
-		} else if (loginType === 'admin') {
-			return hasRoleAccess(item.roles, userRole);
 		}
 
 		return false;

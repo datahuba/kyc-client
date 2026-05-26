@@ -4,12 +4,13 @@
 	import StudentDashboard from './components/StudentDashboard.svelte';
 	import TeacherDashboard from './components/TeacherDashboard.svelte';
 	
-	let role = $derived($userStore.role);
+	let role = $derived($userStore.role || $userStore.user?.rol || '');
 </script>
 
-{#if role === 'superadmin' || role === 'admin'}
+<!-- ISSUE L/M: Agregados 'mae' y 'cobranza' al Dashboard Administrativo -->
+{#if ['superadmin', 'admin', 'mae', 'cobranza'].includes(role)}
 	<AdminDashboard />
-{:else if role === 'teacher' || role === 'docente'}
+{:else if ['teacher', 'docente'].includes(role)}
 	<TeacherDashboard />
 {:else if role === 'student'}
 	<StudentDashboard />

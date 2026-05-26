@@ -30,6 +30,9 @@
 	let totalItems = $state(0);
 	let totalPages = $state(1);
 
+	// Estado de filtro
+	let selectedRoleFilter = $state('all');
+	
 	// Modal state
 	let isFormOpen = $state(false);
 	let selectedUser: User | null = $state(null);
@@ -102,13 +105,16 @@
 		return null;
 	}
 
+	// Mapeo estilizado de roles para la UAGRM
 	function getRoleLabel(role: Role): string {
 		if (!role) return 'Sin rol';
 
 		const labels: Record<string, string> = {
 			admin: 'Admin',
 			superadmin: 'Superadmin',
-			secretary: 'Secretaria',
+			mae: 'MAE',
+			cpd: 'CPD',
+			cobranza: 'Cobranza',
 			docente: 'Docente',
 			student: 'Estudiante'
 		};
@@ -198,6 +204,13 @@
 			}
 		];
 	}
+
+	// Filtro en memoria para evitar llamadas redundantes a la API (ya que gestionamos pocos administradores)
+	let filteredUsers = $derived(
+		selectedRoleFilter === 'all' 
+			? users 
+			: users.filter(u => u.role === selectedRoleFilter)
+	);
 </script>
 
 <div class="space-y-6">
@@ -215,11 +228,28 @@
 		</Button>
 	</div>
 
+	<!-- Barra de Filtros -->
+	<div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row items-center gap-4">
+		<label for="role-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">Filtrar por Perfil:</label>
+		<select 
+			id="role-filter"
+			bind:value={selectedRoleFilter}
+			class="block w-full sm:w-64 rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+		>
+			<option value="all">Todos los usuarios</option>
+			<option value="superadmin">Superadmin (Soporte Técnico)</option>
+			<option value="admin">Admin (General)</option>
+			<option value="mae">MAE (Lector Directivo)</option>
+			<option value="cpd">CPD (Académico)</option>
+			<option value="cobranza">Cobranza (Financiero)</option>
+		</select>
+	</div>
+
 	{#if loading}
 		<TableSkeleton columns={5} rows={10} />
-	{:else if users.length === 0}
+	{:else if filteredUsers.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-			<p class="text-gray-500 dark:text-gray-400">No hay usuarios registrados.</p>
+			<p class="text-gray-500 dark:text-gray-400">No hay usuarios registrados que coincidan con el filtro.</p>
 		</div>
 	{:else}
 		<!-- Desktop Table -->
@@ -237,7 +267,7 @@
 					</tr>
 				</thead>
 				<tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-					{#each users as user}
+					{#each filteredUsers as user}
 						<tr>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm font-medium text-gray-900 dark:text-white">{user.username}</div>
@@ -290,7 +320,7 @@
 
 		<!-- Mobile Cards -->
 		<div class="md:hidden grid grid-cols-1 gap-4">
-			{#each users as user}
+			{#each filteredUsers as user}
 				<Card>
 					<div class="flex items-center justify-between mb-4">
 						<div>
@@ -344,6 +374,7 @@
 		/>
 	</Modal>
 
+	<!-- Delete Modal -->
 	<ModalConfirm
 		isOpen={showDeleteModal}
 		message={`¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.`}
