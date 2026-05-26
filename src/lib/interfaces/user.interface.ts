@@ -2,6 +2,7 @@ export type Role = 'admin' | 'superadmin' | 'secretary' | 'docente' | 'student' 
 export type UserType = 'user' | 'student';
 
 export interface User {
+	nombre: string;
 	_id: string;
 	username: string;
 	email: string;
