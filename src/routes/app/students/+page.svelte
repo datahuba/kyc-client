@@ -55,7 +55,7 @@
 	let importLoading = $state(false);
 	let importReport: { success_count: number; errors: string[] } | null = $state(null);
 
-	// SELECCIÓN MÚLTIPLE Y BORRADO EN LOTE STATE (NUEVO)
+	// SELECCIÓN MÚLTIPLE
 	let selectedStudentIds: string[] = $state([]);
 	let showBulkDeleteModal = $state(false);
 	let bulkDeleteLoading = $state(false);
@@ -63,27 +63,28 @@
 	// Filters
 	let filters = $state({
 		q: '',
-		activo: 'all', // 'all', 'true', 'false'
+		activo: 'all',
 		estado_titulo: 'all',
 		curso_id: ''
 	});
 	let debounceTimer: any;
 	let allCourses: Course[] = $state([]);
 
-	// Computed: Verificar si el rol es SuperAdmin para controles de borrado masivo
-	let isSuperAdmin = $derived($userStore.role === 'superadmin');
+	// ISSUE N: PERMISOS VISUALES GRANULARES
+	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let isSuperAdmin = $derived(currentRole === 'superadmin');
+	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canEditStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canVerifyTitle = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 
-	// Computed: Verificar si todos los estudiantes de la página actual están seleccionados
 	let isAllSelected = $derived(
 		students.length > 0 && students.every(s => selectedStudentIds.includes(s._id))
 	);
 
 	function toggleSelectAll() {
 		if (isAllSelected) {
-			// Deseleccionar los estudiantes de la página actual
 			selectedStudentIds = selectedStudentIds.filter(id => !students.some(s => s._id === id));
 		} else {
-			// Seleccionar todos los estudiantes de la página actual sin duplicar
 			const currentIds = students.map(s => s._id);
 			selectedStudentIds = [...new Set([...selectedStudentIds, ...currentIds])];
 		}
@@ -103,10 +104,8 @@
 		try {
 			const response = await studentService.bulkDelete(selectedStudentIds);
 			alert('success', response.message || `Se eliminaron ${selectedStudentIds.length} estudiantes.`);
-			
-			// Actualización reactiva instantánea SPA (Filtramos localmente los borrados)
 			students = students.filter(s => !selectedStudentIds.includes(s._id));
-			selectedStudentIds = []; // Limpiar selección
+			selectedStudentIds = [];
 			showBulkDeleteModal = false;
 		} catch (e: any) {
 			alert('error', e.message || 'Error al realizar la eliminación masiva');
@@ -121,7 +120,6 @@
 				const coursesRes = await courseService.getAll(1, 100);
 				allCourses = coursesRes.data;
 			}
-			
 		} catch (error) {
 			console.error('Error fetching courses for filter', error);
 		}
@@ -137,7 +135,6 @@
 			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
 
 			const response = await studentService.getAll(page, limit, filterParams);
-			console.log("students response", response);
 			
 			if (response && response.data) {
 				students = response.data;
@@ -162,7 +159,7 @@
 	function handleSearchInput() {
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => {
-			page = 1; // Reset to page 1 on search
+			page = 1;
 			loadStudents();
 		}, 300);
 	}
@@ -174,7 +171,7 @@
 
 	function handleLimitChange(newLimit: number) {
 		limit = newLimit;
-		page = 1; // Reset to first page
+		page = 1;
 		loadStudents();
 	}
 
@@ -237,12 +234,7 @@
 			await studentService.verifyTitulo(idToVerify, {});
 			alert('success', 'Título verificado correctamente');
 			isVerifyModalOpen = false;
-			
-			students = students.map(s => 
-				s._id === idToVerify 
-					? { ...s, titulo: s.titulo ? { ...s.titulo, estado: 'verificado' } : undefined } 
-					: s
-			);
+			students = students.map(s => s._id === idToVerify ? { ...s, titulo: s.titulo ? { ...s.titulo, estado: 'verificado' } : undefined } : s);
 		} catch (error: any) {
 			alert('error', error.message || 'Error al verificar título');
 		} finally {
@@ -264,12 +256,7 @@
 			await studentService.rejectTitulo(idToReject, reason);
 			alert('success', 'Título rechazado correctamente');
 			isRejectModalOpen = false;
-			
-			students = students.map(s => 
-				s._id === idToReject 
-					? { ...s, titulo: s.titulo ? { ...s.titulo, estado: 'rechazado' } : undefined } 
-					: s
-			);
+			students = students.map(s => s._id === idToReject ? { ...s, titulo: s.titulo ? { ...s.titulo, estado: 'rechazado' } : undefined } : s);
 		} catch (error: any) {
 			alert('error', error.message || 'Error al rechazar título');
 		} finally {
@@ -326,7 +313,7 @@
 	}
 
 	function getDropdownOptions(student: Student) {
-		const options = [
+		const options: any[] = [
 			{
 				label: 'Ver Detalles',
 				id: 'details',
@@ -338,24 +325,30 @@
 				id: 'enrollments',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`,
 				action: () => handleViewEnrollments(student)
-			},
-			{
+			}
+		];
+
+		if (canEditStudent) {
+			options.push({
 				label: 'Editar',
 				id: 'edit',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>`,
 				action: () => handleEdit(student)
-			},
-			{
+			});
+		}
+
+		if (isSuperAdmin) {
+			options.push({
 				label: 'Eliminar',
 				id: 'delete',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`,
 				action: () => handleDeleteClick(student),
 				divider: true
-			}
-		];
+			});
+		}
 
-		if (student.titulo && student.titulo.estado !== 'verificado') {
-			options.splice(1, 0, {
+		if (canVerifyTitle && student.titulo && student.titulo.estado !== 'verificado') {
+			options.push({
 				label: 'Verificar Título',
 				id: 'verify',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
@@ -363,8 +356,8 @@
 			} as any);
 		}
 
-		if (student.titulo && student.titulo.estado !== 'rechazado') {
-			options.splice(options.length - 1, 0, {
+		if (canVerifyTitle && student.titulo && student.titulo.estado !== 'rechazado') {
+			options.push({
 				label: 'Rechazar Título',
 				id: 'reject',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
@@ -429,7 +422,6 @@
 		}
 	}
 
-	// --- LOGICA DE IMPORTACION DESDE EXCEL ---
 	async function handleImportExcelSubmit() {
 		if (!importFile) {
 			alert('error', 'Por favor, seleccione un archivo de Excel');
@@ -486,20 +478,21 @@
 				Descargar CSV
 			</Button>
 
-			<!-- Botón de Importación de Excel -->
-			<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; }} variant="secondary">
-				{#snippet leftIcon()}
-					<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-				{/snippet}
-				Importar Excel
-			</Button>
+			{#if canCreateStudent}
+				<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; }} variant="secondary">
+					{#snippet leftIcon()}
+						<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+					{/snippet}
+					Importar Excel
+				</Button>
 
-			<Button onclick={handleCreate}>
-				{#snippet leftIcon()}
-					<PlusIcon class="size-5" />
-				{/snippet}
-				Nuevo Estudiante
-			</Button>
+				<Button onclick={handleCreate}>
+					{#snippet leftIcon()}
+						<PlusIcon class="size-5" />
+					{/snippet}
+					Nuevo Estudiante
+				</Button>
+			{/if}
 		</div>
 	</div>
 
@@ -575,17 +568,11 @@
 						onclick={() => { filters.curso_id = ''; page = 1; handleFilterChange(); }}
 						class="absolute right-7 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors z-10"
 						title="Quitar filtro de curso"
-						aria-label="Quitar filtro de curso"
 					>
 						<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
 					</button>
 				{/if}
 			</div>
-			{#if filters.curso_id}
-				<span class="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400">
-					<svg class="size-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></span
-				>
-			{/if}
 		</div>
 	</div>
 
@@ -596,7 +583,6 @@
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 				<thead class="bg-gray-50 dark:bg-gray-800">
 					<tr>
-						<!-- Checkbox Maestro para el SuperAdmin -->
 						{#if isSuperAdmin}
 							<th scope="col" class="px-6 py-3 text-left w-10">
 								<input
@@ -621,7 +607,6 @@
 				<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
 					{#each students as student (student._id)}
 						<tr class={selectedStudentIds.includes(student._id) ? 'bg-primary-50/40 dark:bg-primary-950/20 transition-colors' : 'transition-colors'}>
-							<!-- Checkbox Individual para el SuperAdmin -->
 							{#if isSuperAdmin}
 								<td class="px-6 py-4 whitespace-nowrap">
 									<input
@@ -721,7 +706,7 @@
 		{/if}
 	</Modal>
 
-	<!-- Delete Confirmation Modal (CORREGIDO CON MENSAJE DE AUDITORÍA) -->
+	<!-- Delete Modal -->
 	<ModalConfirm
 		isOpen={isDeleteModalOpen}
 		message={`¿Estás seguro de que deseas eliminar al estudiante ${studentToDelete?.nombre}? El sistema borrará sus inscripciones y solo purgará sus pagos pendientes, conservando aprobados y cancelados por fines de auditoría.`}
@@ -834,14 +819,11 @@
 		maxWidth="sm:max-w-2xl"
 	>
 		<div class="p-6 space-y-6">
+			<!-- Contenido de importación... -->
 			<div class="text-sm text-gray-500 dark:text-gray-400 space-y-2">
 				<p>
 					Sube una hoja de cálculo con la lista de estudiantes para registrarlos en lote de manera automática.
 				</p>
-				<ul class="list-disc pl-5 space-y-1 text-xs text-gray-400 dark:text-gray-500">
-					<li>La contraseña inicial por defecto de cada estudiante será su **Carnet de Identidad (CI)** [26].</li>
-					<li><b>Regla de Negocio:</b> Si una fila no tiene <b>Registro</b>, se utilizará su <b>Email</b> como usuario de acceso para su login.</li>
-				</ul>
 			</div>
 
 			<div class="flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-100 dark:border-gray-700">
@@ -851,7 +833,6 @@
 				</Button>
 			</div>
 
-			<!-- Input para Subir Archivo -->
 			<div class="space-y-1">
 				<label for="import-file" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Selecciona el archivo (.xlsx o .xls)</label>
 				<input
@@ -868,7 +849,6 @@
 				/>
 			</div>
 
-			<!-- Reporte de Resultados / Errores de Procesamiento -->
 			{#if importReport}
 				<div class="border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-3 max-h-60 overflow-y-auto">
 					<h4 class="text-sm font-bold text-gray-800 dark:text-white">Reporte de Procesamiento:</h4>
@@ -900,7 +880,7 @@
 		</div>
 	</Modal>
 
-	<!-- BARRA DE ACCIONES FLOTANTE DE SELECCIÓN MÚLTIPLE -->
+	<!-- BARRA DE ACCIONES FLOTANTE -->
 	{#if selectedStudentIds.length > 0 && isSuperAdmin}
 		<div class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900/95 dark:bg-gray-950/95 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-6 z-50 border border-gray-800 dark:border-gray-700 backdrop-blur-sm transition-all duration-300">
 			<span class="text-sm font-semibold tracking-wider">
@@ -917,7 +897,7 @@
 		</div>
 	{/if}
 
-	<!-- MODAL CONFIRMACIÓN ELIMINACIÓN MASIVA (CORREGIDO CON MENSAJE DE AUDITORÍA) -->
+	<!-- MODAL CONFIRMACIÓN ELIMINACIÓN MASIVA -->
 	<ModalConfirm
 		isOpen={showBulkDeleteModal}
 		message={`¿Estás absolutamente seguro de que deseas eliminar a los ${selectedStudentIds.length} estudiantes seleccionados? El sistema borrará sus inscripciones y solo purgará sus pagos en estado pendiente, reteniendo aprobados y rechazados por normativas de auditoría.`}

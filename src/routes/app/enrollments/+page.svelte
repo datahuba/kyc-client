@@ -16,7 +16,6 @@
 	import { Pagination } from '$lib/components/ui';
 	import { alert, formatDate, formatCurrency } from '$lib/utils';
 	
-
 	let enrollments: Enrollment[] = $state([]);
 	let studentsMap: Record<string, Student> = $state({});
 	let coursesMap: Record<string, Course> = $state({});
@@ -51,6 +50,12 @@
 	let studentsList: Student[] = $state([]);
 	let coursesList: Course[] = $state([]);
 
+	// ISSUE N: Control de Permisos Visuales (RBAC Frontend)
+	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let canCreateEnrollment = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canEditEnrollment = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canDeleteEnrollment = $derived(currentRole === 'superadmin');
+
 	onMount(() => {
 		if (!$userStore.isAuthenticated) {
 			userStore.init();
@@ -62,8 +67,7 @@
 		loading = true;
 
 		try {
-			// Populate lists for filters (Admin only) or mapping names
-			if (studentsList.length === 0 && $userStore.role !== 'student') {
+			if (studentsList.length === 0 && currentRole !== 'student') {
 				const studentsRes = await studentService.getAll(1, 100); 
 				studentsList = studentsRes.data;
 				studentsRes.data.forEach(s => (studentsMap[s._id] = s));
@@ -75,9 +79,8 @@
 				coursesRes.data.forEach(c => (coursesMap[c._id] = c));
 			}
 
-			// Main query
 			let enrollmentsPromise;
-			if ($userStore.role === 'student') {
+			if (currentRole === 'student') {
 				enrollmentsPromise = enrollmentService.getByStudentId($userStore.user?._id || '');
 			} else {
 				const filterParams: any = {};
@@ -91,7 +94,7 @@
 
 			const result = await enrollmentsPromise;
 
-			if ($userStore.role === 'student') {
+			if (currentRole === 'student') {
 				enrollments = Array.isArray(result) ? result : (result as any).data; 
 			} else {
 				const response = result as any; 
@@ -136,7 +139,6 @@
 		page = 1;
 		loadData();
 	}
-
 
 	function handleCreate() {
 		selectedEnrollment = null;
@@ -187,27 +189,26 @@
 	}
 
 	function getDropdownOptions(enrollment: Enrollment) {
-		// Estudiantes no ven acciones administrativas
-        if ($userStore.role === 'student') return [];
+        if (currentRole === 'student') return [];
 		
-		// Opciones base (visibles para ADMIN y SUPERADMIN)
-		const options: any[] = [
-			{
+		const options: any[] = [];
+
+		if (canEditEnrollment) {
+			options.push({
 				label: 'Editar',
 				id: 'edit',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>`,
 				action: () => handleEdit(enrollment)
-			}
-		];
+			});
+		}
 
-		// Opción destructiva (visible SOLO para SUPERADMIN)
-		if ($userStore.role === 'superadmin') {
+		if (canDeleteEnrollment) {
 			options.push({
 				label: 'Eliminar',
 				id: 'delete',
-				icon: `<svg class="size-5" text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`,
+				icon: `<svg class="size-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`,
 				action: () => confirmDelete(enrollment),
-				divider: true
+				divider: options.length > 0
 			});
 		}
 
@@ -215,7 +216,7 @@
 	}
 
 	function getStudentName(id: string) {
-		if ($userStore.role === 'student' && $userStore.user) {
+		if (currentRole === 'student' && $userStore.user) {
 			return $userStore.user.nombre || $userStore.user.username || $userStore.user.email || 'Mi Usuario';
 		}
 		return studentsMap[id]?.nombre || 'Desconocido';
@@ -235,13 +236,12 @@
 			default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
 		}
 	}
-
 </script>
 
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<Heading level="h1">Inscripciones</Heading>
-		{#if $userStore.role !== 'student'}
+		{#if canCreateEnrollment}
 			<Button onclick={handleCreate}>
 				{#snippet leftIcon()}
 					<PlusIcon class="size-5" />
@@ -251,7 +251,7 @@
 		{/if}
 	</div>
 
-	{#if $userStore.role !== 'student'}
+	{#if currentRole !== 'student'}
 		<!-- Filters -->
 		<div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
 			<!-- Start Search -->
@@ -341,7 +341,9 @@
 						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dto. Curso</th>
 						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dto. Personal</th>
 						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
-						{#if $userStore.role !== 'student'}
+						
+						<!-- ISSUE N: Ocultar cabecera de acciones si el rol no tiene permisos -->
+						{#if canEditEnrollment || canDeleteEnrollment}
 							<th scope="col" class="relative px-4 py-3">
 								<span class="sr-only">Acciones</span>
 							</th>
@@ -390,7 +392,9 @@
 									{enrollment.estado}
 								</span>
 							</td>
-							{#if $userStore.role !== 'student'}
+							
+							<!-- ISSUE N: Ocultar menú de 3 puntos si no hay opciones -->
+							{#if canEditEnrollment || canDeleteEnrollment}
 								<td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium relative">
 									<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
 										<DotsVerticalIcon class="size-5" />
@@ -413,7 +417,7 @@
 			</table>
 		</div>
 
-		{#if $userStore.role !== 'student'}
+		{#if currentRole !== 'student'}
 			<Pagination
 				currentPage={page}
 				{totalPages}
@@ -433,21 +437,25 @@
 							<h3 class="text-sm font-medium text-gray-900 dark:text-white">{getStudentName(enrollment.estudiante_id)}</h3>
 							<p class="text-xs text-gray-500 dark:text-gray-400">{getCourseName(enrollment.curso_id)}</p>
 						</div>
-						<div class="relative">
-							<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-								<DotsVerticalIcon class="size-5" />
-							</button>
-							{#if openDropdownId === enrollment._id}
-								<div class="absolute right-0 mt-2 w-48 z-10">
-									<DropdownMenu 
-										options={getDropdownOptions(enrollment)} 
-										isOpen={true} 
-										width="w-48" 
-										class="origin-top-right right-0"
-									/>
-								</div>
-							{/if}
-						</div>
+						
+						<!-- ISSUE N: Ocultar menú de 3 puntos en móvil -->
+						{#if canEditEnrollment || canDeleteEnrollment}
+							<div class="relative">
+								<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+									<DotsVerticalIcon class="size-5" />
+								</button>
+								{#if openDropdownId === enrollment._id}
+									<div class="absolute right-0 mt-2 w-48 z-10">
+										<DropdownMenu 
+											options={getDropdownOptions(enrollment)} 
+											isOpen={true} 
+											width="w-48" 
+											class="origin-top-right right-0"
+										/>
+									</div>
+								{/if}
+							</div>
+						{/if}
 					</div>
 					<div class="space-y-2 text-sm">
 						<div class="flex justify-between">
