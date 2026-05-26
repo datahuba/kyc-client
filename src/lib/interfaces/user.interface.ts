@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'superadmin' | 'secretary' | 'docente' | 'student' | null;
+export type Role = 'docente' | 'admin' | 'superadmin' | 'mae' | 'cpd' | 'cobranza' | null;
 export type UserType = 'user' | 'student';
 
 export interface User {
