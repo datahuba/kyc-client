@@ -86,14 +86,17 @@
 			placeholder="usuario@kyc.com"
 		/>
 		
+		<!-- ISSUE L/M: Selector de Roles alineado a la jerarquía de Postgrado UAGRM -->
 		<Select
 			label="Rol"
 			bind:value={formData.role}
 			required
 		>
-			<option value="admin">Admin</option>
-			<option value="superadmin">Superadmin</option>
-			<option value="secretary">Secretaria</option>
+			<option value="superadmin">Superadmin (Soporte Técnico)</option>
+			<option value="admin">Administrador General</option>
+			<option value="mae">MAE (Decano / Director / JAF)</option>
+			<option value="cpd">CPD (Gestión Académica)</option>
+			<option value="cobranza">Cobranza (Cuentas por Cobrar)</option>
 			<option value="docente">Docente</option>
 		</Select>
 
