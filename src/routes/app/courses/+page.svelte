@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { courseService } from '$lib/services';
 	import type { Course, CourseStudent } from '$lib/interfaces';
+	import { userStore } from '$lib/stores/userStore'; // <-- Importación del Store
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -49,6 +50,12 @@
 	let studentsLoading = $state(false);
 	let courseStudents: CourseStudent[] = $state([]);
 	let selectedCourseStudents: Course | null = $state(null);
+
+	// ISSUE N: Control de Permisos Visuales
+	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let canCreateCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canEditCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canDeleteCourse = $derived(currentRole === 'superadmin');
 
 	onMount(() => {
 		loadCourses();
@@ -140,8 +147,6 @@
 		if (!courseToDelete) return;
 		deleteLoading = true;
 		
-		// Guardamos el ID en una constante local segura para evitar que Svelte
-		// rastree reactivamente el objeto 'courseToDelete' después de limpiarlo.
 		const idToDelete = courseToDelete._id;
 		
 		try {
@@ -171,27 +176,37 @@
 	}
 
 	function getDropdownOptions(course: Course) {
-		return [
+		// Opción base: Todos los del Staff pueden ver la lista de alumnos
+		const options: any[] = [
 			{
 				label: 'Ver Estudiantes',
 				id: 'students',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>`,
 				action: () => handleViewStudents(course)
-			},
-			{
+			}
+		];
+
+		// Inyección de opciones según rol
+		if (canEditCourse) {
+			options.push({
 				label: 'Editar',
 				id: 'edit',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>`,
 				action: () => handleEdit(course)
-			},
-			{
+			});
+		}
+
+		if (canDeleteCourse) {
+			options.push({
 				label: 'Eliminar',
 				id: 'delete',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`,
 				action: () => confirmDelete(course),
 				divider: true
-			}
-		];
+			});
+		}
+
+		return options;
 	}
 
 	// Export students list per course to CSV
@@ -244,12 +259,16 @@
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<Heading level="h1">Cursos</Heading>
-		<Button onclick={handleCreate}>
-			{#snippet leftIcon()}
-				<PlusIcon class="size-5" />
-			{/snippet}
-			Nuevo Curso
-		</Button>
+		
+		<!-- ISSUE N: Ocultar botón Nuevo Curso si no tiene permisos -->
+		{#if canCreateCourse}
+			<Button onclick={handleCreate}>
+				{#snippet leftIcon()}
+					<PlusIcon class="size-5" />
+				{/snippet}
+				Nuevo Curso
+			</Button>
+		{/if}
 	</div>
 
 	<!-- Filters -->

@@ -59,9 +59,12 @@
 	let openDropdownId: string | null = $state(null);
 	let selectedPayment: Payment | null = $state(null);
 
-	// Computed
-	let isAdmin = $derived($userStore.role === 'admin' || $userStore.role === 'superadmin');
-	let isStudent = $derived($userStore.role === 'student');
+	// ISSUE N: Permisos Visuales Granulares de Finanzas
+	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let isStudent = $derived(currentRole === 'student');
+	let isStaff = $derived(['superadmin', 'admin', 'mae', 'cpd', 'cobranza'].includes(currentRole));
+	let canProcessPayments = $derived(['superadmin', 'admin', 'cobranza'].includes(currentRole));
+
 	let coursesMap = $derived(
 		coursesList.reduce((acc, c) => ({ ...acc, [c._id]: c }), {} as Record<string, typeof coursesList[0]>)
 	);
@@ -69,8 +72,8 @@
 	async function loadPayments() {
 		loading = true;
 		try {
-			// Populate lists for filters (Admin only)
-			if (isAdmin && studentsList.length === 0) {
+			// Populate lists for filters (Staff only)
+			if (isStaff && studentsList.length === 0) {
 				const studentsRes = await studentService.getAll(1, 100);
 				studentsList = studentsRes.data;
 			}
@@ -136,7 +139,7 @@
 	onMount(async () => {
 		const results = await Promise.all([
 			courseService.getAll(1, 100),
-			isAdmin ? studentService.getAll(1, 100) : Promise.resolve(null)
+			isStaff ? studentService.getAll(1, 100) : Promise.resolve(null)
 		]);
 		coursesList = results[0].data;
 		if (results[1]) studentsList = (results[1] as any).data;
@@ -230,7 +233,8 @@
 			action: () => handleViewDetails(payment)
 		});
 
-		if (isAdmin && payment.estado_pago === 'pendiente') {
+		// ISSUE N: Solo roles financieros pueden aprobar/rechazar pagos
+		if (canProcessPayments && payment.estado_pago === 'pendiente') {
 			options.push(
 				{
 					label: 'Aprobar Pago',
@@ -284,7 +288,7 @@
 				: 'todos';
 			const filename = `pagos_${courseName}_${new Date().toISOString().slice(0,10)}.csv`;
 
-			const headers = ['Remitente','Banco','Monto Comprobante','Fecha Comprobante','Cuenta Destino','Fecha Registro','Concepto','Monto/Cuota','Nº Transacción', isAdmin ? 'Estudiante ID' : '', 'Curso', 'Estado'];
+			const headers = ['Remitente','Banco','Monto Comprobante','Fecha Comprobante','Cuenta Destino','Fecha Registro','Concepto','Monto/Cuota','Nº Transacción', isStaff ? 'Estudiante ID' : '', 'Curso', 'Estado'];
 			const rows = allPayments.map(p => [
 				p.remitente || 'No disponible',
 				p.banco || 'No disponible',
@@ -295,7 +299,7 @@
 				p.concepto,
 				p.cantidad_pago,
 				p.numero_transaccion,
-				isAdmin ? p.estudiante_id : '',
+				isStaff ? p.estudiante_id : '',
 				`"${coursesMap[p.curso_id]?.nombre_programa ?? '—'}"`,
 				p.estado_pago
 			]);
@@ -323,7 +327,7 @@
 		<div>
 			<Heading level="h1">Gestión de Pagos</Heading>
 			<p class="text-gray-500 dark:text-gray-400 text-sm mt-1">
-				{#if isAdmin}Administre los pagos recibidos{:else}Historial de sus pagos realizados{/if}
+				{#if isStaff}Administre los pagos recibidos{:else}Historial de sus pagos realizados{/if}
 			</p>
 		</div>
 		
@@ -380,7 +384,7 @@
 			</select>
 		</div>
 
-		{#if isAdmin}
+		{#if isStaff}
 			<!-- Curso -->
 			<div class="flex flex-col gap-1">
 				<div class="relative">
@@ -525,7 +529,7 @@
 						{/each}
 						{#if payments.length === 0}
 							<tr>
-								<td colspan={isAdmin ? 10 : 9} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
+								<td colspan={isStaff ? 10 : 9} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
 									No se encontraron pagos.
 								</td>
 							</tr>
