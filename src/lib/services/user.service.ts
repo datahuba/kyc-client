@@ -1,6 +1,20 @@
 import { apiKyC } from '../config/apiKyC.config';
 import type { User, CreateUserRequest, UpdateUserRequest } from '../interfaces';
 
+type UserPayload = Omit<Partial<CreateUserRequest>, 'role'> & {
+	rol?: CreateUserRequest['role'];
+};
+
+function toBackendPayload(data: CreateUserRequest | UpdateUserRequest): UserPayload {
+	const { role, ...rest } = data;
+	return role !== undefined
+		? {
+				...rest,
+				rol: role
+			}
+		: rest;
+}
+
 class UserService {
 	async getAll(
 		page = 1,
@@ -24,11 +38,11 @@ class UserService {
 	}
 
 	async create(data: CreateUserRequest): Promise<User> {
-		return apiKyC.post<User>('/users/', data);
+		return apiKyC.post<User>('/users/', toBackendPayload(data));
 	}
 
 	async update(id: string, data: UpdateUserRequest): Promise<User> {
-		return apiKyC.put<User>(`/users/${id}`, data);
+		return apiKyC.put<User>(`/users/${id}`, toBackendPayload(data));
 	}
 
 	async delete(id: string): Promise<User> {

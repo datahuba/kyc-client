@@ -7,6 +7,8 @@
 	import { goto } from '$app/navigation';
 	import { UsersIcon } from '$lib/icons/outline';
 
+	const TEACHER_ROLE = 'docente';
+
 	let teachers: User[] = [];
 	let loading = true;
 	let error = '';
@@ -15,7 +17,7 @@
 		username: '',
 		email: '',
 		password: '',
-		role: 'student' // Docentes se crean como "student" pero con marca especial
+		role: TEACHER_ROLE
 	};
 	let isSubmitting = false;
 
@@ -43,7 +45,7 @@
 				username: newTeacher.username,
 				email: newTeacher.email,
 				password: newTeacher.password,
-				role: newTeacher.role,
+				role: TEACHER_ROLE,
 				activo: true
 			});
 
@@ -55,7 +57,7 @@
 				username: '',
 				email: '',
 				password: '',
-				role: 'student'
+				role: TEACHER_ROLE
 			};
 			showNewTeacherModal = false;
 			error = '';
