@@ -3,6 +3,7 @@
 	import { enrollmentService, studentService, courseService } from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
 	import type { Enrollment, Student, Course } from '$lib/interfaces';
+	import { goto } from '$app/navigation';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -43,6 +44,10 @@
 	let showDeleteModal: boolean = $state(false);
 	let enrollmentToDelete: Enrollment | null = $state(null);
 	let deleteLoading: boolean = $state(false);
+
+	// ISSUE P: Kardex Académico State
+	let isKardexOpen: boolean = $state(false);
+	let selectedKardex: Enrollment | null = $state(null);
 
 	// Dropdown state
 	let openDropdownId: string | null = $state(null);
@@ -150,6 +155,12 @@
 		isFormOpen = true;
 	}
 
+	function handleViewKardex(enrollment: Enrollment) {
+		selectedKardex = enrollment;
+		isKardexOpen = true;
+		openDropdownId = null;
+	}
+
 	function confirmDelete(enrollment: Enrollment) {
 		enrollmentToDelete = enrollment;
 		showDeleteModal = true;
@@ -189,9 +200,17 @@
 	}
 
 	function getDropdownOptions(enrollment: Enrollment) {
-        if (currentRole === 'student') return [];
-		
-		const options: any[] = [];
+		// ISSUE P: La libreta es visible para TODOS (Estudiantes, Docentes y Administrativos)
+		const options: any[] = [
+			{
+				label: 'Ver Libreta / Notas',
+				id: 'kardex',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`,
+				action: () => handleViewKardex(enrollment)
+			}
+		];
+
+        if (currentRole === 'student') return options;
 
 		if (canEditEnrollment) {
 			options.push({
@@ -208,7 +227,7 @@
 				id: 'delete',
 				icon: `<svg class="size-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`,
 				action: () => confirmDelete(enrollment),
-				divider: options.length > 0
+				divider: true
 			});
 		}
 
@@ -342,12 +361,10 @@
 						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dto. Personal</th>
 						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
 						
-						<!-- ISSUE N: Ocultar cabecera de acciones si el rol no tiene permisos -->
-						{#if canEditEnrollment || canDeleteEnrollment}
-							<th scope="col" class="relative px-4 py-3">
-								<span class="sr-only">Acciones</span>
-							</th>
-						{/if}
+						<!-- Acciones siempre visibles porque todos tienen la Libreta -->
+						<th scope="col" class="relative px-4 py-3">
+							<span class="sr-only">Acciones</span>
+						</th>
 					</tr>
 				</thead>
 				<tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -393,24 +410,21 @@
 								</span>
 							</td>
 							
-							<!-- ISSUE N: Ocultar menú de 3 puntos si no hay opciones -->
-							{#if canEditEnrollment || canDeleteEnrollment}
-								<td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-									<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-										<DotsVerticalIcon class="size-5" />
-									</button>
-									{#if openDropdownId === enrollment._id}
-										<div class="absolute right-0 mt-2 w-48 z-10">
-											<DropdownMenu 
-												options={getDropdownOptions(enrollment)} 
-												isOpen={true} 
-												width="w-48" 
-												class="origin-top-right right-0"
-											/>
-										</div>
-									{/if}
-								</td>
-							{/if}
+							<td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+								<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+									<DotsVerticalIcon class="size-5" />
+								</button>
+								{#if openDropdownId === enrollment._id}
+									<div class="absolute right-0 mt-2 w-48 z-10">
+										<DropdownMenu 
+											options={getDropdownOptions(enrollment)} 
+											isOpen={true} 
+											width="w-48" 
+											class="origin-top-right right-0"
+										/>
+									</div>
+								{/if}
+							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -438,24 +452,21 @@
 							<p class="text-xs text-gray-500 dark:text-gray-400">{getCourseName(enrollment.curso_id)}</p>
 						</div>
 						
-						<!-- ISSUE N: Ocultar menú de 3 puntos en móvil -->
-						{#if canEditEnrollment || canDeleteEnrollment}
-							<div class="relative">
-								<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-									<DotsVerticalIcon class="size-5" />
-								</button>
-								{#if openDropdownId === enrollment._id}
-									<div class="absolute right-0 mt-2 w-48 z-10">
-										<DropdownMenu 
-											options={getDropdownOptions(enrollment)} 
-											isOpen={true} 
-											width="w-48" 
-											class="origin-top-right right-0"
-										/>
-									</div>
-								{/if}
-							</div>
-						{/if}
+						<div class="relative">
+							<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+								<DotsVerticalIcon class="size-5" />
+							</button>
+							{#if openDropdownId === enrollment._id}
+								<div class="absolute right-0 mt-2 w-48 z-10">
+									<DropdownMenu 
+										options={getDropdownOptions(enrollment)} 
+										isOpen={true} 
+										width="w-48" 
+										class="origin-top-right right-0"
+									/>
+								</div>
+							{/if}
+						</div>
 					</div>
 					<div class="space-y-2 text-sm">
 						<div class="flex justify-between">
@@ -498,6 +509,100 @@
 			onSuccess={handleFormSuccess}
 			onCancel={() => isFormOpen = false}
 		/>
+	</Modal>
+
+	<!-- ISSUE P: Modal de Libreta / Kardex -->
+	<Modal
+		isOpen={isKardexOpen}
+		title="Libreta Académica y Financiera"
+		onClose={() => isKardexOpen = false}
+		maxWidth="sm:max-w-5xl"
+	>
+		{#if selectedKardex}
+			<div class="p-6 space-y-6">
+				<!-- Cabecera de la Libreta -->
+				<div class="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+					<div>
+						<p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold mb-1">Programa</p>
+						<p class="text-lg font-bold text-slate-900 dark:text-white leading-tight">{getCourseName(selectedKardex.curso_id)}</p>
+						{#if currentRole !== 'student'}
+							<p class="text-sm text-blue-600 font-semibold mt-1">Estudiante: {getStudentName(selectedKardex.estudiante_id)}</p>
+						{/if}
+					</div>
+					<div class="text-left md:text-right bg-white dark:bg-slate-900 px-6 py-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+						<p class="text-xs text-slate-500 uppercase tracking-wider font-bold">Promedio General</p>
+						<p class={`text-3xl font-black mt-1 ${selectedKardex.nota_final && selectedKardex.nota_final >= 64 ? 'text-green-600' : selectedKardex.nota_final ? 'text-red-600' : 'text-slate-400'}`}>
+							{selectedKardex.nota_final !== null && selectedKardex.nota_final !== undefined ? selectedKardex.nota_final : '--'}
+						</p>
+					</div>
+				</div>
+
+				<!-- Tabla de Módulos (Notas y Pagos) -->
+				<div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
+					<table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+						<thead class="bg-slate-100 dark:bg-slate-900">
+							<tr>
+								<th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Módulo</th>
+								<th class="px-4 py-3 text-center text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider bg-blue-50/50 dark:bg-blue-900/10">Nota Final</th>
+								<th class="px-4 py-3 text-center text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider bg-blue-50/50 dark:bg-blue-900/10">Situación</th>
+								<th class="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Costo (Bs)</th>
+								<th class="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Estado Pago</th>
+							</tr>
+						</thead>
+						<tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+							{#if selectedKardex.modulos && selectedKardex.modulos.length > 0}
+								{#each selectedKardex.modulos as mod}
+									<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+										<td class="px-4 py-4 text-sm font-medium text-slate-900 dark:text-white max-w-[200px]" title={mod.nombre}>
+											{mod.nombre}
+										</td>
+										
+										<!-- Columna Académica -->
+										<td class="px-4 py-4 text-center bg-blue-50/10 dark:bg-blue-900/5">
+											<span class={`text-lg font-black ${mod.nota !== null && mod.nota !== undefined && mod.nota >= 64 ? 'text-green-600 dark:text-green-400' : mod.nota !== null && mod.nota !== undefined ? 'text-red-600 dark:text-red-400' : 'text-slate-400'}`}>
+												{mod.nota !== null && mod.nota !== undefined ? mod.nota : '--'}
+											</span>
+										</td>
+										<td class="px-4 py-4 text-center bg-blue-50/10 dark:bg-blue-900/5">
+											<span class={`px-3 py-1.5 text-[11px] font-bold rounded-full uppercase tracking-wide ${mod.estado_academico === 'Aprobado' ? 'bg-green-100 text-green-700 border border-green-200' : mod.estado_academico === 'Reprobado' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600'}`}>
+												{mod.estado_academico || 'Cursando'}
+											</span>
+										</td>
+
+										<!-- Columna Financiera -->
+										<td class="px-4 py-4 text-right text-sm text-slate-600 dark:text-slate-300">
+											<div class="font-bold text-slate-900 dark:text-white">{formatCurrency(mod.costo)}</div>
+											<div class="text-xs text-emerald-600 font-medium mt-0.5">Pagado: {formatCurrency(mod.monto_pagado || 0)}</div>
+										</td>
+										<td class="px-4 py-4 text-center">
+											<span class={`px-2.5 py-1 text-xs font-bold rounded-full ${mod.estado === 'Pagado' ? 'bg-emerald-100 text-emerald-700' : mod.estado === 'Parcial' ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-100 text-orange-700'}`}>
+												{mod.estado || 'Pendiente'}
+											</span>
+										</td>
+									</tr>
+								{/each}
+							{:else}
+								<tr>
+									<td colspan="5" class="px-4 py-8 text-center text-slate-500">
+										No hay módulos registrados en esta inscripción.
+									</td>
+								</tr>
+							{/if}
+						</tbody>
+					</table>
+				</div>
+
+				<div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+					<!-- Si es estudiante y debe dinero, mostrar atajo rápido al pago -->
+					{#if currentRole === 'student' && selectedKardex.saldo_pendiente > 0}
+						<Button onclick={() => goto('/app/payments')} class="bg-blue-600 hover:bg-blue-700 text-white">
+							Pagar Saldo Pendiente
+						</Button>
+					{/if}
+					<Button variant="secondary" onclick={() => isKardexOpen = false}>Cerrar Libreta</Button>
+				</div>
+			</div>
+		{/if}
 	</Modal>
 
 	<ModalConfirm
