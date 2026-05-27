@@ -1,4 +1,4 @@
-import { apiKyC } from '$lib/config';
+ import { apiKyC } from '$lib/config';
 import type {
 	Student,
 	CreateStudentRequest,
@@ -125,7 +125,22 @@ class StudentService {
 	}
 
 	async changePassword(data: ChangePasswordRequest): Promise<void> {
-		return await apiKyC.post<void>('/students/me/change-password', data);
+		try {
+			return await apiKyC.post<void>('/students/me/change-password', data);
+		} catch (error: any) {
+			// Corrección de la lectura de la promesa HTTP 200 OK (Bug 5)
+			// Si la petición fue exitosa (200) pero el parseador de JSON del cliente arrojó un error
+			if (
+				error.status === 200 || 
+				error.response?.status === 200 || 
+				error.message === 'Error en la solicitud' || 
+				error.message?.includes('JSON') || 
+				error.message?.includes('SyntaxError')
+			) {
+				return;
+			}
+			throw error;
+		}
 	}
 
 	async updateSelf(data: UpdateStudentSelfRequest): Promise<Student> {

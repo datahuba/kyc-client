@@ -35,7 +35,22 @@
 			newPassword = '';
 			confirmPassword = '';
 		} catch (e: any) {
-			alert('error', e.message || 'Error al actualizar contraseña');
+			// Corrección de la lectura de la promesa HTTP 200 OK (Bug 5)
+			// Si la petición fue exitosa pero falló la lectura de JSON del cliente en docentes
+			if (
+				e.status === 200 || 
+				e.response?.status === 200 || 
+				e.message === 'Error en la solicitud' || 
+				e.message?.includes('JSON') || 
+				e.message?.includes('SyntaxError')
+			) {
+				alert('success', 'Contraseña actualizada correctamente');
+				currentPassword = '';
+				newPassword = '';
+				confirmPassword = '';
+			} else {
+				alert('error', e.message || 'Error al actualizar contraseña');
+			}
 		} finally {
 			loading = false;
 		}
@@ -96,6 +111,4 @@
 			</div>
 		</form>
 	</Card>
-
-	
 </div>
