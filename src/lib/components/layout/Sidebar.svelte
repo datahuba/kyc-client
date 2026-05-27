@@ -52,6 +52,7 @@
 	const navigation: NavigationItem[] = [
 		// Student roles (Academic)
 		{ name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student'], loginTypes: ['academic'] },
+		{ name: 'Dashboard Docente', href: '/app/dashboard', icon: HomeIcon, roles: ['docente'], loginTypes: ['academic'] },
 		
 		// Admin/Staff roles (Se condiciona el acceso en base a la jerarquía de la UAGRM)
 		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza'], loginTypes: ['admin'] },
