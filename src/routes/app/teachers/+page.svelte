@@ -10,17 +10,31 @@
 
 	const TEACHER_ROLE = 'docente';
 
-	let teachers: User[] = [];
-	let loading = true;
-	let error = '';
-	let showNewTeacherModal = false;
-	let newTeacher = {
+	// DECLARACIÓN ESTRICTA DE TODAS LAS VARIABLES CON RUNAS DE SVELTE 5 (BUG DE CONGELAMIENTO RESUELTO)
+	let teachers: User[] = $state([]); 
+	let loading = $state(true);
+	let error = $state('');
+	
+	// Modal Create State
+	let showNewTeacherModal = $state(false);
+	let newTeacher = $state({
 		username: '',
 		email: '',
 		password: '',
 		role: TEACHER_ROLE
-	};
-	let isSubmitting = false;
+	});
+	
+	// Modal Edit State (Edición de Docentes - Declarados con let $state para evitar ReferenceError)
+	let showEditTeacherModal = $state(false);
+	let editingTeacher: User | null = $state(null);
+	let editTeacherData = $state({
+		username: '',
+		email: '',
+		password: '',
+		activo: true
+	});
+
+	let isSubmitting = $state(false);
 
 	onMount(async () => {
 		try {
@@ -286,7 +300,7 @@
 		</div>
 	{/if}
 
-	<!-- Modal Editar Docente (Implementado para Bug 4 / Solicitud CPD) -->
+	<!-- Modal Editar Docente (Implementado bajo estándar estricto de Svelte 5) -->
 	{#if showEditTeacherModal}
 		<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
 			<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
