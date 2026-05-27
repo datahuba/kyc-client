@@ -281,6 +281,22 @@
 		}
 	}
 
+	// Etiquetas dinámicas de colores para distinguir conceptos de pago (Bug 7)
+	function getConceptBadgeColor(concept: string) {
+		const normalized = (concept || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+		
+		if (normalized.includes('matricula')) {
+			// Azul para matrícula (concepto académico)
+			return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50';
+		}
+		if (normalized.includes('modulo') || normalized.includes('cuota')) {
+			// Púrpura para módulos/cuotas (concepto financiero)
+			return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800/50';
+		}
+		// Gris por defecto
+		return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700';
+	}
+
 
 	let csvLoading = $state(false);
 
@@ -458,7 +474,7 @@
 
 
 	{#if loading && payments.length === 0}
-		<TableSkeleton columns={10} rows={10} />
+		<TableSkeleton columns={12} rows={10} />
 	{:else}
 		<div class="w-full overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -472,7 +488,7 @@
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Comprobante</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta destino</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Registro</th>
-							<!-- <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th> -->
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto/Cuota</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
 							<th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
@@ -517,9 +533,11 @@
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
 									{formatDate(payment.created_at || '---')}
 								</td>
-								<!-- <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-white">
-									{payment.concepto}
-								</td> -->
+								<td class="px-6 py-4 whitespace-nowrap text-sm">
+									<span class={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getConceptBadgeColor(payment.concepto)}`}>
+										{payment.concepto || 'No especificado'}
+									</span>
+								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
 									{formatCurrency(payment.cantidad_pago)}
 								</td>
@@ -547,7 +565,7 @@
 						{/each}
 						{#if payments.length === 0}
 							<tr>
-								<td colspan={isStaff ? 11 : 10} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
+								<td colspan={isStaff ? 12 : 11} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
 									No se encontraron pagos.
 								</td>
 							</tr>
@@ -665,14 +683,12 @@
 							{selectedPayment.cuenta_destino || '---'}
 						</p>
 					</div>
-					<!-- <div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Fecha</label>
-						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1">{formatDate(selectedPayment.created_at)}</p>
-					</div> -->
-					<!-- <div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Concepto</label>
-						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1">{selectedPayment.concepto}</p>
-					</div> -->
+					<div>
+						<label for="detailsConcepto" class="block text-xs font-medium text-gray-900 uppercase">Concepto</label>
+						<span id="detailsConcepto" class={`mt-1 px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getConceptBadgeColor(selectedPayment.concepto)}`}>
+							{selectedPayment.concepto || 'No especificado'}
+						</span>
+					</div>
 					<div>
 						<label for="monto" class="block text-xs font-medium text-gray-900 uppercase">Monto/Cuota</label>
 						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="monto">{formatCurrency(selectedPayment.cantidad_pago)}</p>
