@@ -47,7 +47,14 @@ class EnrollmentService {
 	async getByCourseId(courseId: string): Promise<Enrollment[]> {
 		return await apiKyC.get<Enrollment[]>(`/enrollments/course/${courseId}`);
 	}
+
+	// === ISSUE R: MÉTODO PARA CALIFICAR MÓDULOS DE ESTUDIANTES ===
+	async updateModuloNota(enrollmentId: string, moduloIndex: number, nota: number): Promise<Enrollment> {
+		return await apiKyC.patch<Enrollment>(
+			`/enrollments/${enrollmentId}/modulos/${moduloIndex}/nota`,
+			{ nota: nota }
+		);
+	}
 }
 
 export const enrollmentService = new EnrollmentService();
-
