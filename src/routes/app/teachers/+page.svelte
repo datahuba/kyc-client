@@ -8,30 +8,19 @@
 	import { UsersIcon } from '$lib/icons/outline';
 	import { alert } from '$lib/utils'; // <-- IMPORTADO PARA MENSAJES DE TOAST
 
-	let teachers: User[] = $state([]); // Svelte 5 State
-	let loading = $state(true);
-	let error = $state('');
-	
-	// Modal Create State
-	let showNewTeacherModal = $state(false);
-	let newTeacher = $state({
-		username: '',
-		email: '',
-		password: '',
-		role: 'student' // Docentes se crean como "student" pero con marca especial
-	});
-	
-	// Modal Edit State (Edición de Docentes - Implementado para cerrar solicitudes)
-	let showEditTeacherModal = $state(false);
-	let editingTeacher: User | null = $state(null);
-	let editTeacherData = $state({
-		username: '',
-		email: '',
-		password: '',
-		activo: true
-	});
+	const TEACHER_ROLE = 'docente';
 
-	let isSubmitting = $state(false);
+	let teachers: User[] = [];
+	let loading = true;
+	let error = '';
+	let showNewTeacherModal = false;
+	let newTeacher = {
+		username: '',
+		email: '',
+		password: '',
+		role: TEACHER_ROLE
+	};
+	let isSubmitting = false;
 
 	onMount(async () => {
 		try {
@@ -57,7 +46,7 @@
 				username: newTeacher.username,
 				email: newTeacher.email,
 				password: newTeacher.password,
-				role: newTeacher.role,
+				role: TEACHER_ROLE,
 				activo: true
 			});
 
@@ -69,7 +58,7 @@
 				username: '',
 				email: '',
 				password: '',
-				role: 'student'
+				role: TEACHER_ROLE
 			};
 			showNewTeacherModal = false;
 			error = '';

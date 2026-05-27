@@ -7,10 +7,12 @@ type UserPayload = Omit<Partial<CreateUserRequest>, 'role'> & {
 
 function toBackendPayload(data: CreateUserRequest | UpdateUserRequest): UserPayload {
 	const { role, ...rest } = data;
-	return {
-		...rest,
-		rol: role
-	};
+	return role !== undefined
+		? {
+				...rest,
+				rol: role
+			}
+		: rest;
 }
 
 class UserService {
