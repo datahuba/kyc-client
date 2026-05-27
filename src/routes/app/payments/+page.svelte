@@ -309,7 +309,8 @@
 			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
 			if (filters.estudiante_id) filterParams.estudiante_id = filters.estudiante_id;
 
-			const res = await paymentService.getAll(1, 1000, filterParams) as any;
+			// SE CORRIGE LÍMITE DE CONSULTA A 500 PARA EVITAR EL ERROR 422 DEL BACKEND (BUG DESCARGA)
+			const res = await paymentService.getAll(1, 500, filterParams) as any;
 			const allPayments: Payment[] = Array.isArray(res) ? res : (res?.data ?? []);
 
 			if (allPayments.length === 0) {
@@ -323,19 +324,21 @@
 			const filename = `pagos_${courseName}_${new Date().toISOString().slice(0,10)}.csv`;
 
 			const headers = ['Remitente','Banco','Monto Comprobante','Fecha Comprobante','Cuenta Destino','Fecha Registro','Concepto','Monto/Cuota','Nº Transacción', isStaff ? 'Estudiante ID' : '', 'Curso', 'Estado'];
+			
+			// BLINDADO CONTRA VALORES NULOS/INDEFINIDOS (PARCHE BUG DESCARGA)
 			const rows = allPayments.map(p => [
 				p.remitente || 'No disponible',
 				p.banco || 'No disponible',
-				formatCurrency(p.monto_comprobante ?? 0),
-				p.fecha_comprobante || '---',
+				p.monto_comprobante ? formatCurrency(p.monto_comprobante) : 'Bs 0.00',
+				p.fecha_comprobante ? formatDate(p.fecha_comprobante) : '---',
 				p.cuenta_destino || '---',
-				formatDate(p.created_at),
-				p.concepto,
-				p.cantidad_pago,
-				p.numero_transaccion,
-				isStaff ? p.estudiante_id : '',
-				`"${coursesMap[p.curso_id]?.nombre_programa ?? '—'}"`,
-				p.estado_pago
+				p.created_at ? formatDate(p.created_at) : '---',
+				p.concepto || 'No especificado',
+				p.cantidad_pago ? formatCurrency(p.cantidad_pago) : 'Bs 0.00',
+				p.numero_transaccion || '---',
+				isStaff ? (p.estudiante_id || '') : '',
+				`"${p.curso_id && coursesMap[p.curso_id] ? coursesMap[p.curso_id].nombre_programa : '—'}"`,
+				p.estado_pago || '---'
 			]);
 
 			const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');

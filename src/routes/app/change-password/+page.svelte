@@ -6,11 +6,16 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import { alert } from '$lib/utils';
 	import { KeyIcon, CheckIcon } from '$lib/icons/outline';
+	import { userStore } from '$lib/stores/userStore'; // <-- IMPORTADO PARA EVALUACIÓN REACTIVA (BUG 5)
 
 	let currentPassword = $state('');
 	let newPassword = $state('');
 	let confirmPassword = $state('');
 	let loading = $state(false);
+
+	// Evaluación de rol en Svelte 5 (Bug 5)
+	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let isUserStudent = $derived(currentRole === 'student');
 
 	async function handleSubmit() {
 		if (newPassword !== confirmPassword) {
@@ -29,14 +34,13 @@
 				current_password: currentPassword,
 				new_password: newPassword,
 				confirm_password: confirmPassword
-			});
+			}, isUserStudent); // <-- SE PASA EL ATRIBUTO PARA CONMUTAR EL ENDPOINT CORRECTO
+
 			alert('success', 'Contraseña actualizada correctamente');
 			currentPassword = '';
 			newPassword = '';
 			confirmPassword = '';
 		} catch (e: any) {
-			// Corrección de la lectura de la promesa HTTP 200 OK (Bug 5)
-			// Si la petición fue exitosa pero falló la lectura de JSON del cliente en docentes
 			if (
 				e.status === 200 || 
 				e.response?.status === 200 || 
