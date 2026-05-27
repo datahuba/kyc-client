@@ -88,7 +88,6 @@
 				prevCuotas = course.cantidad_cuotas;
 				prevCostoTotal = course.costo_total_interno;
                 
-				// Si estamos editando un curso, deshabilitamos el cálculo automático para que el CPD no pierda sus nombres personalizados
 				autoCalculateModules = false; 
 			} else {
 				formData = {
@@ -112,7 +111,6 @@
 				prevCuotas = 1;
 				prevCostoTotal = 0;
                 
-				// Al crear uno nuevo, encendemos el autocalculador para facilitar el trabajo
 				autoCalculateModules = true; 
 			}
 			trackedCourseId = currentId;
@@ -284,18 +282,16 @@
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-3 gap-2">
 				    <Heading level="h3" class="text-md text-primary-600">Configuración de Módulos y Docentes</Heading>
                     
-					<!-- Toggle Switch Nativo de Tailwind CORREGIDO (Bug CSS) -->
-					<div class="flex items-center bg-white dark:bg-gray-900 px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm">
-						<label class="relative inline-flex items-center cursor-pointer">
-							<input type="checkbox" bind:checked={autoCalculateModules} class="sr-only peer">
-							<!-- SE AGREGARON: relative, shrink-0 para evitar desbordes -->
-							<div class="w-11 h-6 relative shrink-0 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
-							<!-- SE AGREGÓ: whitespace-nowrap para que el texto no baje de línea -->
-							<span class="ml-3 text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider select-none whitespace-nowrap">
-								{autoCalculateModules ? 'Cálculo Auto' : 'Edición Manual'}
-							</span>
-						</label>
-					</div>
+					<!-- TOGGLE SWITCH A PRUEBA DE BALAS -->
+					<label class="flex items-center cursor-pointer bg-white dark:bg-gray-900 px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+						<div class="relative w-10 h-5 shrink-0 flex items-center bg-gray-300 dark:bg-gray-600 rounded-full p-1 duration-300 ease-in-out" class:bg-primary-500={autoCalculateModules}>
+							<div class="bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out" class:translate-x-4={autoCalculateModules}></div>
+						</div>
+						<div class="ml-3 text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider select-none whitespace-nowrap">
+							{autoCalculateModules ? 'Cálculo Auto' : 'Edición Manual'}
+						</div>
+						<input type="checkbox" bind:checked={autoCalculateModules} class="hidden" />
+					</label>
                 </div>
 
 				<div class="grid grid-cols-1 gap-4">
