@@ -325,7 +325,8 @@
                         </div>
                     {:else}
                         <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <div class="overflow-x-auto">
+                            <table class="min-w-[920px] divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-900/50">
                                     <tr>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Módulo</th>
@@ -356,6 +357,7 @@
                                     {/each}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     {/if}
                 </div>
