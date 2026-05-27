@@ -59,12 +59,12 @@
 	let openDropdownId: string | null = $state(null);
 	let selectedPayment: Payment | null = $state(null);
 
-	// ISSUE N: Permisos Visuales Granulares de Finanzas
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
-	let isStudent = $derived(currentRole === 'student');
-	let isStaff = $derived(['superadmin', 'admin', 'mae', 'cpd', 'cobranza'].includes(currentRole));
-	let canProcessPayments = $derived(['superadmin', 'admin', 'cobranza'].includes(currentRole));
-
+	// Computed
+	let isAdmin = $derived($userStore.role === 'admin' || $userStore.role === 'superadmin');
+	let isStudent = $derived($userStore.role === 'student');
+	let isCPD = $derived($userStore.role === 'cpd');
+	let isCobranza = $derived($userStore.role === 'cobranza');
+	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae'].includes($userStore.role || ''));
 	let coursesMap = $derived(
 		coursesList.reduce((acc, c) => ({ ...acc, [c._id]: c }), {} as Record<string, typeof coursesList[0]>)
 	);
@@ -223,6 +223,25 @@
 		openDropdownId = null;
 	}
 
+	function canApproveReject(payment: Payment): boolean {
+		if (payment.estado_pago !== 'pendiente') return false;
+		
+		const role = $userStore.role;
+		if (role === 'admin' || role === 'superadmin') return true;
+		
+		const concept = (payment.concepto || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+		const isMatricula = concept.includes('matricula');
+		
+		if (role === 'cpd') {
+			return isMatricula;
+		}
+		if (role === 'cobranza') {
+			return !isMatricula;
+		}
+		
+		return false;
+	}
+
 	function getDropdownOptions(payment: Payment) {
 		const options = [];
 
@@ -233,8 +252,7 @@
 			action: () => handleViewDetails(payment)
 		});
 
-		// ISSUE N: Solo roles financieros pueden aprobar/rechazar pagos
-		if (canProcessPayments && payment.estado_pago === 'pendiente') {
+		if (canApproveReject(payment)) {
 			options.push(
 				{
 					label: 'Aprobar Pago',
@@ -529,7 +547,7 @@
 						{/each}
 						{#if payments.length === 0}
 							<tr>
-								<td colspan={isStaff ? 10 : 9} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
+								<td colspan={isStaff ? 11 : 10} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
 									No se encontraron pagos.
 								</td>
 							</tr>
