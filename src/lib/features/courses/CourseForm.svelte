@@ -21,7 +21,7 @@
 	let isEditMode = $derived(!!course);
 	let saving = $state(false);
 	let discounts: Discount[] = $state([]);
-	let teachers: User[] = $state([]); // State para almacenar docentes activos (Bug R)
+	let teachers: User[] = $state([]);
 
 	let formData: CreateCourseRequest = $state({
 		codigo: '',
@@ -39,17 +39,18 @@
 		fecha_inicio: '',
 		fecha_fin: '',
 		activo: true,
-		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }] // Añadido campo de docente
+		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }] 
 	});
 	
-	// Variables "espía" para saber cuándo recalcular el dinero
 	let prevCuotas = $state(1);
 	let prevCostoTotal = $state(0);
 	let trackedCourseId = $state<string | undefined>(undefined);
 
+    // ISSUE F: Candado de Cálculo Manual vs Automático
+    let autoCalculateModules = $state(true); 
+
 	onMount(async () => {
 		try {
-			// Cargar descuentos y docentes activos en paralelo
 			const [resDiscounts, resTeachers] = await Promise.all([
 				discountService.getAll(1, 100),
 				userService.getTeachers()
@@ -61,7 +62,7 @@
 		}
 	});
 
-	// Efecto para cargar los datos cuando se abre el modal
+	// Inicializador
 	$effect(() => {
 		const currentId = course ? course._id : '';
 		if (currentId !== trackedCourseId) {
@@ -82,13 +83,14 @@
 					fecha_inicio: course.fecha_inicio.split('T')[0],
 					fecha_fin: course.fecha_fin.split('T')[0],
 					activo: course.activo,
-					// Se asegura de preservar el docente si existe o inicializar vacío
 					modulos: course.modulos ? course.modulos.map(m => ({...m, docente_id: m.docente_id || ''})) : Array.from({ length: course.cantidad_cuotas || 1 }, (_, i) => ({ nombre: `Módulo ${i + 1}`, costo: 0, docente_id: '' }))
 				};
 				prevCuotas = course.cantidad_cuotas;
 				prevCostoTotal = course.costo_total_interno;
+                
+				// Si estamos editando un curso, deshabilitamos el cálculo automático para que el CPD no pierda sus nombres personalizados
+				autoCalculateModules = false; 
 			} else {
-				// Resetear formulario para Curso Nuevo
 				formData = {
 					codigo: '',
 					nombre_programa: '',
@@ -109,15 +111,17 @@
 				};
 				prevCuotas = 1;
 				prevCostoTotal = 0;
+                
+				// Al crear uno nuevo, encendemos el autocalculador para facilitar el trabajo
+				autoCalculateModules = true; 
 			}
 			trackedCourseId = currentId;
 		}
 	});
 
-	// LA CEREZA DEL PASTEL: El cerebro matemático reactivo
+	// Cerebro Matemático Controlado (ISSUE F)
 	$effect(() => {
-		// Evitar calcular si aún no se abrió el modal
-		if (trackedCourseId === undefined) return;
+		if (trackedCourseId === undefined || !autoCalculateModules) return;
 
 		const count = formData.cantidad_cuotas || 0;
 		const totalCosto = formData.costo_total_interno || 0;
@@ -125,7 +129,6 @@
 		let changedArray = false;
 		let newModulos = formData.modulos ? [...formData.modulos] : [];
 
-		// 1. Ajustar cantidad de casillas (Si el jefe sube a 5, creamos 5 casillas preservando docentes)
 		if (count !== newModulos.length) {
 			if (count > newModulos.length) {
 				while (newModulos.length < count) {
@@ -137,18 +140,15 @@
 			changedArray = true;
 		}
 
-		// 2. REPARTICIÓN AUTOMÁTICA DE DINERO
-		// Si el jefe cambió el Costo Total o la Cantidad de Cuotas, dividimos el dinero equitativamente
 		if (count !== prevCuotas || totalCosto !== prevCostoTotal) {
 			const costoUnitario = count > 0 ? Number((totalCosto / count).toFixed(2)) : 0;
 			newModulos = newModulos.map(m => ({
-				nombre: m.nombre, // Mantiene el nombre que le pusiste
-				costo: costoUnitario, // Sobreescribe el costo con la división exacta
-				docente_id: m.docente_id // Mantiene al docente si ya fue asignado (ISSUE R)
+				nombre: m.nombre, 
+				costo: costoUnitario, 
+				docente_id: m.docente_id 
 			}));
 			changedArray = true;
 			
-			// Actualizar los espías para no entrar en bucle
 			prevCuotas = count;
 			prevCostoTotal = totalCosto;
 		}
@@ -173,7 +173,6 @@
 				payload.matricula_externo = 0;
 			}
 
-			// Limpiar docente_id vacíos antes de enviar a FastAPI
 			payload.modulos = payload.modulos.map(m => {
 				const mod = { ...m };
 				if (!mod.docente_id) {
@@ -181,6 +180,16 @@
 				}
 				return mod;
 			});
+
+            // ISSUE F: Verificador de congruencia financiera
+            const sumModulos = payload.modulos.reduce((acc, curr) => acc + Number(curr.costo), 0);
+            if (!autoCalculateModules && sumModulos !== payload.costo_total_interno) {
+                const proceed = confirm(`¡Atención!\nLa suma manual de los módulos (Bs. ${sumModulos}) no coincide con el Costo Total (Bs. ${payload.costo_total_interno}).\n\n¿Estás seguro de que deseas guardar el programa con esta discrepancia financiera?`);
+                if(!proceed) {
+                    saving = false;
+                    return;
+                }
+            }
 			
 			if (isEditMode && course) {
 				const updatePayload = {
@@ -188,14 +197,14 @@
 					inscritos: course.inscritos
 				};
 				await courseService.update(course._id, updatePayload);
-				alert('success', 'Curso y módulos actualizados correctamente');
+				alert('success', 'Programa y módulos actualizados correctamente');
 			} else {
 				await courseService.create(payload);
-				alert('success', 'Curso creado correctamente');
+				alert('success', 'Programa creado correctamente');
 			}
 			onSuccess();
 		} catch (e: any) {
-			alert('error', e.message || 'Error al guardar curso');
+			alert('error', e.message || 'Error al guardar el curso');
 		} finally {
 			saving = false;
 		}
@@ -269,19 +278,50 @@
 			</Select>
 		</div>
 
-		<!-- SECCIÓN DINÁMICA DE MÓDULOS CON ASIGNACIÓN DE DOCENTES (ISSUE R) -->
+		<!-- SECCIÓN DINÁMICA DE MÓDULOS CON ASIGNACIÓN DE DOCENTES (ISSUE R + ISSUE F) -->
 		{#if formData.modulos && formData.modulos.length > 0}
 			<div class="md:col-span-2 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mt-2">
-				<Heading level="h3" class="mb-4 text-md text-primary-600">Configuración de Módulos y Docentes</Heading>
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-3 gap-2">
+				    <Heading level="h3" class="text-md text-primary-600">Configuración de Módulos y Docentes</Heading>
+                    
+					<!-- Toggle Switch Nativo de Tailwind CORREGIDO (Bug CSS) -->
+					<div class="flex items-center bg-white dark:bg-gray-900 px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm">
+						<label class="relative inline-flex items-center cursor-pointer">
+							<input type="checkbox" bind:checked={autoCalculateModules} class="sr-only peer">
+							<!-- SE AGREGARON: relative, shrink-0 para evitar desbordes -->
+							<div class="w-11 h-6 relative shrink-0 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+							<!-- SE AGREGÓ: whitespace-nowrap para que el texto no baje de línea -->
+							<span class="ml-3 text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider select-none whitespace-nowrap">
+								{autoCalculateModules ? 'Cálculo Auto' : 'Edición Manual'}
+							</span>
+						</label>
+					</div>
+                </div>
+
 				<div class="grid grid-cols-1 gap-4">
 					{#each formData.modulos as modulo, i}
-						<div class="flex flex-col xl:flex-row gap-4 items-center bg-white dark:bg-gray-800 p-3 rounded-md shadow-sm border border-gray-100 dark:border-gray-700">
+						<div class="flex flex-col xl:flex-row gap-4 items-center bg-white dark:bg-gray-800 p-3 rounded-md shadow-sm border border-gray-100 dark:border-gray-700 transition-colors {autoCalculateModules ? 'opacity-80' : ''}">
 							<span class="font-bold text-gray-400 bg-gray-100 dark:bg-gray-700 w-8 h-8 flex items-center justify-center rounded-full shrink-0">{i + 1}</span>
 							<div class="w-full xl:w-2/5">
-								<Input label="Nombre del Módulo" id={`modulo_nombre_${i}`} bind:value={formData.modulos[i].nombre} required placeholder="Ej: Introducción a la IA" />
+								<Input 
+									label="Nombre del Módulo" 
+									id={`modulo_nombre_${i}`} 
+									bind:value={formData.modulos[i].nombre} 
+									required 
+									placeholder="Ej: Introducción a la IA" 
+								/>
 							</div>
 							<div class="w-full xl:w-1/5">
-								<Input label="Costo (Bs)" id={`modulo_costo_${i}`} type="number" bind:value={formData.modulos[i].costo} required placeholder="Ej: 588" />
+								<Input 
+                                    label="Costo (Bs)" 
+                                    id={`modulo_costo_${i}`} 
+                                    type="number" 
+                                    bind:value={formData.modulos[i].costo} 
+                                    required 
+                                    placeholder="Ej: 588" 
+                                    readonly={autoCalculateModules}
+                                    class={autoCalculateModules ? 'bg-gray-100 dark:bg-gray-900 text-gray-500 border-dashed' : 'border-primary-300 dark:border-primary-700 font-semibold'}
+                                />
 							</div>
 							<div class="w-full xl:w-2/5">
 								<Select label="Docente Titular (Opcional)" bind:value={formData.modulos[i].docente_id}>
@@ -294,6 +334,12 @@
 						</div>
 					{/each}
 				</div>
+                {#if autoCalculateModules}
+                    <p class="text-xs text-blue-600 dark:text-blue-400 mt-3 flex items-center gap-1.5 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                        <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        El sistema está prorrateando el costo equitativamente. Cambia el switch superior a "Edición Manual" para alterar los precios y no perder los cambios.
+                    </p>
+                {/if}
 			</div>
 		{/if}
 
