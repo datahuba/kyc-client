@@ -46,6 +46,11 @@ class CourseService {
 	async getStudents(id: string): Promise<import('$lib/interfaces').CourseStudent[]> {
 		return await apiKyC.get<import('$lib/interfaces').CourseStudent[]>(`/courses/${id}/students`);
 	}
+
+	// ISSUE R: Endpoint para obtener módulos asignados a un docente específico
+	async getModulesByTeacher(teacherId: string): Promise<any[]> {
+		return await apiKyC.get<any[]>(`/courses/modules/by-teacher/${teacherId}`);
+	}
 }
 
 export const courseService = new CourseService();

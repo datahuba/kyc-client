@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { courseService, discountService } from '$lib/services';
-	import type { CreateCourseRequest, Course, Discount } from '$lib/interfaces';
+	import { courseService, discountService, userService } from '$lib/services';
+	import type { CreateCourseRequest, Course, Discount, User } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import Select from '$lib/components/ui/select.svelte';
@@ -21,6 +21,7 @@
 	let isEditMode = $derived(!!course);
 	let saving = $state(false);
 	let discounts: Discount[] = $state([]);
+	let teachers: User[] = $state([]); // State para almacenar docentes activos (Bug R)
 
 	let formData: CreateCourseRequest = $state({
 		codigo: '',
@@ -38,7 +39,7 @@
 		fecha_inicio: '',
 		fecha_fin: '',
 		activo: true,
-		modulos: [{ nombre: 'Módulo 1', costo: 0 }]
+		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }] // Añadido campo de docente
 	});
 	
 	// Variables "espía" para saber cuándo recalcular el dinero
@@ -48,10 +49,15 @@
 
 	onMount(async () => {
 		try {
-			const res = await discountService.getAll(1, 100);
-			discounts = res.data;
+			// Cargar descuentos y docentes activos en paralelo
+			const [resDiscounts, resTeachers] = await Promise.all([
+				discountService.getAll(1, 100),
+				userService.getTeachers()
+			]);
+			discounts = resDiscounts.data;
+			teachers = resTeachers;
 		} catch (e) {
-			console.error('Error fetching discounts', e);
+			console.error('Error fetching data for course form', e);
 		}
 	});
 
@@ -76,7 +82,8 @@
 					fecha_inicio: course.fecha_inicio.split('T')[0],
 					fecha_fin: course.fecha_fin.split('T')[0],
 					activo: course.activo,
-					modulos: course.modulos ? [...course.modulos] : Array.from({ length: course.cantidad_cuotas || 1 }, (_, i) => ({ nombre: `Módulo ${i + 1}`, costo: 0 }))
+					// Se asegura de preservar el docente si existe o inicializar vacío
+					modulos: course.modulos ? course.modulos.map(m => ({...m, docente_id: m.docente_id || ''})) : Array.from({ length: course.cantidad_cuotas || 1 }, (_, i) => ({ nombre: `Módulo ${i + 1}`, costo: 0, docente_id: '' }))
 				};
 				prevCuotas = course.cantidad_cuotas;
 				prevCostoTotal = course.costo_total_interno;
@@ -98,7 +105,7 @@
 					fecha_inicio: '',
 					fecha_fin: '',
 					activo: true,
-					modulos: [{ nombre: 'Módulo 1', costo: 0 }]
+					modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }]
 				};
 				prevCuotas = 1;
 				prevCostoTotal = 0;
@@ -118,11 +125,11 @@
 		let changedArray = false;
 		let newModulos = formData.modulos ? [...formData.modulos] : [];
 
-		// 1. Ajustar cantidad de casillas (Si el jefe sube a 5, creamos 5 casillas)
+		// 1. Ajustar cantidad de casillas (Si el jefe sube a 5, creamos 5 casillas preservando docentes)
 		if (count !== newModulos.length) {
 			if (count > newModulos.length) {
 				while (newModulos.length < count) {
-					newModulos.push({ nombre: `Módulo ${newModulos.length + 1}`, costo: 0 });
+					newModulos.push({ nombre: `Módulo ${newModulos.length + 1}`, costo: 0, docente_id: '' });
 				}
 			} else {
 				newModulos = newModulos.slice(0, count);
@@ -135,8 +142,9 @@
 		if (count !== prevCuotas || totalCosto !== prevCostoTotal) {
 			const costoUnitario = count > 0 ? Number((totalCosto / count).toFixed(2)) : 0;
 			newModulos = newModulos.map(m => ({
-				nombre: m.nombre, // Mantiene el nombre que le pusiste ("Módulo 1", "Tesis", etc)
-				costo: costoUnitario // Sobreescribe el costo con la división exacta
+				nombre: m.nombre, // Mantiene el nombre que le pusiste
+				costo: costoUnitario, // Sobreescribe el costo con la división exacta
+				docente_id: m.docente_id // Mantiene al docente si ya fue asignado (ISSUE R)
 			}));
 			changedArray = true;
 			
@@ -164,6 +172,15 @@
 			if (payload.matricula_externo === null || payload.matricula_externo === undefined || payload.matricula_externo === '') {
 				payload.matricula_externo = 0;
 			}
+
+			// Limpiar docente_id vacíos antes de enviar a FastAPI
+			payload.modulos = payload.modulos.map(m => {
+				const mod = { ...m };
+				if (!mod.docente_id) {
+					delete mod.docente_id;
+				}
+				return mod;
+			});
 			
 			if (isEditMode && course) {
 				const updatePayload = {
@@ -171,7 +188,7 @@
 					inscritos: course.inscritos
 				};
 				await courseService.update(course._id, updatePayload);
-				alert('success', 'Curso actualizado correctamente');
+				alert('success', 'Curso y módulos actualizados correctamente');
 			} else {
 				await courseService.create(payload);
 				alert('success', 'Curso creado correctamente');
@@ -252,19 +269,27 @@
 			</Select>
 		</div>
 
-		<!-- SECCIÓN DINÁMICA DE MÓDULOS -->
+		<!-- SECCIÓN DINÁMICA DE MÓDULOS CON ASIGNACIÓN DE DOCENTES (ISSUE R) -->
 		{#if formData.modulos && formData.modulos.length > 0}
 			<div class="md:col-span-2 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mt-2">
-				<Heading level="h3" class="mb-4 text-md text-primary-600">Configuración de Módulos (Auto-calculado)</Heading>
+				<Heading level="h3" class="mb-4 text-md text-primary-600">Configuración de Módulos y Docentes</Heading>
 				<div class="grid grid-cols-1 gap-4">
 					{#each formData.modulos as modulo, i}
-						<div class="flex flex-col md:flex-row gap-4 items-center bg-white dark:bg-gray-800 p-3 rounded-md shadow-sm border border-gray-100 dark:border-gray-700">
+						<div class="flex flex-col xl:flex-row gap-4 items-center bg-white dark:bg-gray-800 p-3 rounded-md shadow-sm border border-gray-100 dark:border-gray-700">
 							<span class="font-bold text-gray-400 bg-gray-100 dark:bg-gray-700 w-8 h-8 flex items-center justify-center rounded-full shrink-0">{i + 1}</span>
-							<div class="flex-1 w-full">
+							<div class="w-full xl:w-2/5">
 								<Input label="Nombre del Módulo" id={`modulo_nombre_${i}`} bind:value={formData.modulos[i].nombre} required placeholder="Ej: Introducción a la IA" />
 							</div>
-							<div class="w-full md:w-1/3">
+							<div class="w-full xl:w-1/5">
 								<Input label="Costo (Bs)" id={`modulo_costo_${i}`} type="number" bind:value={formData.modulos[i].costo} required placeholder="Ej: 588" />
+							</div>
+							<div class="w-full xl:w-2/5">
+								<Select label="Docente Titular (Opcional)" bind:value={formData.modulos[i].docente_id}>
+									<option value="">Sin asignar</option>
+									{#each teachers as teacher}
+										<option value={teacher._id}>{teacher.username} ({teacher.email})</option>
+									{/each}
+								</Select>
 							</div>
 						</div>
 					{/each}

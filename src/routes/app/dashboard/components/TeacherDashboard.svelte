@@ -1,254 +1,378 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { courseService, enrollmentService, studentService } from '$lib/services';
-	import { apiKyC } from '$lib/config/apiKyC.config';
+	import { userStore } from '$lib/stores/userStore';
 	import Heading from '$lib/components/ui/heading.svelte';
-	import Card from '$lib/components/ui/card.svelte';
 	import Button from '$lib/components/ui/button.svelte';
-	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import { alert } from '$lib/utils';
 	import type { Course, Enrollment, Student } from '$lib/interfaces';
 
-	let courses: Course[] = $state([]);
+	let loading = $state(true);
+    let myModules: any[] = $state([]); 
 	let enrollments: Enrollment[] = $state([]);
-	let studentsMap: Record<string, Student> = $state({});
-	
-	let selectedCourseId = $state('');
-	let selectedModuleIndex = $state('-1'); 
-	
-	let loadingData = $state(false);
-	let savingIds = $state<Set<string>>(new Set()); 
-	
-	let notasInput: Record<string, string | number> = $state({});
+	let students: Record<string, Student> = $state({});
 
-	let selectedCourse = $derived(courses.find(c => c._id === selectedCourseId));
+    let activeModule: any | null = $state(null);
+    let moduleEnrollments: Enrollment[] = $state([]);
+	
+	let calificacionInputs: Record<string, number | ''> = $state({});
+	let savingCalificacion: Record<string, boolean> = $state({});
+	let savingAll = $state(false);
 
 	onMount(async () => {
 		try {
-			const res = await courseService.getAll(1, 100);
-			courses = res.data || [];
-		} catch (e) {
-			console.error("Error al cargar programas", e);
+            const userId = $userStore.user?._id;
+            if (!userId) return;
+
+            myModules = await courseService.getModulesByTeacher(userId);
+		} catch (error: any) {
+			alert('error', error.message || 'Error al cargar información del docente');
+		} finally {
+			loading = false;
 		}
 	});
 
-	async function loadEnrollments() {
-		if (!selectedCourseId) {
-			enrollments = [];
-			selectedModuleIndex = '-1';
-			return;
+    async function loadStudentsForModule(module: any) {
+        activeModule = module;
+        loading = true;
+        try {
+            const courseEnrollments = await enrollmentService.getByCourseId(module.curso_id);
+            moduleEnrollments = courseEnrollments.filter(e => e.estado === 'activo');
+
+            for (const enrollment of moduleEnrollments) {
+                if (!students[enrollment.estudiante_id]) {
+                    const st = await studentService.getById(enrollment.estudiante_id);
+                    if (st) students[enrollment.estudiante_id] = st;
+                }
+
+                const realIndex = module.modulo_index - 1;
+                if (enrollment.modulos && enrollment.modulos.length > realIndex) {
+                    const notaGuardada = enrollment.modulos[realIndex].nota;
+                    calificacionInputs[enrollment._id] = notaGuardada !== null && notaGuardada !== undefined ? notaGuardada : '';
+                } else {
+                    calificacionInputs[enrollment._id] = '';
+                }
+            }
+        } catch (error: any) {
+            alert('error', 'Error al cargar estudiantes del módulo.');
+        } finally {
+            loading = false;
+        }
+    }
+
+	async function saveCalificacion(enrollmentId: string, showSuccessAlert = true) {
+        if (!activeModule) return;
+        
+		const nota = calificacionInputs[enrollmentId];
+		if (nota === '' || nota === null) {
+			if(showSuccessAlert) alert('error', 'Ingrese una nota válida');
+			return false;
 		}
-		
-		loadingData = true;
+
+		if (Number(nota) < 0 || Number(nota) > 100) {
+			if(showSuccessAlert) alert('error', 'La nota debe estar entre 0 y 100');
+			return false;
+		}
+
+		savingCalificacion[enrollmentId] = true;
 		try {
-			// 1. Cargar las inscripciones del curso
-			const resEnr = await enrollmentService.getAll(1, 500, { curso_id: selectedCourseId });
-			enrollments = resEnr.data || (Array.isArray(resEnr) ? resEnr : []);
-
-			// 2. Extraer IDs únicos y buscar a los estudiantes uno por uno (Evita el límite de 100 del backend)
-			const studentIds = [...new Set(enrollments.map(e => e.estudiante_id))];
+            const moduleArrayIndex = activeModule.modulo_index - 1;
+			const response = await enrollmentService.updateModuloNota(enrollmentId, moduleArrayIndex, Number(nota));
 			
-			const studentPromises = studentIds.map(id => studentService.getById(id).catch(() => null));
-			const studentsList = await Promise.all(studentPromises);
-			
-			let mapTemp: Record<string, Student> = {};
-			studentsList.forEach(s => {
-				if (s && s._id) {
-					mapTemp[s._id] = s;
-				}
-			});
-			studentsMap = mapTemp; 
-
-			resetNotasInput();
-		} catch (e: any) {
-			alert('error', 'Error al cargar la lista de estudiantes.');
-			console.error(e);
-		} finally {
-			loadingData = false;
-		}
-	}
-
-	function resetNotasInput() {
-		const newNotas: Record<string, string | number> = {};
-		const modIndex = parseInt(selectedModuleIndex);
-		
-		if (modIndex >= 0) {
-			enrollments.forEach(enr => {
-				const mod = enr.modulos[modIndex];
-				newNotas[enr._id] = mod?.nota !== null && mod?.nota !== undefined ? mod.nota : '';
-			});
-		}
-		notasInput = newNotas;
-	}
-
-	function onCourseChange() {
-		selectedModuleIndex = '-1';
-		enrollments = [];
-		loadEnrollments();
-	}
-
-	function onModuleChange() {
-		resetNotasInput();
-	}
-
-	async function saveNota(enrollmentId: string) {
-		const modIndex = parseInt(selectedModuleIndex);
-		const notaString = notasInput[enrollmentId];
-		
-		if (notaString === '' || notaString === null || notaString === undefined) {
-			alert('error', 'El campo de nota no puede estar vacío');
-			return;
-		}
-
-		const notaValue = parseFloat(notaString.toString());
-		if (isNaN(notaValue) || notaValue < 0 || notaValue > 100) {
-			alert('error', 'Por favor ingresa una nota válida entre 0 y 100');
-			return;
-		}
-
-		savingIds.add(enrollmentId);
-		savingIds = new Set(savingIds); 
-
-		try {
-			const response = await apiKyC.patch<Enrollment>(
-				`/enrollments/${enrollmentId}/modulos/${modIndex}/nota`, 
-				{ nota: notaValue }
-			);
-			
-			const index = enrollments.findIndex(e => e._id === enrollmentId);
+			const index = moduleEnrollments.findIndex(e => e._id === enrollmentId);
 			if (index !== -1) {
-				enrollments[index] = response;
+				moduleEnrollments[index] = response;
 			}
-			alert('success', 'Calificación guardada correctamente');
-		} catch (e: any) {
-			alert('error', e.message || 'Error al guardar la calificación');
+			
+			if(showSuccessAlert) alert('success', 'Calificación guardada correctamente');
+			return true;
+		} catch (error: any) {
+			if(showSuccessAlert) alert('error', error.message || 'Error al guardar la calificación');
+			return false;
 		} finally {
-			savingIds.delete(enrollmentId);
-			savingIds = new Set(savingIds);
+			savingCalificacion[enrollmentId] = false;
 		}
+	}
+
+	async function saveAllCalificaciones() {
+		savingAll = true;
+		let successCount = 0;
+		let failCount = 0;
+
+		for (const enrollment of moduleEnrollments) {
+			const nota = calificacionInputs[enrollment._id];
+			if (nota !== '' && nota !== null && nota !== undefined) {
+				const result = await saveCalificacion(enrollment._id, false);
+				if (result) successCount++;
+				else failCount++;
+			}
+		}
+
+		savingAll = false;
+		if (successCount > 0) alert('success', `Se guardaron ${successCount} calificaciones exitosamente.`);
+		if (failCount > 0) alert('error', `Hubo problemas guardando ${failCount} calificaciones.`);
+	}
+
+	function exportCSV() {
+		if (!activeModule || moduleEnrollments.length === 0) return;
+
+		const headers = ['Estudiante', 'Registro', 'CI', 'Calificacion'];
+		const rows = moduleEnrollments.map(e => {
+			const student = students[e.estudiante_id];
+			const realIndex = activeModule.modulo_index - 1;
+			const notaActual = (e.modulos && e.modulos.length > realIndex) ? e.modulos[realIndex].nota : '';
+			
+			return [
+				`"${student?.nombre || 'Desconocido'}"`,
+				student?.registro || '',
+				student?.carnet || '',
+				notaActual !== null ? notaActual : ''
+			];
+		});
+
+		const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');
+		const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = `Planilla_${activeModule.curso_codigo}_Modulo${activeModule.modulo_index}.csv`;
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+	}
+
+	function importCSV(event: Event) {
+		const target = event.target as HTMLInputElement;
+		const file = target.files?.[0];
+		if (!file) return;
+
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			const text = e.target?.result as string;
+			const rows = text.split(/\r?\n/).map(row => row.split(','));
+			
+			let importedCount = 0;
+			for (let i = 1; i < rows.length; i++) {
+				const row = rows[i];
+				if (row.length >= 4) {
+					const registroStr = row[1]?.replace(/"/g, '').trim();
+					const ciStr = row[2]?.replace(/"/g, '').trim();
+					const notaStr = row[3]?.replace(/"/g, '').trim();
+					
+					if (notaStr !== '') {
+						const notaNum = Number(notaStr);
+						if (!isNaN(notaNum) && notaNum >= 0 && notaNum <= 100) {
+							const enrollmentMatch = moduleEnrollments.find(enr => {
+								const st = students[enr.estudiante_id];
+								return st?.registro === registroStr || st?.carnet === ciStr;
+							});
+
+							if (enrollmentMatch) {
+								calificacionInputs[enrollmentMatch._id] = notaNum;
+								importedCount++;
+							}
+						}
+					}
+				}
+			}
+
+			if (importedCount > 0) {
+				alert('success', `Se cargaron ${importedCount} notas en pantalla. Por favor, revisa y haz clic en "Guardar Todo".`);
+			} else {
+				alert('warning', 'No se encontraron notas válidas que coincidan con los registros de los estudiantes.');
+			}
+			
+			target.value = '';
+		};
+		reader.readAsText(file);
+	}
+
+	function getStudentStatus(enrollment: Enrollment, moduleIndexBase0: number) {
+        if (!enrollment.modulos || enrollment.modulos.length <= moduleIndexBase0) return { label: 'Sin Datos', class: 'bg-gray-100 text-gray-800' };
+
+        const modulo = enrollment.modulos[moduleIndexBase0];
+        if (modulo.nota === null || modulo.nota === undefined) return { label: 'Cursando', class: 'bg-blue-100 text-blue-800' };
+        if (modulo.nota >= 51) return { label: 'Aprobado', class: 'bg-green-100 text-green-800' };
+        return { label: 'Reprobado', class: 'bg-red-100 text-red-800' };
 	}
 </script>
 
-<div class="space-y-6">
-	<Heading level="h1">Registro de Calificaciones</Heading>
+<div class="space-y-8 max-w-7xl mx-auto">
+	<div>
+		<Heading level="h1">Dashboard Docente</Heading>
+		<p class="text-gray-500 dark:text-gray-400 mt-1">Selecciona un módulo para gestionar las calificaciones</p>
+	</div>
 
-	<!-- Selector de Programa y Módulo -->
-	<Card class="p-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-			
-			<div class="flex flex-col gap-2">
-				<label for="curso" class="text-sm font-semibold text-slate-700 dark:text-slate-300">Programa Académico Asignado</label>
-				<select 
-					id="curso"
-					bind:value={selectedCourseId} 
-					onchange={onCourseChange}
-					class="block w-full rounded-xl border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white sm:text-sm py-2.5"
-				>
-					<option value="">-- Seleccione un Programa --</option>
-					{#each courses as course}
-						<option value={course._id}>{course.nombre_programa} ({course.codigo})</option>
-					{/each}
-				</select>
-			</div>
-
-			<div class="flex flex-col gap-2">
-				<label for="modulo" class="text-sm font-semibold text-slate-700 dark:text-slate-300">Módulo a Calificar</label>
-				<select 
-					id="modulo"
-					bind:value={selectedModuleIndex} 
-					onchange={onModuleChange}
-					disabled={!selectedCourse}
-					class="block w-full rounded-xl border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white sm:text-sm py-2.5 disabled:opacity-50"
-				>
-					<option value="-1">-- Seleccione el Módulo --</option>
-					{#if selectedCourse?.modulos}
-						{#each selectedCourse.modulos as mod, i}
-							<option value={i.toString()}>{mod.nombre}</option>
-						{/each}
-					{/if}
-				</select>
-			</div>
+	{#if loading && myModules.length === 0}
+		<div class="flex items-center justify-center py-12">
+			<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
 		</div>
-	</Card>
+    {:else if myModules.length === 0}
+        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
+			<!-- SVG Book Seguro -->
+			<svg class="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+			</svg>
+            <p class="text-gray-500 dark:text-gray-400 font-medium">No tienes módulos asignados en este momento.</p>
+            <p class="text-sm text-gray-400 mt-2">Comunícate con el área de Gestión Académica (CPD) si esto es un error.</p>
+        </div>
+	{:else}
+        <!-- TARJETAS DE MÓDULOS -->
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {#each myModules as module}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div 
+                    onclick={() => loadStudentsForModule(module)}
+                    class={`bg-white dark:bg-gray-800 rounded-xl border p-5 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md
+                        ${activeModule?.curso_id === module.curso_id && activeModule?.modulo_index === module.modulo_index 
+                            ? 'border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/10 dark:bg-indigo-900/10' 
+                            : 'border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-700'}`
+                    }
+                >
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-800 text-sm font-bold dark:bg-indigo-900/30 dark:text-indigo-400">
+                            {module.modulo_index}
+                        </span>
+                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                            {module.curso_codigo}
+                        </span>
+                    </div>
+                    
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white leading-tight mb-1 truncate" title={module.modulo_nombre}>
+                        {module.modulo_nombre}
+                    </h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 min-h-[2.5rem]">
+                        {module.curso_nombre}
+                    </p>
 
-	<!-- Planilla de Estudiantes -->
-	{#if loadingData}
-		<TableSkeleton columns={5} rows={5} />
-	{:else if selectedCourseId && selectedModuleIndex !== '-1'}
-		
-		<div class="flex items-center justify-between mt-8 mb-4">
-			<h2 class="text-lg font-bold text-slate-800 dark:text-white">Planilla de Estudiantes</h2>
-			<span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">
-				{enrollments.length} Inscritos
-			</span>
+                    <div class="mt-5 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                        <span class="text-indigo-600 dark:text-indigo-400 text-sm font-medium flex items-center gap-1 group-hover:underline">
+                            Ver Planilla &rarr;
+                        </span>
+                    </div>
+                </div>
+            {/each}
 		</div>
 
-		<div class="w-full overflow-hidden border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
-			<table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-				<thead class="bg-slate-100 dark:bg-slate-800">
-					<tr>
-						<th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Estudiante</th>
-						<th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Registro / CI</th>
-						<th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Estado Actual</th>
-						<th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-48">Calificación (0-100)</th>
-					</tr>
-				</thead>
-				<tbody class="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-800">
-					{#each enrollments as enr (enr._id)}
-						{@const student = studentsMap[enr.estudiante_id]}
-						{@const modIndex = parseInt(selectedModuleIndex)}
-						{@const modulo = enr.modulos[modIndex]}
+        <!-- PLANILLA DE ESTUDIANTES DEL MÓDULO SELECCIONADO -->
+        {#if activeModule}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden animate-fade-in mt-8">
+                
+				<!-- ENCABEZADO CON BOTONES DE EXPORTAR E IMPORTAR -->
+				<div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-gray-50 dark:bg-gray-900/50">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+							Planilla de Estudiantes
+							<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+								<!-- SVG Users Seguro -->
+								<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+								</svg> 
+								{moduleEnrollments.length}
+							</span>
+						</h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{activeModule.modulo_nombre} • {activeModule.curso_codigo}</p>
+                    </div>
+                    
+					<!-- CONTROLES MASIVOS CON ICONOS SVG SEGUROS -->
+					<div class="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+						<Button variant="secondary" class="text-sm py-1.5" onclick={exportCSV}>
+							{#snippet leftIcon()}
+								<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+								</svg>
+							{/snippet}
+							Exportar Planilla
+						</Button>
 						
-						<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="font-medium text-slate-900 dark:text-white">{student?.nombre || 'Desconocido'}</div>
-							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-sm text-slate-500">{student?.registro || '-'} / {student?.carnet || '-'}</div>
-							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								{#if modulo?.nota !== null && modulo?.nota !== undefined}
-									{#if modulo.nota >= 64}
-										<span class="px-2.5 py-1 bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 rounded-full text-xs font-bold">Aprobado</span>
-									{:else}
-										<span class="px-2.5 py-1 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-400 rounded-full text-xs font-bold">Reprobado</span>
-									{/if}
-								{:else}
-									<span class="px-2.5 py-1 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded-full text-xs font-bold">Cursando</span>
-								{/if}
-							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="flex items-center gap-2">
-									<input 
-										type="number" 
-										min="0" 
-										max="100" 
-										step="0.1"
-										bind:value={notasInput[enr._id]}
-										class="w-20 px-2 py-1.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:border-slate-600 dark:text-white text-center font-semibold"
-										placeholder="--"
-									/>
-									<Button 
-										onclick={() => saveNota(enr._id)} 
-										loading={savingIds.has(enr._id)}
-										variant="primary"
-										class="px-3 py-1.5 text-xs shadow-sm"
-									>
-										Guardar
-									</Button>
-								</div>
-							</td>
-						</tr>
-					{/each}
-					{#if enrollments.length === 0}
-						<tr>
-							<td colspan="4" class="px-6 py-12 text-center text-slate-500">
-								No se encontraron estudiantes inscritos en este programa.
-							</td>
-						</tr>
-					{/if}
-				</tbody>
-			</table>
-		</div>
+						<!-- Input de archivo oculto enlazado al botón -->
+						<input type="file" id="csv-upload" accept=".csv" class="hidden" onchange={importCSV} />
+						<Button variant="secondary" class="text-sm py-1.5" onclick={() => document.getElementById('csv-upload')?.click()}>
+							{#snippet leftIcon()}
+								<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+								</svg>
+							{/snippet}
+							Importar Notas
+						</Button>
+
+						<Button variant="primary" class="text-sm py-1.5 ml-auto" loading={savingAll} onclick={saveAllCalificaciones}>
+							{#snippet leftIcon()}
+								<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+								</svg>
+							{/snippet}
+							Guardar Todo
+						</Button>
+					</div>
+                </div>
+
+                {#if loading}
+                    <div class="flex justify-center py-12">
+                        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+                    </div>
+                {:else if moduleEnrollments.length === 0}
+                    <div class="p-8 text-center text-gray-500 dark:text-gray-400">
+                        No hay estudiantes inscritos (activos) en este programa académico.
+                    </div>
+                {:else}
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Estudiante</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Registro / CI</th>
+                                    <th class="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado Actual</th>
+                                    <th class="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Calificación (0-100)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                {#each moduleEnrollments as enrollment (enrollment._id)}
+                                    {@const student = students[enrollment.estudiante_id]}
+                                    {@const status = getStudentStatus(enrollment, activeModule.modulo_index - 1)}
+                                    <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <p class="font-medium text-gray-900 dark:text-white">
+                                                {student?.nombre || 'Cargando...'}
+                                            </p>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                            {student?.registro || '--'} / {student?.carnet || '--'}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                                            <span class={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${status.class}`}>
+                                                {status.label}
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-right">
+                                            <div class="flex items-center justify-end gap-3">
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    bind:value={calificacionInputs[enrollment._id]}
+                                                    class="w-20 rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm dark:bg-gray-700 dark:text-white text-center font-medium placeholder-gray-300"
+                                                    placeholder="--"
+                                                />
+                                                <Button 
+                                                    size="sm"
+                                                    loading={savingCalificacion[enrollment._id]}
+                                                    onclick={() => saveCalificacion(enrollment._id, true)}
+                                                    disabled={calificacionInputs[enrollment._id] === ''}
+                                                >
+                                                    Guardar
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                {/if}
+            </div>
+        {/if}
 	{/if}
 </div>
