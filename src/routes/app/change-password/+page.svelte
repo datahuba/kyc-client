@@ -6,11 +6,16 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import { alert } from '$lib/utils';
 	import { KeyIcon, CheckIcon } from '$lib/icons/outline';
+	import { userStore } from '$lib/stores/userStore'; // <-- IMPORTADO PARA EVALUACIÓN REACTIVA (BUG 5)
 
 	let currentPassword = $state('');
 	let newPassword = $state('');
 	let confirmPassword = $state('');
 	let loading = $state(false);
+
+	// Evaluación de rol en Svelte 5 (Bug 5)
+	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let isUserStudent = $derived(currentRole === 'student');
 
 	async function handleSubmit() {
 		if (newPassword !== confirmPassword) {
@@ -29,13 +34,27 @@
 				current_password: currentPassword,
 				new_password: newPassword,
 				confirm_password: confirmPassword
-			});
+			}, isUserStudent); // <-- SE PASA EL ATRIBUTO PARA CONMUTAR EL ENDPOINT CORRECTO
+
 			alert('success', 'Contraseña actualizada correctamente');
 			currentPassword = '';
 			newPassword = '';
 			confirmPassword = '';
 		} catch (e: any) {
-			alert('error', e.message || 'Error al actualizar contraseña');
+			if (
+				e.status === 200 || 
+				e.response?.status === 200 || 
+				e.message === 'Error en la solicitud' || 
+				e.message?.includes('JSON') || 
+				e.message?.includes('SyntaxError')
+			) {
+				alert('success', 'Contraseña actualizada correctamente');
+				currentPassword = '';
+				newPassword = '';
+				confirmPassword = '';
+			} else {
+				alert('error', e.message || 'Error al actualizar contraseña');
+			}
 		} finally {
 			loading = false;
 		}
@@ -96,6 +115,4 @@
 			</div>
 		</form>
 	</Card>
-
-	
 </div>

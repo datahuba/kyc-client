@@ -76,6 +76,7 @@
 	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canEditStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canVerifyTitle = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae'].includes(currentRole));
 
 	let isAllSelected = $derived(
 		students.length > 0 && students.every(s => selectedStudentIds.includes(s._id))
@@ -292,6 +293,7 @@
 	function handleRejectClick(student: Student) {
 		studentToAction = student;
 		rejectReason = '';
+		isVerifyModalOpen = false; // Se asegura consistencia de estados
 		isRejectModalOpen = true;
 		openDropdownId = null;
 	}
@@ -379,8 +381,25 @@
 			if (filters.estado_titulo !== 'all') filterParams.estado_titulo = filters.estado_titulo;
 			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
 
-			const res = await studentService.getAll(1, 1000, filterParams);
-			const allStudents = res.data ?? [];
+			// PROCESAMIENTO ROBUSTO POR LOTES SEGUROS DE 100 REGISTROS (BUG DESCARGA 422 RESUELTO)
+			let allStudents: Student[] = [];
+			let currentPage = 1;
+			let hasMore = true;
+			const batchLimit = 100; // Límite seguro soportado por el backend para alumnos
+
+			while (hasMore) {
+				const res = await studentService.getAll(currentPage, batchLimit, filterParams);
+				if (res && res.data && res.data.length > 0) {
+					allStudents = [...allStudents, ...res.data];
+					if (res.meta && res.meta.hasNextPage) {
+						currentPage++;
+					} else {
+						hasMore = false;
+					}
+				} else {
+					hasMore = false;
+				}
+			}
 
 			if (allStudents.length === 0) {
 				alert('error', 'No hay datos para descargar');
@@ -388,15 +407,17 @@
 			}
 
 			const headers = ['Estudiante', 'Email', 'Registro', 'Carnet', 'Contacto', 'Domicilio', 'Estado', 'Título'];
+			
+			// BLINDADO CONTRA VALORES NULOS/INDEFINIDOS (PARCHE BUG DESCARGA)
 			const rows = allStudents.map(s => [
-				`"${s.nombre}"`,
+				`"${s.nombre || 'Sin nombre'}"`,
 				s.email || 'N/A',
 				s.registro || 'N/A',
 				s.carnet || 'N/A',
 				s.celular || 'N/A',
 				`"${s.domicilio || 'N/A'}"`,
 				s.activo ? 'Activo' : 'Inactivo',
-				s.titulo ? s.titulo.estado : 'Sin Título'
+				s.titulo && s.titulo.estado ? s.titulo.estado : 'Sin Título'
 			]);
 
 			const courseName = filters.curso_id
@@ -709,7 +730,7 @@
 	<!-- Delete Modal -->
 	<ModalConfirm
 		isOpen={isDeleteModalOpen}
-		message={`¿Estás seguro de que deseas eliminar al estudiante ${studentToDelete?.nombre}? El sistema borrará sus inscripciones y solo purgará sus pagos pendientes, conservando aprobados y cancelados por fines de auditoría.`}
+		message={`¿Estás seguro de que deseas eliminar al estudiante {studentToDelete?.nombre}? El sistema borrará sus inscripciones y solo purgará sus pagos pendientes, conservando aprobados y cancelados por fines de auditoría.`}
 		onConfirm={confirmDelete}
 		onCancel={() => isDeleteModalOpen = false}
 		loading={deleteLoading}
@@ -718,7 +739,7 @@
 	<!-- Verify Confirmation Modal -->
 	<ModalConfirm
 		isOpen={isVerifyModalOpen}
-		message={`¿Confirma que desea VERIFICAR el título del estudiante ${studentToAction?.nombre}?`}
+		message={`¿Confirma que desea VERIFICAR el título del estudiante {studentToAction?.nombre}?`}
 		onConfirm={confirmVerify}
 		onCancel={() => isVerifyModalOpen = false}
 		loading={actionLoading}
@@ -755,7 +776,7 @@
 	<!-- Enrollments Modal -->
 	<Modal
 		isOpen={isEnrollmentsOpen}
-		title={`Inscripciones de ${selectedStudent?.nombre || ''}`}
+		title={`Inscripciones de {selectedStudent?.nombre || ''}`}
 		onClose={() => isEnrollmentsOpen = false}
 		maxWidth="sm:max-w-4xl"
 	>
@@ -790,12 +811,12 @@
 										<div class="text-xs text-green-600">Pagado: {formatCurrency(enrollment.total_pagado)}</div>
 									</td>
 									<td class="px-6 py-4 whitespace-nowrap">
-										<span class={`font-medium ${enrollment.saldo_pendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>
+										<span class={`font-medium {enrollment.saldo_pendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>
 											{formatCurrency(enrollment.saldo_pendiente)}
 										</span>
 									</td>
 									<td class="px-6 py-4 whitespace-nowrap">
-										<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+										<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full {enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
 											{enrollment.estado}
 										</span>
 									</td>
@@ -900,7 +921,7 @@
 	<!-- MODAL CONFIRMACIÓN ELIMINACIÓN MASIVA -->
 	<ModalConfirm
 		isOpen={showBulkDeleteModal}
-		message={`¿Estás absolutamente seguro de que deseas eliminar a los ${selectedStudentIds.length} estudiantes seleccionados? El sistema borrará sus inscripciones y solo purgará sus pagos en estado pendiente, reteniendo aprobados y rechazados por normativas de auditoría.`}
+		message={`¿Estás absolutamente seguro de que deseas eliminar a los {selectedStudentIds.length} estudiantes seleccionados? El sistema borrará sus inscripciones y solo purgará sus pagos en estado pendiente, reteniendo aprobados y rechazados por normativas de auditoría.`}
 		onConfirm={handleBulkDelete}
 		onCancel={() => showBulkDeleteModal = false}
 		loading={bulkDeleteLoading}

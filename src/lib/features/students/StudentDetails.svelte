@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Student, TituloData } from '$lib/interfaces';
 	import { studentService, courseService } from '$lib/services';
+	import { userStore } from '$lib/stores/userStore'; // <-- IMPORTADO PARA CONTROL DE ACCESOS / BUG 4
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
@@ -30,6 +31,10 @@
 		año_expedicion: '',
 		universidad: ''
 	});
+
+	// Permisos granulares de escritura de archivos académicos y verificación KYC (Bug 4)
+	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let canUploadAndVerify = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 
 	// Only populate if student has title data
 	$effect(() => {
@@ -299,25 +304,34 @@
 									</button>
 								</div>
 							</div>
-							<div class="text-xs text-center mt-1">
-								<button 
-									type="button"
-									class="text-primary-600 hover:underline disabled:opacity-50" 
-									onclick={(e) => { e.preventDefault(); document.getElementById(`upload-${doc.type}`)?.click(); }}
-									disabled={!!uploadingDoc}
-								>
-									{uploadingDoc === doc.type ? 'Actualizando...' : 'Reemplazar'}
-								</button>
-							</div>
+							
+							{#if canUploadAndVerify}
+								<div class="text-xs text-center mt-1">
+									<button 
+										type="button"
+										class="text-primary-600 hover:underline disabled:opacity-50" 
+										onclick={(e) => { e.preventDefault(); document.getElementById(`upload-${doc.type}`)?.click(); }}
+										disabled={!!uploadingDoc}
+									>
+										{uploadingDoc === doc.type ? 'Actualizando...' : 'Reemplazar'}
+									</button>
+								</div>
+							{/if}
 						{:else}
-							<FileUpload 
-								label="" 
-								id={`upload-${doc.type}-full`}
-								accept={doc.accept} 
-								preview={false}
-								loading={uploadingDoc === doc.type}
-								onFileSelect={(f) => handleUpload(f, doc.type as any)} 
-							/>
+							{#if canUploadAndVerify}
+								<FileUpload 
+									label="" 
+									id={`upload-${doc.type}-full`}
+									accept={doc.accept} 
+									preview={false}
+									loading={uploadingDoc === doc.type}
+									onFileSelect={(f) => handleUpload(f, doc.type as any)} 
+								/>
+							{:else}
+								<div class="flex h-48 w-full items-center justify-center rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+									<span class="text-xs text-gray-400 italic">Documento no presentado</span>
+								</div>
+							{/if}
 						{/if}
 						<!-- Hidden input for replace action -->
 						<input 
@@ -351,10 +365,14 @@
 			{#if !student.titulo}
 				<div class="text-center py-8">
 					<p class="text-gray-500">No hay información de título registrada.</p>
-					<p class="text-sm text-gray-400">Suba el documento en la sección de uploads para registrarlo.</p>
-					<div class="mt-4 max-w-xs mx-auto">
-						<FileUpload label="Subir Título" accept=".pdf" onFileSelect={(f) => handleUpload(f, 'titulo')} />
-					</div>
+					{#if canUploadAndVerify}
+						<p class="text-sm text-gray-400">Suba el documento en la sección de uploads para registrarlo.</p>
+						<div class="mt-4 max-w-xs mx-auto">
+							<FileUpload label="Subir Título" accept=".pdf" onFileSelect={(f) => handleUpload(f, 'titulo')} />
+						</div>
+					{:else}
+						<p class="text-sm text-gray-400 italic mt-1">Pendiente de presentación por el estudiante o CPD.</p>
+					{/if}
 				</div>
 			{:else}
 				<div class="space-y-6">
@@ -397,10 +415,10 @@
 
 					<!-- Form for Editing/Verifying -->
 					<div class="grid grid-cols-2 gap-4">
-						<Input label="Título" bind:value={verifyData.titulo} />
-						<Input label="Nº Registro" bind:value={verifyData.numero_titulo} />
-						<Input label="Año expedición" bind:value={verifyData.año_expedicion} />
-						<Input label="Universidad" bind:value={verifyData.universidad} />
+						<Input label="Título" bind:value={verifyData.titulo} disabled={!canUploadAndVerify} />
+						<Input label="Nº Registro" bind:value={verifyData.numero_titulo} disabled={!canUploadAndVerify} />
+						<Input label="Año expedición" bind:value={verifyData.año_expedicion} disabled={!canUploadAndVerify} />
+						<Input label="Universidad" bind:value={verifyData.universidad} disabled={!canUploadAndVerify} />
 					</div>
 
 					<div class="flex items-center gap-4 flex-col">
@@ -413,7 +431,7 @@
 							Descargar Documento
 						</button>
 						
-						{#if student.titulo}
+						{#if student.titulo && canUploadAndVerify}
 							<div class="flex flex-col md:flex-row gap-3 pt-4 border-t border-gray-100 dark:border-gray-700 my-auto">
 								<div class="flex flex-col gap-1.5">
 									<label for="reject-reason" class="text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -445,16 +463,6 @@
 							</div>
 						{/if}
 					</div>
-					
-					<!-- {#if student.titulo.estado !== 'verificado' && student.titulo.estado !== 'rechazado'}
-						<div class="border-t pt-4 mt-4">
-							<label class="block text-sm font-medium text-red-700 mb-2">Rechazar Título</label>
-							<div class="flex gap-2">
-								<Input bind:value={rejectionReason} placeholder="Motivo del rechazo..." class="flex-1" />
-								<Button variant="destructive" loading={rejecting} onclick={handleReject}>Rechazar</Button>
-							</div>
-						</div>
-					{/if} -->
 				</div>
 			{/if}
 		</div>

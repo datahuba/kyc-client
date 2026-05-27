@@ -59,12 +59,12 @@
 	let openDropdownId: string | null = $state(null);
 	let selectedPayment: Payment | null = $state(null);
 
-	// ISSUE N: Permisos Visuales Granulares de Finanzas
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
-	let isStudent = $derived(currentRole === 'student');
-	let isStaff = $derived(['superadmin', 'admin', 'mae', 'cpd', 'cobranza'].includes(currentRole));
-	let canProcessPayments = $derived(['superadmin', 'admin', 'cobranza'].includes(currentRole));
-
+	// Computed
+	let isAdmin = $derived($userStore.role === 'admin' || $userStore.role === 'superadmin');
+	let isStudent = $derived($userStore.role === 'student');
+	let isCPD = $derived($userStore.role === 'cpd');
+	let isCobranza = $derived($userStore.role === 'cobranza');
+	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae'].includes($userStore.role || ''));
 	let coursesMap = $derived(
 		coursesList.reduce((acc, c) => ({ ...acc, [c._id]: c }), {} as Record<string, typeof coursesList[0]>)
 	);
@@ -223,6 +223,25 @@
 		openDropdownId = null;
 	}
 
+	function canApproveReject(payment: Payment): boolean {
+		if (payment.estado_pago !== 'pendiente') return false;
+		
+		const role = $userStore.role;
+		if (role === 'admin' || role === 'superadmin') return true;
+		
+		const concept = (payment.concepto || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+		const isMatricula = concept.includes('matricula');
+		
+		if (role === 'cpd') {
+			return isMatricula;
+		}
+		if (role === 'cobranza') {
+			return !isMatricula;
+		}
+		
+		return false;
+	}
+
 	function getDropdownOptions(payment: Payment) {
 		const options = [];
 
@@ -233,8 +252,7 @@
 			action: () => handleViewDetails(payment)
 		});
 
-		// ISSUE N: Solo roles financieros pueden aprobar/rechazar pagos
-		if (canProcessPayments && payment.estado_pago === 'pendiente') {
+		if (canApproveReject(payment)) {
 			options.push(
 				{
 					label: 'Aprobar Pago',
@@ -263,6 +281,22 @@
 		}
 	}
 
+	// Etiquetas dinámicas de colores para distinguir conceptos de pago (Bug 7)
+	function getConceptBadgeColor(concept: string) {
+		const normalized = (concept || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+		
+		if (normalized.includes('matricula')) {
+			// Azul para matrícula (concepto académico)
+			return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50';
+		}
+		if (normalized.includes('modulo') || normalized.includes('cuota')) {
+			// Púrpura para módulos/cuotas (concepto financiero)
+			return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800/50';
+		}
+		// Gris por defecto
+		return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700';
+	}
+
 
 	let csvLoading = $state(false);
 
@@ -275,7 +309,8 @@
 			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
 			if (filters.estudiante_id) filterParams.estudiante_id = filters.estudiante_id;
 
-			const res = await paymentService.getAll(1, 1000, filterParams) as any;
+			// SE CORRIGE LÍMITE DE CONSULTA A 500 PARA EVITAR EL ERROR 422 DEL BACKEND (BUG DESCARGA)
+			const res = await paymentService.getAll(1, 500, filterParams) as any;
 			const allPayments: Payment[] = Array.isArray(res) ? res : (res?.data ?? []);
 
 			if (allPayments.length === 0) {
@@ -289,19 +324,21 @@
 			const filename = `pagos_${courseName}_${new Date().toISOString().slice(0,10)}.csv`;
 
 			const headers = ['Remitente','Banco','Monto Comprobante','Fecha Comprobante','Cuenta Destino','Fecha Registro','Concepto','Monto/Cuota','Nº Transacción', isStaff ? 'Estudiante ID' : '', 'Curso', 'Estado'];
+			
+			// BLINDADO CONTRA VALORES NULOS/INDEFINIDOS (PARCHE BUG DESCARGA)
 			const rows = allPayments.map(p => [
 				p.remitente || 'No disponible',
 				p.banco || 'No disponible',
-				formatCurrency(p.monto_comprobante ?? 0),
-				p.fecha_comprobante || '---',
+				p.monto_comprobante ? formatCurrency(p.monto_comprobante) : 'Bs 0.00',
+				p.fecha_comprobante ? formatDate(p.fecha_comprobante) : '---',
 				p.cuenta_destino || '---',
-				formatDate(p.created_at),
-				p.concepto,
-				p.cantidad_pago,
-				p.numero_transaccion,
-				isStaff ? p.estudiante_id : '',
-				`"${coursesMap[p.curso_id]?.nombre_programa ?? '—'}"`,
-				p.estado_pago
+				p.created_at ? formatDate(p.created_at) : '---',
+				p.concepto || 'No especificado',
+				p.cantidad_pago ? formatCurrency(p.cantidad_pago) : 'Bs 0.00',
+				p.numero_transaccion || '---',
+				isStaff ? (p.estudiante_id || '') : '',
+				`"${p.curso_id && coursesMap[p.curso_id] ? coursesMap[p.curso_id].nombre_programa : '—'}"`,
+				p.estado_pago || '---'
 			]);
 
 			const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');
@@ -440,7 +477,7 @@
 
 
 	{#if loading && payments.length === 0}
-		<TableSkeleton columns={10} rows={10} />
+		<TableSkeleton columns={12} rows={10} />
 	{:else}
 		<div class="w-full overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -454,7 +491,7 @@
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Comprobante</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta destino</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Registro</th>
-							<!-- <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th> -->
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto/Cuota</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
 							<th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
@@ -499,9 +536,11 @@
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
 									{formatDate(payment.created_at || '---')}
 								</td>
-								<!-- <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-white">
-									{payment.concepto}
-								</td> -->
+								<td class="px-6 py-4 whitespace-nowrap text-sm">
+									<span class={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getConceptBadgeColor(payment.concepto)}`}>
+										{payment.concepto || 'No especificado'}
+									</span>
+								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
 									{formatCurrency(payment.cantidad_pago)}
 								</td>
@@ -529,7 +568,7 @@
 						{/each}
 						{#if payments.length === 0}
 							<tr>
-								<td colspan={isStaff ? 10 : 9} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
+								<td colspan={isStaff ? 12 : 11} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
 									No se encontraron pagos.
 								</td>
 							</tr>
@@ -647,14 +686,12 @@
 							{selectedPayment.cuenta_destino || '---'}
 						</p>
 					</div>
-					<!-- <div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Fecha</label>
-						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1">{formatDate(selectedPayment.created_at)}</p>
-					</div> -->
-					<!-- <div>
-						<label class="block text-xs font-medium text-gray-500 uppercase">Concepto</label>
-						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1">{selectedPayment.concepto}</p>
-					</div> -->
+					<div>
+						<label for="detailsConcepto" class="block text-xs font-medium text-gray-900 uppercase">Concepto</label>
+						<span id="detailsConcepto" class={`mt-1 px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getConceptBadgeColor(selectedPayment.concepto)}`}>
+							{selectedPayment.concepto || 'No especificado'}
+						</span>
+					</div>
 					<div>
 						<label for="monto" class="block text-xs font-medium text-gray-900 uppercase">Monto/Cuota</label>
 						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="monto">{formatCurrency(selectedPayment.cantidad_pago)}</p>

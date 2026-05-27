@@ -133,8 +133,12 @@
 
 			if (isEditMode && student) {
 				const hasTituloData = tituloData.titulo || tituloData.universidad;
+				
+				// Excluir course_id del payload de actualización para evitar envíos huérfanos a la API
+				const { course_id, ...updatePayload } = formData;
+				
 				savedStudent = await studentService.update(student._id, {
-					...formData,
+					...updatePayload,
 					activo: active,
 					password: formData.password || undefined,
 					titulo: hasTituloData ? tituloData : undefined
@@ -230,17 +234,20 @@
 				<option value="interno">Interno</option>
 				<option value="externo">Externo</option>
 			</Select>
-			<Select
-				label="Curso / Programa"
-				bind:value={formData.course_id}
-				required={!isEditMode}
-				title={selectedCourseName}
-			>
-				<option value="" disabled selected>Seleccione un curso activo</option>
-				{#each courses as course}
-					<option value={course._id} title={course.nombre_programa}>{courseOptionLabel(course)}</option>
-				{/each}
-			</Select>
+			
+			{#if !isEditMode}
+				<Select
+					label="Curso / Programa"
+					bind:value={formData.course_id}
+					required={true}
+					title={selectedCourseName}
+				>
+					<option value="" disabled selected>Seleccione un curso activo</option>
+					{#each courses as course}
+						<option value={course._id} title={course.nombre_programa}>{courseOptionLabel(course)}</option>
+					{/each}
+				</Select>
+			{/if}
 
 			<div class="relative w-full">
 				<div class="relative">
@@ -265,45 +272,6 @@
 			</div>
 		</div>
 	</div>
-
-	<!-- Course Selection -->
-	<!-- <div class="p-6 shadow-sm">
-		<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4">
-			<div class="rounded-lg bg-green-50 p-2 text-green-600 dark:bg-green-900/20 dark:text-green-400">
-				<CollectionIcon class="size-6" />
-			</div>
-			<div>
-				<Heading level="h4" class="text-lg font-semibold text-gray-900 dark:text-white">Cursos Inscritos</Heading>
-				<p class="text-sm text-gray-500 dark:text-gray-400">Seleccione los cursos</p>
-			</div>
-		</div> -->
-
-		<!-- <div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border border-gray-200 rounded-lg dark:border-gray-700">
-			{#each courses as course}
-				<label class="flex items-center space-x-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors">
-					<input 
-						type="checkbox" 
-						value={course._id} 
-						checked={formData.lista_cursos_ids?.includes(course._id)}
-						onchange={(e) => {
-							const checked = e.currentTarget.checked;
-							const current = formData.lista_cursos_ids || [];
-							if (checked) {
-								formData.lista_cursos_ids = [...current, course._id];
-							} else {
-								formData.lista_cursos_ids = current.filter(id => id !== course._id);
-							}
-						}}
-						class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
-					/>
-					<span class="text-sm text-gray-700 dark:text-gray-300 select-none">{course.nombre_programa}</span>
-				</label>
-			{/each}
-			{#if courses.length === 0}
-				<p class="text-sm text-gray-500 col-span-2 text-center py-4">No hay cursos disponibles.</p>
-			{/if}
-		</div> -->
-	<!-- </div> -->
 
 	<!-- Documents & Title -->
 	<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">

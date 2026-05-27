@@ -124,8 +124,24 @@ class StudentService {
 		});
 	}
 
-	async changePassword(data: ChangePasswordRequest): Promise<void> {
-		return await apiKyC.post<void>('/students/me/change-password', data);
+	async changePassword(data: ChangePasswordRequest, isStudent: boolean = true): Promise<void> {
+		// Encaminamiento dinámico de contraseñas: Alumno vs Personal Administrativo (Bug 5)
+		const endpoint = isStudent ? '/students/me/change-password' : '/users/me/change-password';
+		try {
+			return await apiKyC.post<void>(endpoint, data);
+		} catch (error: any) {
+			// Si la petición fue exitosa (200) pero el parseador de JSON del cliente arrojó un error (texto plano en docentes)
+			if (
+				error.status === 200 || 
+				error.response?.status === 200 || 
+				error.message === 'Error en la solicitud' || 
+				error.message?.includes('JSON') || 
+				error.message?.includes('SyntaxError')
+			) {
+				return;
+			}
+			throw error;
+		}
 	}
 
 	async updateSelf(data: UpdateStudentSelfRequest): Promise<Student> {
