@@ -42,15 +42,22 @@ class StudentService {
 		return await apiKyC.post<Student>('/students/', data);
 	}
 
-    async importFromExcel(file: File): Promise<{ success_count: number; errors: string[] }> {
-	const formData = new FormData();
-	formData.append('file', file);
-	return await apiKyC.post<{ success_count: number; errors: string[] }>(
-		'/students/import/excel', 
-		formData, 
-		{ customTimeout: 120000 } // 120000 ms = 2 minutos (Evita cancelaciones a los 30s)
-	);
-}
+    // ISSUE G: Añadido selector de tipo de estudiante
+    async importFromExcel(file: File, tipoEstudiante: 'interno' | 'externo'): Promise<{ success_count: number; errors: string[] }> {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('tipo_estudiante', tipoEstudiante);
+        return await apiKyC.post<{ success_count: number; errors: string[] }>(
+            '/students/import/excel', 
+            formData, 
+            { customTimeout: 120000 }
+        );
+    }
+
+    // ISSUE H: Botón rápido de cambio de tipo
+    async toggleTipoEstudiante(id: string, tipo: 'interno' | 'externo'): Promise<Student> {
+        return await apiKyC.patch<Student>(`/students/${id}/toggle-tipo`, { tipo });
+    }
 
     async bulkDelete(ids: string[]): Promise<{ message: string; deleted_count: number }> {
 		return await apiKyC.post<{ message: string; deleted_count: number }>('/students/bulk-delete', { ids });

@@ -1,4 +1,5 @@
 export interface Modulo {
+	docente_id: string;
 	nombre: string;
 	costo: number;
 }
