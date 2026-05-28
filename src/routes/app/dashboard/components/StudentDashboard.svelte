@@ -40,7 +40,7 @@
 	{#if loading}
 		<DashboardSkeleton />
 	{:else}
-		<!-- 1. Tarjeta de Bienvenida y Perfil Rápido (Contraste Corregido) -->
+		<!-- 1. Tarjeta de Bienvenida y Perfil Rápido -->
 		<div class="bg-slate-900 rounded-2xl shadow-xl p-8 sm:p-10 text-white overflow-hidden relative">
 			<!-- Decoración de fondo -->
 			<div class="absolute top-0 right-0 -mt-10 -mr-10 w-48 h-48 bg-white opacity-5 rounded-full blur-2xl pointer-events-none"></div>
@@ -54,13 +54,15 @@
 				
 				<!-- Info Estudiante -->
 				<div class="text-center md:text-left flex-1">
-					<h2 class="text-3xl font-bold mb-2 text-white">¡Hola, {$userStore.user?.nombre || 'Estudiante'}!</h2>
+					<!-- SUGERENCIA IMPLEMENTADA: Mensaje de bienvenida personalizado con nombre completo -->
+					<h2 class="text-3xl font-bold mb-2 text-white">¡Bienvenido, {$userStore.user?.nombre || 'Estudiante'}!</h2>
 					<p class="text-slate-300 mb-5 text-base font-medium">Bienvenido a tu portal académico de postgrado de la UAGRM.</p>
 					
 					<div class="flex flex-wrap items-center justify-center md:justify-start gap-3 text-sm font-medium">
 						<div class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-xl border border-slate-700 shadow-sm text-slate-200">
 							<svg class="size-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" /></svg>
-							<span>Registro: {$userStore.user?.registro || 'N/A'}</span>
+							<!-- BUG 1 SOLUCIONADO: Mapeo seguro con tres opciones de fallback (registro, codigo_registro o username) -->
+							<span>Registro: {$userStore.user?.registro || $userStore.user?.codigo_registro || $userStore.user?.username || 'N/A'}</span>
 						</div>
 						<div class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-xl border border-slate-700 shadow-sm text-slate-200">
 							<svg class="size-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
