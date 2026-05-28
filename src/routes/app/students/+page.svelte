@@ -172,9 +172,25 @@
 
 	onMount(async () => {
 		try {
-			const coursesRes = await courseService.getAll(1, 100);
-			allCourses = coursesRes.data;
-		} catch (e) { console.error('Error loading courses', e); }
+			// --- OPTIMIZACIÓN: SISTEMA DE CACHÉ CLIENT-SIDE EN DIPLOMADOS/CURSOS ---
+			const cachedCourses = sessionStorage.getItem('cached_courses_list');
+			const cacheTimestamp = sessionStorage.getItem('cached_courses_timestamp');
+			const now = new Date().getTime();
+			const cacheDuration = 5 * 60 * 1000; // Validez de 5 minutos de búfer
+
+			if (cachedCourses && cacheTimestamp && (now - Number(cacheTimestamp) < cacheDuration)) {
+				allCourses = JSON.parse(cachedCourses);
+			} else {
+				const coursesRes = await courseService.getAll(1, 100);
+				if (coursesRes && coursesRes.data) {
+					allCourses = coursesRes.data;
+					sessionStorage.setItem('cached_courses_list', JSON.stringify(coursesRes.data));
+					sessionStorage.setItem('cached_courses_timestamp', String(now));
+				}
+			}
+		} catch (e) { 
+			console.error('Error loading courses with cache integration', e); 
+		}
 
 		const cursoIdParam = $appPage.url.searchParams.get('curso_id');
 		if (cursoIdParam) {
