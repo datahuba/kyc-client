@@ -4,8 +4,8 @@
 	import { onMount } from 'svelte';
 	import { userStore } from '$lib/stores/userStore';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores'; // <-- Store nativo para rastrear la URL
-	import { alert } from '$lib/utils'; // <-- Utilidad de alertas visuales de tu UI
+	import { page } from '$app/stores'; // Store nativo para rastrear la URL
+	import { alert } from '$lib/utils'; // Utilidad de alertas visuales de tu UI
 
 	let { children } = $props();
 	let sidebarOpen = $state(false);
@@ -78,7 +78,13 @@
 	});
 </script>
 
-<div class="flex h-screen bg-gray-100">
+<!-- 
+  Añadida la directiva data-sveltekit-preload-data=\"hover\" a nivel del contenedor principal.
+  SvelteKit descargará automáticamente el JavaScript de la página y pre-cargará los datos 
+  en segundo plano en el mismo instante en que el usuario pase el puntero del mouse sobre 
+  cualquier enlace o pestaña de navegación de Postgrado, simulando transiciones de 0ms.
+-->
+<div class="flex h-screen bg-gray-100" data-sveltekit-preload-data="hover">
 	<Sidebar 
 		isOpen={sidebarOpen} 
 		onClose={() => sidebarOpen = false} 
