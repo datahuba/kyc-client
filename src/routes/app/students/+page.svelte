@@ -768,8 +768,8 @@
 		</div>
 	</Modal>
 
-	<!-- Enrollments Modal -->
-	<Modal isOpen={isEnrollmentsOpen} title={`Inscripciones de estudiante`} onClose={() => isEnrollmentsOpen = false} maxWidth="sm:max-w-4xl">
+	<!-- BUG 6 SOLUCIONADO: Título interpolado mediante plantilla de JS para evitar fallos de compilación en Svelte 5 -->
+	<Modal isOpen={isEnrollmentsOpen} title={selectedStudent ? `Inscripciones de ${selectedStudent.nombre}` : 'Inscripciones'} onClose={() => isEnrollmentsOpen = false} maxWidth="sm:max-w-4xl">
 		<div class="p-6">
 			{#if enrollmentsLoading}
 				<div class="flex justify-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>
