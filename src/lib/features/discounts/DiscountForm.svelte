@@ -99,6 +99,28 @@
 	}
 
 	async function handleSubmit() {
+		// Validar que el nombre no esté vacío o contenga únicamente espacios
+		if (!formData.nombre || !formData.nombre.trim()) {
+			alert('error', 'El nombre del descuento es obligatorio y no puede contener solo espacios');
+			return;
+		}
+
+		// Convertir y validar el porcentaje numérico
+		const porcentajeNum = Number(formData.porcentaje);
+		if (formData.porcentaje === null || formData.porcentaje === undefined || isNaN(porcentajeNum)) {
+			alert('error', 'El porcentaje es obligatorio y debe ser un número válido');
+			return;
+		}
+
+		if (porcentajeNum < 0 || porcentajeNum > 100) {
+			alert('error', 'El porcentaje de descuento debe estar entre 0% y 100%');
+			return;
+		}
+
+		// Asignar datos saneados
+		formData.nombre = formData.nombre.trim();
+		formData.porcentaje = porcentajeNum;
+
 		saving = true;
 		try {
 			if (isEditMode && discount) {
@@ -133,6 +155,9 @@
 				label="Porcentaje (%)"
 				id="porcentaje"
 				type="number"
+				min="0"
+				max="100"
+				step="0.01"
 				bind:value={formData.porcentaje}
 				required
 			/>
@@ -208,3 +233,4 @@
 			</Button>
 		</div>
 	</form>
+	
