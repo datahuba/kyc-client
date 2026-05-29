@@ -48,11 +48,10 @@
 	// Estado para colapsar en Desktop
 	let isCollapsed = $state(false);
 
-	// ISSUE M: Mapeo de navegación granular basado en la nueva jerarquía de la UAGRM
+	// Navegación del sistema con los roles correspondientes
 	const navigation: NavigationItem[] = [
-		// Student roles (Academic)
-		{ name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student'], loginTypes: ['academic'] },
-		{ name: 'Dashboard Docente', href: '/app/dashboard', icon: HomeIcon, roles: ['docente'], loginTypes: ['academic'] },
+		// Student/Teacher roles (Academic)
+		{ name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 		
 		// Admin/Staff roles (Se condiciona el acceso en base a la jerarquía de la UAGRM)
 		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza'], loginTypes: ['admin'] },
@@ -70,35 +69,36 @@
 		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
 		
-		// CORREGIDO BUG SINTÁCTICO: Se reemplazó el Enum por el componente visual 'UsersIcon'
 		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] }, 
 		
 		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
 		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	];
 
-	// Filter navigation based on user role
+	// Derivación segura de roles y estados de sesión
 	let userRole = $derived($userStore?.role || $userStore?.user?.rol || 'student');
-	let loginType = $derived($userStore.loginType);
-	let academicRole = $derived($userStore.academicRole);
+	let loginType = $derived($userStore?.loginType);
+	let academicRole = $derived($userStore?.academicRole);
 
-	// ISSUE M: Filtro reactivo estricto para roles administrativos de la UAGRM
 	let filteredNavigation = $derived(navigation.filter(item => {
+		const isStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza'].includes(userRole);
+		const isTeacher = userRole === 'docente' || academicRole === 'teacher';
+		const isStudent = userRole === 'student' || academicRole === 'student';
+
 		// 1. Si el usuario pertenece al personal administrativo/staff de Postgrado
-		if (['admin', 'superadmin', 'mae', 'cpd', 'cobranza'].includes(userRole)) {
-			// Debe coincidir con el login tipo 'admin' y el ítem debe autorizar su rol específico
+		if (isStaff) {
 			return item.loginTypes.includes('admin') && item.roles.includes(userRole);
 		}
 
-		// 2. Si el login es académico (Estudiantes y Docentes)
-		if (loginType === 'academic') {
+		// 2. Si el login es de tipo académico o se identifican roles académicos
+		if (loginType === 'academic' || isTeacher || isStudent) {
 			// Caso especial: Accesos externos de la UAGRM
 			if (item.name === 'Aula Virtual UAGRM' || item.name === 'Perfil de Notas UAGRM') {
-				if (academicRole === 'teacher') return item.roles.includes('docente');
+				if (isTeacher) return item.roles.includes('docente');
 				return item.roles.includes('student');
 			}
 
-			if (academicRole === 'teacher') {
+			if (isTeacher) {
 				return item.roles.includes('docente');
 			} else {
 				return item.roles.includes('student');
@@ -193,7 +193,7 @@
 				</li>
 
 				<!-- Contexto de clase activa (solo docente) -->
-				{#if academicRole === 'teacher' && $activeClassroomStore.id}
+				{#if (userRole === 'docente' || academicRole === 'teacher') && $activeClassroomStore.id}
 					<li transition:slide={{ duration: 200 }}>
 						{#if !isCollapsed}
 							<div class="px-2 mb-1" in:fade={{ duration: 100 }}>

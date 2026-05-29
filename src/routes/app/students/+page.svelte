@@ -8,15 +8,18 @@
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
-	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import StudentDetails from '$lib/features/students/StudentDetails.svelte';
 	import StudentForm from '$lib/features/students/StudentForm.svelte';
-	import { PlusIcon, DotsVerticalIcon, UserIcon, CheckIcon, XIcon, FileTextIcon, DownloadIcon } from '$lib/icons/outline';
+	import { PlusIcon, DownloadIcon } from '$lib/icons/outline';
 	import { alert } from '$lib/utils';
-	import Input from '$lib/components/ui/input.svelte';
 	import { Pagination } from '$lib/components/ui';
-	import { formatDate, formatCurrency } from '$lib/utils';
+
+	// Importación de Componentes Modulares
+	import StudentFilters from './StudentFilters.svelte';
+	import StudentTable from './StudentTable.svelte';
+	import ImportModal from './ImportModal.svelte';
+	import EnrollmentsModal from './EnrollmentsModal.svelte';
 
 	let students: Student[] = $state([]);
 	let loading = $state(true);
@@ -48,19 +51,19 @@
 	let studentEnrollments: Enrollment[] = $state([]);
 	let enrollmentsLoading :boolean= $state(false);
 
-	// IMPORTACIÓN EXCEL STATE (AÑADIDO ISSUE G)
+	// Importación Excel State
 	let isImportModalOpen: boolean = $state(false);
 	let importFile: File | null = $state(null);
 	let importLoading = $state(false);
 	let importReport: { success_count: number; errors: string[] } | null = $state(null);
-    let importTipoEstudiante: 'interno' | 'externo' = $state('externo'); // Por defecto externo
+	let importTipoEstudiante: 'interno' | 'externo' = $state('externo'); 
 
-	// SELECCIÓN MÚLTIPLE
+	// Selección Múltiple
 	let selectedStudentIds: string[] = $state([]);
 	let showBulkDeleteModal = $state(false);
 	let bulkDeleteLoading = $state(false);
 
-	// Toggling State (ISSUE H)
+	// Toggling State
 	let togglingTypeIds: Set<string> = $state(new Set());
 
 	// Filters
@@ -73,13 +76,12 @@
 	let debounceTimer: any;
 	let allCourses: Course[] = $state([]);
 
-	// PERMISOS VISUALES GRANULARES
+	// Permisos Visuales Granulares
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
 	let isSuperAdmin = $derived(currentRole === 'superadmin');
 	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canEditStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canVerifyTitle = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
-	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae'].includes(currentRole));
 
 	let isAllSelected = $derived(
 		students.length > 0 && students.every(s => selectedStudentIds.includes(s._id))
@@ -115,17 +117,6 @@
 			alert('error', e.message || 'Error al realizar la eliminación masiva');
 		} finally {
 			bulkDeleteLoading = false;
-		}
-	}
-
-	async function loadCourses() {
-		try {
-			if (allCourses.length === 0) {
-				const coursesRes = await courseService.getAll(1, 100);
-				allCourses = coursesRes.data;
-			}
-		} catch (error) {
-			console.error('Error fetching courses for filter', error);
 		}
 	}
 
@@ -181,9 +172,25 @@
 
 	onMount(async () => {
 		try {
-			const coursesRes = await courseService.getAll(1, 100);
-			allCourses = coursesRes.data;
-		} catch (e) { console.error('Error loading courses', e); }
+			// --- OPTIMIZACIÓN: SISTEMA DE CACHÉ CLIENT-SIDE EN DIPLOMADOS/CURSOS ---
+			const cachedCourses = sessionStorage.getItem('cached_courses_list');
+			const cacheTimestamp = sessionStorage.getItem('cached_courses_timestamp');
+			const now = new Date().getTime();
+			const cacheDuration = 5 * 60 * 1000; // Validez de 5 minutos de búfer
+
+			if (cachedCourses && cacheTimestamp && (now - Number(cacheTimestamp) < cacheDuration)) {
+				allCourses = JSON.parse(cachedCourses);
+			} else {
+				const coursesRes = await courseService.getAll(1, 100);
+				if (coursesRes && coursesRes.data) {
+					allCourses = coursesRes.data;
+					sessionStorage.setItem('cached_courses_list', JSON.stringify(coursesRes.data));
+					sessionStorage.setItem('cached_courses_timestamp', String(now));
+				}
+			}
+		} catch (e) { 
+			console.error('Error loading courses with cache integration', e); 
+		}
 
 		const cursoIdParam = $appPage.url.searchParams.get('curso_id');
 		if (cursoIdParam) {
@@ -270,30 +277,24 @@
 		}
 	}
 
-    // ISSUE H: Función asíncrona para mutación rápida del tipo de estudiante
-    async function toggleStudentType(student: Student) {
-        if (!canEditStudent) return; // Bloquear si no tiene permisos
-        
-        const newType = student.es_estudiante_interno === 'interno' ? 'externo' : 'interno';
-        
-        // UI Optimista / Estado de carga
-        togglingTypeIds.add(student._id);
-        togglingTypeIds = new Set(togglingTypeIds); // Gatillar reactividad en Svelte 5
-        
-        try {
-            const updatedStudent = await studentService.toggleTipoEstudiante(student._id, newType);
-            
-            // Actualizar la tabla local
-            students = students.map(s => s._id === student._id ? { ...s, es_estudiante_interno: updatedStudent.es_estudiante_interno } : s);
-            
-            alert('success', `El estudiante ahora es ${newType.toUpperCase()}`);
-        } catch (error: any) {
-            alert('error', error.message || 'Error al cambiar tipo de estudiante');
-        } finally {
-            togglingTypeIds.delete(student._id);
-            togglingTypeIds = new Set(togglingTypeIds);
-        }
-    }
+	async function toggleStudentType(student: Student) {
+		if (!canEditStudent) return; 
+		const newType = student.es_estudiante_interno === 'interno' ? 'externo' : 'interno';
+		
+		togglingTypeIds.add(student._id);
+		togglingTypeIds = new Set(togglingTypeIds); 
+		
+		try {
+			const updatedStudent = await studentService.toggleTipoEstudiante(student._id, newType);
+			students = students.map(s => s._id === student._id ? { ...s, es_estudiante_interno: updatedStudent.es_estudiante_interno } : s);
+			alert('success', `El estudiante ahora es ${newType.toUpperCase()}`);
+		} catch (error: any) {
+			alert('error', error.message || 'Error al cambiar tipo de estudiante');
+		} finally {
+			togglingTypeIds.delete(student._id);
+			togglingTypeIds = new Set(togglingTypeIds);
+		}
+	}
 
 	function handleFormSuccess() {
 		isFormOpen = false;
@@ -477,7 +478,6 @@
 		importLoading = true;
 		importReport = null;
 		try {
-            // ISSUE G: Pasamos el valor del Select (importTipoEstudiante) a la API
 			const response = await studentService.importFromExcel(importFile, importTipoEstudiante);
 			importReport = response;
 			if (response.success_count > 0) {
@@ -512,7 +512,6 @@
 		URL.revokeObjectURL(url);
 		alert('success', 'Plantilla descargada. Rellénala y súbela en formato Excel o CSV.');
 	}
-
 </script>
 
 <div class="space-y-6">
@@ -544,186 +543,34 @@
 		</div>
 	</div>
 
-	<!-- Filters -->
-	<div class="grid grid-cols-1 md:grid-cols-5 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-		<div class="md:col-span-2">
-			<label for="search" class="sr-only">Buscar</label>
-			<div class="relative">
-				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-					<svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-					</svg>
-				</div>
-				<input
-					type="text"
-					id="search"
-					bind:value={filters.q}
-					class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-					placeholder="Buscar por nombre, CI, registro..."
-					oninput={handleSearchInput}
-				/>
-			</div>
-		</div>
-		
-		<div>
-			<select
-				bind:value={filters.activo}
-				onchange={handleFilterChange}
-				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-			>
-				<option value="all">Todos los estados</option>
-				<option value="true">Activo</option>
-				<option value="false">Inactivo</option>
-			</select>
-		</div>
-
-		<div>
-			<select
-				bind:value={filters.estado_titulo}
-				onchange={handleFilterChange}
-				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-			>
-				<option value="all">Todos los títulos</option>
-				<option value="pendiente">Pendiente</option>
-				<option value="verificado">Verificado</option>
-				<option value="rechazado">Rechazado</option>
-				<option value="sin_titulo">Sin Título</option>
-			</select>
-		</div>
-
-		<div class="flex flex-col gap-1">
-			<div class="relative">
-				<select
-					bind:value={filters.curso_id}
-					onchange={handleFilterChange}
-					class="block w-full rounded-md border-0 py-1.5 pr-8 text-gray-900 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6
-						{filters.curso_id
-							? 'ring-2 ring-inset ring-primary-500 bg-primary-50 font-medium text-primary-900 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500'
-							: 'ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-white dark:ring-gray-600'}"
-				>
-					<option value="">Todos los cursos</option>
-					{#each allCourses as course (course._id)}
-						<option value={course._id}>{course.nombre_programa} ({course.codigo})</option>
-					{/each}
-				</select>
-				{#if filters.curso_id}
-					<button
-						type="button"
-						onclick={() => { filters.curso_id = ''; page = 1; handleFilterChange(); }}
-						class="absolute right-7 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors z-10"
-						title="Quitar filtro de curso"
-					>
-						<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-					</button>
-				{/if}
-			</div>
-		</div>
-	</div>
+	<!-- Componente de Filtros Modularizado -->
+	<StudentFilters
+		bind:q={filters.q}
+		bind:activo={filters.activo}
+		bind:estado_titulo={filters.estado_titulo}
+		bind:curso_id={filters.curso_id}
+		{allCourses}
+		onSearchInput={handleSearchInput}
+		onFilterChange={handleFilterChange}
+	/>
 
 	{#if loading}
 		<TableSkeleton columns={6} rows={10} />
 	{:else}
-		<div class="w-full overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm animate-fade-in">
-			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-				<thead class="bg-gray-50 dark:bg-gray-800">
-					<tr>
-						{#if isSuperAdmin}
-							<th scope="col" class="px-6 py-3 text-left w-10">
-								<input type="checkbox" checked={isAllSelected} onchange={toggleSelectAll} class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 h-4 w-4 dark:bg-gray-700 cursor-pointer" />
-							</th>
-						{/if}
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estudiante</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registro</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carnet</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domicilio</th>
-						<th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
-					</tr>
-				</thead>
-				<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-					{#each students as student (student._id)}
-						<tr class={selectedStudentIds.includes(student._id) ? 'bg-primary-50/40 dark:bg-primary-950/20 transition-colors' : 'transition-colors'}>
-							{#if isSuperAdmin}
-								<td class="px-6 py-4 whitespace-nowrap">
-									<input type="checkbox" checked={selectedStudentIds.includes(student._id)} onchange={() => toggleSelectStudent(student._id)} class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 h-4 w-4 dark:bg-gray-700 cursor-pointer" />
-								</td>
-							{/if}
-
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="flex items-center">
-									<div class="h-10 w-10 shrink-0">
-										{#if student.foto_url}
-										<img class="h-10 w-10 rounded-full object-cover" src={student.foto_url || `https://ui-avatars.com/api/?name=${student.nombre}`} alt="" />
-										{:else}
-										<span><UserIcon class="size-10"/></span>
-										{/if}
-									</div>
-									<div class="ml-4">
-										<div class="text-sm font-medium text-gray-900 dark:text-white">{student.nombre}</div>
-										<div class="text-sm text-gray-500">{student.email}</div>
-									</div>
-								</div>
-							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-sm text-gray-900 dark:text-white">{student.registro}</div>
-							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-sm text-gray-900 dark:text-white">{student.carnet}</div>
-							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-sm text-gray-900 dark:text-white">{student.celular}</div>
-								
-                                <!-- ISSUE H: BOTÓN DE MUTACIÓN RÁPIDA -->
-                                <div class="mt-1">
-                                    <button 
-                                        type="button"
-                                        disabled={!canEditStudent || togglingTypeIds.has(student._id)}
-                                        onclick={() => toggleStudentType(student)}
-                                        class={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition-colors
-                                            ${student.es_estudiante_interno === 'interno' 
-                                                ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400' 
-                                                : 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400'}
-                                            ${!canEditStudent ? 'cursor-default opacity-80' : 'cursor-pointer'}
-                                            ${togglingTypeIds.has(student._id) ? 'opacity-50 pointer-events-none' : ''}
-                                        `}
-                                        title={canEditStudent ? 'Haga clic para cambiar entre Interno/Externo' : 'Tipo de Estudiante'}
-                                    >
-                                        {#if togglingTypeIds.has(student._id)}
-                                            <svg class="animate-spin -ml-0.5 mr-1 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            Cambiando...
-                                        {:else}
-                                            {student.es_estudiante_interno}
-                                        {/if}
-                                    </button>
-                                </div>
-
-							</td>
-							<td class="px-6 py-4 whitespace-nowrap">
-								<div class="text-sm text-gray-900 dark:text-white truncate max-w-[150px]" title={student.domicilio}>{student.domicilio}</div>
-							</td>
-							<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-								<button onclick={() => toggleDropdown(student._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-									<DotsVerticalIcon class="size-5" />
-								</button>
-								{#if openDropdownId === student._id}
-									<div class="absolute right-0 mt-2 w-48 z-10">
-										<DropdownMenu 
-											options={getDropdownOptions(student)} 
-											isOpen={true} 
-											width="w-48" 
-											class="origin-top-right right-0"
-										/>
-									</div>
-								{/if}
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
+		<!-- Componente de Tabla Modularizado -->
+		<StudentTable
+			{students}
+			{isSuperAdmin}
+			{canEditStudent}
+			{togglingTypeIds}
+			{getDropdownOptions}
+			{toggleSelectAll}
+			{toggleSelectStudent}
+			{toggleStudentType}
+			{toggleDropdown}
+			bind:selectedStudentIds={selectedStudentIds}
+			bind:openDropdownId={openDropdownId}
+		/>
 		
 		<Pagination
 			currentPage={page}
@@ -735,25 +582,21 @@
 		/>
 	{/if}
 
-	<!-- Create/Edit Modal -->
+	<!-- Modales de Negocio -->
 	<Modal isOpen={isFormOpen} title={selectedStudent ? 'Editar Estudiante' : 'Nuevo Estudiante'} onClose={() => isFormOpen = false} maxWidth="sm:max-w-7xl">
 		<StudentForm student={selectedStudent} onSuccess={handleFormSuccess} onCancel={() => isFormOpen = false} />
 	</Modal>
 
-	<!-- Details Modal -->
 	<Modal isOpen={isDetailsOpen} title="Detalles del Estudiante" onClose={() => isDetailsOpen = false} maxWidth="sm:max-w-7xl">
 		{#if selectedStudent}
 			<StudentDetails student={selectedStudent} onUpdate={handleDetailsUpdate} onClose={() => isDetailsOpen = false} />
 		{/if}
 	</Modal>
 
-	<!-- Delete Modal -->
 	<ModalConfirm isOpen={isDeleteModalOpen} message={`¿Estás seguro de que deseas eliminar al estudiante? El sistema borrará sus inscripciones y solo purgará sus pagos pendientes, conservando aprobados y cancelados por fines de auditoría.`} onConfirm={confirmDelete} onCancel={() => isDeleteModalOpen = false} loading={deleteLoading} />
 
-	<!-- Verify Confirmation Modal -->
 	<ModalConfirm isOpen={isVerifyModalOpen} message={`¿Confirma que desea VERIFICAR el título del estudiante?`} onConfirm={confirmVerify} onCancel={() => isVerifyModalOpen = false} loading={actionLoading} />
 
-	<!-- Reject Input Modal -->
 	<Modal isOpen={isRejectModalOpen} title="Rechazar Título" onClose={() => isRejectModalOpen = false} maxWidth="sm:max-w-lg">
 		<div class="space-y-4 p-4">
 			<p class="text-sm text-gray-500">Por favor ingrese el motivo por el cual se rechaza el título del estudiante.</p>
@@ -768,111 +611,33 @@
 		</div>
 	</Modal>
 
-	<!-- Enrollments Modal -->
-	<Modal isOpen={isEnrollmentsOpen} title={`Inscripciones de estudiante`} onClose={() => isEnrollmentsOpen = false} maxWidth="sm:max-w-4xl">
-		<div class="p-6">
-			{#if enrollmentsLoading}
-				<div class="flex justify-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>
-			{:else if studentEnrollments.length === 0}
-				<div class="text-center py-8 text-gray-500">No se encontraron inscripciones para este estudiante.</div>
-			{:else}
-				<div class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-						<thead class="bg-gray-50 dark:bg-gray-800">
-							<tr>
-								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montos</th>
-								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo</th>
-								<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-							</tr>
-						</thead>
-						<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-							{#each studentEnrollments as enrollment (enrollment._id)}
-								<tr>
-									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{new Date(enrollment.fecha_inscripcion).toLocaleDateString()}</td>
-									<td class="px-6 py-4 whitespace-nowrap">
-										<div class="text-xs text-gray-500">Total: {formatCurrency(enrollment.total_a_pagar)}</div>
-										<div class="text-xs text-green-600">Pagado: {formatCurrency(enrollment.total_pagado)}</div>
-									</td>
-									<td class="px-6 py-4 whitespace-nowrap">
-										<span class={`font-medium ${enrollment.saldo_pendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(enrollment.saldo_pendiente)}</span>
-									</td>
-									<td class="px-6 py-4 whitespace-nowrap">
-										<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{enrollment.estado}</span>
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-			{/if}
-			<div class="mt-6 flex justify-end"><Button variant="secondary" onclick={() => isEnrollmentsOpen = false}>Cerrar</Button></div>
-		</div>
-	</Modal>
+	<!-- Modal de Inscripciones Modularizado -->
+	<EnrollmentsModal
+		isOpen={isEnrollmentsOpen}
+		student={selectedStudent}
+		{enrollmentsLoading}
+		{studentEnrollments}
+		onClose={() => isEnrollmentsOpen = false}
+	/>
 
-	<!-- Import Modal (AÑADIDO ISSUE G) -->
-	<Modal isOpen={isImportModalOpen} title="Importación Masiva de Estudiantes (Excel)" onClose={() => { if (!importLoading) isImportModalOpen = false; }} maxWidth="sm:max-w-2xl">
-		<div class="p-6 space-y-6">
-			<div class="text-sm text-gray-500 dark:text-gray-400 space-y-2">
-				<p>Sube una hoja de cálculo con la lista de estudiantes para registrarlos en lote de manera automática.</p>
-			</div>
+	<!-- Modal de Importación Modularizado -->
+	<ImportModal
+		isOpen={isImportModalOpen}
+		{importLoading}
+		{downloadTemplateCSV}
+		onClose={() => isImportModalOpen = false}
+		onDownloadTemplate={downloadTemplateCSV}
+		onFileChange={(e) => {
+			const files = (e.target as HTMLInputElement).files;
+			if (files && files.length > 0) importFile = files[0];
+		}}
+		onSubmit={handleImportExcelSubmit}
+		bind:importFile={importFile}
+		bind:importTipoEstudiante={importTipoEstudiante}
+		bind:importReport={importReport}
+	/>
 
-			<div class="flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-100 dark:border-gray-700">
-				<span class="text-sm font-medium text-gray-700 dark:text-gray-300">¿No tienes la plantilla?</span>
-				<Button onclick={downloadTemplateCSV} variant="secondary" class="text-xs py-1 px-3">Descargar Plantilla</Button>
-			</div>
-
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="space-y-1">
-                    <label for="import-tipo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Estudiante a Registrar</label>
-                    <select
-                        id="import-tipo"
-                        bind:value={importTipoEstudiante}
-                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                    >
-                        <option value="externo">Externos (Público General)</option>
-                        <option value="interno">Internos (UAGRM)</option>
-                    </select>
-                </div>
-                
-                <div class="space-y-1">
-                    <label for="import-file" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Selecciona el archivo (.xlsx)</label>
-                    <input
-                        id="import-file"
-                        type="file"
-                        accept=".xlsx, .xls, .csv"
-                        onchange={(e) => {
-                            const files = (e.target as HTMLInputElement).files;
-                            if (files && files.length > 0) importFile = files[0];
-                        }}
-                        class="block w-full text-sm text-gray-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:text-gray-400 dark:file:bg-gray-700 dark:file:text-white"
-                    />
-                </div>
-			</div>
-
-			{#if importReport}
-				<div class="border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-3 max-h-60 overflow-y-auto">
-					<h4 class="text-sm font-bold text-gray-800 dark:text-white">Reporte de Procesamiento:</h4>
-					<p class="text-xs text-green-600 dark:text-green-400 font-semibold">✓ {importReport.success_count} estudiantes importados con éxito.</p>
-					{#if importReport.errors.length > 0}
-						<div class="space-y-1">
-							<p class="text-xs text-red-600 dark:text-red-400 font-semibold">⚠️ Se detectaron {importReport.errors.length} problemas en el archivo:</p>
-							<ul class="list-disc pl-5 text-[11px] text-red-500 space-y-1">
-								{#each importReport.errors as err}<li>{err}</li>{/each}
-							</ul>
-						</div>
-					{/if}
-				</div>
-			{/if}
-
-			<div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-				<Button variant="secondary" onclick={() => isImportModalOpen = false} disabled={importLoading}>Cancelar</Button>
-				<Button onclick={handleImportExcelSubmit} loading={importLoading} disabled={!importFile}>Procesar Importación</Button>
-			</div>
-		</div>
-	</Modal>
-
-	<!-- BARRA DE ACCIONES FLOTANTE -->
+	<!-- Barra de Acciones Flotante -->
 	{#if selectedStudentIds.length > 0 && isSuperAdmin}
 		<div class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900/95 dark:bg-gray-950/95 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-6 z-50 border border-gray-800 dark:border-gray-700 backdrop-blur-sm transition-all duration-300">
 			<span class="text-sm font-semibold tracking-wider">{selectedStudentIds.length} estudiantes seleccionados</span>
