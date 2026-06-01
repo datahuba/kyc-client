@@ -41,7 +41,7 @@ export interface CreateCourseRequest {
 	fecha_inicio: string;
 	fecha_fin: string;
 	activo: boolean;
-	descuento_id?: string;
+	descuento_id?: string | null;
 	modulos?: Modulo[]; // <--- ¡Y aquí también!
 }
 

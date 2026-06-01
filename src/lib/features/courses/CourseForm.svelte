@@ -22,6 +22,13 @@
 	let saving = $state(false);
 	let discounts: Discount[] = $state([]);
 	let teachers: User[] = $state([]);
+	let availableDiscounts = $derived(
+		discounts.filter((discount) => {
+			if (discount.activo) return true;
+			// En edición, conservar visible el descuento ya asociado al curso aunque esté inactivo
+			return Boolean(formData.descuento_id) && discount._id === formData.descuento_id;
+		})
+	);
 
 	let formData: CreateCourseRequest = $state({
 		codigo: '',
@@ -161,7 +168,13 @@
 		try {
 			const payload = { ...formData };
 			if (!payload.descuento_id) {
-				delete payload.descuento_id;
+				if (isEditMode) {
+					// En edición, enviar null explícito para remover descuento existente
+					payload.descuento_id = null;
+				} else {
+					// En creación, omitir el campo cuando no hay descuento seleccionado
+					delete payload.descuento_id;
+				}
 			}
 
 			if (payload.costo_total_externo === null || payload.costo_total_externo === undefined || payload.costo_total_externo === '') {
@@ -270,7 +283,7 @@
 			/>
 			<Select label="Descuento Global" bind:value={formData.descuento_id}>
 				<option value="">Ninguno</option>
-				{#each discounts as discount}
+				{#each availableDiscounts as discount}
 					<option value={discount._id}>{discount.nombre} ({discount.porcentaje}%)</option>
 				{/each}
 			</Select>
