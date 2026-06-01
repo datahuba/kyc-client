@@ -201,55 +201,55 @@
   	<Heading level="h1">Dashboard</Heading>
 
 		<!-- Stats Grid -->
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+		<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
 			<a href="/app/students" class="block">
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg">
-					<div>
+				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
+					<div class="flex-1 min-w-0">
 						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Estudiantes</p>
-						<p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.students.total}</p>
+						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 break-words">{stats.students.total}</p>
 						<p class="text-xs text-green-600 mt-1">{stats.students.active} Activos</p>
 					</div>
-					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
-						<UsersIcon class="size-8" />
+					<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+						<UsersIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
 			</a>
 
 			<a href="/app/courses" class="block">
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg">
-					<div>
+				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
+					<div class="flex-1 min-w-0">
 						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Cursos</p>
-						<p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.courses.total}</p>
+						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 break-words">{stats.courses.total}</p>
 						<p class="text-xs text-green-600 mt-1">{stats.courses.active} Activos</p>
 					</div>
-					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
-						<TagIcon class="size-8" />
+					<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+						<TagIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
 			</a>
 
 			<a href="/app/enrollments" class="block">
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg">
-					<div>
+				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
+					<div class="flex-1 min-w-0">
 						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Inscripciones</p>
-						<p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.enrollments.total}</p>
+						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 break-words">{stats.enrollments.total}</p>
 						<p class="text-xs text-green-600 mt-1">{stats.enrollments.active} Activas</p>
 					</div>
-					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
-						<ClipboardIcon class="size-8" />
+					<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+						<ClipboardIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
 			</a>
 
 			<a href="/app/payments" class="block">
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg">
-					<div>
+				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg sm:col-span-2 xl:col-span-1">
+					<div class="flex-1 min-w-0">
 						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Ingresos</p>
-						<p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{formatCurrency(stats.payments.revenue)}</p>
-						<p class="text-xs text-yellow-600 mt-1">{stats.payments.pending} Pagos Pendientes</p>
+						<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 break-words">{formatCurrency(stats.payments.revenue)}</p>
+						<p class="text-xs text-yellow-600 mt-1 break-words">{stats.payments.pending} Pagos Pendientes</p>
 					</div>
-					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
-						<CreditCardIcon class="size-8" />
+					<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+						<CreditCardIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
 			</a>
@@ -317,59 +317,59 @@
 											</div>
 
 											<!-- 4 cards exactamente igual al Stats Grid del dashboard -->
-											<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+									<div class="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-4 sm:gap-6">
 
 												<!-- Inscritos -->
 												<a href={`/app/students?curso_id=${course.id}`} class="block">
-													<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg">
-														<div>
+													<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
+														<div class="flex-1 min-w-0">
 															<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Inscritos</p>
-															<p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{course.inscritos}</p>
+															<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 break-words">{course.inscritos}</p>
 															<p class="text-xs text-green-600 mt-1">{course.inscritosActivos} Activos</p>
 														</div>
-														<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
-															<svg class="size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+														<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+															<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
 														</div>
 													</div>
 												</a>
 
 												<!-- Pagos Pendientes -->
 												<a href={`/app/payments?curso_id=${course.id}`} class="block">
-													<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg">
-														<div>
+													<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
+														<div class="flex-1 min-w-0">
 															<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pagos Pendientes</p>
-															<p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{course.pagosPendientes}</p>
+															<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 break-words">{course.pagosPendientes}</p>
 															<p class="text-xs text-yellow-600 mt-1">{course.pagosPendientes} Por Revisar</p>
 														</div>
-														<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
-															<svg class="size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+														<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+															<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 														</div>
 													</div>
 												</a>
 
 												<!-- Recaudado -->
 												<a href={`/app/payments?curso_id=${course.id}`} class="block">
-													<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg">
-														<div>
+													<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
+														<div class="flex-1 min-w-0">
 															<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Recaudado</p>
-															<p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{formatCurrency(course.ingresos)}</p>
+															<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 break-words">{formatCurrency(course.ingresos)}</p>
 															<p class="text-xs text-green-600 mt-1">Pagos Aprobados</p>
 														</div>
-														<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
-															<svg class="size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+														<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+															<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 														</div>
 													</div>
 												</a>
 
 												<!-- Por Cobrar -->
-												<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex items-center justify-between">
-													<div>
+												<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3">
+													<div class="flex-1 min-w-0">
 														<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Por Cobrar</p>
-														<p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{formatCurrency(course.saldoPendiente)}</p>
-														<p class="text-xs text-orange-500 mt-1">Saldo Pendiente</p>
+														<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 break-words">{formatCurrency(course.saldoPendiente)}</p>
+														<p class="text-xs text-orange-500 mt-1 break-words">Saldo Pendiente</p>
 													</div>
-													<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary">
-														<svg class="size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+													<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+														<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 													</div>
 												</div>
 
