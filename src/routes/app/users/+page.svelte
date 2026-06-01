@@ -369,6 +369,7 @@
 	>
 		<UserForm
 			user={selectedUser}
+			currentUserId={currentUser?._id}
 			onSuccess={handleFormSuccess}
 			onCancel={() => isFormOpen = false}
 		/>
