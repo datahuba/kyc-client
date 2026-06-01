@@ -112,8 +112,8 @@
 			return;
 		}
 
-		if (porcentajeNum < 0 || porcentajeNum > 100) {
-			alert('error', 'El porcentaje de descuento debe estar entre 0% y 100%');
+		if (porcentajeNum <= 0 || porcentajeNum > 100) {
+			alert('error', 'El porcentaje de descuento debe ser mayor a 0% y menor o igual a 100%');
 			return;
 		}
 
@@ -155,7 +155,7 @@
 				label="Porcentaje (%)"
 				id="porcentaje"
 				type="number"
-				min="0"
+				min="0.01"
 				max="100"
 				step="0.01"
 				bind:value={formData.porcentaje}
