@@ -1,4 +1,4 @@
-<script lang="ts">
+ <script lang="ts">
 	import { onMount } from 'svelte';
 	import { courseService, enrollmentService, studentService } from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
@@ -11,6 +11,7 @@
     let myModules: any[] = $state([]); 
 	let enrollments: Enrollment[] = $state([]);
 	let students: Record<string, Student> = $state({});
+	let missingStudentIds: Record<string, boolean> = $state({});
 
     let activeModule: any | null = $state(null);
     let moduleEnrollments: Enrollment[] = $state([]);
@@ -38,11 +39,24 @@
         try {
             const courseEnrollments = await enrollmentService.getByCourseId(module.curso_id);
             moduleEnrollments = courseEnrollments.filter(e => e.estado === 'activo');
+            let missingCount = 0;
 
             for (const enrollment of moduleEnrollments) {
                 if (!students[enrollment.estudiante_id]) {
-                    const st = await studentService.getById(enrollment.estudiante_id);
-                    if (st) students[enrollment.estudiante_id] = st;
+                    try {
+                        const st = await studentService.getById(enrollment.estudiante_id);
+                        if (st) {
+                            students[enrollment.estudiante_id] = st;
+                            missingStudentIds[enrollment.estudiante_id] = false;
+                        }
+                    } catch (error: any) {
+                        if (error?.status === 404 || error?.response?.status === 404) {
+                            missingStudentIds[enrollment.estudiante_id] = true;
+                            missingCount += 1;
+                            continue;
+                        }
+                        throw error;
+                    }
                 }
 
                 const realIndex = module.modulo_index - 1;
@@ -52,6 +66,10 @@
                 } else {
                     calificacionInputs[enrollment._id] = '';
                 }
+            }
+
+            if (missingCount > 0) {
+                alert('warning', `Se cargó la planilla con ${missingCount} registro(s) de estudiante no encontrado(s).`);
             }
         } catch (error: any) {
             alert('error', 'Error al cargar estudiantes del módulo.');
@@ -333,11 +351,11 @@
                                     {@const student = students[enrollment.estudiante_id]}
                                     {@const status = getStudentStatus(enrollment, activeModule.modulo_index - 1)}
                                     <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <p class="font-medium text-gray-900 dark:text-white">
-                                                {student?.nombre || 'Cargando...'}
-                                            </p>
-                                        </td>
+									<td class="px-6 py-4 whitespace-nowrap">
+										<p class="font-medium text-gray-900 dark:text-white">
+											{student?.nombre || (missingStudentIds[enrollment.estudiante_id] ? 'Estudiante no encontrado' : 'Cargando...')}
+										</p>
+									</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                             {student?.registro || '--'} / {student?.carnet || '--'}
                                         </td>

@@ -325,7 +325,8 @@
                         </div>
                     {:else}
                         <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <div class="overflow-x-auto">
+                            <table class="min-w-[920px] divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-900/50">
                                     <tr>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Módulo</th>
@@ -337,14 +338,14 @@
                                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                     {#each teacherModules as module}
                                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                            <td class="px-6 py-4 whitespace-nowrap">
+                                            <td class="px-6 py-4 whitespace-normal align-top">
                                                 <div class="flex items-center gap-2">
                                                     <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold dark:bg-indigo-900/30 dark:text-indigo-400">{module.modulo_index}</span>
-                                                    <span class="text-sm font-medium text-gray-900 dark:text-white">{module.modulo_nombre}</span>
+                                                    <span class="text-sm font-medium text-gray-900 dark:text-white break-words">{module.modulo_nombre}</span>
                                                 </div>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <span class="text-sm text-gray-600 dark:text-gray-300 max-w-[250px] truncate block" title={module.curso_nombre}>{module.curso_nombre}</span>
+                                            <td class="px-6 py-4 whitespace-normal align-top">
+                                                <span class="text-sm text-gray-600 dark:text-gray-300 max-w-[250px] break-words block" title={module.curso_nombre}>{module.curso_nombre}</span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <span class="px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">{module.curso_codigo}</span>
@@ -356,6 +357,7 @@
                                     {/each}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     {/if}
                 </div>

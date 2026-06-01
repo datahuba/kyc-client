@@ -5,19 +5,27 @@
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
 	import { alert } from '$lib/utils';
-	import { KeyIcon, CheckIcon } from '$lib/icons/outline';
+	import { KeyIcon, CheckIcon, EyeIcon, EyeOffIcon } from '$lib/icons/outline';
 	import { userStore } from '$lib/stores/userStore'; // <-- IMPORTADO PARA EVALUACIÓN REACTIVA (BUG 5)
 
 	let currentPassword = $state('');
 	let newPassword = $state('');
 	let confirmPassword = $state('');
 	let loading = $state(false);
+	let showCurrentPassword = $state(false);
+	let showNewPassword = $state(false);
+	let showConfirmPassword = $state(false);
 
 	// Evaluación de rol en Svelte 5 (Bug 5)
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
 	let isUserStudent = $derived(currentRole === 'student');
 
 	async function handleSubmit() {
+		if (currentPassword === newPassword) {
+			alert('error', 'La nueva contraseña debe ser diferente a la actual');
+			return;
+		}
+
 		if (newPassword !== confirmPassword) {
 			alert('error', 'Las nuevas contraseñas no coinciden');
 			return;
@@ -75,34 +83,76 @@
 	<Card>
 		<form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 			<div class="space-y-4">
-				<Input
-					label="Contraseña Actual"
-					id="current_password"
-					type="password"
-					bind:value={currentPassword}
-					required
-					placeholder="Ingrese su contraseña actual"
-				/>
+				<div class="relative">
+					<Input
+						label="Contraseña Actual"
+						id="current_password"
+						type={showCurrentPassword ? 'text' : 'password'}
+						bind:value={currentPassword}
+						required
+						placeholder="Ingrese su contraseña actual"
+					/>
+					<button
+						type="button"
+						onclick={() => (showCurrentPassword = !showCurrentPassword)}
+						class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+						aria-label={showCurrentPassword ? 'Ocultar contraseña actual' : 'Mostrar contraseña actual'}
+					>
+						{#if showCurrentPassword}
+							<EyeOffIcon class="size-5" />
+						{:else}
+							<EyeIcon class="size-5" />
+						{/if}
+					</button>
+				</div>
 
 				<div class="border-t border-gray-100 dark:border-gray-700 my-4"></div>
 
-				<Input
-					label="Nueva Contraseña"
-					id="new_password"
-					type="password"
-					bind:value={newPassword}
-					required
-					placeholder="Mínimo 5 caracteres"
-				/>
+				<div class="relative">
+					<Input
+						label="Nueva Contraseña"
+						id="new_password"
+						type={showNewPassword ? 'text' : 'password'}
+						bind:value={newPassword}
+						required
+						placeholder="Mínimo 5 caracteres"
+					/>
+					<button
+						type="button"
+						onclick={() => (showNewPassword = !showNewPassword)}
+						class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+						aria-label={showNewPassword ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'}
+					>
+						{#if showNewPassword}
+							<EyeOffIcon class="size-5" />
+						{:else}
+							<EyeIcon class="size-5" />
+						{/if}
+					</button>
+				</div>
 
-				<Input
-					label="Confirmar Nueva Contraseña"
-					id="confirm_password"
-					type="password"
-					bind:value={confirmPassword}
-					required
-					placeholder="Repita la nueva contraseña"
-				/>
+				<div class="relative">
+					<Input
+						label="Confirmar Nueva Contraseña"
+						id="confirm_password"
+						type={showConfirmPassword ? 'text' : 'password'}
+						bind:value={confirmPassword}
+						required
+						placeholder="Repita la nueva contraseña"
+					/>
+					<button
+						type="button"
+						onclick={() => (showConfirmPassword = !showConfirmPassword)}
+						class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+						aria-label={showConfirmPassword ? 'Ocultar confirmación de contraseña' : 'Mostrar confirmación de contraseña'}
+					>
+						{#if showConfirmPassword}
+							<EyeOffIcon class="size-5" />
+						{:else}
+							<EyeIcon class="size-5" />
+						{/if}
+					</button>
+				</div>
 			</div>
 
 			<div class="flex justify-end pt-4">
