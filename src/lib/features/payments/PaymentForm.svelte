@@ -36,7 +36,7 @@
     let cuentaDestino = $state('');
 
 	// Listas de ayuda para los select
-    const bancosDisponibles = ["Banco Unión", "BNB", "Mercantil Santa Cruz", "Banco Bisa", "Banco Ganadero", "Banco Económico", "Otro"];
+    const bancosDisponibles = ["Banco Unión", "BNB", "Mercantil Santa Cruz", "Banco Bisa", "Banco Ganadero", "Banco Económico", "Yape", "Altoke", "Yolo", "Otro"];
     const cuentasInstitucion = ["Cta. Corriente BNB - 1234567", "Cta. Ahorros Unión - 9876543"];
 
 	// Control reactivo: ocultar opción de matrícula si ya fue cancelada
@@ -104,26 +104,9 @@
 		}
 	});
 
-	// Saneamiento automático reactivo Svelte 5 para el Número de Transacción (Bug 6)
-	$effect(() => {
-		if (transactionNumber) {
-			const sanitized = transactionNumber.replace(/[^a-zA-Z0-9]/g, '');
-			if (sanitized !== transactionNumber) {
-				transactionNumber = sanitized;
-			}
-		}
-	});
-
 	async function handleSubmit() {
 		if (!selectedEnrollmentId || !transactionNumber || !file || !remitente || !banco || montoComprobante === null || !cuentaDestino || !fechaComprobante || !concepto) {
 			alert('error', 'Todos los campos son obligatorios');
-			return;
-		}
-
-		// Doble validación Regex estricta de seguridad alfanumérica (Bug 6)
-		const regexAlfanumerico = /^[a-zA-Z0-9]+$/;
-		if (!regexAlfanumerico.test(transactionNumber)) {
-			alert('error', 'El número de transacción solo debe contener letras y números (sin espacios ni símbolos)');
 			return;
 		}
 
@@ -238,8 +221,8 @@
             </div>
 
             <div class="md:col-span-2">
-                <Input label="Número de Transacción / Referencia" bind:value={transactionNumber} required placeholder="Ej: 84729384" />
-            </div>
+				<Input label="Número de Transacción / Referencia" bind:value={transactionNumber} required placeholder="Ej: 84729384 o ABC12345" />
+			</div>
         </div>
     </div>
 
