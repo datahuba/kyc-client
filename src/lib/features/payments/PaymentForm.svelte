@@ -36,7 +36,7 @@
     let cuentaDestino = $state('');
 
 	// Listas de ayuda para los select
-    const bancosDisponibles = ["Banco Unión", "BNB", "Mercantil Santa Cruz", "Banco Bisa", "Banco Ganadero", "Banco Económico", "Otro"];
+    const bancosDisponibles = ["Banco Unión", "BNB", "Mercantil Santa Cruz", "Banco Bisa", "Banco Ganadero", "Banco Económico", "Yape", "Altoke", "Yolo", "Otro"];
     const cuentasInstitucion = ["Cta. Corriente BNB - 1234567", "Cta. Ahorros Unión - 9876543"];
 
 	// Control reactivo: ocultar opción de matrícula si ya fue cancelada
@@ -238,8 +238,8 @@
             </div>
 
             <div class="md:col-span-2">
-                <Input label="Número de Transacción / Referencia" bind:value={transactionNumber} required placeholder="Ej: 84729384" />
-            </div>
+				<Input label="Número de Transacción / Referencia" bind:value={transactionNumber} required placeholder="Ej: 84729384 o ABC12345" />
+			</div>
         </div>
     </div>
 
