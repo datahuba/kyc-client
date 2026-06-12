@@ -1,4 +1,4 @@
-name: Deploy Frontend to VPS
+name: 🕵️ Auditoria de VPS Hostinger
 
 on:
   push:
@@ -6,39 +6,38 @@ on:
       - develop_kevin
 
 jobs:
-  deploy:
+  audit_server:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Diagnóstico de Servidor y Despliegue
+      - name: Escaneo Profundo del VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
-            echo "🔍 === INICIANDO DIAGNÓSTICO EN EL VPS ==="
-            echo "Usuario SSH actual: $(whoami)"
+            echo "=========================================================="
+            echo "           AUDITORÍA DE RED Y PROCESOS DEL VPS            "
+            echo "=========================================================="
             
-            echo "🔍 === ¿QUIÉN TIENE SECUESTRADO EL PUERTO 3000? ==="
-            sudo ss -tulpn | grep :3000 || true
+            echo -e "\n1. ¿QUÉ SERVICIOS ESTÁN ESCUCHANDO EN EL PUERTO 3000? (Uso de red puro)"
+            sudo netstat -tulpn | grep :3000 || echo "Ninguno detectado por netstat."
             
-            echo "🔍 === ESTADO ACTUAL DE LOS CONTENEDORES ==="
+            echo -e "\n2. ¿QUIÉN TIENE EL SOCKET 3000 ABIERTO? (Uso de archivos/sockets)"
+            sudo lsof -i -P -n | grep 3000 || echo "Ninguno detectado por lsof."
+            
+            echo -e "\n3. ESTADO DEL MOTOR DOCKER Y REDES"
             docker ps -a
             
-            echo "🔨 === APLICANDO REINICIO PROFUNDO DE DOCKER ==="
-            # Esto fuerza al sistema operativo a reiniciar el motor de Docker, 
-            # liberando cualquier puerto (docker-proxy) que se haya quedado pegado.
-            sudo systemctl restart docker || true
+            echo -e "\n4. ¿HAY PROCESOS DE NODE O PM2 CORRIENDO EN SEGUNDO PLANO?"
+            ps aux | grep node | grep -v grep || echo "No hay procesos nativos de Node.js."
+            ps aux | grep pm2 | grep -v grep || echo "No hay procesos de PM2."
             
-            echo "🚀 === INICIANDO DESPLIEGUE ==="
-            # Destruimos explícitamente el contenedor por su nombre exacto en los logs
-            docker rm -f kyc-frontend || true
+            echo -e "\n5. ÚLTIMOS ERRORES DEL SISTEMA OPERATIVO (Logs recientes)"
+            sudo journalctl -xe -n 20 || echo "No se pudo leer journalctl."
             
-            cd /var/www/frontend
-            git stash
-            git pull origin develop_kevin
-            
-            cd /var/www
-            docker compose up -d --build frontend
+            echo "=========================================================="
+            echo "                   FIN DE LA AUDITORÍA                    "
+            echo "=========================================================="
             
