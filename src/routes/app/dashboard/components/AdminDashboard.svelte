@@ -102,7 +102,6 @@
 			const enrollments = enrollmentsRes.data ?? [];
 			const payments = paymentsRes.data ?? [];
 
-			// ===== STATS =====
 			stats.students.total = studentsRes.meta?.totalItems ?? students.length;
 			stats.students.active = students.filter(s => s.activo).length;
 
@@ -118,7 +117,6 @@
 				.filter(p => p.estado_pago === 'aprobado' || p.estado_pago === 'pagado')
 				.reduce((sum, p) => sum + p.cantidad_pago, 0);
 
-			// ===== MAPS =====
 			const studentsMap = students.reduce(
 				(acc, s) => ({ ...acc, [s._id]: s.nombre }),
 				{} as Record<string, string>
@@ -129,7 +127,6 @@
 				{} as Record<string, string>
 			);
 
-			// ===== RECENTS =====
 			recentEnrollments = enrollments
 				.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 				.slice(0, 5)
@@ -148,7 +145,6 @@
 					courseName: coursesMap[p.curso_id] || '—'
 				}));
 
-			// ===== DESGLOSE POR CURSO =====
 			courseBreakdown = courses.map(course => {
 				const courseEnrollments = enrollments.filter(e => e.curso_id === course._id);
 				const coursePayments = payments.filter(p => p.curso_id === course._id);
@@ -203,64 +199,67 @@
 		<!-- Stats Grid -->
 		<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
 			<a href="/app/students" class="block">
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
-					<div class="flex-1 min-w-0">
-						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Estudiantes</p>
-						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 break-words">{stats.students.total}</p>
-						<p class="text-xs text-green-600 mt-1">{stats.students.active} Activos</p>
+				<!-- BUG 6 FIX: Aplicación de min-w-0 al padre y flex-1 min-w-0 al contenedor de texto -->
+				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg min-w-0">
+					<div class="flex-1 min-w-0 mr-3">
+						<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Estudiantes</p>
+						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 truncate">{stats.students.total}</p>
+						<p class="text-[10px] sm:text-xs text-green-600 mt-1 truncate">{stats.students.active} Activos</p>
 					</div>
-					<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+					<!-- BUG 6 FIX: shrink-0 para proteger el icono del aplastamiento -->
+					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
 						<UsersIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
 			</a>
 
 			<a href="/app/courses" class="block">
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
-					<div class="flex-1 min-w-0">
-						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Cursos</p>
-						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 break-words">{stats.courses.total}</p>
-						<p class="text-xs text-green-600 mt-1">{stats.courses.active} Activos</p>
+				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg min-w-0">
+					<div class="flex-1 min-w-0 mr-3">
+						<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Cursos</p>
+						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 truncate">{stats.courses.total}</p>
+						<p class="text-[10px] sm:text-xs text-green-600 mt-1 truncate">{stats.courses.active} Activos</p>
 					</div>
-					<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
 						<TagIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
 			</a>
 
 			<a href="/app/enrollments" class="block">
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
-					<div class="flex-1 min-w-0">
-						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Inscripciones</p>
-						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 break-words">{stats.enrollments.total}</p>
-						<p class="text-xs text-green-600 mt-1">{stats.enrollments.active} Activas</p>
+				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg min-w-0">
+					<div class="flex-1 min-w-0 mr-3">
+						<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Inscripciones</p>
+						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 truncate">{stats.enrollments.total}</p>
+						<p class="text-[10px] sm:text-xs text-green-600 mt-1 truncate">{stats.enrollments.active} Activas</p>
 					</div>
-					<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
 						<ClipboardIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
 			</a>
 
 			<a href="/app/payments" class="block">
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg sm:col-span-2 xl:col-span-1">
-					<div class="flex-1 min-w-0">
-						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Ingresos</p>
-						<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 break-words">{formatCurrency(stats.payments.revenue)}</p>
-						<p class="text-xs text-yellow-600 mt-1 break-words">{stats.payments.pending} Pagos Pendientes</p>
+				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg min-w-0">
+					<div class="flex-1 min-w-0 mr-3">
+						<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Ingresos</p>
+						<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(stats.payments.revenue)}>
+							{formatCurrency(stats.payments.revenue)}
+						</p>
+						<p class="text-[10px] sm:text-xs text-yellow-600 mt-1 truncate">{stats.payments.pending} Pendientes</p>
 					</div>
-					<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
 						<CreditCardIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
 			</a>
 		</div>
 
-
 		<!-- Course Breakdown Section -->
 		<div>
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Desglose por Curso</h2>
-				<a href="/app/courses" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105">Ver cursos</a>
+				<a href="/app/courses" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">Ver cursos</a>
 			</div>
 
 			{#if courseBreakdown.length === 0}
@@ -282,14 +281,14 @@
 							<button
 								type="button"
 								onclick={() => toggleGroup(tipo)}
-								class={`w-full flex items-center justify-between px-6 py-4 ${style.bg} hover:brightness-95 transition-all`}
+								class={`w-full flex items-center justify-between px-4 sm:px-6 py-4 ${style.bg} hover:brightness-95 transition-all min-w-0`}
 							>
-								<div class="flex items-center gap-3 flex-wrap">
-									<span class={`text-base font-bold ${style.text}`}>{TYPE_LABELS[tipo] ?? tipo}</span>
-									<span class={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${style.badge}`}>
+								<div class="flex items-center gap-2 sm:gap-3 flex-wrap flex-1 min-w-0 pr-4">
+									<span class={`text-sm sm:text-base font-bold ${style.text} truncate`}>{TYPE_LABELS[tipo] ?? tipo}</span>
+									<span class={`px-2 py-0.5 text-[10px] sm:text-xs font-semibold rounded-full ${style.badge} shrink-0`}>
 										{group.length} {group.length === 1 ? 'curso' : 'cursos'}
 									</span>
-									<span class="hidden sm:flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 ml-1">
+									<span class="hidden lg:flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 ml-1 truncate">
 										<span>{totalInscritos} inscritos</span>
 										<span>·</span>
 										<span>{formatCurrency(totalIngresos)} recaudado</span>
@@ -302,74 +301,76 @@
 							</button>
 
 							{#if isOpen}
-								<div class="bg-gray-50 dark:bg-gray-900/30 p-5 space-y-6">
+								<div class="bg-gray-50 dark:bg-gray-900/30 p-4 sm:p-5 space-y-6">
 									{#each group as course}
 										<!-- Nombre del curso -->
-										<div>
-											<div class="flex items-center gap-2 mb-3">
-												<div class={`w-1 h-5 rounded-full shrink-0 ${style.accent}`}></div>
-												<p class="text-sm font-bold text-gray-900 dark:text-white">{course.nombre}</p>
-												<span class="text-xs font-mono text-gray-400">{course.codigo}</span>
-												<span class={`px-1.5 py-0.5 text-xs font-medium rounded-full ${course.activo ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
-													{course.activo ? 'Activo' : 'Inactivo'}
-												</span>
-												<span class="px-1.5 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 capitalize">{course.modalidad}</span>
+										<div class="bg-white dark:bg-gray-800 p-4 sm:p-5 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+											<div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
+												<div class={`hidden sm:block w-1.5 h-6 rounded-full shrink-0 ${style.accent}`}></div>
+												<p class="text-sm sm:text-base font-bold text-gray-900 dark:text-white line-clamp-2 flex-1">{course.nombre}</p>
+												
+												<div class="flex items-center gap-2 shrink-0">
+													<span class="text-xs font-mono text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-600">{course.codigo}</span>
+													<span class={`px-2 py-1 text-[10px] sm:text-xs font-bold rounded-md uppercase tracking-wider ${course.activo ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
+														{course.activo ? 'Activo' : 'Inactivo'}
+													</span>
+												</div>
 											</div>
 
-											<!-- 4 cards exactamente igual al Stats Grid del dashboard -->
-									<div class="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-4 sm:gap-6">
+											<!-- 4 cards del desglose -->
+											<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
 												<!-- Inscritos -->
 												<a href={`/app/students?curso_id=${course.id}`} class="block">
-													<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
-														<div class="flex-1 min-w-0">
-															<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Inscritos</p>
-															<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 break-words">{course.inscritos}</p>
-															<p class="text-xs text-green-600 mt-1">{course.inscritosActivos} Activos</p>
+													<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
+														<div class="flex-1 min-w-0 mr-3">
+															<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Inscritos</p>
+															<p class="text-xl sm:text-2xl font-black text-gray-800 dark:text-white mt-0.5 truncate">{course.inscritos}</p>
+															<p class="text-[10px] text-green-600 font-semibold mt-1 truncate">{course.inscritosActivos} Activos</p>
 														</div>
-														<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
-															<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+														<div class="p-2.5 sm:p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl text-blue-600 shrink-0">
+															<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
 														</div>
 													</div>
 												</a>
 
 												<!-- Pagos Pendientes -->
 												<a href={`/app/payments?curso_id=${course.id}`} class="block">
-													<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
-														<div class="flex-1 min-w-0">
-															<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pagos Pendientes</p>
-															<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 break-words">{course.pagosPendientes}</p>
-															<p class="text-xs text-yellow-600 mt-1">{course.pagosPendientes} Por Revisar</p>
+													<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
+														<div class="flex-1 min-w-0 mr-3">
+															<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Pagos Pend.</p>
+															<p class="text-xl sm:text-2xl font-black text-gray-800 dark:text-white mt-0.5 truncate">{course.pagosPendientes}</p>
+															<p class="text-[10px] text-yellow-600 font-semibold mt-1 truncate">{course.pagosPendientes} Por Revisar</p>
 														</div>
-														<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
-															<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+														<div class="p-2.5 sm:p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl text-yellow-600 shrink-0">
+															<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 														</div>
 													</div>
 												</a>
 
 												<!-- Recaudado -->
 												<a href={`/app/payments?curso_id=${course.id}`} class="block">
-													<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3 hover:scale-105 transition-transform hover:shadow-lg">
-														<div class="flex-1 min-w-0">
-															<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Recaudado</p>
-															<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 break-words">{formatCurrency(course.ingresos)}</p>
-															<p class="text-xs text-green-600 mt-1">Pagos Aprobados</p>
+													<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
+														<div class="flex-1 min-w-0 mr-3">
+															<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Recaudado</p>
+															<p class="text-lg sm:text-xl font-black text-gray-800 dark:text-white mt-0.5 truncate" title={formatCurrency(course.ingresos)}>{formatCurrency(course.ingresos)}</p>
+															<p class="text-[10px] text-green-600 font-semibold mt-1 truncate">Aprobados</p>
 														</div>
-														<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
-															<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+														<div class="p-2.5 sm:p-3 bg-green-100 dark:bg-green-900/30 rounded-xl text-green-600 shrink-0">
+															<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 														</div>
 													</div>
 												</a>
 
 												<!-- Por Cobrar -->
-												<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-6 flex items-start gap-3">
-													<div class="flex-1 min-w-0">
-														<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Por Cobrar</p>
-														<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 break-words">{formatCurrency(course.saldoPendiente)}</p>
-														<p class="text-xs text-orange-500 mt-1 break-words">Saldo Pendiente</p>
+												<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
+													<div class="flex-1 min-w-0 mr-3">
+														<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Por Cobrar</p>
+														<p class="text-lg sm:text-xl font-black text-gray-800 dark:text-white mt-0.5 truncate" title={formatCurrency(course.saldoPendiente)}>{formatCurrency(course.saldoPendiente)}</p>
+														<p class="text-[10px] text-orange-500 font-semibold mt-1 truncate">Saldo Pendiente</p>
 													</div>
-													<div class="p-2.5 sm:p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
-														<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+													<div class="p-2.5 sm:p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl text-orange-600 shrink-0">
+														<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 													</div>
 												</div>
 
