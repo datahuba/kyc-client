@@ -3,7 +3,7 @@ name: Deploy Frontend to VPS
 on:
   push:
     branches:
-      - main
+      - develop_kevin
 
 jobs:
   deploy:
@@ -17,8 +17,16 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
+            # 1. Liberar el puerto 3000 matando procesos huérfanos (Node/PM2)
+            fuser -k 3000/tcp || true
+
+            # 2. Actualizar el código fuente
             cd /var/www/frontend
             git stash
-            git pull origin main
+            git pull origin develop_kevin
+            
+            # 3. Reconstruir infraestructura Docker de forma limpia
             cd /var/www
+            docker compose stop frontend || true
+            docker compose rm -f frontend || true
             docker compose up -d --build frontend
