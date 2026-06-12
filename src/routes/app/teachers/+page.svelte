@@ -365,6 +365,7 @@
                                     {/each}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     {/if}
                 </div>

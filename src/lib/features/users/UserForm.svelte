@@ -7,15 +7,19 @@
 	import { alert } from '$lib/utils';
 	import { CheckIcon } from '$lib/icons/outline';
 
-	interface Props {
+interface Props {
 		user?: UserResponse | null;
+		currentUserId?: string | null;
 		onSuccess: () => void;
 		onCancel: () => void;
 	}
 
-	let { user = null, onSuccess, onCancel }: Props = $props();
+	let { user = null, currentUserId = null, onSuccess, onCancel }: Props = $props();
 
 	let isEditMode = $derived(!!user);
+	let isEditingSelf = $derived(!!user && !!currentUserId && user._id === currentUserId);
+	let disableActivoCheckbox = $derived(isEditMode && isEditingSelf);
+	let disableRoleSelect = $derived(isEditMode && isEditingSelf);
 	let saving = $state(false);
 
 	let formData: CreateUserRequest = $state({
@@ -49,6 +53,16 @@
 	async function handleSubmit() {
 		saving = true;
 		try {
+			if (isEditMode && isEditingSelf && formData.activo === false) {
+				alert('error', 'No puedes desactivar tu propia cuenta.');
+				return;
+			}
+
+			if (isEditMode && isEditingSelf && user && formData.role !== user.role) {
+				alert('error', 'No puedes cambiar tu propio rol.');
+				return;
+			}
+
 			if (isEditMode && user) {
 				await userService.update(user._id, {
 					...formData,
@@ -90,6 +104,7 @@
 		<Select
 			label="Rol"
 			bind:value={formData.role}
+			disabled={disableRoleSelect}
 			required
 		>
 			<option value="superadmin">Superadmin (Soporte Técnico)</option>
@@ -99,6 +114,12 @@
 			<option value="cobranza">Cobranza (Cuentas por Cobrar)</option>
 			<option value="docente">Docente</option>
 		</Select>
+
+		{#if disableRoleSelect}
+			<p class="-mt-3 text-xs text-amber-600 dark:text-amber-400 md:col-span-2">
+				No puedes cambiar tu propio rol.
+			</p>
+		{/if}
 
 		{#if !isEditMode}
 			<Input
@@ -125,12 +146,19 @@
 			type="checkbox"
 			id="activo"
 			bind:checked={formData.activo}
-			class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+			disabled={disableActivoCheckbox}
+			class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
 		/>
 		<label for="activo" class="text-sm font-medium text-gray-700 dark:text-gray-300">
 			Usuario Activo
 		</label>
 	</div>
+
+	{#if disableActivoCheckbox}
+		<p class="-mt-3 text-xs text-amber-600 dark:text-amber-400">
+			No puedes desactivar tu propia cuenta.
+		</p>
+	{/if}
 
 	<div class="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
 		<Button type="button" variant="secondary" onclick={onCancel}>

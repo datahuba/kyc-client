@@ -12,6 +12,9 @@
 	let newPassword = $state('');
 	let confirmPassword = $state('');
 	let loading = $state(false);
+	let showCurrentPassword = $state(false);
+	let showNewPassword = $state(false);
+	let showConfirmPassword = $state(false);
 
 	// Estado para visibilidad de contraseñas
 	let showCurrent = $state(false);

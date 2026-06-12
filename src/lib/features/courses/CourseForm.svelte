@@ -22,6 +22,13 @@
 	let saving = $state(false);
 	let discounts: Discount[] = $state([]);
 	let teachers: User[] = $state([]);
+	let availableDiscounts = $derived(
+		discounts.filter((discount) => {
+			if (discount.activo) return true;
+			// En edición, conservar visible el descuento ya asociado al curso aunque esté inactivo
+			return Boolean(formData.descuento_id) && discount._id === formData.descuento_id;
+		})
+	);
 
 	// BUG 3 FIX: Filtrado reactivo de descuentos para ocultar inactivos.
 	// Soporta tanto booleanos (`activo: true`) como strings heredados (`estado: 'Activo'`)
@@ -167,7 +174,13 @@
 		try {
 			const payload = { ...formData };
 			if (!payload.descuento_id) {
-				delete payload.descuento_id;
+				if (isEditMode) {
+					// En edición, enviar null explícito para remover descuento existente
+					payload.descuento_id = null;
+				} else {
+					// En creación, omitir el campo cuando no hay descuento seleccionado
+					delete payload.descuento_id;
+				}
 			}
 
 			if (payload.costo_total_externo === null || payload.costo_total_externo === undefined || payload.costo_total_externo === '') {

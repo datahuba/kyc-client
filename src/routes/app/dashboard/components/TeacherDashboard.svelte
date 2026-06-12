@@ -1,4 +1,4 @@
-<script lang="ts">
+ <script lang="ts">
 	import { onMount } from 'svelte';
 	import { courseService, enrollmentService, studentService } from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
@@ -11,6 +11,7 @@
     let myModules: any[] = $state([]); 
 	let enrollments: Enrollment[] = $state([]);
 	let students: Record<string, Student> = $state({});
+	let missingStudentIds: Record<string, boolean> = $state({});
 
     let activeModule: any | null = $state(null);
     let moduleEnrollments: Enrollment[] = $state([]);
@@ -38,6 +39,7 @@
         try {
             const courseEnrollments = await enrollmentService.getByCourseId(module.curso_id);
             moduleEnrollments = courseEnrollments.filter(e => e.estado === 'activo');
+            let missingCount = 0;
 
             // Carga concurrente segura (Tolerante a fallos 404 por borrado físico)
             await Promise.all(
