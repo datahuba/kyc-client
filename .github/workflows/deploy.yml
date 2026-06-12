@@ -3,22 +3,42 @@ name: Deploy Frontend to VPS
 on:
   push:
     branches:
-      - main
+      - develop_kevin
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Conectarse al Servidor por SSH y Actualizar Docker
+      - name: Desmantelamiento de PM2 y Despliegue en Docker
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
+            echo "🛑 === APAGANDO GOD DAEMON (PM2) Y LIBERANDO PUERTOS === 🛑"
+            
+            # 1. Matar todos los procesos gestionados por PM2
+            pm2 kill || true
+            
+            # 2. Eliminar PM2 de los scripts de arranque automático de Linux
+            pm2 unstartup || true
+            
+            # 3. Forzar el asesinato de cualquier proceso node nativo sobreviviente (PID 862227)
+            sudo killall -9 node || true
+            
+            echo "📥 === ACTUALIZANDO CÓDIGO FUENTE DE SVELTEKIT === 📥"
             cd /var/www/frontend
             git stash
-            git pull origin main
+            git pull origin develop_kevin
+            
+            echo "🚀 === INICIANDO DESPLIEGUE LIMPIO CON DOCKER === 🚀"
             cd /var/www
-            docker compose up -d --build frontend
+            
+            # Recreamos de forma segura el frontend sin tocar el backend
+            docker compose build --no-cache frontend
+            docker compose up -d --no-deps --force-recreate frontend
+            
+            echo "✅ === SISTEMA DESPLEGADO EN PRODUCCIÓN === ✅"
+            

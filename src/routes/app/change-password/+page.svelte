@@ -5,8 +5,8 @@
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
 	import { alert } from '$lib/utils';
-	import { KeyIcon, CheckIcon, EyeIcon, EyeOffIcon } from '$lib/icons/outline';
-	import { userStore } from '$lib/stores/userStore'; // <-- IMPORTADO PARA EVALUACIÓN REACTIVA (BUG 5)
+	import { KeyIcon, CheckIcon } from '$lib/icons/outline';
+	import { userStore } from '$lib/stores/userStore'; 
 
 	let currentPassword = $state('');
 	let newPassword = $state('');
@@ -16,25 +16,33 @@
 	let showNewPassword = $state(false);
 	let showConfirmPassword = $state(false);
 
-	// Evaluación de rol en Svelte 5 (Bug 5)
+	// Estado para visibilidad de contraseñas
+	let showCurrent = $state(false);
+	let showNew = $state(false);
+	let showConfirm = $state(false);
+
+	// Evaluación de rol en Svelte 5
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
-	let isUserStudent = $derived(currentRole === 'student');
+	let isUserStudent = $derived(currentRole === 'student' || currentRole === 'estudiante');
+
+	// Validaciones de negocio reactivas en tiempo real
+	let isSamePassword = $derived(currentPassword !== '' && newPassword !== '' && currentPassword === newPassword);
+	let isMismatch = $derived(newPassword !== '' && confirmPassword !== '' && newPassword !== confirmPassword);
+	let isTooShort = $derived(newPassword !== '' && newPassword.length < 5);
+	
+	// Validador maestro para el botón de envío
+	let isFormValid = $derived(
+		currentPassword !== '' && 
+		newPassword !== '' && 
+		confirmPassword !== '' && 
+		!isSamePassword && 
+		!isMismatch && 
+		!isTooShort
+	);
 
 	async function handleSubmit() {
-		if (currentPassword === newPassword) {
-			alert('error', 'La nueva contraseña debe ser diferente a la actual');
-			return;
-		}
-
-		if (newPassword !== confirmPassword) {
-			alert('error', 'Las nuevas contraseñas no coinciden');
-			return;
-		}
-
-		if (newPassword.length < 5) {
-			alert('error', 'La nueva contraseña debe tener al menos 5 caracteres');
-			return;
-		}
+		// Doble blindaje lógico antes de enviar la petición
+		if (!isFormValid) return;
 
 		loading = true;
 		try {
@@ -42,7 +50,7 @@
 				current_password: currentPassword,
 				new_password: newPassword,
 				confirm_password: confirmPassword
-			}, isUserStudent); // <-- SE PASA EL ATRIBUTO PARA CONMUTAR EL ENDPOINT CORRECTO
+			}, isUserStudent); 
 
 			alert('success', 'Contraseña actualizada correctamente');
 			currentPassword = '';
@@ -83,80 +91,99 @@
 	<Card>
 		<form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 			<div class="space-y-4">
+				
+				<!-- Contraseña Actual -->
 				<div class="relative">
 					<Input
 						label="Contraseña Actual"
 						id="current_password"
-						type={showCurrentPassword ? 'text' : 'password'}
+						type={showCurrent ? "text" : "password"}
 						bind:value={currentPassword}
 						required
 						placeholder="Ingrese su contraseña actual"
 					/>
 					<button
 						type="button"
-						onclick={() => (showCurrentPassword = !showCurrentPassword)}
-						class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-						aria-label={showCurrentPassword ? 'Ocultar contraseña actual' : 'Mostrar contraseña actual'}
+						class="absolute right-3 bottom-0 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none"
+						onclick={() => showCurrent = !showCurrent}
+						tabindex="-1"
+						title={showCurrent ? "Ocultar contraseña" : "Mostrar contraseña"}
 					>
-						{#if showCurrentPassword}
-							<EyeOffIcon class="size-5" />
+						{#if showCurrent}
+							<svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.568 1 1 0 0 1 0 .712 11.334 11.334 0 0 1-4.225 4.887M15.344 15.344A4.89 4.89 0 0 1 12 17a5 5 0 0 1-5-5 4.89 4.89 0 0 1 1.656-3.344M2 2l20 20"/><path d="M14.5 14.5a3 3 0 0 1-2.5-2.5"/><path d="M8.544 3.01A10.6 10.6 0 0 0 2 12a1 1 0 0 0 0 .712 10.73 10.73 0 0 0 4.225 4.887"/></svg>
 						{:else}
-							<EyeIcon class="size-5" />
+							<svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"/><circle cx="12" cy="12" r="3"/></svg>
 						{/if}
 					</button>
 				</div>
 
 				<div class="border-t border-gray-100 dark:border-gray-700 my-4"></div>
 
-				<div class="relative">
-					<Input
-						label="Nueva Contraseña"
-						id="new_password"
-						type={showNewPassword ? 'text' : 'password'}
-						bind:value={newPassword}
-						required
-						placeholder="Mínimo 5 caracteres"
-					/>
-					<button
-						type="button"
-						onclick={() => (showNewPassword = !showNewPassword)}
-						class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-						aria-label={showNewPassword ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'}
-					>
-						{#if showNewPassword}
-							<EyeOffIcon class="size-5" />
-						{:else}
-							<EyeIcon class="size-5" />
-						{/if}
-					</button>
+				<!-- Nueva Contraseña -->
+				<div>
+					<div class="relative">
+						<Input
+							label="Nueva Contraseña"
+							id="new_password"
+							type={showNew ? "text" : "password"}
+							bind:value={newPassword}
+							required
+							placeholder="Mínimo 5 caracteres"
+						/>
+						<button
+							type="button"
+							class="absolute right-3 bottom-0 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none"
+							onclick={() => showNew = !showNew}
+							tabindex="-1"
+						>
+							{#if showNew}
+								<svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.568 1 1 0 0 1 0 .712 11.334 11.334 0 0 1-4.225 4.887M15.344 15.344A4.89 4.89 0 0 1 12 17a5 5 0 0 1-5-5 4.89 4.89 0 0 1 1.656-3.344M2 2l20 20"/><path d="M14.5 14.5a3 3 0 0 1-2.5-2.5"/><path d="M8.544 3.01A10.6 10.6 0 0 0 2 12a1 1 0 0 0 0 .712 10.73 10.73 0 0 0 4.225 4.887"/></svg>
+							{:else}
+								<svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"/><circle cx="12" cy="12" r="3"/></svg>
+							{/if}
+						</button>
+					</div>
+					{#if isTooShort}
+						<p class="text-xs text-red-500 font-medium mt-1">La contraseña debe tener al menos 5 caracteres.</p>
+					{/if}
+					{#if isSamePassword}
+						<p class="text-xs text-red-500 font-medium mt-1">La nueva contraseña no puede ser igual a tu contraseña actual.</p>
+					{/if}
 				</div>
 
-				<div class="relative">
-					<Input
-						label="Confirmar Nueva Contraseña"
-						id="confirm_password"
-						type={showConfirmPassword ? 'text' : 'password'}
-						bind:value={confirmPassword}
-						required
-						placeholder="Repita la nueva contraseña"
-					/>
-					<button
-						type="button"
-						onclick={() => (showConfirmPassword = !showConfirmPassword)}
-						class="absolute right-3 top-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-						aria-label={showConfirmPassword ? 'Ocultar confirmación de contraseña' : 'Mostrar confirmación de contraseña'}
-					>
-						{#if showConfirmPassword}
-							<EyeOffIcon class="size-5" />
-						{:else}
-							<EyeIcon class="size-5" />
-						{/if}
-					</button>
+				<!-- Confirmar Nueva Contraseña -->
+				<div>
+					<div class="relative">
+						<Input
+							label="Confirmar Nueva Contraseña"
+							id="confirm_password"
+							type={showConfirm ? "text" : "password"}
+							bind:value={confirmPassword}
+							required
+							placeholder="Repita la nueva contraseña"
+						/>
+						<button
+							type="button"
+							class="absolute right-3 bottom-0 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none"
+							onclick={() => showConfirm = !showConfirm}
+							tabindex="-1"
+						>
+							{#if showConfirm}
+								<svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.568 1 1 0 0 1 0 .712 11.334 11.334 0 0 1-4.225 4.887M15.344 15.344A4.89 4.89 0 0 1 12 17a5 5 0 0 1-5-5 4.89 4.89 0 0 1 1.656-3.344M2 2l20 20"/><path d="M14.5 14.5a3 3 0 0 1-2.5-2.5"/><path d="M8.544 3.01A10.6 10.6 0 0 0 2 12a1 1 0 0 0 0 .712 10.73 10.73 0 0 0 4.225 4.887"/></svg>
+							{:else}
+								<svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"/><circle cx="12" cy="12" r="3"/></svg>
+							{/if}
+						</button>
+					</div>
+					{#if isMismatch}
+						<p class="text-xs text-red-500 font-medium mt-1">Las nuevas contraseñas no coinciden.</p>
+					{/if}
 				</div>
+
 			</div>
 
 			<div class="flex justify-end pt-4">
-				<Button type="submit" loading={loading}>
+				<Button type="submit" loading={loading} disabled={!isFormValid}>
 					{#snippet leftIcon()}
 						<CheckIcon class="size-5" />
 					{/snippet}

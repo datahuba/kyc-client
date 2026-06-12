@@ -30,6 +30,12 @@
 		})
 	);
 
+	// BUG 3 FIX: Filtrado reactivo de descuentos para ocultar inactivos.
+	// Soporta tanto booleanos (`activo: true`) como strings heredados (`estado: 'Activo'`)
+	let activeDiscounts = $derived(
+		discounts.filter((d: any) => d.activo === true || d.estado === 'Activo')
+	);
+
 	let formData: CreateCourseRequest = $state({
 		codigo: '',
 		nombre_programa: '',
@@ -281,15 +287,17 @@
 				bind:value={formData.cantidad_cuotas}
 				required
 			/>
+			
+			<!-- BUG 3 FIX: Iteración sobre activeDiscounts en lugar de discounts -->
 			<Select label="Descuento Global" bind:value={formData.descuento_id}>
 				<option value="">Ninguno</option>
-				{#each availableDiscounts as discount}
+				{#each activeDiscounts as discount}
 					<option value={discount._id}>{discount.nombre} ({discount.porcentaje}%)</option>
 				{/each}
 			</Select>
 		</div>
 
-		<!-- SECCIÓN DINÁMICA DE MÓDULOS CON ASIGNACIÓN DE DOCENTES (ISSUE R + ISSUE F) -->
+		<!-- SECCIÓN DINÁMICA DE MÓDULOS CON ASIGNACIÓN DE DOCENTES -->
 		{#if formData.modulos && formData.modulos.length > 0}
 			<div class="md:col-span-2 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mt-2">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-3 gap-2">
@@ -345,7 +353,7 @@
 				</div>
                 {#if autoCalculateModules}
                     <p class="text-xs text-blue-600 dark:text-blue-400 mt-3 flex items-center gap-1.5 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                        <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         El sistema está prorrateando el costo equitativamente. Cambia el switch superior a "Edición Manual" para alterar los precios y no perder los cambios.
                     </p>
                 {/if}

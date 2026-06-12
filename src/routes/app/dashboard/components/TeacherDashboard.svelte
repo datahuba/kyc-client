@@ -41,38 +41,37 @@
             moduleEnrollments = courseEnrollments.filter(e => e.estado === 'activo');
             let missingCount = 0;
 
-            for (const enrollment of moduleEnrollments) {
-                if (!students[enrollment.estudiante_id]) {
-                    try {
-                        const st = await studentService.getById(enrollment.estudiante_id);
-                        if (st) {
-                            students[enrollment.estudiante_id] = st;
-                            missingStudentIds[enrollment.estudiante_id] = false;
+            // Carga concurrente segura (Tolerante a fallos 404 por borrado físico)
+            await Promise.all(
+                moduleEnrollments.map(async (enrollment) => {
+                    if (!students[enrollment.estudiante_id]) {
+                        try {
+                            const st = await studentService.getById(enrollment.estudiante_id);
+                            if (st) students[enrollment.estudiante_id] = st;
+                        } catch (studentError: any) {
+                            // Bug 2 Fix: Si el alumno fue eliminado pero retiene deudas/notas,
+                            // inyectamos un objeto mockeado para evitar colapso de la tabla.
+                            students[enrollment.estudiante_id] = {
+                                _id: enrollment.estudiante_id,
+                                nombre: "Estudiante Eliminado",
+                                registro: "N/A",
+                                carnet: "N/A",
+                                isDeleted: true // Bandera lógica para la UI
+                            } as any;
                         }
-                    } catch (error: any) {
-                        if (error?.status === 404 || error?.response?.status === 404) {
-                            missingStudentIds[enrollment.estudiante_id] = true;
-                            missingCount += 1;
-                            continue;
-                        }
-                        throw error;
                     }
-                }
 
-                const realIndex = module.modulo_index - 1;
-                if (enrollment.modulos && enrollment.modulos.length > realIndex) {
-                    const notaGuardada = enrollment.modulos[realIndex].nota;
-                    calificacionInputs[enrollment._id] = notaGuardada !== null && notaGuardada !== undefined ? notaGuardada : '';
-                } else {
-                    calificacionInputs[enrollment._id] = '';
-                }
-            }
-
-            if (missingCount > 0) {
-                alert('warning', `Se cargó la planilla con ${missingCount} registro(s) de estudiante no encontrado(s).`);
-            }
+                    const realIndex = module.modulo_index - 1;
+                    if (enrollment.modulos && enrollment.modulos.length > realIndex) {
+                        const notaGuardada = enrollment.modulos[realIndex].nota;
+                        calificacionInputs[enrollment._id] = notaGuardada !== null && notaGuardada !== undefined ? notaGuardada : '';
+                    } else {
+                        calificacionInputs[enrollment._id] = '';
+                    }
+                })
+            );
         } catch (error: any) {
-            alert('error', 'Error al cargar estudiantes del módulo.');
+            alert('error', 'Error al cargar inscripciones del módulo.');
         } finally {
             loading = false;
         }
@@ -228,7 +227,6 @@
 		</div>
     {:else if myModules.length === 0}
         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
-			<!-- SVG Book Seguro -->
 			<svg class="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
 			</svg>
@@ -236,11 +234,8 @@
             <p class="text-sm text-gray-400 mt-2">Comunícate con el área de Gestión Académica (CPD) si esto es un error.</p>
         </div>
 	{:else}
-        <!-- TARJETAS DE MÓDULOS -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {#each myModules as module}
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div 
                     onclick={() => loadStudentsForModule(module)}
                     class={`bg-white dark:bg-gray-800 rounded-xl border p-5 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md
@@ -274,17 +269,14 @@
             {/each}
 		</div>
 
-        <!-- PLANILLA DE ESTUDIANTES DEL MÓDULO SELECCIONADO -->
         {#if activeModule}
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden animate-fade-in mt-8">
                 
-				<!-- ENCABEZADO CON BOTONES DE EXPORTAR E IMPORTAR -->
 				<div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-gray-50 dark:bg-gray-900/50">
                     <div>
                         <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
 							Planilla de Estudiantes
 							<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-								<!-- SVG Users Seguro -->
 								<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
 								</svg> 
@@ -294,7 +286,6 @@
                         <p class="text-sm text-gray-500 dark:text-gray-400">{activeModule.modulo_nombre} • {activeModule.curso_codigo}</p>
                     </div>
                     
-					<!-- CONTROLES MASIVOS CON ICONOS SVG SEGUROS -->
 					<div class="flex flex-wrap items-center gap-2 w-full xl:w-auto">
 						<Button variant="secondary" class="text-sm py-1.5" onclick={exportCSV}>
 							{#snippet leftIcon()}
@@ -305,7 +296,6 @@
 							Exportar Planilla
 						</Button>
 						
-						<!-- Input de archivo oculto enlazado al botón -->
 						<input type="file" id="csv-upload" accept=".csv" class="hidden" onchange={importCSV} />
 						<Button variant="secondary" class="text-sm py-1.5" onclick={() => document.getElementById('csv-upload')?.click()}>
 							{#snippet leftIcon()}
@@ -351,11 +341,14 @@
                                     {@const student = students[enrollment.estudiante_id]}
                                     {@const status = getStudentStatus(enrollment, activeModule.modulo_index - 1)}
                                     <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
-									<td class="px-6 py-4 whitespace-nowrap">
-										<p class="font-medium text-gray-900 dark:text-white">
-											{student?.nombre || (missingStudentIds[enrollment.estudiante_id] ? 'Estudiante no encontrado' : 'Cargando...')}
-										</p>
-									</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <p class="font-medium flex items-center gap-2 text-gray-900 dark:text-white">
+                                                {student?.nombre || 'Cargando...'}
+                                                {#if (student as any)?.isDeleted}
+                                                    <span class="px-1.5 py-0.5 bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 text-[10px] rounded-md uppercase font-bold tracking-wider">Fantasma</span>
+                                                {/if}
+                                            </p>
+                                        </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                             {student?.registro || '--'} / {student?.carnet || '--'}
                                         </td>
@@ -371,14 +364,15 @@
                                                     min="0"
                                                     max="100"
                                                     bind:value={calificacionInputs[enrollment._id]}
-                                                    class="w-20 rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm dark:bg-gray-700 dark:text-white text-center font-medium placeholder-gray-300"
+                                                    disabled={(student as any)?.isDeleted}
+                                                    class="w-20 rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm dark:bg-gray-700 dark:text-white text-center font-medium placeholder-gray-300 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-gray-800"
                                                     placeholder="--"
                                                 />
                                                 <Button 
                                                     size="sm"
                                                     loading={savingCalificacion[enrollment._id]}
                                                     onclick={() => saveCalificacion(enrollment._id, true)}
-                                                    disabled={calificacionInputs[enrollment._id] === ''}
+                                                    disabled={calificacionInputs[enrollment._id] === '' || (student as any)?.isDeleted}
                                                 >
                                                     Guardar
                                                 </Button>
