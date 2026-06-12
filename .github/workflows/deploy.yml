@@ -16,17 +16,27 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          # Usamos sudo no-password (si es aplicable) o forzamos la muerte del puerto
           script: |
-            # 1. Liberar el puerto 3000 matando procesos huérfanos (Node/PM2)
-            fuser -k 3000/tcp || true
+            # 1. Bajar el contenedor problemático de inmediato
+            cd /var/www || true
+            docker compose stop frontend || true
+            docker compose rm -f frontend || true
+            
+            # 2. Matar procesos nativos en el puerto 3000
+            # Múltiples métodos para asegurar que el puerto quede libre
+            fuser -k -9 3000/tcp || true
+            lsof -ti:3000 | xargs kill -9 || true
+            
+            # 3. Limpiar redes congeladas de Docker que podrían retener el puerto
+            docker network prune -f || true
 
-            # 2. Actualizar el código fuente
+            # 4. Actualizar código fuente
             cd /var/www/frontend
             git stash
             git pull origin develop_kevin
             
-            # 3. Reconstruir infraestructura Docker de forma limpia
+            # 5. Desplegar
             cd /var/www
-            docker compose stop frontend || true
-            docker compose rm -f frontend || true
             docker compose up -d --build frontend
+            
