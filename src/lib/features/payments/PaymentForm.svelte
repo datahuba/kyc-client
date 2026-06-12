@@ -104,10 +104,11 @@
 		}
 	});
 
-	// Saneamiento automático reactivo Svelte 5 para el Número de Transacción (Bug 6)
+	// BUG 10 FIX: Sanitización reactiva ultrarrígida (Sólo números bancarios)
 	$effect(() => {
 		if (transactionNumber) {
-			const sanitized = transactionNumber.replace(/[^a-zA-Z0-9]/g, '');
+			// Esta regex borra cualquier caracter que NO sea del 0 al 9 en tiempo real
+			const sanitized = transactionNumber.replace(/[^0-9]/g, '');
 			if (sanitized !== transactionNumber) {
 				transactionNumber = sanitized;
 			}
@@ -120,10 +121,10 @@
 			return;
 		}
 
-		// Doble validación Regex estricta de seguridad alfanumérica (Bug 6)
-		const regexAlfanumerico = /^[a-zA-Z0-9]+$/;
-		if (!regexAlfanumerico.test(transactionNumber)) {
-			alert('error', 'El número de transacción solo debe contener letras y números (sin espacios ni símbolos)');
+		// BUG 10 FIX: Doble escudo en caso de evasión del DOM
+		const regexSoloNumeros = /^[0-9]+$/;
+		if (!regexSoloNumeros.test(transactionNumber)) {
+			alert('error', 'El número de transacción de tu banco debe contener ÚNICAMENTE números. Revisa tu recibo.');
 			return;
 		}
 
@@ -238,7 +239,17 @@
             </div>
 
             <div class="md:col-span-2">
-				<Input label="Número de Transacción / Referencia" bind:value={transactionNumber} required placeholder="Ej: 84729384 o ABC12345" />
+				<!-- BUG 10 FIX: Ayuda contextual y patrón numérico -->
+				<div class="space-y-1">
+					<Input 
+						label="Número de Transacción / Referencia" 
+						bind:value={transactionNumber} 
+						required 
+						placeholder="Ej: 84729384" 
+						class="font-mono tracking-widest text-lg"
+					/>
+					<p class="text-xs text-blue-600 dark:text-blue-400 font-medium">Sólo ingresa los números principales del recibo bancario (Sin letras ni guiones).</p>
+				</div>
 			</div>
         </div>
     </div>
