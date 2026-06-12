@@ -174,7 +174,6 @@
 		</div>
 	{:else if teachers.length === 0}
 		<div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
-			<!-- SVG Seguro -->
 			<svg class="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
 			</svg>
@@ -288,14 +287,13 @@
 		</div>
 	{/if}
 
-    <!-- Modal Módulos Asignados (ISSUE R) -->
+    <!-- Modal Módulos Asignados (ISSUE R / BUG 4 FIX) -->
     {#if showModulesModal}
         <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
                 <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
-							<!-- SVG Seguro -->
 							<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
 							</svg>
@@ -306,14 +304,14 @@
                         </div>
                     </div>
                     <button onclick={() => { showModulesModal = false; selectedTeacherForModules = null; }} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors p-2">
-                        <!-- SVG Seguro -->
 						<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
 						</svg>
                     </button>
                 </div>
 
-                <div class="flex-1 overflow-y-auto p-6">
+                <!-- BUG 4 FIX: Contenedor con scroll para evitar desbordes -->
+                <div class="flex-1 overflow-y-auto p-4 md:p-6">
                     {#if loadingModules}
                         <div class="flex justify-center py-12">
                             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
@@ -324,33 +322,44 @@
                             <p class="text-sm text-gray-400 mt-2">Puedes asignarle módulos desde la sección de Cursos.</p>
                         </div>
                     {:else}
-                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <!-- BUG 4 FIX: overflow-x-auto para responsividad en tabla -->
+                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto w-full">
+                            <table class="w-full text-left border-collapse">
                                 <thead class="bg-gray-50 dark:bg-gray-900/50">
                                     <tr>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Módulo</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Programa / Curso</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Código</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Costo (Bs)</th>
+                                        <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Módulo</th>
+                                        <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Programa / Curso</th>
+                                        <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Código</th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Costo Unitario</th>
                                     </tr>
                                 </thead>
-                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:border-gray-700">
                                     {#each teacherModules as module}
                                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="flex items-center gap-2">
-                                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold dark:bg-indigo-900/30 dark:text-indigo-400">{module.modulo_index}</span>
-                                                    <span class="text-sm font-medium text-gray-900 dark:text-white">{module.modulo_nombre}</span>
+                                            <td class="px-4 py-4 align-top">
+                                                <div class="flex items-start gap-2">
+                                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold shrink-0 mt-0.5">{module.modulo_index}</span>
+                                                    <!-- BUG 4 FIX: break-words y whitespace-normal para títulos de módulos largos -->
+                                                    <span class="text-sm font-medium text-gray-900 dark:text-white whitespace-normal break-words max-w-[280px]">
+                                                        {module.modulo_nombre}
+                                                    </span>
                                                 </div>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <span class="text-sm text-gray-600 dark:text-gray-300 max-w-[250px] truncate block" title={module.curso_nombre}>{module.curso_nombre}</span>
+                                            <td class="px-4 py-4 align-top">
+                                                <!-- BUG 4 FIX: break-words y whitespace-normal en lugar de truncate -->
+                                                <span class="text-sm text-gray-600 dark:text-gray-300 whitespace-normal break-words max-w-[300px] block">
+                                                    {module.curso_nombre}
+                                                </span>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <span class="px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">{module.curso_codigo}</span>
+                                            <td class="px-4 py-4 align-top">
+                                                <span class="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200 whitespace-nowrap">
+                                                    {module.curso_codigo}
+                                                </span>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400 font-medium">
-                                                {safeFormatCurrency(module.modulo_costo)}
+                                            <td class="px-4 py-4 align-top text-right whitespace-nowrap">
+                                                <span class="text-sm text-green-600 dark:text-green-400 font-bold">
+                                                    {safeFormatCurrency(module.modulo_costo)}
+                                                </span>
                                             </td>
                                         </tr>
                                     {/each}
