@@ -1,4 +1,5 @@
 export interface Enrollment {
+	modulos: any;
 	_id: string;
 	cantidad_cuotas: number;
 	costo_matricula: number;
