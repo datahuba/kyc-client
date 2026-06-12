@@ -10,33 +10,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Conectarse al Servidor por SSH y Actualizar Docker
+      - name: Diagnóstico de Servidor y Despliegue
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          # Usamos sudo no-password (si es aplicable) o forzamos la muerte del puerto
           script: |
-            # 1. Bajar el contenedor problemático de inmediato
-            cd /var/www || true
-            docker compose stop frontend || true
-            docker compose rm -f frontend || true
+            echo "🔍 === INICIANDO DIAGNÓSTICO EN EL VPS ==="
+            echo "Usuario SSH actual: $(whoami)"
             
-            # 2. Matar procesos nativos en el puerto 3000
-            # Múltiples métodos para asegurar que el puerto quede libre
-            fuser -k -9 3000/tcp || true
-            lsof -ti:3000 | xargs kill -9 || true
+            echo "🔍 === ¿QUIÉN TIENE SECUESTRADO EL PUERTO 3000? ==="
+            sudo ss -tulpn | grep :3000 || true
             
-            # 3. Limpiar redes congeladas de Docker que podrían retener el puerto
-            docker network prune -f || true
-
-            # 4. Actualizar código fuente
+            echo "🔍 === ESTADO ACTUAL DE LOS CONTENEDORES ==="
+            docker ps -a
+            
+            echo "🔨 === APLICANDO REINICIO PROFUNDO DE DOCKER ==="
+            # Esto fuerza al sistema operativo a reiniciar el motor de Docker, 
+            # liberando cualquier puerto (docker-proxy) que se haya quedado pegado.
+            sudo systemctl restart docker || true
+            
+            echo "🚀 === INICIANDO DESPLIEGUE ==="
+            # Destruimos explícitamente el contenedor por su nombre exacto en los logs
+            docker rm -f kyc-frontend || true
+            
             cd /var/www/frontend
             git stash
             git pull origin develop_kevin
             
-            # 5. Desplegar
             cd /var/www
             docker compose up -d --build frontend
             
