@@ -28,27 +28,25 @@
 	let qrUrl = $state('');
 
 	// --- ESTADOS DE PAGO ---
-    let concepto = $state(''); // 'Matrícula' o 'Módulo'
+    let concepto = $state(''); 
     let remitente = $state('');
     let banco = $state('');
     let montoComprobante = $state<number | null>(null);
-    let fechaComprobante = $state(new Date().toISOString().split('T')[0]); // Fecha actual
+    let fechaComprobante = $state(new Date().toISOString().split('T')[0]); 
     let cuentaDestino = $state('');
 
-	// Listas de ayuda para los select
     const bancosDisponibles = ["Banco Unión", "BNB", "Mercantil Santa Cruz", "Banco Bisa", "Banco Ganadero", "Banco Económico", "Yape", "Altoke", "Yolo", "Otro"];
     const cuentasInstitucion = ["Cta. Corriente BNB - 1234567", "Cta. Ahorros Unión - 9876543"];
 
-	// Control reactivo: ocultar opción de matrícula si ya fue cancelada
-	let showMatriculaOption = $derived(
+	// Control reactivo: Matrícula
+	let isMatriculaPagada = $derived(
 		selectedEnrollmentId 
-			? !enrollments.find(e => e._id === selectedEnrollmentId)?.matricula_pagada 
-			: true
+			? !!enrollments.find(e => e._id === selectedEnrollmentId)?.matricula_pagada 
+			: false
 	);
 
 	onMount(async () => {
 		try {
-			// Cargar configuración de QR y cursos
 			const [config, coursesRes] = await Promise.all([
 				paymentConfigService.get(),
 				courseService.getAll(1, 100)
@@ -72,7 +70,7 @@
 		}
 	});
 
-	// Efecto reactivo Svelte 5: Calcula y bloquea el monto exacto según el concepto elegido
+	// REGLA DE NEGOCIO Y PRORRATEO
 	$effect(() => {
 		if (!selectedEnrollmentId) {
 			montoComprobante = null;
@@ -86,28 +84,31 @@
 		const course = coursesList.find(c => c._id === enrollment.curso_id);
 		if (!course) return;
 
-		// Determinar si el estudiante aplica a costos internos o externos
 		const isInterno = enrollment.es_estudiante_interno === 'interno';
 
-		if (concepto === 'Matrícula') {
-			montoComprobante = isInterno ? course.matricula_interno : course.matricula_externo;
-		} else if (concepto === 'Módulo') {
-			// El costo total en tus cursos ya representa únicamente el total de los módulos,
-			// por lo que solo debemos dividirlo directamente entre la cantidad de cuotas.
-			const total = isInterno ? course.costo_total_interno : course.costo_total_externo;
-			const cuotas = course.cantidad_cuotas || 1;
-			
-			// Redondeo seguro a 2 decimales
-			montoComprobante = Math.round((total / cuotas) * 100) / 100;
+		// FORZAMOS LA SELECCIÓN: 
+		// Si no pagó matrícula, obligatoriamente el concepto será 'Matrícula'.
+		// Si ya pagó, obligatoriamente será 'Módulo'.
+		if (!isMatriculaPagada) {
+			concepto = 'Matrícula';
+			// Sugerimos el valor exacto de la matrícula, pero dejamos el input libre
+			if (montoComprobante === null) {
+				montoComprobante = isInterno ? course.matricula_interno : course.matricula_externo;
+			}
 		} else {
-			montoComprobante = null;
+			concepto = 'Módulo';
+			// Sugerimos el valor de la cuota como ayuda visual, pero dejamos el input libre
+			if (montoComprobante === null) {
+				const total = isInterno ? course.costo_total_interno : course.costo_total_externo;
+				const cuotas = course.cantidad_cuotas || 1;
+				montoComprobante = Math.round((total / cuotas) * 100) / 100;
+			}
 		}
 	});
 
-	// Saneamiento automático reactivo Svelte 5 para el Número de Transacción (Bug 6)
 	$effect(() => {
 		if (transactionNumber) {
-			const sanitized = transactionNumber.replace(/[^a-zA-Z0-9]/g, '');
+			const sanitized = transactionNumber.replace(/[^0-9]/g, '');
 			if (sanitized !== transactionNumber) {
 				transactionNumber = sanitized;
 			}
@@ -120,31 +121,34 @@
 			return;
 		}
 
-		// Doble validación Regex estricta de seguridad alfanumérica (Bug 6)
-		const regexAlfanumerico = /^[a-zA-Z0-9]+$/;
-		if (!regexAlfanumerico.test(transactionNumber)) {
-			alert('error', 'El número de transacción solo debe contener letras y números (sin espacios ni símbolos)');
+		if (montoComprobante <= 0) {
+			alert('error', 'El monto a reportar debe ser mayor a 0 Bs.');
+			return;
+		}
+
+		const regexSoloNumeros = /^[0-9]+$/;
+		if (!regexSoloNumeros.test(transactionNumber)) {
+			alert('error', 'El número de transacción solo debe contener números.');
 			return;
 		}
 
 		saving = true;
 		try {
-			// Añadimos el concepto elegido y el monto fijo al payload de envío
 			const payload: any = {
 				inscripcion_id: selectedEnrollmentId,
 				numero_transaccion: transactionNumber,
 				file: file,
                 remitente,
                 banco,
-                monto_comprobante: montoComprobante!,
+                monto_comprobante: montoComprobante,
                 fecha_comprobante: fechaComprobante,
                 cuenta_destino: cuentaDestino,
-				concepto, // 'Matrícula' o 'Módulo'
-				cantidad_pago: montoComprobante!
+				concepto, 
+				cantidad_pago: montoComprobante
 			};
 
 			await paymentService.create(payload);
-			alert('success', 'Pago registrado correctamente');
+			alert('success', 'Pago reportado correctamente. El CPD lo revisará a la brevedad.');
 			onSuccess();
 		} catch (error: any) {
 			console.error(error);
@@ -179,22 +183,22 @@
 			{/if}
 		</div>
 
-		<!-- Concepto de Pago Inteligente -->
+		<!-- Concepto Automático (Bloqueado) -->
 		<div>
 			<label for="concepto" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Concepto de Pago</label>
-			<select
+			<input
 				id="concepto"
-				bind:value={concepto}
-				required
-				disabled={!selectedEnrollmentId}
-				class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm disabled:bg-gray-100 dark:disabled:bg-gray-800"
-			>
-				<option value="">Seleccione Concepto</option>
-				{#if showMatriculaOption}
-					<option value="Matrícula">Matrícula</option>
-				{/if}
-				<option value="Módulo">Módulo / Cuota de Programa</option>
-			</select>
+				type="text"
+				value={concepto}
+				readonly
+				class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm bg-gray-100 text-gray-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400 font-semibold uppercase tracking-wider"
+				placeholder="Seleccione un programa primero"
+			/>
+			{#if selectedEnrollmentId && !isMatriculaPagada}
+				<p class="text-[10px] text-orange-600 font-bold mt-1">⚠️ Debes pagar la Matrícula institucional antes de habilitar las cuotas de colegiatura.</p>
+			{:else if selectedEnrollmentId && isMatriculaPagada}
+				<p class="text-[10px] text-green-600 font-bold mt-1">✅ Matrícula al día. Puedes registrar pagos de colegiatura.</p>
+			{/if}
 		</div>
 	</div>
 
@@ -212,17 +216,25 @@
                 </select>
             </div>
 
-			<!-- Campo de Monto Bloqueado (Readonly) si ya se seleccionó un concepto para evitar digitaciones erróneas -->
-            <Input 
-				label="Monto Pagado (Bs)" 
-				type="number" 
-				step="0.01" 
-				bind:value={montoComprobante} 
-				required 
-				readonly={!!concepto}
-				class={concepto ? 'bg-gray-100 dark:bg-gray-800 font-semibold text-primary-600' : ''}
-				placeholder="Seleccione concepto primero" 
-			/>
+			<!-- Campo de Monto Liberado para el Algoritmo de Prorrateo -->
+			<div class="space-y-1">
+				<Input 
+					label="Monto Depositado (Bs)" 
+					type="number" 
+					step="0.01" 
+					min="1"
+					bind:value={montoComprobante} 
+					required 
+					disabled={!selectedEnrollmentId}
+					class="font-bold text-primary-600 text-lg disabled:opacity-50"
+					placeholder="Ej: 588.00" 
+				/>
+				{#if selectedEnrollmentId}
+					<p class="text-xs text-blue-600 dark:text-blue-400 font-medium leading-tight">
+						Se sugiere este monto, pero puedes modificarlo si depositaste una cantidad menor o mayor. El sistema distribuirá tu saldo automáticamente.
+					</p>
+				{/if}
+			</div>
             
             <div>
                 <label for="fechaComprobante" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha del Voucher</label>
@@ -238,7 +250,16 @@
             </div>
 
             <div class="md:col-span-2">
-				<Input label="Número de Transacción / Referencia" bind:value={transactionNumber} required placeholder="Ej: 84729384 o ABC12345" />
+				<div class="space-y-1">
+					<Input 
+						label="Número de Transacción / Referencia" 
+						bind:value={transactionNumber} 
+						required 
+						placeholder="Ej: 84729384" 
+						class="font-mono tracking-widest text-lg"
+					/>
+					<p class="text-xs text-blue-600 dark:text-blue-400 font-medium">Sólo ingresa los números principales del recibo bancario (Sin letras ni guiones).</p>
+				</div>
 			</div>
         </div>
     </div>
@@ -267,7 +288,7 @@
         <Button type="button" variant="secondary" onclick={onCancel} disabled={saving}>Cancelar</Button>
         <Button type="submit" loading={saving}>
             {#snippet leftIcon()} <UploadIcon class="size-5" /> {/snippet}
-            Confirmar Pago
+            Reportar Pago
         </Button>
     </div>
 </form>

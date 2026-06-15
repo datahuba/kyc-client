@@ -17,7 +17,6 @@
 	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon } from '$lib/icons/solid';
 	import { goto } from '$app/navigation';
 
-	// Secciones de la clase mostradas al docente en el sidebar
 	const classroomSections = [
 		{ id: 'muro',           label: 'Muro' },
 		{ id: 'materiales',     label: 'Materiales' },
@@ -45,16 +44,18 @@
 
 	let { isOpen, onClose }: Props = $props();
 
-	// Estado para colapsar en Desktop
 	let isCollapsed = $state(false);
 
-	// Navegación del sistema con los roles correspondientes
 	const navigation: NavigationItem[] = [
 		// Student/Teacher roles (Academic)
 		{ name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 		
 		// Admin/Staff roles (Se condiciona el acceso en base a la jerarquía de la UAGRM)
 		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza'], loginTypes: ['admin'] },
+		
+		// ---> REUBICADO: ACCESO DIRECTO A INSCRIPCIONES INMEDIATAMENTE DEBAJO DEL DASHBOARD <---
+		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
+		
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza'], loginTypes: ['admin'] },
 		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
 		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
@@ -63,19 +64,19 @@
         // ---- ACCESOS EXTERNOS UAGRM ----
         { name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
 		{ name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
-		// --------------------------------
 
-        { name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
-		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
+		// Vistas del estudiante
+        { name: 'Mis Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
+		{ name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
+		
+		// Configuración Financiera y Usuarios
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-		
 		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] }, 
-		
 		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
+		
 		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	];
 
-	// Derivación segura de roles y estados de sesión
 	let userRole = $derived($userStore?.role || $userStore?.user?.rol || 'student');
 	let loginType = $derived($userStore?.loginType);
 	let academicRole = $derived($userStore?.academicRole);
@@ -85,14 +86,11 @@
 		const isTeacher = userRole === 'docente' || academicRole === 'teacher';
 		const isStudent = userRole === 'student' || academicRole === 'student';
 
-		// 1. Si el usuario pertenece al personal administrativo/staff de Postgrado
 		if (isStaff) {
 			return item.loginTypes.includes('admin') && item.roles.includes(userRole);
 		}
 
-		// 2. Si el login es de tipo académico o se identifican roles académicos
 		if (loginType === 'academic' || isTeacher || isStudent) {
-			// Caso especial: Accesos externos de la UAGRM
 			if (item.name === 'Aula Virtual UAGRM' || item.name === 'Perfil de Notas UAGRM') {
 				if (isTeacher) return item.roles.includes('docente');
 				return item.roles.includes('student');
@@ -120,7 +118,6 @@
 	}
 </script>
 
-<!-- Mobile sidebar backdrop -->
 {#if isOpen}
 	<button 
 		class="fixed inset-0 z-40 bg-gray-900/80 backdrop-blur-sm lg:hidden"
@@ -132,7 +129,6 @@
 	></button>
 {/if}
 
-<!-- Sidebar -->
 <div class={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
 	transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
 	${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -192,7 +188,6 @@
 					</ul>
 				</li>
 
-				<!-- Contexto de clase activa (solo docente) -->
 				{#if (userRole === 'docente' || academicRole === 'teacher') && $activeClassroomStore.id}
 					<li transition:slide={{ duration: 200 }}>
 						{#if !isCollapsed}
@@ -251,7 +246,6 @@
 </div>
 
 <style>
-    /* Ocultar scrollbar pero permitir scroll */
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
     }
