@@ -53,12 +53,53 @@
 		}
 	});
 
+	// Función de barrido defensivo para localizar el Token JWT bajo cualquier formato común
+	function getAuthToken(): string | null {
+		if (typeof localStorage === 'undefined') return null;
+
+		// 1. Barrido de claves directas comunes
+		const directKeys = ['access_token', 'accessToken', 'token', 'jwt', 'kyc_token'];
+		for (const key of directKeys) {
+			const val = localStorage.getItem(key);
+			if (val) return val;
+		}
+
+		// 2. Barrido reactivo sobre el store de usuario de Svelte ($userStore)
+		const storeToken = $userStore?.token 
+			|| $userStore?.accessToken 
+			|| $userStore?.jwt 
+			|| $userStore?.user?.token 
+			|| $userStore?.user?.access_token;
+		if (storeToken) return storeToken;
+
+		// 3. Barrido de des-serialización de objetos compuestos de sesión
+		const complexKeys = ['user', 'auth', 'session', 'userStore'];
+		for (const key of complexKeys) {
+			try {
+				const val = localStorage.getItem(key);
+				if (val) {
+					const parsed = JSON.parse(val);
+					const token = parsed.token 
+						|| parsed.access_token 
+						|| parsed.accessToken 
+						|| parsed.jwt 
+						|| parsed.user?.token;
+					if (token) return token;
+				}
+			} catch (e) {
+				// Ignorar fallos de parseo JSON si el valor no es un objeto
+			}
+		}
+
+		return null;
+	}
+
 	// Petición HTTP nativa asíncrona robusta con detector dinámico de entorno
 	async function fetchFinancialSummary(id: string) {
 		financialLoading = true;
 		financialError = null;
 		try {
-			const token = localStorage.getItem('token') || localStorage.getItem('jwt');
+			const token = getAuthToken();
 			const headers: Record<string, string> = {
 				'Content-Type': 'application/json'
 			};
@@ -179,7 +220,7 @@
 									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{enrollment.estado}</span>
 								</td>
 							</tr>
-						{#each}
+						{/each}
 					</tbody>
 				</table>
 			</div>
