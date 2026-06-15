@@ -36,6 +36,9 @@
     let fechaComprobante = $state(new Date().toISOString().split('T')[0]); 
     let cuentaDestino = $state('');
 
+	// Seguro para evitar auto-relleno infinito (UX FIX)
+	let lastAutoFilledId = $state('');
+
     const metodosDisponibles = ["Transferencia", "Depósito", "Caja"];
     const bancosDisponibles = ["Banco Unión", "BNB", "Mercantil Santa Cruz", "Banco Bisa", "Banco Ganadero", "Banco Económico", "Yape", "Altoke", "Yolo", "Otro"];
     const cuentasInstitucion = ["Cta. Corriente BNB - 1234567", "Cta. Ahorros Unión - 9876543"];
@@ -77,6 +80,7 @@
 		if (!selectedEnrollmentId) {
 			montoComprobante = null;
 			concepto = '';
+			lastAutoFilledId = '';
 			return;
 		}
 
@@ -90,15 +94,19 @@
 
 		if (!isMatriculaPagada) {
 			concepto = 'Matrícula';
-			if (montoComprobante === null) {
+			// Solo auto-sugiere si el usuario recién seleccionó este curso
+			if (lastAutoFilledId !== selectedEnrollmentId) {
 				montoComprobante = isInterno ? course.matricula_interno : course.matricula_externo;
+				lastAutoFilledId = selectedEnrollmentId;
 			}
 		} else {
 			concepto = 'Módulo';
-			if (montoComprobante === null) {
+			// Solo auto-sugiere si el usuario recién seleccionó este curso
+			if (lastAutoFilledId !== selectedEnrollmentId) {
 				const total = isInterno ? course.costo_total_interno : course.costo_total_externo;
 				const cuotas = course.cantidad_cuotas || 1;
 				montoComprobante = Math.round((total / cuotas) * 100) / 100;
+				lastAutoFilledId = selectedEnrollmentId;
 			}
 		}
 	});
@@ -113,7 +121,6 @@
 	});
 
 	async function handleSubmit() {
-		// Validaciones base comunes
 		if (!selectedEnrollmentId || montoComprobante === null || !concepto || !metodoPago) {
 			alert('error', 'Por favor complete todos los campos obligatorios del pago.');
 			return;
@@ -124,7 +131,6 @@
 			return;
 		}
 
-		// Validaciones estrictas si el método es por Banco
 		if (requiereBancoYVoucher) {
 			if (!transactionNumber || !file || !banco || !remitente || !cuentaDestino || !fechaComprobante) {
 				alert('error', 'Debe adjuntar el voucher, el banco y el número de transacción para pagos digitales.');
@@ -139,7 +145,6 @@
 
 		saving = true;
 		try {
-			// ISSUE-P-CANALES: Payload dinámico según método de pago
 			const payload: any = {
 				inscripcion_id: selectedEnrollmentId,
 				metodo_pago: metodoPago,
@@ -156,7 +161,6 @@
 				payload.fecha_comprobante = fechaComprobante;
 				payload.cuenta_destino = cuentaDestino;
 			} else {
-				// Valores por defecto seguros para pagos en Caja Física
 				payload.numero_transaccion = `CAJA-${Date.now()}`;
 				payload.remitente = $userStore.user?.nombre || "Caja Física";
 				payload.banco = "Caja UAGRM";
@@ -178,7 +182,6 @@
 
 <form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-		<!-- Selección de Inscripción -->
 		<div>
 			<label for="enrollment" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Inscripción / Programa</label>
 			{#if loading}
@@ -200,7 +203,6 @@
 			{/if}
 		</div>
 
-		<!-- Concepto Automático (Bloqueado) -->
 		<div>
 			<label for="concepto" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Concepto de Pago</label>
 			<input
