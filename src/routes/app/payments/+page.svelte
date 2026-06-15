@@ -42,18 +42,19 @@
 	});
 	let debounceTimer: any;
 
-	// Helper lists for filters
 	let studentsList: Student[] = $state([]);
 	let coursesList: Course[] = $state([]);
 
-	// State
+	// State Modals
 	let isCreateModalOpen = $state(false);
 	let isApproveModalOpen = $state(false);
 	let isRejectModalOpen = $state(false);
+	let isRevertModalOpen = $state(false); // ISSUE-P-CANALES: Modal de anulación
 	
 	let paymentToAction: Payment | null = $state(null);
 	let actionLoading = $state(false);
 	let rejectReason = $state('');
+	let revertReason = $state('');
 
 	// Dropdown
 	let openDropdownId: string | null = $state(null);
@@ -72,7 +73,6 @@
 	async function loadPayments() {
 		loading = true;
 		try {
-			// Populate lists for filters (Staff only)
 			if (isStaff && studentsList.length === 0) {
 				const studentsRes = await studentService.getAll(1, 100);
 				studentsList = studentsRes.data;
@@ -169,6 +169,13 @@
 		openDropdownId = null;
 	}
 
+	function handleRevertClick(payment: Payment) {
+		paymentToAction = payment;
+		revertReason = '';
+		isRevertModalOpen = true;
+		openDropdownId = null;
+	}
+
 	async function confirmApprove() {
 		if (!paymentToAction) return;
 		actionLoading = true;
@@ -177,10 +184,8 @@
 		
 		try {
 			await paymentService.approve(idToApprove);
-			alert('success', 'Pago aprobado correctamente');
+			alert('success', 'Pago aprobado y Algoritmo de Prorrateo ejecutado correctamente.');
 			isApproveModalOpen = false;
-			
-			// ACTUALIZACIÓN REACTIVA INSTANTÁNEA SIN RECARGAR RED
 			payments = payments.map(p => p._id === idToApprove ? { ...p, estado_pago: 'aprobado' } : p);
 		} catch (error: any) {
 			alert('error', error.message || 'Error al aprobar pago');
@@ -205,16 +210,38 @@
 			await paymentService.reject(idToReject, reason);
 			alert('success', 'Pago rechazado correctamente');
 			isRejectModalOpen = false;
-			
-			// ACTUALIZACIÓN REACTIVA INSTANTÁNEA SIN RECARGAR RED
 			payments = payments.map(p => p._id === idToReject ? { ...p, estado_pago: 'rechazado' } : p);
 		} catch (error: any) {
-			actionLoading = false;
 			alert('error', error.message || 'Error al rechazar pago');
 		} finally {
 			actionLoading = false;
 			paymentToAction = null;
 			rejectReason = '';
+		}
+	}
+
+	async function confirmRevert() {
+		if (!paymentToAction) return;
+		if (!revertReason.trim() || revertReason.length < 10) {
+			alert('error', 'Debe ingresar un motivo legal válido de al menos 10 caracteres.');
+			return;
+		}
+		actionLoading = true;
+		
+		const idToRevert = paymentToAction._id;
+		const reason = revertReason;
+		
+		try {
+			await paymentService.revert(idToRevert, reason);
+			alert('success', 'Pago Anulado con éxito. La deuda del estudiante ha sido restaurada en cascada.');
+			isRevertModalOpen = false;
+			payments = payments.map(p => p._id === idToRevert ? { ...p, estado_pago: 'anulado' } : p);
+		} catch (error: any) {
+			alert('error', error.message || 'Error al anular pago');
+		} finally {
+			actionLoading = false;
+			paymentToAction = null;
+			revertReason = '';
 		}
 	}
 
@@ -232,14 +259,16 @@
 		const concept = (payment.concepto || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 		const isMatricula = concept.includes('matricula');
 		
-		if (role === 'cpd') {
-			return isMatricula;
-		}
-		if (role === 'cobranza') {
-			return !isMatricula;
-		}
-		
+		if (role === 'cpd') return isMatricula;
+		if (role === 'cobranza') return !isMatricula;
 		return false;
+	}
+
+	function canRevert(payment: Payment): boolean {
+		// ISSUE-P-CANALES: Solo personal financiero puede revertir pagos ya aprobados
+		if (payment.estado_pago !== 'aprobado') return false;
+		const role = $userStore.role;
+		return role === 'admin' || role === 'superadmin' || role === 'cobranza';
 	}
 
 	function getDropdownOptions(payment: Payment) {
@@ -269,6 +298,17 @@
 			);
 		}
 
+		if (canRevert(payment)) {
+			options.push(
+				{
+					label: 'Anular Pago',
+					id: 'revert',
+					icon: `<svg class="size-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+					action: () => handleRevertClick(payment)
+				}
+			)
+		}
+
 		return options;
 	}
 
@@ -277,23 +317,19 @@
 			case 'pendiente': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
 			case 'aprobado': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
 			case 'rechazado': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+			case 'anulado': return 'bg-gray-800 text-white dark:bg-gray-100 dark:text-gray-900'; // ISSUE-P-CANALES
 			default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
 		}
 	}
 
-	// Etiquetas dinámicas de colores para distinguir conceptos de pago (Bug 7)
 	function getConceptBadgeColor(concept: string) {
 		const normalized = (concept || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-		
 		if (normalized.includes('matricula')) {
-			// Azul para matrícula (concepto académico)
 			return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50';
 		}
 		if (normalized.includes('modulo') || normalized.includes('cuota')) {
-			// Púrpura para módulos/cuotas (concepto financiero)
 			return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800/50';
 		}
-		// Gris por defecto
 		return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700';
 	}
 
@@ -309,7 +345,6 @@
 			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
 			if (filters.estudiante_id) filterParams.estudiante_id = filters.estudiante_id;
 
-			// SE CORRIGE LÍMITE DE CONSULTA A 500 PARA EVITAR EL ERROR 422 DEL BACKEND (BUG DESCARGA)
 			const res = await paymentService.getAll(1, 500, filterParams) as any;
 			const allPayments: Payment[] = Array.isArray(res) ? res : (res?.data ?? []);
 
@@ -323,18 +358,17 @@
 				: 'todos';
 			const filename = `pagos_${courseName}_${new Date().toISOString().slice(0,10)}.csv`;
 
-			const headers = ['Remitente','Banco','Monto Comprobante','Fecha Comprobante','Cuenta Destino','Fecha Registro','Concepto','Monto/Cuota','Nº Transacción', isStaff ? 'Estudiante ID' : '', 'Curso', 'Estado'];
+			const headers = ['Remitente', 'Método', 'Banco','Monto Comprobante','Fecha Comprobante','Cuenta Destino','Fecha Registro','Concepto','Nº Transacción', isStaff ? 'Estudiante ID' : '', 'Curso', 'Estado'];
 			
-			// BLINDADO CONTRA VALORES NULOS/INDEFINIDOS (PARCHE BUG DESCARGA)
 			const rows = allPayments.map(p => [
 				p.remitente || 'No disponible',
-				p.banco || 'No disponible',
+				p.metodo_pago || 'Transferencia',
+				p.banco || 'Caja UAGRM',
 				p.monto_comprobante ? formatCurrency(p.monto_comprobante) : 'Bs 0.00',
 				p.fecha_comprobante ? formatDate(p.fecha_comprobante) : '---',
 				p.cuenta_destino || '---',
 				p.created_at ? formatDate(p.created_at) : '---',
 				p.concepto || 'No especificado',
-				p.cantidad_pago ? formatCurrency(p.cantidad_pago) : 'Bs 0.00',
 				p.numero_transaccion || '---',
 				isStaff ? (p.estudiante_id || '') : '',
 				`"${p.curso_id && coursesMap[p.curso_id] ? coursesMap[p.curso_id].nombre_programa : '—'}"`,
@@ -356,7 +390,6 @@
 			csvLoading = false;
 		}
 	}
-
 </script>
 
 <div class="space-y-6">
@@ -387,7 +420,6 @@
 
 	<!-- Filters -->
 	<div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-		<!-- Search -->
 		<div class="md:col-span-1">
 			<label for="search" class="sr-only">Buscar</label>
 			<div class="relative">
@@ -401,13 +433,12 @@
 					id="search"
 					bind:value={filters.q}
 					class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-					placeholder="Buscar..."
+					placeholder="Buscar recibo o nombre..."
 					oninput={handleSearchInput}
 				/>
 			</div>
 		</div>
 		
-		<!-- Estado -->
 		<div>
 			<select
 				bind:value={filters.estado}
@@ -418,11 +449,11 @@
 				<option value="pendiente">Pendiente</option>
 				<option value="aprobado">Aprobado</option>
 				<option value="rechazado">Rechazado</option>
+				<option value="anulado">Anulado</option>
 			</select>
 		</div>
 
 		{#if isStaff}
-			<!-- Curso -->
 			<div class="flex flex-col gap-1">
 				<div class="relative">
 					<select
@@ -444,21 +475,13 @@
 							onclick={() => { filters.curso_id = ''; page = 1; handleFilterChange(); }}
 							class="absolute right-7 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors z-10"
 							title="Quitar filtro de curso"
-							aria-label="Quitar filtro de curso"
 						>
 							<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
 						</button>
 					{/if}
 				</div>
-				{#if filters.curso_id}
-					<span class="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400">
-						<svg class="size-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-						Filtro activo
-					</span>
-				{/if}
 			</div>
 
-			<!-- Estudiante -->
 			<div>
 				<select
 					bind:value={filters.estudiante_id}
@@ -477,31 +500,30 @@
 
 
 	{#if loading && payments.length === 0}
-		<TableSkeleton columns={12} rows={10} />
+		<TableSkeleton columns={11} rows={10} />
 	{:else}
+		<!-- UX/UI FIX: Se agregó whitespace-nowrap y se eliminó la columna Monto/Cuota -->
 		<div class="w-full overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 					<thead class="bg-gray-50 dark:bg-gray-800">
 						<tr>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nº Transacción</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
-						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Banco</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Comprobante</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Comprobante</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta destino</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Registro</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto/Cuota</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nº Transacción</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Curso</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Remitente</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Método</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Banco</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Monto Depositado</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Fecha Transacción</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Concepto Prorrateo</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Estado</th>
 							<th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
 						</tr>
 					</thead>
 					<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
 						{#each payments as payment (payment._id)}
 							<tr>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
-									{payment.numero_transaccion}
+								<td class="px-6 py-4 whitespace-nowrap text-sm font-mono font-medium text-gray-700 dark:text-gray-300">
+									{payment.numero_transaccion?.startsWith('CAJA-') ? 'Físico / ' + payment.numero_transaccion : payment.numero_transaccion}
 								</td>
 								<td class="px-6 py-4 text-sm max-w-[200px]">
 									{#if coursesMap[payment.curso_id]}
@@ -511,7 +533,7 @@
 											class="inline-flex flex-col items-start text-left group"
 											title="Filtrar por este curso"
 										>
-											<span class="text-gray-900 dark:text-white font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight">{coursesMap[payment.curso_id].nombre_programa}</span>
+											<span class="text-gray-900 dark:text-white font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight line-clamp-2">{coursesMap[payment.curso_id].nombre_programa}</span>
 											<span class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{coursesMap[payment.curso_id].codigo}</span>
 										</button>
 									{:else}
@@ -521,28 +543,25 @@
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
 									{payment.remitente || 'No disponible'}
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-									{payment.banco || 'No disponible'}
+								<!-- Módulo ISSUE-P-CANALES: Columna de Método -->
+								<td class="px-6 py-4 whitespace-nowrap text-sm">
+									<span class={`px-2 py-0.5 inline-flex text-xs font-bold rounded-md ${payment.metodo_pago === 'Caja' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}>
+										{payment.metodo_pago || 'Transferencia'}
+									</span>
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+									{payment.banco || 'Caja UAGRM'}
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600 dark:text-green-400">
 									{payment.monto_comprobante ? formatCurrency(payment.monto_comprobante) : '0.00'}
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
 									{formatDate(payment.fecha_comprobante || '---')}
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
-									{payment.cuenta_destino || '---'}
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
-									{formatDate(payment.created_at || '---')}
-								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm">
 									<span class={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getConceptBadgeColor(payment.concepto)}`}>
 										{payment.concepto || 'No especificado'}
 									</span>
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
-									{formatCurrency(payment.cantidad_pago)}
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(payment.estado_pago)}`}>
@@ -568,14 +587,13 @@
 						{/each}
 						{#if payments.length === 0}
 							<tr>
-								<td colspan={isStaff ? 12 : 11} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
+								<td colspan={isStaff ? 10 : 9} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
 									No se encontraron pagos.
 								</td>
 							</tr>
 						{/if}
 					</tbody>
 			</table>
-		
 		</div>
 
 		<Pagination
@@ -641,6 +659,37 @@
 		</div>
 	</Modal>
 
+	<!-- Revert/Anular Modal (ISSUE-P-CANALES) -->
+	<Modal
+		isOpen={isRevertModalOpen}
+		title="Anular Pago (Rollback Financiero)"
+		onClose={() => isRevertModalOpen = false}
+		maxWidth="sm:max-w-lg"
+	>
+		<div class="space-y-4 p-4">
+			<div class="bg-red-50 border-l-4 border-red-500 p-3 rounded-md">
+				<p class="text-xs text-red-700 font-medium">
+					⚠️ ADVERTENCIA: Esta acción anulará el pago en la libreta del estudiante y <strong>restaurará sus deudas de forma automática</strong>. Use esto solo para cheques sin fondos, transferencias revertidas o errores graves.
+				</p>
+			</div>
+			<div>
+				<label for="revertReason" class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Justificación Legal de la Anulación</label>
+				<textarea
+					id="revertReason"
+					bind:value={revertReason}
+					rows="3"
+					class="w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
+					placeholder="Ej: Transferencia internacional bloqueada por el banco emisor. Se restaura deuda."
+				></textarea>
+				<p class="text-[10px] text-gray-500 mt-1">Mínimo 10 caracteres requeridos para auditoría.</p>
+			</div>
+			<div class="flex justify-end gap-3 mt-4">
+				<Button variant="secondary" onclick={() => isRevertModalOpen = false} disabled={actionLoading}>Cancelar</Button>
+				<Button variant="destructive" onclick={confirmRevert} loading={actionLoading} disabled={revertReason.length < 10}>Anular y Restaurar Deuda</Button>
+			</div>
+		</div>
+	</Modal>
+
 	<!-- View Payment Details Modal -->
 	<Modal
 		isOpen={!!selectedPayment}
@@ -659,16 +708,24 @@
 						<label for="remitente" class="block text-xs font-medium text-gray-900 uppercase">Remitente</label>
 						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="remitente">{selectedPayment.remitente || 'No disponible'}</p>
 					</div>
+					
+					<div>
+						<label for="metodo_pago" class="block text-xs font-medium text-gray-900 uppercase">Método de Pago</label>
+						<span class={`mt-1 px-2.5 py-0.5 inline-flex text-xs font-bold rounded-md ${selectedPayment.metodo_pago === 'Caja' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+							{selectedPayment.metodo_pago || 'Transferencia'}
+						</span>
+					</div>
+
 					<div>
 						<label for="banco" class="block text-xs font-medium text-gray-900 uppercase">Banco</label>
 						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="banco">
-							{selectedPayment.banco || 'No registrado'}
+							{selectedPayment.banco || 'Caja Física UAGRM'}
 						</p>
 					</div>
 
 					<div>
-						<label for="montoComprobante" class="block text-xs font-medium text-gray-900 uppercase">Monto Comprobante (Bs)</label>
-						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="montoComprobante">
+						<label for="montoComprobante" class="block text-xs font-bold text-gray-900 uppercase">Monto Real Depositado</label>
+						<p class="text-lg font-black text-green-600 dark:text-green-400 mt-1" id="montoComprobante">
 							{selectedPayment.monto_comprobante ? formatCurrency(selectedPayment.monto_comprobante) : '---'}
 						</p>
 					</div>
@@ -687,21 +744,18 @@
 						</p>
 					</div>
 					<div>
-						<label for="detailsConcepto" class="block text-xs font-medium text-gray-900 uppercase">Concepto</label>
+						<label for="detailsConcepto" class="block text-xs font-medium text-gray-900 uppercase">Concepto Prorrateo</label>
 						<span id="detailsConcepto" class={`mt-1 px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getConceptBadgeColor(selectedPayment.concepto)}`}>
 							{selectedPayment.concepto || 'No especificado'}
 						</span>
 					</div>
-					<div>
-						<label for="monto" class="block text-xs font-medium text-gray-900 uppercase">Monto/Cuota</label>
-						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="monto">{formatCurrency(selectedPayment.cantidad_pago)}</p>
-					</div>
+					
 					<div>
 						<label for="numeroTransaccion" class="block text-xs font-medium text-gray-900 uppercase">Nº Transacción</label>
-						<p class="text-sm font-medium text-gray-500 dark:text-white mt-1" id="numeroTransaccion">{selectedPayment.numero_transaccion}</p>
+						<p class="text-sm font-mono text-gray-500 dark:text-white mt-1" id="numeroTransaccion">{selectedPayment.numero_transaccion || 'S/N'}</p>
 					</div>
 					<div>
-						<label for="estado" class="block text-xs font-medium text-gray-900 uppercase">Estado</label>
+						<label for="estado" class="block text-xs font-medium text-gray-900 uppercase">Estado General</label>
 						<span class={`mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedPayment.estado_pago)}`}>
 							{selectedPayment.estado_pago}
 						</span>
@@ -713,7 +767,6 @@
 					{#if selectedPayment.comprobante_url}
 						<div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900 flex justify-center items-center min-h-[200px]">
 							{#if selectedPayment.comprobante_url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) || selectedPayment.comprobante_url.includes('cloudinary')} 
-								<!-- Simple heuristic for images, assuming cloudinary urls without specific extension might be images or using img tag handles it if it is an image resource -->
 								<img 
 									src={selectedPayment.comprobante_url} 
 									alt="Comprobante" 
@@ -729,7 +782,13 @@
 							{/if}
 						</div>
 					{:else}
-						<p class="text-sm text-gray-500 italic">No hay comprobante adjunto.</p>
+						<div class="bg-orange-50 border border-orange-200 p-8 rounded-lg text-center">
+							<svg class="size-10 text-orange-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+							</svg>
+							<p class="text-orange-800 font-bold">Pago Presencial en Caja</p>
+							<p class="text-sm text-orange-600 mt-1">Este pago no requiere comprobante digital adjunto.</p>
+						</div>
 					{/if}
 				</div>
 
