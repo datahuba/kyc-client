@@ -4,6 +4,7 @@
 	import Modal from '$lib/components/ui/modal.svelte';
 	import { formatCurrency } from '$lib/utils';
 	import { userStore } from '$lib/stores/userStore';
+	import { apiKyC } from '$lib/config/apiKyc.config'; // IMPORTACIÓN DEL CLIENTE ESTÁNDAR DE TU PROYECTO
 
 	interface Props {
 		isOpen: boolean;
@@ -53,76 +54,18 @@
 		}
 	});
 
-	// Función de barrido defensivo para localizar el Token JWT bajo cualquier formato común
-	function getAuthToken(): string | null {
-		if (typeof localStorage === 'undefined') return null;
-
-		// 1. Barrido de claves directas comunes
-		const directKeys = ['access_token', 'accessToken', 'token', 'jwt', 'kyc_token'];
-		for (const key of directKeys) {
-			const val = localStorage.getItem(key);
-			if (val) return val;
-		}
-
-		// 2. Barrido reactivo sobre el store de usuario de Svelte ($userStore)
-		const storeToken = $userStore?.token 
-			|| $userStore?.accessToken 
-			|| $userStore?.jwt 
-			|| $userStore?.user?.token 
-			|| $userStore?.user?.access_token;
-		if (storeToken) return storeToken;
-
-		// 3. Barrido de des-serialización de objetos compuestos de sesión
-		const complexKeys = ['user', 'auth', 'session', 'userStore'];
-		for (const key of complexKeys) {
-			try {
-				const val = localStorage.getItem(key);
-				if (val) {
-					const parsed = JSON.parse(val);
-					const token = parsed.token 
-						|| parsed.access_token 
-						|| parsed.accessToken 
-						|| parsed.jwt 
-						|| parsed.user?.token;
-					if (token) return token;
-				}
-			} catch (e) {
-				// Ignorar fallos de parseo JSON si el valor no es un objeto
-			}
-		}
-
-		return null;
-	}
-
-	// Petición HTTP nativa asíncrona robusta con detector dinámico de entorno
+	// Petición HTTP limpia, estandarizada y segura utilizando apiKyC
 	async function fetchFinancialSummary(id: string) {
 		financialLoading = true;
 		financialError = null;
 		try {
-			const token = getAuthToken();
-			const headers: Record<string, string> = {
-				'Content-Type': 'application/json'
-			};
-			if (token) {
-				headers['Authorization'] = `Bearer ${token}`;
-			}
-
-			// DETECTOR DINÁMICO DE ENTORNO: 
-			// En localhost redirige al puerto 8000 de FastAPI. En prod usa ruta relativa para Nginx proxy.
-			const host = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-				? 'http://localhost:8000' 
-				: '';
-
-			const response = await fetch(`${host}/api/v1/students/${id}/financial-summary`, {
-				headers
-			});
-
-			if (!response.ok) {
-				const errData = await response.json().catch(() => ({}));
-				throw new Error(errData.detail || 'Error al obtener resumen financiero');
-			}
-
-			financialSummary = await response.json();
+			// Consumimos el endpoint utilizando el cliente estándar apiKyC de la universidad
+			financialSummary = await apiKyC.get<{
+				total_invertido: number;
+				pagado: number;
+				en_proceso: number;
+				saldo_pendiente: number;
+			}>(`/students/${id}/financial-summary`);
 		} catch (err: any) {
 			console.error('Error fetching financial summary:', err);
 			financialError = err.message || 'Error de conexión';
@@ -228,4 +171,3 @@
 		<div class="mt-6 flex justify-end"><Button variant="secondary" onclick={onClose}>Cerrar</Button></div>
 	</div>
 </Modal>
-
