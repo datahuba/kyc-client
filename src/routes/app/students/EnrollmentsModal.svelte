@@ -36,7 +36,7 @@
 	// Obtener ID resiliente para MongoDB
 	const studentId = $derived(student?._id || student?.id);
 
-	// Filtro multicapa ultra-resistente para detectar rol CPD (ignora mayúsculas/minúsculas)
+	// Filtro de rol CPD (ignora mayúsculas/minúsculas)
 	const isCpd = $derived(
 		$userStore?.rol?.toUpperCase() === 'CPD' || 
 		$userStore?.user?.rol?.toUpperCase() === 'CPD' ||
