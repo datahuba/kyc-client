@@ -228,3 +228,4 @@
 		<div class="mt-6 flex justify-end"><Button variant="secondary" onclick={onClose}>Cerrar</Button></div>
 	</div>
 </Modal>
+
