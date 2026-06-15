@@ -35,10 +35,12 @@
 	// Obtener ID resiliente para MongoDB
 	const studentId = $derived(student?._id || student?.id);
 
-	// Determinar rol y segregación de funciones (cpd no debe ver datos financieros)
+	// Filtro multicapa ultra-resistente para detectar rol CPD (ignora mayúsculas/minúsculas)
 	const isCpd = $derived(
-		$userStore?.rol === 'cpd' || 
-		$userStore?.user?.rol === 'cpd'
+		$userStore?.rol?.toUpperCase() === 'CPD' || 
+		$userStore?.user?.rol?.toUpperCase() === 'CPD' ||
+		$userStore?.role?.toUpperCase() === 'CPD' ||
+		$userStore?.user?.role?.toUpperCase() === 'CPD'
 	);
 
 	// Efecto reactivo para fetch dinámico controlado
@@ -51,7 +53,7 @@
 		}
 	});
 
-	// Petición HTTP nativa asíncrona robusta con tokens de sesión de DataHub
+	// Petición HTTP nativa asíncrona robusta con detector dinámico de entorno
 	async function fetchFinancialSummary(id: string) {
 		financialLoading = true;
 		financialError = null;
@@ -64,7 +66,13 @@
 				headers['Authorization'] = `Bearer ${token}`;
 			}
 
-			const response = await fetch(`/api/v1/students/${id}/financial-summary`, {
+			// DETECTOR DINÁMICO DE ENTORNO: 
+			// En localhost redirige al puerto 8000 de FastAPI. En prod usa ruta relativa para Nginx proxy.
+			const host = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+				? 'http://localhost:8000' 
+				: '';
+
+			const response = await fetch(`${host}/api/v1/students/${id}/financial-summary`, {
 				headers
 			});
 
@@ -171,7 +179,7 @@
 									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{enrollment.estado}</span>
 								</td>
 							</tr>
-						{/each}
+						{#each}
 					</tbody>
 				</table>
 			</div>
