@@ -50,10 +50,10 @@
 		// Student/Teacher roles (Academic)
 		{ name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 		
-		// Admin/Staff roles (Se condiciona el acceso en base a la jerarquía de la UAGRM)
+		// Admin/Staff roles 
 		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza'], loginTypes: ['admin'] },
 		
-		// ---> REUBICADO: ACCESO DIRECTO A INSCRIPCIONES INMEDIATAMENTE DEBAJO DEL DASHBOARD <---
+		// ---> ACCESO DIRECTO A INSCRIPCIONES <---
 		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
 		
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza'], loginTypes: ['admin'] },
