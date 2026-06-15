@@ -27,25 +27,28 @@ class PaymentService {
 		);
 	}
 
-	async create(data: CreatePaymentFormData): Promise<Payment> {
+	async create(data: any): Promise<Payment> {
 		const formData = new FormData();
-		formData.append('file', data.file);
+		
 		formData.append('inscripcion_id', data.inscripcion_id);
-		formData.append('numero_transaccion', data.numero_transaccion);
-
-		// --- NUEVOS CAMPOS ---
-        formData.append('remitente', data.remitente);
-        formData.append('banco', data.banco);
         formData.append('monto_comprobante', data.monto_comprobante.toString());
-        formData.append('fecha_comprobante', data.fecha_comprobante);
-		formData.append('cuenta_destino', data.cuenta_destino);
-
-		// if (data.glosa) {
-        //     formData.append('glosa', data.glosa);
-        // }
+		
+		// ISSUE-P-CANALES: Campos dinámicos agregados para el algoritmo de Prorrateo y Caja
+		if (data.metodo_pago) formData.append('metodo_pago', data.metodo_pago);
+		if (data.concepto) formData.append('concepto', data.concepto);
+		if (data.numero_transaccion) formData.append('numero_transaccion', data.numero_transaccion);
+        if (data.remitente) formData.append('remitente', data.remitente);
+        if (data.banco) formData.append('banco', data.banco);
+        if (data.fecha_comprobante) formData.append('fecha_comprobante', data.fecha_comprobante);
+		if (data.cuenta_destino) formData.append('cuenta_destino', data.cuenta_destino);
 
 		if (data.descuento_aplicado) {
 			formData.append('descuento_aplicado', data.descuento_aplicado.toString());
+		}
+
+		// BUG FIX: Evitar que FormData envíe el string "null" a FastAPI si no hay archivo
+		if (data.file && data.file !== null && data.file !== undefined) {
+			formData.append('file', data.file);
 		}
 
 		return await apiKyC.post<Payment>('/payments/', formData);
@@ -65,6 +68,11 @@ class PaymentService {
 
 	async reject(id: string, motivo: string): Promise<Payment> {
 		return await apiKyC.put<Payment>(`/payments/${id}/rechazar`, { motivo });
+	}
+
+	// ROLLBACK FINANCIERO (Anulación de pago)
+	async revert(id: string, motivo: string): Promise<Payment> {
+		return await apiKyC.put<Payment>(`/payments/${id}/anular`, { motivo });
 	}
 
 }
