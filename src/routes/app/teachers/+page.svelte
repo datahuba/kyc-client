@@ -310,7 +310,6 @@
                     </button>
                 </div>
 
-                <!-- BUG 4 FIX: Contenedor con scroll para evitar desbordes -->
                 <div class="flex-1 overflow-y-auto p-4 md:p-6">
                     {#if loadingModules}
                         <div class="flex justify-center py-12">
@@ -322,7 +321,6 @@
                             <p class="text-sm text-gray-400 mt-2">Puedes asignarle módulos desde la sección de Cursos.</p>
                         </div>
                     {:else}
-                        <!-- BUG 4 FIX: overflow-x-auto para responsividad en tabla -->
                         <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto w-full">
                             <table class="w-full text-left border-collapse">
                                 <thead class="bg-gray-50 dark:bg-gray-900/50">
@@ -339,14 +337,12 @@
                                             <td class="px-4 py-4 align-top">
                                                 <div class="flex items-start gap-2">
                                                     <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold shrink-0 mt-0.5">{module.modulo_index}</span>
-                                                    <!-- BUG 4 FIX: break-words y whitespace-normal para títulos de módulos largos -->
                                                     <span class="text-sm font-medium text-gray-900 dark:text-white whitespace-normal break-words max-w-[280px]">
                                                         {module.modulo_nombre}
                                                     </span>
                                                 </div>
                                             </td>
                                             <td class="px-4 py-4 align-top">
-                                                <!-- BUG 4 FIX: break-words y whitespace-normal en lugar de truncate -->
                                                 <span class="text-sm text-gray-600 dark:text-gray-300 whitespace-normal break-words max-w-[300px] block">
                                                     {module.curso_nombre}
                                                 </span>
@@ -365,7 +361,6 @@
                                     {/each}
                                 </tbody>
                             </table>
-                            </div>
                         </div>
                     {/if}
                 </div>
