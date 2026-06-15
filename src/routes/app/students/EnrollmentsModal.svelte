@@ -4,7 +4,7 @@
 	import Modal from '$lib/components/ui/modal.svelte';
 	import { formatCurrency } from '$lib/utils';
 	import { userStore } from '$lib/stores/userStore';
-	import { apiKyC } from '$lib/config/apiKyc.config'; // IMPORTACIÓN DEL CLIENTE ESTÁNDAR DE TU PROYECTO
+	import { apiKyC } from '$lib/config/apiKyC.config'; // IMPORTACIÓN CORREGIDA CON "C" MAYÚSCULA PARA LINUX
 
 	interface Props {
 		isOpen: boolean;
