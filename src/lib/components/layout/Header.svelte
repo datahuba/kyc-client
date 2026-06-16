@@ -63,33 +63,40 @@
 		goto('/auth/sign-in');
 	}
 
-	// Lógica asíncrona de notificaciones (Con bandera 'silent' para evitar loaders molestos)
-	async function loadNotificationsSummary(silent = false) {
+	// Lógica asíncrona de notificaciones
+	async function loadNotificationsSummary() {
 		if (!user) return;
 		try {
 			// Consultar conteo de alertas no leídas
 			const countRes = await apiKyC.get<{ unread_count: number }>('/notifications/unread-count');
 			unreadCount = countRes.unread_count;
 
-			// Si el dropdown está abierto, refrescar la lista
+			// Si el dropdown está abierto, refrescar la lista en segundo plano
 			if (isNotificationsOpen) {
-				await fetchNotificationsList(silent);
+				await fetchNotificationsList();
 			}
 		} catch (err) {
 			console.error('Error loading notifications summary:', err);
 		}
 	}
 
-	async function fetchNotificationsList(silent = false) {
-		if (!silent) notificationsLoading = true;
+	async function fetchNotificationsList() {
+		// [ESTRATEGIA CACHE-FIRST]: Solo activamos el spinner de carga si la lista local está vacía.
+		// Si ya tenemos notificaciones en memoria, las renderizamos al instante y refrescamos de forma silenciosa.
+		const isFirstLoad = notifications.length === 0;
+		if (isFirstLoad) {
+			notificationsLoading = true;
+		}
+		
 		try {
-			// Agregada la barra diagonal final "/" para evitar el 307 Redirect en el VPS
 			const list = await apiKyC.get<any[]>('/notifications/?limit=15');
 			notifications = list;
 		} catch (err) {
 			console.error('Error fetching notifications list:', err);
 		} finally {
-			if (!silent) notificationsLoading = false;
+			if (isFirstLoad) {
+				notificationsLoading = false;
+			}
 		}
 	}
 
@@ -102,7 +109,10 @@
 		try {
 			// 2. Enviar petición en segundo plano silencioso
 			await apiKyC.patch(`/notifications/${id}/read`, {});
-			await loadNotificationsSummary(true);
+			
+			// 3. Sincronizar conteo de manera silenciosa
+			const countRes = await apiKyC.get<{ unread_count: number }>('/notifications/unread-count');
+			unreadCount = countRes.unread_count;
 		} catch (err) {
 			console.error('Error marking notification as read:', err);
 			// Rollback en caso de falla
@@ -119,7 +129,10 @@
 		try {
 			// 2. Enviar petición en segundo plano silencioso
 			await apiKyC.post('/notifications/read-all', {});
-			await loadNotificationsSummary(true);
+			
+			// 3. Sincronizar conteo de manera silenciosa
+			const countRes = await apiKyC.get<{ unread_count: number }>('/notifications/unread-count');
+			unreadCount = countRes.unread_count;
 		} catch (err) {
 			console.error('Error marking all as read:', err);
 			loadNotificationsSummary();
@@ -217,6 +230,7 @@
 						onclick={() => { isNotificationsOpen = !isNotificationsOpen; isProfileOpen = false; }}
 					>
 						<span class="sr-only">Ver notificaciones</span>
+						<!-- Campana SVG de Tailwind CSS -->
 						<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
 						</svg>
@@ -225,7 +239,7 @@
 								<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
 								<span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
 							</span>
-						{/if}
+						 font-semibold{/if}
 					</button>
 
 					{#if isNotificationsOpen}
