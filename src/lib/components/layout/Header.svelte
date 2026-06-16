@@ -63,7 +63,7 @@
 		goto('/auth/sign-in');
 	}
 
-	// Lógica asíncrona de notificaciones
+	// Lógica asíncrona de notificaciones (Con bandera 'silent' para evitar loaders molestos)
 	async function loadNotificationsSummary(silent = false) {
 		if (!user) return;
 		try {
@@ -80,7 +80,7 @@
 		}
 	}
 
-	async function fetchNotificationsList() {
+	async function fetchNotificationsList(silent = false) {
 		// [ESTRATEGIA CACHE-FIRST]: Solo activamos el spinner de carga si la lista local está vacía.
 		// Si ya tenemos notificaciones en memoria, las renderizamos al instante y refrescamos de forma silenciosa.
 		const isFirstLoad = notifications.length === 0;
@@ -140,30 +140,28 @@
 		}
 	}
 
-	// Normalización matemática aritmética estricta de Bolivia (UTC-4) libre de timezones locales del cliente
+	// Sanitizado estricto e interpretación ISO de Bolivia (UTC-4) sin importar reloj local del cliente
 	function formatTime(dateStr: string): string {
 		if (!dateStr) return '';
 		
-		let normalizedDateStr = dateStr;
-		if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-')) {
-			normalizedDateStr += 'Z';
+		// 1. Reemplazar espacio por 'T' para asegurar formato estándar ISO
+		let cleanStr = dateStr.trim().replace(' ', 'T');
+		
+		// 2. Recortar microsegundos que confunden a algunos motores JS
+		if (cleanStr.includes('.')) {
+			cleanStr = cleanStr.split('.')[0];
 		}
 		
-		const date = new Date(normalizedDateStr);
+		// 3. Forzar sufijo 'Z' para indicar que es UTC nativo de MongoDB
+		if (!cleanStr.endsWith('Z') && !cleanStr.includes('+') && !cleanStr.includes('-')) {
+			cleanStr += 'Z';
+		}
+		
+		const date = new Date(cleanStr);
 		if (isNaN(date.getTime())) return dateStr;
 		
-		// Forzar matemáticamente Bolivia (UTC-4) independientemente del reloj de la PC del cliente
-		const utcMs = date.getTime();
-		const boliviaOffsetMs = -4 * 60 * 60 * 1000; // -4 Horas en milisegundos
-		const boliviaDate = new Date(utcMs + boliviaOffsetMs);
-		
-		const hours = String(boliviaDate.getUTCHours()).padStart(2, '0');
-		const minutes = String(boliviaDate.getUTCMinutes()).padStart(2, '0');
-		const day = boliviaDate.getUTCDate();
-		const month = boliviaDate.getUTCMonth() + 1;
-		const year = boliviaDate.getUTCFullYear();
-		
-		return `${hours}:${minutes} ${day}/${month}/${year}`;
+		// 4. Formatear la fecha local (El navegador la convertirá automáticamente a Bolivia UTC-4)
+		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString();
 	}
 
 	// Cerrar dropdowns al hacer clic fuera de ellos (Click-Outside nativo)
@@ -228,7 +226,7 @@
 					<button 
 						type="button" 
 						class="relative -m-2.5 p-2.5 text-gray-400 hover:text-gray-500 dark:text-gray-300 dark:hover:text-gray-200 transition-colors"
-						onclick={() => { isNotificationsOpen = !isNotificationsOpen; isProfileOpen = false; }}
+						onclick={(e) => { e.stopPropagation(); isNotificationsOpen = !isNotificationsOpen; isProfileOpen = false; }}
 					>
 						<span class="sr-only">Ver notificaciones</span>
 						<!-- Campana SVG de Tailwind CSS -->
@@ -240,17 +238,20 @@
 								<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
 								<span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
 							</span>
-						{/if} <!-- SANEADA LA LITERAL RESIDUA QUE MOSTRABA FONT-SEMIBOLD EN PRODUCCIÓN -->
+						{/if}
 					</button>
 
 					{#if isNotificationsOpen}
-						<div class="absolute right-0 z-50 mt-2.5 w-80 origin-top-right rounded-lg bg-white dark:bg-gray-900 py-2 shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-800 focus:outline-none border border-gray-100 dark:border-gray-800">
+						<div 
+							onclick={(e) => e.stopPropagation()} 
+							class="absolute right-0 z-50 mt-2.5 w-80 origin-top-right rounded-lg bg-white dark:bg-gray-900 py-2 shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-800 focus:outline-none border border-gray-100 dark:border-gray-800"
+						>
 							<div class="px-4 py-2 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
 								<span class="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Notificaciones</span>
 								{#if unreadCount > 0}
 									<button 
 										type="button" 
-										onclick={markAllAsRead}
+										onclick={(e) => { e.stopPropagation(); markAllAsRead(); }}
 										class="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
 									>
 										Marcar todo como leído
@@ -276,7 +277,7 @@
 										{#each unreadAlerts as item (item._id || item.id)}
 											<button
 												type="button"
-												onclick={() => markAsRead(item._id || item.id)}
+												onclick={(e) => { e.stopPropagation(); markAsRead(item._id || item.id); }}
 												class="w-full text-left px-4 py-3 text-xs flex gap-x-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40 bg-blue-50/40 dark:bg-blue-900/10"
 											>
 												<div class="mt-0.5 shrink-0">
@@ -313,7 +314,7 @@
 										{#each readAlerts as item (item._id || item.id)}
 											<button
 												type="button"
-												onclick={() => markAsRead(item._id || item.id)}
+												onclick={(e) => { e.stopPropagation(); markAsRead(item._id || item.id); }}
 												class="w-full text-left px-4 py-3 text-xs flex gap-x-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40"
 											>
 												<div class="mt-0.5 shrink-0">
