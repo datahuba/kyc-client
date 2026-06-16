@@ -27,6 +27,10 @@
 	let notificationContainerEl = $state<HTMLDivElement | null>(null);
 	let profileContainerEl = $state<HTMLDivElement | null>(null);
 
+	// Derivados reactivos para separar Nuevas de Anteriores (Historial)
+	const unreadAlerts = $derived(notifications.filter(n => !n.leido));
+	const readAlerts = $derived(notifications.filter(n => n.leido));
+
 	function getUserTypeLabel(): string {
 		if (loginType === 'academic') {
 			return academicRole === 'teacher' ? 'Docente' : 'Estudiante';
@@ -79,7 +83,8 @@
 	async function fetchNotificationsList() {
 		notificationsLoading = true;
 		try {
-			const list = await apiKyC.get<any[]>('/notifications?limit=10');
+			// SANEADO: Agregada la barra diagonal final "/" para evitar el 307 Redirect en el VPS
+			const list = await apiKyC.get<any[]>('/notifications/?limit=15');
 			notifications = list;
 		} catch (err) {
 			console.error('Error fetching notifications list:', err);
@@ -217,7 +222,7 @@
 								{/if}
 							</div>
 
-							<div class="max-h-64 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+							<div class="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 scrollbar-hide">
 								{#if notificationsLoading}
 									<div class="flex justify-center items-center py-6">
 										<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
@@ -227,36 +232,79 @@
 										No tienes notificaciones
 									</div>
 								{:else}
-									{#each notifications as item (item._id || item.id)}
-										<button
-											type="button"
-											onclick={() => markAsRead(item._id || item.id)}
-											class="w-full text-left px-4 py-3 text-xs flex gap-x-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40 { !item.leido ? 'bg-blue-50/40 dark:bg-blue-900/10' : '' }"
-										>
-											<div class="mt-0.5 shrink-0">
-												{#if item.tipo_alerta === 'success'}
-													<span class="size-2 rounded-full bg-green-500 inline-block"></span>
-												{:else if item.tipo_alerta === 'warning'}
-													<span class="size-2 rounded-full bg-amber-500 inline-block"></span>
-												{:else if item.tipo_alerta === 'error'}
-													<span class="size-2 rounded-full bg-red-500 inline-block"></span>
-												{:else}
-													<span class="size-2 rounded-full bg-blue-500 inline-block"></span>
-												{/if}
-											</div>
-											<div class="flex-1">
-												<p class="text-gray-900 dark:text-white { !item.leido ? 'font-bold' : 'font-medium' }">
-													{item.titulo}
-												</p>
-												<p class="text-gray-500 dark:text-gray-400 mt-0.5 break-words">
-													{item.mensaje}
-												</p>
-												<span class="text-[9px] text-gray-400 mt-1 block">
-													{formatTime(item.created_at)}
-												</span>
-											</div>
-										</button>
-									{/each}
+									<!-- SECCIÓN 1: NUEVAS (ALERTAS SIN LEER) -->
+									{#if unreadAlerts.length > 0}
+										<div class="px-4 py-1.5 bg-blue-50/20 dark:bg-blue-950/20 text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+											Nuevas
+										</div>
+										{#each unreadAlerts as item (item._id || item.id)}
+											<button
+												type="button"
+												onclick={() => markAsRead(item._id || item.id)}
+												class="w-full text-left px-4 py-3 text-xs flex gap-x-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40 bg-blue-50/40 dark:bg-blue-900/10"
+											>
+												<div class="mt-0.5 shrink-0">
+													{#if item.tipo_alerta === 'success'}
+														<span class="size-2 rounded-full bg-green-500 inline-block"></span>
+													{:else if item.tipo_alerta === 'warning'}
+														<span class="size-2 rounded-full bg-amber-500 inline-block"></span>
+													{:else if item.tipo_alerta === 'error'}
+														<span class="size-2 rounded-full bg-red-500 inline-block"></span>
+													{:else}
+														<span class="size-2 rounded-full bg-blue-500 inline-block"></span>
+													{/if}
+												</div>
+												<div class="flex-1">
+													<p class="text-gray-900 dark:text-white font-bold">
+														{item.titulo}
+													</p>
+													<p class="text-gray-500 dark:text-gray-400 mt-0.5 break-words">
+														{item.mensaje}
+													</p>
+													<span class="text-[9px] text-gray-400 mt-1 block">
+														{formatTime(item.created_at)}
+													</span>
+												</div>
+											</button>
+										{/each}
+									{/if}
+
+									<!-- SECCIÓN 2: HISTORIAL (NOTIFICACIONES LEÍDAS) -->
+									{#if readAlerts.length > 0}
+										<div class="px-4 py-1.5 bg-gray-50 dark:bg-gray-800/40 text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+											Anteriores (Historial)
+										</div>
+										{#each readAlerts as item (item._id || item.id)}
+											<button
+												type="button"
+												onclick={() => markAsRead(item._id || item.id)}
+												class="w-full text-left px-4 py-3 text-xs flex gap-x-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40"
+											>
+												<div class="mt-0.5 shrink-0">
+													{#if item.tipo_alerta === 'success'}
+														<span class="size-2 rounded-full bg-green-500 inline-block"></span>
+													{:else if item.tipo_alerta === 'warning'}
+														<span class="size-2 rounded-full bg-amber-500 inline-block"></span>
+													{:else if item.tipo_alerta === 'error'}
+														<span class="size-2 rounded-full bg-red-500 inline-block"></span>
+													{:else}
+														<span class="size-2 rounded-full bg-blue-500 inline-block"></span>
+													{/if}
+												</div>
+												<div class="flex-1">
+													<p class="text-gray-900 dark:text-white font-medium">
+														{item.titulo}
+													</p>
+													<p class="text-gray-500 dark:text-gray-400 mt-0.5 break-words">
+														{item.mensaje}
+													</p>
+													<span class="text-[9px] text-gray-400 mt-1 block">
+														{formatTime(item.created_at)}
+													</span>
+												</div>
+											</button>
+										{/each}
+									{/if}
 								{/if}
 							</div>
 						</div>
