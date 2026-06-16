@@ -63,8 +63,8 @@
 		goto('/auth/sign-in');
 	}
 
-	// Lógica asíncrona de notificaciones
-	async function loadNotificationsSummary() {
+	// Lógica asíncrona de notificaciones (Con bandera 'silent' para evitar loaders molestos)
+	async function loadNotificationsSummary(silent = false) {
 		if (!user) return;
 		try {
 			// Consultar conteo de alertas no leídas
@@ -73,60 +73,83 @@
 
 			// Si el dropdown está abierto, refrescar la lista
 			if (isNotificationsOpen) {
-				await fetchNotificationsList();
+				await fetchNotificationsList(silent);
 			}
 		} catch (err) {
 			console.error('Error loading notifications summary:', err);
 		}
 	}
 
-	async function fetchNotificationsList() {
-		notificationsLoading = true;
+	async function fetchNotificationsList(silent = false) {
+		if (!silent) notificationsLoading = true;
 		try {
-			// SANEADO: Agregada la barra diagonal final "/" para evitar el 307 Redirect en el VPS
+			// Agregada la barra diagonal final "/" para evitar el 307 Redirect en el VPS
 			const list = await apiKyC.get<any[]>('/notifications/?limit=15');
 			notifications = list;
 		} catch (err) {
 			console.error('Error fetching notifications list:', err);
 		} finally {
-			notificationsLoading = false;
+			if (!silent) notificationsLoading = false;
 		}
 	}
 
+	// Marcar como leído con actualización optimista de 0ms para el usuario
 	async function markAsRead(id: string) {
+		// 1. Cambio optimista inmediato en la UI local sin mostrar spinner de carga
+		notifications = notifications.map(n => (n._id === id || n.id === id) ? { ...n, leido: true } : n);
+		if (unreadCount > 0) unreadCount--;
+
 		try {
+			// 2. Enviar petición en segundo plano silencioso
 			await apiKyC.patch(`/notifications/${id}/read`, {});
-			// Actualización optimista de la UI antes de refrescar
-			notifications = notifications.map(n => (n._id === id || n.id === id) ? { ...n, leido: true } : n);
-			await loadNotificationsSummary();
+			await loadNotificationsSummary(true);
 		} catch (err) {
 			console.error('Error marking notification as read:', err);
+			// Rollback en caso de falla
+			loadNotificationsSummary();
 		}
 	}
 
+	// Marcar todas como leídas optimista e instantáneo
 	async function markAllAsRead() {
+		// 1. Cambio optimista inmediato
+		notifications = notifications.map(n => ({ ...n, leido: true }));
+		unreadCount = 0;
+
 		try {
+			// 2. Enviar petición en segundo plano silencioso
 			await apiKyC.post('/notifications/read-all', {});
-			notifications = notifications.map(n => ({ ...n, leido: true }));
-			unreadCount = 0;
-			await loadNotificationsSummary();
+			await loadNotificationsSummary(true);
 		} catch (err) {
 			console.error('Error marking all as read:', err);
+			loadNotificationsSummary();
 		}
 	}
 
-	// Normalización matemática y conversión automática a hora local de Bolivia (UTC-4)
+	// Normalización matemática aritmética estricta de Bolivia (UTC-4) libre de timezones locales del cliente
 	function formatTime(dateStr: string): string {
 		if (!dateStr) return '';
 		
 		let normalizedDateStr = dateStr;
-		// Si es ingenua (naive) desde Python, agregar el sufijo 'Z' de UTC
 		if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-')) {
 			normalizedDateStr += 'Z';
 		}
 		
 		const date = new Date(normalizedDateStr);
-		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString();
+		if (isNaN(date.getTime())) return dateStr;
+		
+		// Forzar matemáticamente Bolivia (UTC-4) independientemente del reloj de la PC del cliente
+		const utcMs = date.getTime();
+		const boliviaOffsetMs = -4 * 60 * 60 * 1000; // -4 Horas en milisegundos
+		const boliviaDate = new Date(utcMs + boliviaOffsetMs);
+		
+		const hours = String(boliviaDate.getUTCHours()).padStart(2, '0');
+		const minutes = String(boliviaDate.getUTCMinutes()).padStart(2, '0');
+		const day = boliviaDate.getUTCDate();
+		const month = boliviaDate.getUTCMonth() + 1;
+		const year = boliviaDate.getUTCFullYear();
+		
+		return `${hours}:${minutes} ${day}/${month}/${year}`;
 	}
 
 	// Cerrar dropdowns al hacer clic fuera de ellos (Click-Outside nativo)
@@ -152,8 +175,7 @@
 	onMount(() => {
 		if (user) {
 			loadNotificationsSummary();
-			// Polling suave en segundo plano cada 45 segundos
-			pollInterval = setInterval(loadNotificationsSummary, 45000);
+			pollInterval = setInterval(() => loadNotificationsSummary(true), 45000); // Refrescos de fondo silenciosos
 		}
 		if (typeof window !== 'undefined') {
 			window.addEventListener('click', handleWindowClick);
@@ -195,7 +217,6 @@
 						onclick={() => { isNotificationsOpen = !isNotificationsOpen; isProfileOpen = false; }}
 					>
 						<span class="sr-only">Ver notificaciones</span>
-						<!-- Campana SVG de Tailwind CSS -->
 						<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
 						</svg>
