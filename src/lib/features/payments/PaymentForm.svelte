@@ -169,7 +169,14 @@
 			}
 
 			await paymentService.create(payload);
-			alert('success', 'Pago reportado correctamente. El CPD lo revisará a la brevedad.');
+
+			// [SANEADO LOGICO - TEXTO DINÁMICO REVISOR]
+			// Determinamos si audita el CPD (para Matrícula) o Cobranzas (para Módulos de colegiatura)
+			const conceptoLower = (concepto || "").toLowerCase().trim();
+			const isMatricula = conceptoLower.includes("matricula") || conceptoLower.includes("matrícula");
+			const revisor = isMatricula ? "El CPD" : "Cobranzas";
+
+			alert('success', `Pago reportado correctamente. ${revisor} lo revisará a la brevedad.`);
 			onSuccess();
 		} catch (error: any) {
 			console.error(error);
