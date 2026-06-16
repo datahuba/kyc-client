@@ -110,8 +110,17 @@
 		}
 	}
 
+	// Normalización matemática y conversión automática a hora local de Bolivia (UTC-4)
 	function formatTime(dateStr: string): string {
-		const date = new Date(dateStr);
+		if (!dateStr) return '';
+		
+		let normalizedDateStr = dateStr;
+		// Si es ingenua (naive) desde Python, agregar el sufijo 'Z' de UTC
+		if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-')) {
+			normalizedDateStr += 'Z';
+		}
+		
+		const date = new Date(normalizedDateStr);
 		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString();
 	}
 
@@ -224,7 +233,6 @@
 											onclick={() => markAsRead(item._id || item.id)}
 											class="w-full text-left px-4 py-3 text-xs flex gap-x-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40 { !item.leido ? 'bg-blue-50/40 dark:bg-blue-900/10' : '' }"
 										>
-											<!-- Indicador de severidad de la alerta -->
 											<div class="mt-0.5 shrink-0">
 												{#if item.tipo_alerta === 'success'}
 													<span class="size-2 rounded-full bg-green-500 inline-block"></span>
@@ -234,7 +242,7 @@
 													<span class="size-2 rounded-full bg-red-500 inline-block"></span>
 												{:else}
 													<span class="size-2 rounded-full bg-blue-500 inline-block"></span>
-												{/if}
+												{#if}
 											</div>
 											<div class="flex-1">
 												<p class="text-gray-900 dark:text-white { !item.leido ? 'font-bold' : 'font-medium' }">
@@ -255,7 +263,6 @@
 					{/if}
 				</div>
 				
-				<!-- Divisor vertical visual de diseño -->
 				<div class="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-200 dark:lg:bg-gray-800" aria-hidden="true"></div>
 			{/if}
 
