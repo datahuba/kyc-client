@@ -64,7 +64,7 @@
 	}
 
 	// Lógica asíncrona de notificaciones
-	async function loadNotificationsSummary() {
+	async function loadNotificationsSummary(silent = false) {
 		if (!user) return;
 		try {
 			// Consultar conteo de alertas no leídas
@@ -73,7 +73,7 @@
 
 			// Si el dropdown está abierto, refrescar la lista en segundo plano
 			if (isNotificationsOpen) {
-				await fetchNotificationsList();
+				await fetchNotificationsList(silent);
 			}
 		} catch (err) {
 			console.error('Error loading notifications summary:', err);
@@ -89,6 +89,7 @@
 		}
 		
 		try {
+			// Agregada la barra diagonal final "/" para evitar el 307 Redirect en el VPS
 			const list = await apiKyC.get<any[]>('/notifications/?limit=15');
 			notifications = list;
 		} catch (err) {
@@ -239,7 +240,7 @@
 								<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
 								<span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
 							</span>
-						 font-semibold{/if}
+						{/if} <!-- SANEADA LA LITERAL RESIDUA QUE MOSTRABA FONT-SEMIBOLD EN PRODUCCIÓN -->
 					</button>
 
 					{#if isNotificationsOpen}
