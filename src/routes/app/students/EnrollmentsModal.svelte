@@ -44,22 +44,19 @@
 	// Obtener ID resiliente para MongoDB
 	const studentId = $derived(student?._id || student?.id);
 
+	// Obtener usuario reactivo desde el store de sesión
+	const user = $derived($userStore.user);
+	const userRole = $derived(user?.rol || user?.role);
+
 	// Filtro de rol CPD (ignora mayúsculas/minúsculas)
 	const isCpd = $derived(
-		$userStore?.rol?.toUpperCase() === 'CPD' || 
-		$userStore?.user?.rol?.toUpperCase() === 'CPD' ||
-		$userStore?.role?.toUpperCase() === 'CPD' ||
-		$userStore?.user?.role?.toUpperCase() === 'CPD'
+		userRole?.toUpperCase() === 'CPD'
 	);
 
-	// Determinar si el usuario conectado tiene permisos de Cobranza o Administración
+	// Determinar si el usuario es estrictamente del rol COBRANZA para habilitar cobro directo
 	const isFinanciero = $derived(
-		$userStore?.rol?.toUpperCase() === 'COBRANZA' || 
-		$userStore?.user?.rol?.toUpperCase() === 'COBRANZA' ||
-		$userStore?.rol?.toUpperCase() === 'ADMIN' || 
-		$userStore?.user?.rol?.toUpperCase() === 'ADMIN' ||
-		$userStore?.rol?.toUpperCase() === 'SUPERADMIN' || 
-		$userStore?.user?.rol?.toUpperCase() === 'SUPERADMIN'
+		userRole?.toUpperCase() === 'COBRANZA' || 
+		userRole?.toUpperCase() === 'COBRANZAS'
 	);
 
 	// Efecto reactivo para fetch dinámico controlado

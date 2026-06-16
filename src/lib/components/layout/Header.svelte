@@ -23,6 +23,10 @@
 	let notificationsLoading = $state(false);
 	let pollInterval: any;
 
+	// Referencias de elementos para el cierre click-outside
+	let notificationContainerEl = $state<HTMLDivElement | null>(null);
+	let profileContainerEl = $state<HTMLDivElement | null>(null);
+
 	function getUserTypeLabel(): string {
 		if (loginType === 'academic') {
 			return academicRole === 'teacher' ? 'Docente' : 'Estudiante';
@@ -111,6 +115,19 @@
 		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString();
 	}
 
+	// Cerrar dropdowns al hacer clic fuera de ellos (Click-Outside nativo)
+	function handleWindowClick(event: MouseEvent) {
+		const target = event.target as Node;
+		
+		if (isNotificationsOpen && notificationContainerEl && !notificationContainerEl.contains(target)) {
+			isNotificationsOpen = false;
+		}
+		
+		if (isProfileOpen && profileContainerEl && !profileContainerEl.contains(target)) {
+			isProfileOpen = false;
+		}
+	}
+
 	// Svelte 5: Observar apertura de notificaciones para cargar la lista
 	$effect(() => {
 		if (isNotificationsOpen && user) {
@@ -124,10 +141,16 @@
 			// Polling suave en segundo plano cada 45 segundos
 			pollInterval = setInterval(loadNotificationsSummary, 45000);
 		}
+		if (typeof window !== 'undefined') {
+			window.addEventListener('click', handleWindowClick);
+		}
 	});
 
 	onDestroy(() => {
 		if (pollInterval) clearInterval(pollInterval);
+		if (typeof window !== 'undefined') {
+			window.removeEventListener('click', handleWindowClick);
+		}
 	});
 </script>
 
@@ -151,7 +174,7 @@
 			
 			<!-- BUZÓN DE NOTIFICACIONES (ISSUE-U-BUZON) -->
 			{#if user}
-				<div class="relative">
+				<div class="relative" bind:this={notificationContainerEl}>
 					<button 
 						type="button" 
 						class="relative -m-2.5 p-2.5 text-gray-400 hover:text-gray-500 dark:text-gray-300 dark:hover:text-gray-200 transition-colors"
@@ -237,7 +260,7 @@
 			{/if}
 
 			<!-- Profile dropdown -->
-			<div class="relative">
+			<div class="relative" bind:this={profileContainerEl}>
 				<button 
 					type="button" 
 					class="-m-1.5 flex items-center p-1.5" 
