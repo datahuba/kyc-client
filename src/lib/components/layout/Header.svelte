@@ -242,7 +242,7 @@
 													<span class="size-2 rounded-full bg-red-500 inline-block"></span>
 												{:else}
 													<span class="size-2 rounded-full bg-blue-500 inline-block"></span>
-												{#if}
+												{/if}
 											</div>
 											<div class="flex-1">
 												<p class="text-gray-900 dark:text-white { !item.leido ? 'font-bold' : 'font-medium' }">
