@@ -38,7 +38,19 @@
 		es_estudiante_interno: 'interno',
 		password: '',
 		course_id: '',
-		lista_cursos_ids: []
+		lista_cursos_ids: [],
+		// Datos oficiales UAGRM
+		sexo: '',
+		estado_civil: '',
+		pais: '',
+		departamento: '',
+		provincia: '',
+		nacionalidad: '',
+		telefono: '',
+		modalidad_ingreso: '',
+		periodo: '',
+		tipo_sangre: '',
+		titulo_bachiller: ''
 	});
 
 	// File States
@@ -80,12 +92,24 @@
 				course_id: student.lista_cursos_ids?.[0] || '',
 				nombre: student.nombre,
 				extension: student.extension,
-				fecha_nacimiento: student.fecha_nacimiento.split('T')[0],
+				fecha_nacimiento: student.fecha_nacimiento ? student.fecha_nacimiento.split('T')[0] : '',
 				foto_url: student.foto_url,
 				celular: student.celular,
 				email: student.email,
 				domicilio: student.domicilio,
 				es_estudiante_interno: student.es_estudiante_interno,
+				// Datos oficiales UAGRM
+				sexo: student.sexo || '',
+				estado_civil: student.estado_civil || '',
+				pais: student.pais || '',
+				departamento: student.departamento || '',
+				provincia: student.provincia || '',
+				nacionalidad: student.nacionalidad || '',
+				telefono: student.telefono || '',
+				modalidad_ingreso: student.modalidad_ingreso || '',
+				periodo: student.periodo || '',
+				tipo_sangre: student.tipo_sangre || '',
+				titulo_bachiller: student.titulo_bachiller || ''
 				// password: '',
 				//lista_cursos_ids: student.lista_cursos_ids || []
 			};
@@ -117,6 +141,17 @@
 				domicilio: '',
 				es_estudiante_interno: 'interno',
 				password: '',
+				sexo: '',
+				estado_civil: '',
+				pais: '',
+				departamento: '',
+				provincia: '',
+				nacionalidad: '',
+				telefono: '',
+				modalidad_ingreso: '',
+				periodo: '',
+				tipo_sangre: '',
+				titulo_bachiller: ''
 				//lista_cursos_ids: []
 			};
 			active = true;
@@ -125,7 +160,40 @@
 		}
 	});
 
+	// Fecha máxima permitida para nacimiento (hoy; no se permiten fechas futuras)
+	const hoyISO = new Date().toISOString().split('T')[0];
+
+	// Validación de escritura en el cliente (feedback inmediato antes de enviar)
+	function validarFormulario(): string | null {
+		const nombre = (formData.nombre || '').trim();
+		const carnet = (formData.carnet || '').trim();
+		const email = (formData.email || '').trim();
+		const celular = (formData.celular || '').trim();
+		const telefono = (formData.telefono || '').trim();
+
+		if (nombre.length < 3) return 'Ingresa el nombre completo (mínimo 3 caracteres).';
+		if (!/^\d{5,10}$/.test(carnet)) return 'El carnet debe tener entre 5 y 10 dígitos (solo números).';
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Ingresa un correo electrónico válido.';
+		if (celular && !/^\d{6,15}$/.test(celular)) return 'El celular debe contener solo números (6 a 15 dígitos).';
+		if (telefono && !/^\d{6,15}$/.test(telefono)) return 'El teléfono debe contener solo números.';
+		if (formData.fecha_nacimiento) {
+			const f = new Date(formData.fecha_nacimiento);
+			if (isNaN(f.getTime())) return 'La fecha de nacimiento no es válida.';
+			if (f > new Date()) return 'La fecha de nacimiento no puede ser futura.';
+			if (f.getFullYear() < 1940) return 'La fecha de nacimiento no es válida (año demasiado antiguo).';
+		}
+		if (!isEditMode && (!formData.password || formData.password.length < 5)) {
+			return 'La contraseña debe tener al menos 5 caracteres.';
+		}
+		return null;
+	}
+
 	async function handleSubmit() {
+		const errorValidacion = validarFormulario();
+		if (errorValidacion) {
+			alert('error', errorValidacion);
+			return;
+		}
 		saving = true;
 		uploadProgress = 'Guardando datos básicos...';
 		try {
@@ -205,14 +273,64 @@
 		</div>
 
 		<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-			<Input label="Nombre Completo" id="nombre" bind:value={formData.nombre} required placeholder="Juan Perez" class="md:col-span-2" />
-			<Input label="Fecha de Nacimiento" id="fecha_nacimiento" type="date" bind:value={formData.fecha_nacimiento} required />
-			<Input label="Carnet" id="carnet" bind:value={formData.carnet} required placeholder="12345678" />
-			<Input label="Extensión CI" id="extension" bind:value={formData.extension} required placeholder="LP" />
+			<Input label="Nombre Completo" id="nombre" bind:value={formData.nombre} required minlength={3} maxlength={200} placeholder="Juan Perez" class="md:col-span-2" />
+			<Input label="Fecha de Nacimiento" id="fecha_nacimiento" type="date" bind:value={formData.fecha_nacimiento} required min="1940-01-01" max={hoyISO} />
+			<Input label="Carnet" id="carnet" bind:value={formData.carnet} required inputmode="numeric" pattern="[0-9]*" minlength={5} maxlength={10} placeholder="12345678" />
+			<Input label="Extensión CI" id="extension" bind:value={formData.extension} required maxlength={4} placeholder="LP" />
 			
 			<Input label="Email" id="email" type="email" bind:value={formData.email} required placeholder="juan@example.com" class="md:col-span-2" />
-			<Input label="Celular" id="celular" bind:value={formData.celular} required placeholder="+591 70000000" />
-			<Input label="Domicilio" id="domicilio" bind:value={formData.domicilio} required placeholder="Av. Principal #123" />
+			<Input label="Celular" id="celular" bind:value={formData.celular} required inputmode="numeric" pattern="[0-9]*" maxlength={15} placeholder="70000000" />
+			<Input label="Domicilio" id="domicilio" bind:value={formData.domicilio} required maxlength={200} placeholder="Av. Principal #123" />
+		</div>
+	</div>
+
+	<!-- Datos Oficiales UAGRM -->
+	<div class="p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+		<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-gray-700">
+			<div class="rounded-lg bg-primary-50 p-2 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300">
+				<IdentificationIcon class="size-6" />
+			</div>
+			<div>
+				<Heading level="h4" class="text-lg font-semibold text-gray-900 dark:text-white">Datos Oficiales (UAGRM)</Heading>
+				<p class="text-sm text-gray-500 dark:text-gray-400">Ficha oficial de datos personales y académicos</p>
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+			<Select label="Sexo" bind:value={formData.sexo}>
+				<option value="">— Seleccione —</option>
+				<option value="masculino">Masculino</option>
+				<option value="femenino">Femenino</option>
+			</Select>
+			<Select label="Estado Civil" bind:value={formData.estado_civil}>
+				<option value="">— Seleccione —</option>
+				<option value="soltero">Soltero(a)</option>
+				<option value="casado">Casado(a)</option>
+				<option value="divorciado">Divorciado(a)</option>
+				<option value="viudo">Viudo(a)</option>
+				<option value="otro">Otro</option>
+			</Select>
+			<Select label="Tipo de Sangre" bind:value={formData.tipo_sangre}>
+				<option value="">— Seleccione —</option>
+				<option value="A+">A+</option>
+				<option value="A-">A-</option>
+				<option value="B+">B+</option>
+				<option value="B-">B-</option>
+				<option value="AB+">AB+</option>
+				<option value="AB-">AB-</option>
+				<option value="O+">O+</option>
+				<option value="O-">O-</option>
+			</Select>
+			<Input label="Teléfono (fijo)" id="telefono" bind:value={formData.telefono} inputmode="numeric" pattern="[0-9]*" maxlength={15} placeholder="Solo números" />
+
+			<Input label="Nacionalidad" id="nacionalidad" bind:value={formData.nacionalidad} placeholder="Boliviana" />
+			<Input label="País" id="pais" bind:value={formData.pais} placeholder="Bolivia" />
+			<Input label="Departamento" id="departamento" bind:value={formData.departamento} placeholder="Santa Cruz" />
+			<Input label="Provincia" id="provincia" bind:value={formData.provincia} placeholder="Andrés Ibáñez" />
+
+			<Input label="Modalidad de Ingreso" id="modalidad_ingreso" bind:value={formData.modalidad_ingreso} placeholder="P.S.A." />
+			<Input label="Periodo" id="periodo" bind:value={formData.periodo} placeholder="1/2019" />
+			<Input label="Título de Bachiller" id="titulo_bachiller" bind:value={formData.titulo_bachiller} placeholder="Nº de título" class="md:col-span-2" />
 		</div>
 	</div>
 
