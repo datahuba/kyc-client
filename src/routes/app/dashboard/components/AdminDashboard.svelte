@@ -207,7 +207,7 @@
 						<p class="text-[10px] sm:text-xs text-green-600 mt-1 truncate">{stats.students.active} Activos</p>
 					</div>
 					<!-- BUG 6 FIX: shrink-0 para proteger el icono del aplastamiento -->
-					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+					<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
 						<UsersIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
@@ -220,7 +220,7 @@
 						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 truncate">{stats.courses.total}</p>
 						<p class="text-[10px] sm:text-xs text-green-600 mt-1 truncate">{stats.courses.active} Activos</p>
 					</div>
-					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+					<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
 						<TagIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
@@ -233,7 +233,7 @@
 						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 truncate">{stats.enrollments.total}</p>
 						<p class="text-[10px] sm:text-xs text-green-600 mt-1 truncate">{stats.enrollments.active} Activas</p>
 					</div>
-					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+					<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
 						<ClipboardIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
@@ -248,7 +248,7 @@
 						</p>
 						<p class="text-[10px] sm:text-xs text-yellow-600 mt-1 truncate">{stats.payments.pending} Pendientes</p>
 					</div>
-					<div class="p-3 bg-light-tertiary dark:bg-light-tertiary rounded-full text-light-primary dark:text-light-primary shrink-0">
+					<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
 						<CreditCardIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
@@ -328,7 +328,7 @@
 															<p class="text-xl sm:text-2xl font-black text-gray-800 dark:text-white mt-0.5 truncate">{course.inscritos}</p>
 															<p class="text-[10px] text-green-600 font-semibold mt-1 truncate">{course.inscritosActivos} Activos</p>
 														</div>
-														<div class="p-2.5 sm:p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl text-blue-600 shrink-0">
+														<div class="p-2.5 sm:p-3 bg-primary-100 dark:bg-primary-900/30 rounded-xl text-primary-600 dark:text-primary-300 shrink-0">
 															<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
 														</div>
 													</div>
