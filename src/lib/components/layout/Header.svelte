@@ -2,8 +2,9 @@
 	import { userStore } from '$lib/stores/userStore';
 	import { Menu2Icon, UserIcon } from '$lib/icons/outline';
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
+	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 	import { goto } from '$app/navigation';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import { apiKyC } from '$lib/config/apiKyC.config'; // IMPORTACIÓN DEL CLIENTE ESTÁNDAR
 
 	interface Props {
@@ -140,6 +141,41 @@
 		}
 	}
 
+	// Resolver la ruta destino de una notificación.
+	// 1) usa la `ruta` explícita del backend (notificaciones nuevas);
+	// 2) si no, la deduce por `referencia_tipo`;
+	// 3) fallback por contenido para notificaciones antiguas (sin ruta).
+	function resolveNotificationRoute(item: any): string | null {
+		if (item?.ruta) return item.ruta;
+		if (item?.referencia_tipo === 'payment') return '/app/payments';
+		if (item?.referencia_tipo === 'enrollment') return '/app/enrollments';
+
+		const text = `${item?.titulo ?? ''} ${item?.mensaje ?? ''}`.toLowerCase();
+		if (
+			text.includes('pago') ||
+			text.includes('matrícula') || text.includes('matricula') ||
+			text.includes('cobro') ||
+			text.includes('comprobante') ||
+			text.includes('cuota')
+		) {
+			return '/app/payments';
+		}
+		if (text.includes('inscri')) return '/app/enrollments';
+		return null;
+	}
+
+	// Click en una notificación: marcar leída (si aplica), cerrar el buzón y navegar a su flujo.
+	function handleNotificationClick(item: any) {
+		isNotificationsOpen = false;
+		if (!item.leido) {
+			markAsRead(item._id || item.id);
+		}
+		const ruta = resolveNotificationRoute(item);
+		if (ruta) {
+			goto(ruta);
+		}
+	}
+
 	// Sanitizado estricto e interpretación ISO de Bolivia (UTC-4) sin importar reloj local del cliente
 	function formatTime(dateStr: string): string {
 		if (!dateStr) return '';
@@ -177,10 +213,13 @@
 		}
 	}
 
-	// Svelte 5: Observar apertura de notificaciones para cargar la lista
+	// Svelte 5: Observar apertura de notificaciones para cargar la lista.
+	// `untrack` evita que la lectura de `notifications` dentro de fetchNotificationsList
+	// convierta a `notifications` en dependencia del efecto (lo que provocaba un loop
+	// infinito de fetch y el spinner que nunca terminaba).
 	$effect(() => {
 		if (isNotificationsOpen && user) {
-			fetchNotificationsList();
+			untrack(() => fetchNotificationsList());
 		}
 	});
 
@@ -219,7 +258,10 @@
 			</span>
 		</div>
 		<div class="flex items-center gap-x-4 lg:gap-x-6">
-			
+
+			<!-- TOGGLE DE TEMA CLARO/OSCURO -->
+			<ThemeToggle />
+
 			<!-- BUZÓN DE NOTIFICACIONES (ISSUE-U-BUZON) -->
 			{#if user}
 				<div class="relative" bind:this={notificationContainerEl}>
@@ -277,7 +319,7 @@
 										{#each unreadAlerts as item (item._id || item.id)}
 											<button
 												type="button"
-												onclick={(e) => { e.stopPropagation(); markAsRead(item._id || item.id); }}
+												onclick={(e) => { e.stopPropagation(); handleNotificationClick(item); }}
 												class="w-full text-left px-4 py-3 text-xs flex gap-x-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40 bg-blue-50/40 dark:bg-blue-900/10"
 											>
 												<div class="mt-0.5 shrink-0">
@@ -314,7 +356,7 @@
 										{#each readAlerts as item (item._id || item.id)}
 											<button
 												type="button"
-												onclick={(e) => { e.stopPropagation(); markAsRead(item._id || item.id); }}
+												onclick={(e) => { e.stopPropagation(); handleNotificationClick(item); }}
 												class="w-full text-left px-4 py-3 text-xs flex gap-x-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40"
 											>
 												<div class="mt-0.5 shrink-0">
