@@ -2,7 +2,7 @@ import { ErrorType } from '$lib/interfaces';
 import { AppError, errorService } from '$lib/services';
 import { API_CONFIG, defaultHeaders } from './api.config';
 import { browser } from '$app/environment';
-import { AUTH_TOKEN_KEY } from '$lib/constants';
+import { AUTH_TOKEN_KEY, USER_DATA_KEY, AUTH_TOKEN_EXPIRY_KEY } from '$lib/constants';
 
 interface RequestOptions {
 	requireAuth?: boolean;
@@ -114,11 +114,18 @@ class ApiKyC {
 				const errorBody = await response.json().catch(() => ({}));
 				const errorType = errorService.mapHttpToErrorType(response.status);
 
-				// Si es error 401, limpiar token
-				if (response.status === 401) {
-					if (browser) {
-						localStorage.removeItem('auth_token');
-						localStorage.removeItem('user_data');
+				// Si es error 401, limpiar la sesión con las CLAVES CORRECTAS y re-loguear.
+				// (Antes borraba 'auth_token'/'user_data' que no existen: el token vencido
+				//  quedaba en localStorage y provocaba un 401 eterno sin redirección.)
+				if (response.status === 401 && browser) {
+					localStorage.removeItem(AUTH_TOKEN_KEY);
+					localStorage.removeItem(USER_DATA_KEY);
+					localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
+
+					// Redirigir al login solo si no estamos ya en una pantalla pública
+					const path = window.location.pathname;
+					if (!path.startsWith('/auth') && path !== '/') {
+						window.location.href = '/auth/sign-in';
 					}
 				}
 

@@ -3,6 +3,8 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
 	import { formatCurrency } from '$lib/utils';
+	import { userStore } from '$lib/stores/userStore';
+	import { apiKyC } from '$lib/config/apiKyC.config'; // IMPORTACIÓN DEL CLIENTE ESTÁNDAR
 
 	interface Props {
 		isOpen: boolean;
@@ -19,10 +21,221 @@
 		studentEnrollments,
 		onClose
 	}: Props = $props();
+
+	// Estados reactivos financieros (Svelte 5 - Runas)
+	let financialSummary = $state<{
+		total_invertido: number;
+		pagado: number;
+		en_proceso: number;
+		saldo_pendiente: number;
+	} | null>(null);
+
+	let financialLoading = $state(false);
+	let financialError = $state<string | null>(null);
+
+	// Estados reactivos para el formulario de Cobro en Caja directo
+	let showCajaForm = $state(false);
+	let selectedEnrollmentForCaja = $state<Enrollment | null>(null);
+	let cajaMonto = $state<number>(0);
+	let cajaConcepto = $state<string>('');
+	let cajaRemitente = $state<string>('');
+	let cajaLoading = $state(false);
+
+	// Obtener ID resiliente para MongoDB
+	const studentId = $derived(student?._id || student?.id);
+
+	// Obtener usuario reactivo desde el store de sesión
+	const user = $derived($userStore.user);
+	const userRole = $derived(user?.rol || user?.role);
+
+	// Filtro de rol CPD (ignora mayúsculas/minúsculas)
+	const isCpd = $derived(
+		userRole?.toUpperCase() === 'CPD'
+	);
+
+	// Determinar si el usuario es estrictamente del rol COBRANZA para habilitar cobro directo
+	const isFinanciero = $derived(
+		userRole?.toUpperCase() === 'COBRANZA' || 
+		userRole?.toUpperCase() === 'COBRANZAS'
+	);
+
+	// Efecto reactivo para fetch dinámico controlado
+	$effect(() => {
+		if (isOpen && studentId && !isCpd) {
+			fetchFinancialSummary(studentId);
+		} else {
+			financialSummary = null;
+			financialError = null;
+			showCajaForm = false;
+			selectedEnrollmentForCaja = null;
+		}
+	});
+
+	// Petición HTTP limpia, estandarizada y segura utilizando apiKyC
+	async function fetchFinancialSummary(id: string) {
+		financialLoading = true;
+		financialError = null;
+		try {
+			// Consumimos el endpoint utilizando el cliente estándar apiKyC de la universidad
+			financialSummary = await apiKyC.get<{
+				total_invertido: number;
+				pagado: number;
+				en_proceso: number;
+				saldo_pendiente: number;
+			}>(`/students/${id}/financial-summary`);
+		} catch (err: any) {
+			console.error('Error fetching financial summary:', err);
+			financialError = err.message || 'Error de conexión';
+		} finally {
+			financialLoading = false;
+		}
+	}
+
+	// Confirmación de cobro físico en caja por cobranza
+	async function handleConfirmCajaPayment() {
+		if (!selectedEnrollmentForCaja || !studentId) return;
+		if (cajaMonto <= 0) {
+			alert('El monto del cobro en Caja debe ser estrictamente mayor a 0 Bs.');
+			return;
+		}
+		
+		cajaLoading = true;
+		try {
+			const payload = {
+				estudiante_id: studentId,
+				inscripcion_id: selectedEnrollmentForCaja._id || selectedEnrollmentForCaja.id,
+				cantidad_pago: cajaMonto,
+				concepto: cajaConcepto.trim() || undefined,
+				remitente: cajaRemitente.trim() || undefined
+			};
+
+			await apiKyC.post('/payments/caja-directo', payload);
+			
+			alert('Cobro directo en Caja registrado, aprobado y procesado con éxito.');
+			
+			// Limpiar formulario de Caja
+			showCajaForm = false;
+			selectedEnrollmentForCaja = null;
+			cajaMonto = 0;
+			cajaConcepto = '';
+			cajaRemitente = '';
+			
+			// Recargar resumen financiero y recargar página de forma reactiva para refrescar tablas del fondo
+			await fetchFinancialSummary(studentId);
+			window.location.reload();
+		} catch (err: any) {
+			console.error(err);
+			alert(err.message || 'Error de conexión al procesar pago en Caja');
+		} finally {
+			cajaLoading = false;
+		}
+	}
 </script>
 
 <Modal {isOpen} title={student ? `Inscripciones de ${student.nombre}` : 'Inscripciones'} onClose={onClose} maxWidth="sm:max-w-4xl">
 	<div class="p-6">
+		
+		<!-- FICHA DE ESTADO DE CUENTA (ISSUE-P-FICHA) -->
+		{#if !isCpd && student}
+			<div class="mb-6 bg-gray-50 dark:bg-gray-800/40 p-5 rounded-xl border border-gray-200 dark:border-gray-700/80">
+				<h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+					Ficha de Estado de Cuenta del Estudiante
+				</h3>
+				
+				{#if financialLoading}
+					<div class="grid grid-cols-2 md:grid-cols-4 gap-4 animate-pulse">
+						{#each Array(4) as _}
+							<div class="h-16 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+						{/each}
+					</div>
+				{:else if financialError}
+					<div class="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs rounded-lg">
+						No se pudo cargar la información financiera: {financialError}
+					</div>
+				{:else if financialSummary}
+					<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+						<!-- Total Invertido -->
+						<div class="bg-white dark:bg-gray-900 p-3.5 rounded-lg border border-gray-150 dark:border-gray-800 shadow-sm">
+							<span class="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total Invertido</span>
+							<span class="text-base md:text-lg font-black text-gray-900 dark:text-white mt-1 block">
+								{formatCurrency(financialSummary.total_invertido)}
+							</span>
+						</div>
+						
+						<!-- Pagado -->
+						<div class="bg-white dark:bg-gray-900 p-3.5 rounded-lg border border-gray-150 dark:border-gray-800 shadow-sm">
+							<span class="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Pagado</span>
+							<span class="text-base md:text-lg font-black text-green-600 dark:text-green-400 mt-1 block">
+								{formatCurrency(financialSummary.pagado)}
+							</span>
+						</div>
+						
+						<!-- En Proceso -->
+						<div class="bg-white dark:bg-gray-900 p-3.5 rounded-lg border border-gray-150 dark:border-gray-800 shadow-sm">
+							<span class="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">En Proceso</span>
+							<span class="text-base md:text-lg font-black text-amber-600 dark:text-amber-400 mt-1 block">
+								{formatCurrency(financialSummary.en_proceso)}
+							</span>
+						</div>
+						
+						<!-- Saldo Pendiente -->
+						<div class="bg-white dark:bg-gray-900 p-3.5 rounded-lg border border-gray-150 dark:border-gray-800 shadow-sm">
+							<span class="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Saldo Pendiente</span>
+							<span class={`text-base md:text-lg font-black mt-1 block ${financialSummary.saldo_pendiente > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+								{formatCurrency(financialSummary.saldo_pendiente)}
+							</span>
+						</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
+
+		<!-- FORMULARIO DIRECTO DE COBRO EN CAJA PARA COBRANZAS (ISSUE-P-CANALES) -->
+		{#if showCajaForm && selectedEnrollmentForCaja}
+			<div class="mb-6 bg-blue-50 dark:bg-blue-950/20 p-5 rounded-xl border border-blue-200 dark:border-blue-800 animate-fadeIn">
+				<h4 class="text-xs font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider mb-4">
+					Registrar Cobro Directo en Caja Física
+				</h4>
+				<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+					<div>
+						<label class="block text-[10px] uppercase font-black text-gray-400 tracking-wider mb-1">Monto Cobrado (Bs)*</label>
+						<input 
+							type="number" 
+							min="1"
+							bind:value={cajaMonto} 
+							class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500" 
+						/>
+					</div>
+					<div>
+						<label class="block text-[10px] uppercase font-black text-gray-400 tracking-wider mb-1">Concepto (Opcional)</label>
+						<input 
+							type="text" 
+							placeholder="Ej: Cuota 2 (Sugerido por sistema)" 
+							bind:value={cajaConcepto} 
+							class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500" 
+						/>
+					</div>
+					<div>
+						<label class="block text-[10px] uppercase font-black text-gray-400 tracking-wider mb-1">Remitente (Opcional)</label>
+						<input 
+							type="text" 
+							placeholder="Nombre del pagador" 
+							bind:value={cajaRemitente} 
+							class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500" 
+						/>
+					</div>
+				</div>
+				<div class="mt-4 flex justify-end gap-x-3">
+					<Button variant="secondary" onclick={() => { showCajaForm = false; selectedEnrollmentForCaja = null; }}>
+						Cancelar
+					</Button>
+					<Button variant="primary" loading={cajaLoading} onclick={handleConfirmCajaPayment}>
+						Confirmar y Aprobar Pago
+					</Button>
+				</div>
+			</div>
+		{/if}
+
 		{#if enrollmentsLoading}
 			<div class="flex justify-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>
 		{:else if studentEnrollments.length === 0}
@@ -36,6 +249,9 @@
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montos</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+							{#if isFinanciero}
+								<th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones de Caja</th>
+							{/if}
 						</tr>
 					</thead>
 					<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -52,6 +268,27 @@
 								<td class="px-6 py-4 whitespace-nowrap">
 									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{enrollment.estado}</span>
 								</td>
+								{#if isFinanciero}
+									<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
+										{#if enrollment.saldo_pendiente > 0}
+											<button 
+												type="button" 
+												onclick={() => { 
+													selectedEnrollmentForCaja = enrollment; 
+													cajaMonto = enrollment.saldo_pendiente; 
+													cajaConcepto = '';
+													cajaRemitente = student?.nombre || '';
+													showCajaForm = true; 
+												}}
+												class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+											>
+												Cobrar en Caja
+											</button>
+										{:else}
+											<span class="text-xs text-green-600 dark:text-green-400">Totalmente Pagado</span>
+										{/if}
+									</td>
+								{/if}
 							</tr>
 						{/each}
 					</tbody>

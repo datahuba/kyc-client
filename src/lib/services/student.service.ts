@@ -43,11 +43,19 @@ class StudentService {
 	}
 
     // ISSUE G: Añadido selector de tipo de estudiante
-    async importFromExcel(file: File, tipoEstudiante: 'interno' | 'externo'): Promise<{ success_count: number; errors: string[] }> {
+    // NUEVO: cursoId opcional para auto-inscribir a los estudiantes importados a un curso/diplomado
+    async importFromExcel(
+        file: File,
+        tipoEstudiante: 'interno' | 'externo',
+        cursoId?: string
+    ): Promise<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[] }> {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('tipo_estudiante', tipoEstudiante);
-        return await apiKyC.post<{ success_count: number; errors: string[] }>(
+        if (cursoId) {
+            formData.append('curso_id', cursoId);
+        }
+        return await apiKyC.post<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[] }>(
             '/students/import/excel', 
             formData, 
             { customTimeout: 120000 }

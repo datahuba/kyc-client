@@ -554,8 +554,8 @@
 									<div class="text-sm text-gray-900 dark:text-white">Total: {formatCurrency(student.financiero.total_a_pagar)}</div>
 									<div class="text-xs text-green-600">Pagado: {formatCurrency(student.financiero.total_pagado)}</div>
 									<div class="text-xs text-red-500">Saldo: {formatCurrency(student.financiero.saldo_pendiente)}</div>
-									<div class="w-full bg-gray-200 rounded-full h-1.5 mt-2 dark:bg-gray-700">
-										<div class="bg-blue-600 h-1.5 rounded-full" style={`width: ${Math.min(student.financiero.avance_pago, 100)}%`}></div>
+									<div class="w-full bg-gray-200 rounded-full h-1.5 mt-2 dark:bg-dark-border">
+										<div class="bg-primary-600 h-1.5 rounded-full" style={`width: ${Math.min(student.financiero.avance_pago, 100)}%`}></div>
 									</div>
 									<div class="text-[10px] text-right text-gray-500 mt-0.5">{student.financiero.avance_pago.toFixed(1)}%</div>
 								</td>

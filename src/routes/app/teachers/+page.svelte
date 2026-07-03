@@ -181,51 +181,77 @@
 			<Button onclick={() => (showNewTeacherModal = true)}>Crear primer docente</Button>
 		</div>
 	{:else}
-		<div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-			<div class="overflow-x-auto">
-				<table class="w-full">
-					<thead class="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-						<tr>
-							<th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Docente</th>
-							<th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Email</th>
-							<th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Estado</th>
-							<th class="px-6 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-						{#each teachers as teacher (teacher._id)}
-							<tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-								<td class="px-6 py-4 whitespace-nowrap">
-									<div class="flex items-center">
-										<div class="h-10 w-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
-											{teacher.username.charAt(0).toUpperCase()}
-										</div>
-										<div class="ml-3">
-											<p class="text-sm font-medium text-gray-900 dark:text-white">{teacher.username}</p>
-											<p class="text-xs text-gray-500 dark:text-gray-400">ID: {teacher._id.slice(0, 8)}</p>
-										</div>
+		<!-- ISSUE-X-COMPACT: Tabla de docentes (desktop, sin scroll) -->
+		<div class="hidden md:block bg-white dark:bg-dark-surface rounded-lg shadow border border-gray-200 dark:border-dark-border overflow-hidden">
+			<table class="w-full table-fixed">
+				<thead class="bg-gray-50 dark:bg-dark-background border-b border-gray-200 dark:border-dark-border">
+					<tr>
+						<th class="w-[34%] px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Docente</th>
+						<th class="w-[30%] px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Email</th>
+						<th class="w-[12%] px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Estado</th>
+						<th class="w-[24%] px-6 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-gray-200 dark:divide-dark-border">
+					{#each teachers as teacher (teacher._id)}
+						<tr class="hover:bg-gray-50 dark:hover:bg-dark-background/40 transition-colors align-middle">
+							<td class="px-6 py-4">
+								<div class="flex items-center min-w-0">
+									<div class="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-semibold">
+										{teacher.username.charAt(0).toUpperCase()}
 									</div>
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap">
-									<p class="text-sm text-gray-600 dark:text-gray-300">{teacher.email}</p>
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap">
-									{#if teacher.activo}
-										<span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Activo</span>
-									{:else}
-										<span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">Inactivo</span>
-									{/if}
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                                    <button onclick={() => handleViewModules(teacher)} class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-2">Ver Módulos</button>
-									<button onclick={() => handleEditTeacher(teacher)} class="text-amber-600 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-300 mr-2">Editar</button>
-									<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Eliminar</button>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
+									<div class="ml-3 min-w-0">
+										<p class="text-sm font-medium text-gray-900 dark:text-white truncate">{teacher.username}</p>
+										<p class="text-xs text-gray-500 dark:text-gray-400 truncate">ID: {teacher._id.slice(0, 8)}</p>
+									</div>
+								</div>
+							</td>
+							<td class="px-6 py-4">
+								<p class="text-sm text-gray-600 dark:text-gray-300 truncate" title={teacher.email}>{teacher.email}</p>
+							</td>
+							<td class="px-6 py-4">
+								{#if teacher.activo}
+									<span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Activo</span>
+								{:else}
+									<span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">Inactivo</span>
+								{/if}
+							</td>
+							<td class="px-6 py-4 text-right text-sm font-medium space-x-2 whitespace-nowrap">
+								<button onclick={() => handleViewModules(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
+								<button onclick={() => handleEditTeacher(teacher)} class="text-amber-600 hover:text-amber-800 dark:text-amber-400">Editar</button>
+								<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-red-600 hover:text-red-800 dark:text-red-400">Eliminar</button>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+
+		<!-- ISSUE-X-COMPACT: Tarjetas de docentes (móvil) -->
+		<div class="md:hidden space-y-3">
+			{#each teachers as teacher (teacher._id)}
+				<div class="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl p-4 shadow-sm">
+					<div class="flex items-center gap-3">
+						<div class="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-semibold">
+							{teacher.username.charAt(0).toUpperCase()}
+						</div>
+						<div class="min-w-0 flex-1">
+							<p class="text-sm font-semibold text-gray-900 dark:text-white truncate">{teacher.username}</p>
+							<p class="text-xs text-gray-500 dark:text-gray-400 truncate">{teacher.email}</p>
+						</div>
+						{#if teacher.activo}
+							<span class="px-2.5 py-0.5 shrink-0 text-[10px] font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Activo</span>
+						{:else}
+							<span class="px-2.5 py-0.5 shrink-0 text-[10px] font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">Inactivo</span>
+						{/if}
+					</div>
+					<div class="mt-3 flex items-center gap-4 text-sm font-medium border-t border-gray-100 dark:border-dark-border pt-3">
+						<button onclick={() => handleViewModules(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
+						<button onclick={() => handleEditTeacher(teacher)} class="text-amber-600 hover:text-amber-800 dark:text-amber-400">Editar</button>
+						<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-red-600 hover:text-red-800 dark:text-red-400 ml-auto">Eliminar</button>
+					</div>
+				</div>
+			{/each}
 		</div>
 	{/if}
 
@@ -310,7 +336,6 @@
                     </button>
                 </div>
 
-                <!-- BUG 4 FIX: Contenedor con scroll para evitar desbordes -->
                 <div class="flex-1 overflow-y-auto p-4 md:p-6">
                     {#if loadingModules}
                         <div class="flex justify-center py-12">
@@ -322,7 +347,6 @@
                             <p class="text-sm text-gray-400 mt-2">Puedes asignarle módulos desde la sección de Cursos.</p>
                         </div>
                     {:else}
-                        <!-- BUG 4 FIX: overflow-x-auto para responsividad en tabla -->
                         <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto w-full">
                             <table class="w-full text-left border-collapse">
                                 <thead class="bg-gray-50 dark:bg-gray-900/50">
@@ -339,14 +363,12 @@
                                             <td class="px-4 py-4 align-top">
                                                 <div class="flex items-start gap-2">
                                                     <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold shrink-0 mt-0.5">{module.modulo_index}</span>
-                                                    <!-- BUG 4 FIX: break-words y whitespace-normal para títulos de módulos largos -->
                                                     <span class="text-sm font-medium text-gray-900 dark:text-white whitespace-normal break-words max-w-[280px]">
                                                         {module.modulo_nombre}
                                                     </span>
                                                 </div>
                                             </td>
                                             <td class="px-4 py-4 align-top">
-                                                <!-- BUG 4 FIX: break-words y whitespace-normal en lugar de truncate -->
                                                 <span class="text-sm text-gray-600 dark:text-gray-300 whitespace-normal break-words max-w-[300px] block">
                                                     {module.curso_nombre}
                                                 </span>
@@ -365,7 +387,6 @@
                                     {/each}
                                 </tbody>
                             </table>
-                            </div>
                         </div>
                     {/if}
                 </div>

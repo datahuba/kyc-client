@@ -84,7 +84,7 @@
   en segundo plano en el mismo instante en que el usuario pase el puntero del mouse sobre 
   cualquier enlace o pestaña de navegación de Postgrado, simulando transiciones de 0ms.
 -->
-<div class="flex h-screen bg-gray-100" data-sveltekit-preload-data="hover">
+<div class="flex h-screen bg-light-primary dark:bg-dark-background transition-colors" data-sveltekit-preload-data="hover">
 	<Sidebar 
 		isOpen={sidebarOpen} 
 		onClose={() => sidebarOpen = false} 

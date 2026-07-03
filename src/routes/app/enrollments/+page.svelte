@@ -29,13 +29,13 @@
 	let totalItems: number = $state(0);
 	let totalPages: number = $state(1);
 
-	// Filter state
-	let filters = {
+	// Filter state (reactivo para bind:value sin warnings)
+	let filters = $state({
 		q: '',
 		estado: 'all',
 		curso_id: 'all',
 		estudiante_id: 'all'
-	};
+	});
 	let debounceTimer: any;
 
 	// Modal state
@@ -75,13 +75,18 @@
 			if (studentsList.length === 0 && currentRole !== 'student') {
 				const studentsRes = await studentService.getAll(1, 100); 
 				studentsList = studentsRes.data;
-				studentsRes.data.forEach(s => (studentsMap[s._id] = s));
+				// Construir el mapa local y asignarlo una sola vez (evita assignment_value_stale)
+				const sMap: Record<string, Student> = {};
+				for (const s of studentsRes.data) sMap[s._id] = s;
+				studentsMap = sMap;
 			}
 
 			if (coursesList.length === 0) {
 				const coursesRes = await courseService.getAll(1, 100);
 				coursesList = coursesRes.data;
-				coursesRes.data.forEach(c => (coursesMap[c._id] = c));
+				const cMap: Record<string, Course> = {};
+				for (const c of coursesRes.data) cMap[c._id] = c;
+				coursesMap = cMap;
 			}
 
 			let enrollmentsPromise;
@@ -346,72 +351,47 @@
 			<p class="text-gray-500 dark:text-gray-400">No hay inscripciones registradas.</p>
 		</div>
 	{:else}
-		<!-- Desktop Table -->
-		<div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
-			<table class="divide-y divide-gray-200 dark:divide-gray-700 w-full table-auto">
-				<thead class="bg-gray-50 dark:bg-gray-900">
+		<!-- ISSUE-X-COMPACT: Desktop Table consolidada SIN scroll horizontal -->
+		<div class="hidden md:block bg-white dark:bg-dark-surface rounded-lg shadow border border-gray-200 dark:border-dark-border overflow-hidden">
+			<table class="w-full table-fixed divide-y divide-gray-200 dark:divide-dark-border">
+				<thead class="bg-gray-50 dark:bg-dark-background">
 					<tr>
-						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
-						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Curso</th>
-						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
-						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
-						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pagado</th>
-						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Saldo</th>
-						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dto. Curso</th>
-						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dto. Personal</th>
-						<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
-						
-						<!-- Acciones siempre visibles porque todos tienen la Libreta -->
-						<th scope="col" class="relative px-4 py-3">
-							<span class="sr-only">Acciones</span>
-						</th>
+						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
+						<th scope="col" class="w-[26%] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Curso</th>
+						<th scope="col" class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
+						<th scope="col" class="w-[22%] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Finanzas</th>
+						<th scope="col" class="w-[14%] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
+						<th scope="col" class="w-[6%] relative px-4 py-3"><span class="sr-only">Acciones</span></th>
 					</tr>
 				</thead>
-				<tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+				<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
 					{#each enrollments as enrollment (enrollment._id)}
-						<tr>
+						<tr class="align-top hover:bg-gray-50 dark:hover:bg-dark-background/40 transition-colors">
 							<td class="px-4 py-4">
-								<div class="text-sm font-medium text-gray-900 dark:text-white max-w-[180px] break-words">
+								<div class="text-sm font-medium text-gray-900 dark:text-white line-clamp-2" title={getStudentName(enrollment.estudiante_id)}>
 									{getStudentName(enrollment.estudiante_id)}
 								</div>
 							</td>
 							<td class="px-4 py-4">
-								<div class="text-sm text-gray-900 dark:text-white max-w-[280px] break-words" title={getCourseName(enrollment.curso_id)}>
+								<div class="text-sm text-gray-900 dark:text-white line-clamp-2" title={getCourseName(enrollment.curso_id)}>
 									{getCourseName(enrollment.curso_id)}
 								</div>
 							</td>
-							<td class="px-4 py-4 whitespace-nowrap">
-								<div class="text-sm text-gray-600 dark:text-white">{formatDate(enrollment.fecha_inscripcion)}</div>
+							<td class="px-4 py-4">
+								<div class="text-sm text-gray-600 dark:text-gray-300">{formatDate(enrollment.fecha_inscripcion)}</div>
 							</td>
-							<td class="px-4 py-4 whitespace-nowrap">
-								<div class="text-xs text-gray-600 dark:text-gray-400">{formatCurrency(enrollment.total_a_pagar)}</div>
+							<td class="px-4 py-4 text-xs space-y-0.5">
+								<div class="flex justify-between gap-2"><span class="text-gray-400 dark:text-gray-500">Total</span><span class="font-medium text-gray-700 dark:text-gray-300">{formatCurrency(enrollment.total_a_pagar)}</span></div>
+								<div class="flex justify-between gap-2"><span class="text-gray-400 dark:text-gray-500">Pagado</span><span class="font-medium text-green-600 dark:text-green-400">{formatCurrency(enrollment.total_pagado)}</span></div>
+								<div class="flex justify-between gap-2"><span class="text-gray-400 dark:text-gray-500">Saldo</span><span class={`font-bold ${enrollment.saldo_pendiente > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(enrollment.saldo_pendiente)}</span></div>
 							</td>
-							<td class="px-4 py-4 whitespace-nowrap">
-								<div class="text-xs text-green-600 dark:text-green-400">{formatCurrency(enrollment.total_pagado)}</div>
-							</td>
-							<td class="px-4 py-4 whitespace-nowrap">
-								<div class="text-sm font-semibold text-red-600 dark:text-red-400">
-									{formatCurrency(enrollment.saldo_pendiente)}
-								</div>
-							</td>
-							<td class="px-4 py-4 whitespace-nowrap text-center">
-								<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full text-green-800 bg-green-50">
-									{enrollment.descuento_curso_aplicado || 0}%
-								</span>
-							</td>
-							<td class="px-4 py-4 whitespace-nowrap text-center">
-								<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full text-green-800 bg-green-50">
-									{formatCurrency(enrollment.descuento_personalizado || 0)}
-								</span>
-							</td>
-							<td class="px-4 py-4 whitespace-nowrap">
+							<td class="px-4 py-4">
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(enrollment.estado)}`}>
 									{enrollment.estado}
 								</span>
 							</td>
-							
-							<td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-								<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+							<td class="px-4 py-4 text-right text-sm font-medium relative">
+								<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones de la inscripción">
 									<DotsVerticalIcon class="size-5" />
 								</button>
 								{#if openDropdownId === enrollment._id}
@@ -521,7 +501,7 @@
 		{#if selectedKardex}
 			<div class="p-6 space-y-6">
 				<!-- Cabecera de la Libreta -->
-				<div class="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+				<div class="bg-gray-50 dark:bg-dark-background/40 p-5 rounded-2xl border border-gray-200 dark:border-dark-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 					<div>
 						<p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold mb-1">Programa</p>
 						<p class="text-lg font-bold text-slate-900 dark:text-white leading-tight">{getCourseName(selectedKardex.curso_id)}</p>
@@ -529,7 +509,7 @@
 							<p class="text-sm text-blue-600 font-semibold mt-1">Estudiante: {getStudentName(selectedKardex.estudiante_id)}</p>
 						{/if}
 					</div>
-					<div class="text-left md:text-right bg-white dark:bg-slate-900 px-6 py-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+					<div class="text-left md:text-right bg-white dark:bg-dark-surface px-6 py-3 rounded-xl shadow-sm border border-gray-100 dark:border-dark-border">
 						<p class="text-xs text-slate-500 uppercase tracking-wider font-bold">Promedio General</p>
 						<p class={`text-3xl font-black mt-1 ${selectedKardex.nota_final && selectedKardex.nota_final >= 64 ? 'text-green-600' : selectedKardex.nota_final ? 'text-red-600' : 'text-slate-400'}`}>
 							{selectedKardex.nota_final !== null && selectedKardex.nota_final !== undefined ? selectedKardex.nota_final : '--'}
@@ -538,9 +518,9 @@
 				</div>
 
 				<!-- Tabla de Módulos (Notas y Pagos) -->
-				<div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
-					<table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-						<thead class="bg-slate-100 dark:bg-slate-900">
+				<div class="overflow-x-auto border border-gray-200 dark:border-dark-border rounded-xl shadow-sm">
+					<table class="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
+						<thead class="bg-gray-100 dark:bg-dark-background">
 							<tr>
 								<th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Módulo</th>
 								<th class="px-4 py-3 text-center text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider bg-blue-50/50 dark:bg-blue-900/10">Nota Final</th>
@@ -549,7 +529,7 @@
 								<th class="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Estado Pago</th>
 							</tr>
 						</thead>
-						<tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+						<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
 							{#if selectedKardex.modulos && selectedKardex.modulos.length > 0}
 								{#each selectedKardex.modulos as mod}
 									<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">

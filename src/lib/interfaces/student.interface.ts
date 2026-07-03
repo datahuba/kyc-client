@@ -32,6 +32,18 @@ export interface Student {
 	ci_url?: string | null;
 	cv_url?: string | null;
 	titulo?: Titulo | null;
+	// Datos oficiales UAGRM
+	sexo?: string | null;
+	estado_civil?: string | null;
+	pais?: string | null;
+	departamento?: string | null;
+	provincia?: string | null;
+	nacionalidad?: string | null;
+	telefono?: string | null;
+	modalidad_ingreso?: string | null;
+	periodo?: string | null;
+	tipo_sangre?: string | null;
+	titulo_bachiller?: string | null;
 }
 
 export interface CreateStudentRequest {
@@ -47,6 +59,18 @@ export interface CreateStudentRequest {
 	email: string;
 	domicilio: string;
 	es_estudiante_interno: string;
+	// Datos oficiales UAGRM (opcionales)
+	sexo?: string;
+	estado_civil?: string;
+	pais?: string;
+	departamento?: string;
+	provincia?: string;
+	nacionalidad?: string;
+	telefono?: string;
+	modalidad_ingreso?: string;
+	periodo?: string;
+	tipo_sangre?: string;
+	titulo_bachiller?: string;
 	// lista_cursos_ids?: string[];
 }
 

@@ -348,6 +348,27 @@
 						</div>
 					</Card>
 
+					<!-- Datos Oficiales UAGRM -->
+					<Card>
+						{#snippet header()}
+							<Heading level="h4" class="text-lg font-semibold">Datos Oficiales (UAGRM)</Heading>
+						{/snippet}
+
+						<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+							<Input label="Sexo" value={profileData.sexo || '—'} disabled />
+							<Input label="Estado Civil" value={profileData.estado_civil || '—'} disabled />
+							<Input label="Tipo de Sangre" value={profileData.tipo_sangre || '—'} disabled />
+							<Input label="Teléfono" value={profileData.telefono || '—'} disabled icon={PhoneIcon} />
+							<Input label="Nacionalidad" value={profileData.nacionalidad || '—'} disabled />
+							<Input label="País" value={profileData.pais || '—'} disabled />
+							<Input label="Departamento" value={profileData.departamento || '—'} disabled />
+							<Input label="Provincia" value={profileData.provincia || '—'} disabled />
+							<Input label="Modalidad de Ingreso" value={profileData.modalidad_ingreso || '—'} disabled />
+							<Input label="Periodo" value={profileData.periodo || '—'} disabled />
+							<Input label="Título de Bachiller" value={profileData.titulo_bachiller || '—'} disabled />
+						</div>
+					</Card>
+
 					<!-- Información Académica -->
 					{#if profileData.titulo}
 						<Card>
