@@ -46,9 +46,9 @@
 
 	// Variantes de estilo
 	const variantClasses = {
-		default: 'bg-white border border-gray-200 shadow-sm dark:bg-gray-900 dark:border-gray-800',
-		bordered: 'bg-white border-2 border-gray-300 dark:bg-gray-900 dark:border-gray-700',
-		elevated: 'bg-white shadow-lg border-0 dark:bg-gray-900',
+		default: 'bg-white border border-gray-200 shadow-sm dark:bg-dark-surface dark:border-dark-border',
+		bordered: 'bg-white border-2 border-gray-300 dark:bg-dark-surface dark:border-dark-border',
+		elevated: 'bg-white shadow-lg border-0 dark:bg-dark-surface',
 		ghost: 'bg-transparent border-0 shadow-none'
 	};
 
@@ -70,7 +70,7 @@
 	// Estados interactivos
 	const interactiveClasses =
 		interactive && !disabled
-			? 'hover:shadow-md hover:scale-[1.02] cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900'
+			? 'hover:shadow-md hover:scale-[1.02] cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-dark-background'
 			: '';
 
 	// Estado deshabilitado
@@ -111,7 +111,7 @@
 >
 	<!-- Header Section -->
 	{#if header}
-		<div class="card-header mb-4 border-b border-gray-200 pb-4 dark:border-gray-700">
+		<div class="card-header mb-4 border-b border-gray-200 pb-4 dark:border-dark-border">
 			{@render header()}
 		</div>
 	{/if}
@@ -123,7 +123,7 @@
 
 	<!-- Footer Section -->
 	{#if footer}
-		<div class="card-footer mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+		<div class="card-footer mt-4 border-t border-gray-200 pt-4 dark:border-dark-border">
 			{@render footer()}
 		</div>
 	{/if}

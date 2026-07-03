@@ -24,14 +24,14 @@
 		<BlurOverlay class="overflow-y-auto">
 			<div class="flex items-center justify-center text-center sm:p-0">
 				<div
-					class={`relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 text-left shadow-xl transition-all sm:my-8 sm:w-full ${maxWidth}`}
+					class={`relative transform overflow-hidden rounded-2xl bg-white dark:bg-dark-surface text-left shadow-xl transition-all sm:my-8 sm:w-full ${maxWidth}`}
 				>
 					<!-- Header -->
-					<div class="bg-white dark:bg-gray-800 px-4 py-3 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+					<div class="bg-white dark:bg-dark-surface px-4 py-3 sm:px-6 border-b border-gray-200 dark:border-dark-border flex justify-between items-center">
 						<Heading level="h5">{title}</Heading>
 						<button
 							type="button"
-							class="rounded-md bg-white dark:bg-gray-800 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+							class="rounded-md bg-white dark:bg-dark-surface text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-dark-surface"
 							onclick={onClose}
 						>
 							<span class="sr-only">Cerrar</span>

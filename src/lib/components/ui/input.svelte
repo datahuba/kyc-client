@@ -16,40 +16,42 @@
 </script>
 
 <div class={className}>
-	<label
-		for={restProps.id}
-		class="grid grid-cols-[auto,_1fr] items-center gap-0.5 text-sm leading-6 font-medium text-light-two sm:text-base dark:text-gray-300"
-	>
-		<span class="truncate"
-			>{label} <span class="text-red-500">{restProps.required ? '*' : ''} </span></span
+	{#if label}
+		<label
+			for={restProps.id}
+			class="grid grid-cols-[auto,_1fr] items-center gap-0.5 text-sm leading-6 font-medium text-gray-700 dark:text-gray-300 sm:text-base"
 		>
-	</label>
+			<span class="truncate"
+				>{label} <span class="text-light-error">{restProps.required ? '*' : ''} </span></span
+			>
+		</label>
+	{/if}
 	<div class="relative {label && 'mt-1'}  {icon && 'grid grid-cols-1'}">
 		{#if restProps.type === 'file'}
 			<input
 				type="file"
 				{...restProps}
 				bind:files
-				class="block w-full rounded-md border border-light-four bg-light-one py-2 text-sm text-light-two ring-light-two transition-all placeholder:text-xs placeholder:text-light-two_d hover:ring-1 hover:ring-light-two_d focus:ring-2 focus:ring-light-two sm:text-base sm:leading-6 placeholder:sm:text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-gray-700 dark:file:text-gray-300 {icon &&
+				class="block w-full rounded-lg border border-light-four bg-white dark:border-dark-border dark:bg-dark-surface py-2 px-3 text-sm text-light-black dark:text-dark-white transition-all placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-base sm:leading-6 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-dark-four dark:file:text-dark-tertiary {icon &&
 					'col-start-1 row-start-1 pl-10'} "
 			/>
 		{:else}
 			<input
 				{...restProps}
 				bind:value
-				class="block w-full rounded-md border border-light-four bg-light-one py-2 text-sm text-light-two ring-light-two transition-all placeholder:text-xs placeholder:text-light-two_d hover:ring-1 hover:ring-light-two_d focus:ring-2 focus:ring-light-two sm:text-base sm:leading-6 placeholder:sm:text-sm {icon &&
+				class="block w-full rounded-lg border border-light-four bg-white dark:border-dark-border dark:bg-dark-surface py-2 px-3 text-sm text-light-black dark:text-dark-white transition-all placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-base sm:leading-6 {icon &&
 					'col-start-1 row-start-1 pl-10'} "
 			/>
 		{/if}
 		{#if icon}
-			<p class="pointer-events-none col-start-1 row-start-1 ml-3 self-center text-light-two_d">
+			<p class="pointer-events-none col-start-1 row-start-1 ml-3 self-center text-gray-400">
 				{#await Promise.resolve(icon) then Icon}
 					<Icon />
 				{/await}
 			</p>
 		{/if}
 		{#if error}
-			<p transition:slide={{ duration: 300, easing: cubicOut }} class="mt-1 text-sm text-red-500">
+			<p transition:slide={{ duration: 300, easing: cubicOut }} class="mt-1 text-sm text-light-error">
 				{error}
 			</p>
 		{/if}

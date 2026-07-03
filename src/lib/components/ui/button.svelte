@@ -55,17 +55,20 @@
 		].join(' '),
 
 		variants: {
+			// PRIMARIO = guindo institucional UAGRM
 			primary:
-				'bg-light-secondary text-light-white dark:text-dark-white hover:bg-light-secondary_d dark:hover:bg-dark-secondary_d active:bg-light-secondary_d dark:hover:bg-dark-secondary_d focus:ring-light-secondary shadow-md hover:shadow-lg',
+				'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 focus:ring-primary-500 shadow-md hover:shadow-lg',
+			// SECUNDARIO = contorno guindo sobre superficie
 			secondary:
-				'bg-light-background border border-light-secondary text-light-secondary dark:text-dark-secundary hover:bg-light-primary_d dark:hover:bg-dark-primary_d active:bg-light-primary_d dark:hover:bg-dark-primary_d focus:ring-light-secondary shadow-sm',
+				'bg-white dark:bg-dark-surface border border-primary-600 text-primary-700 dark:text-dark-tertiary hover:bg-primary-50 dark:hover:bg-dark-four active:bg-primary-100 focus:ring-primary-500 shadow-sm',
 			outline:
-				'bg-transparent text-light-secondary dark:text-dark-secondary border border-light-four active:bg-light-primary_d dark:hover:bg-dark-primary_d focus:ring-light-four_d',
+				'bg-transparent text-primary-700 dark:text-dark-tertiary border border-light-four dark:border-dark-border hover:bg-primary-50 dark:hover:bg-dark-four focus:ring-primary-500',
 			ghost:
-				'bg-transparent text-light-secundary dark:text-dark-secundary hover:bg-light-primary_d dark:hover:bg-dark-primary_d active:bg-light-primary_d dark:hover:bg-dark-primary_d focus:ring-light-four_d',
+				'bg-transparent text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-four active:bg-gray-200 dark:active:bg-dark-border focus:ring-primary-500',
+			// DESTRUCTIVO = rojo brillante institucional (distinto del guindo primario)
 			destructive:
 				'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 focus:ring-red-500 shadow-md hover:shadow-lg',
-			link: 'bg-transparent text-light-text-light-secundary dark:text-dark-secundary p-0 hover:text-light-secundary_d hover:underline focus:ring-light-secundary_d underline-offset-4'
+			link: 'bg-transparent text-primary-700 dark:text-dark-tertiary p-0 hover:text-primary-800 hover:underline focus:ring-primary-500 underline-offset-4'
 		},
 
 		sizes: {
