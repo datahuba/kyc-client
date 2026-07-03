@@ -1,13 +1,16 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/button.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
+	import type { Course } from '$lib/interfaces';
 
 	interface Props {
 		isOpen: boolean;
 		importLoading: boolean;
 		importFile: File | null;
 		importTipoEstudiante: 'interno' | 'externo';
-		importReport: { success_count: number; errors: string[] } | null;
+		importCursoId: string;
+		importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[] } | null;
+		courses: Course[];
 		onClose: () => void;
 		onDownloadTemplate: () => void;
 		onFileChange: (e: Event) => void;
@@ -19,12 +22,18 @@
 		importLoading,
 		importFile = $bindable(),
 		importTipoEstudiante = $bindable(),
+		importCursoId = $bindable(),
 		importReport = $bindable(),
+		courses = [],
 		onClose,
 		onDownloadTemplate,
 		onFileChange,
 		onSubmit
 	}: Props = $props();
+
+	// Solo cursos activos son elegibles para auto-inscripción
+	const activeCourses = $derived(courses.filter((c) => c.activo));
+	const selectedCourse = $derived(activeCourses.find((c) => c._id === importCursoId) ?? null);
 </script>
 
 <Modal {isOpen} title="Importación Masiva de Estudiantes (Excel)" onClose={() => { if (!importLoading) onClose(); }} maxWidth="sm:max-w-2xl">
@@ -63,10 +72,44 @@
 			</div>
 		</div>
 
+		<!-- Auto-inscripción opcional a un curso/diplomado -->
+		<div class="space-y-1">
+			<label for="import-curso" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+				Inscribir automáticamente a un curso <span class="text-gray-400 font-normal">(opcional)</span>
+			</label>
+			<select
+				id="import-curso"
+				bind:value={importCursoId}
+				class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
+			>
+				<option value="">No inscribir (solo registrar estudiantes)</option>
+				{#each activeCourses as course (course._id)}
+					<option value={course._id}>{course.nombre_programa}</option>
+				{/each}
+			</select>
+			{#if selectedCourse}
+				<p class="text-xs text-primary-600 dark:text-primary-400 pt-1">
+					Todos los estudiantes de esta importación se inscribirán automáticamente en
+					<span class="font-semibold">{selectedCourse.nombre_programa}</span>.
+					El costo aplicado será el de tipo <span class="font-semibold">{importTipoEstudiante}</span>.
+					Si el archivo incluye columnas de pago (Matrícula, M1, M2…), esos montos se registrarán como pagos aprobados. Si incluye un link de comprobante de matrícula, se registrará como pago pendiente de verificación con el enlace adjunto.
+				</p>
+			{/if}
+		</div>
+
 		{#if importReport}
 			<div class="border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-3 max-h-60 overflow-y-auto">
 				<h4 class="text-sm font-bold text-gray-800 dark:text-white">Reporte de Procesamiento:</h4>
 				<p class="text-xs text-green-600 dark:text-green-400 font-semibold">✓ {importReport.success_count} estudiantes importados con éxito.</p>
+				{#if importReport.enrolled_count > 0}
+					<p class="text-xs text-blue-600 dark:text-blue-400 font-semibold">✓ {importReport.enrolled_count} estudiantes inscritos automáticamente al curso seleccionado.</p>
+				{/if}
+				{#if importReport.migrated_payments_count > 0}
+					<p class="text-xs text-blue-600 dark:text-blue-400 font-semibold">✓ {importReport.migrated_payments_count} estudiantes con pagos históricos migrados (matrícula/módulos).</p>
+				{/if}
+				{#if importReport.matricula_vouchers_count > 0}
+					<p class="text-xs text-amber-600 dark:text-amber-400 font-semibold">✓ {importReport.matricula_vouchers_count} comprobantes de matrícula registrados como pago PENDIENTE (requieren verificación de Cobranza/CPD).</p>
+				{/if}
 				{#if importReport.errors.length > 0}
 					<div class="space-y-1">
 						<p class="text-xs text-red-600 dark:text-red-400 font-semibold">⚠️ Se detectaron {importReport.errors.length} problemas en el archivo:</p>

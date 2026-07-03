@@ -55,8 +55,9 @@
 	let isImportModalOpen: boolean = $state(false);
 	let importFile: File | null = $state(null);
 	let importLoading = $state(false);
-	let importReport: { success_count: number; errors: string[] } | null = $state(null);
+	let importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[] } | null = $state(null);
 	let importTipoEstudiante: 'interno' | 'externo' = $state('externo'); 
+	let importCursoId: string = $state(''); // Curso opcional para auto-inscripción en carga masiva
 
 	// Selección Múltiple
 	let selectedStudentIds: string[] = $state([]);
@@ -478,10 +479,17 @@
 		importLoading = true;
 		importReport = null;
 		try {
-			const response = await studentService.importFromExcel(importFile, importTipoEstudiante);
+			const response = await studentService.importFromExcel(importFile, importTipoEstudiante, importCursoId || undefined);
 			importReport = response;
 			if (response.success_count > 0) {
-				alert('success', `¡Se importaron ${response.success_count} estudiantes con éxito!`);
+				const inscritosMsg = response.enrolled_count > 0
+					? ` y ${response.enrolled_count} inscritos al curso seleccionado`
+					: '';
+				const pagosParts = [];
+				if (response.migrated_payments_count > 0) pagosParts.push(`${response.migrated_payments_count} con pagos migrados`);
+				if (response.matricula_vouchers_count > 0) pagosParts.push(`${response.matricula_vouchers_count} comprobantes de matrícula pendientes`);
+				const pagosMsg = pagosParts.length > 0 ? ` (${pagosParts.join(', ')})` : '';
+				alert('success', `¡Se importaron ${response.success_count} estudiantes con éxito${inscritosMsg}${pagosMsg}!`);
 				loadStudents(); 
 			}
 			if (response.errors.length > 0) {
@@ -526,7 +534,7 @@
 			</Button>
 
 			{#if canCreateStudent}
-				<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; importTipoEstudiante = 'externo'; }} variant="secondary">
+				<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; importTipoEstudiante = 'externo'; importCursoId = ''; }} variant="secondary">
 					{#snippet leftIcon()}
 						<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
 					{/snippet}
@@ -632,8 +640,10 @@
 			if (files && files.length > 0) importFile = files[0];
 		}}
 		onSubmit={handleImportExcelSubmit}
+		courses={allCourses}
 		bind:importFile={importFile}
 		bind:importTipoEstudiante={importTipoEstudiante}
+		bind:importCursoId={importCursoId}
 		bind:importReport={importReport}
 	/>
 
