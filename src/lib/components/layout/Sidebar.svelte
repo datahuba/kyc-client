@@ -6,6 +6,11 @@
 	import { slide, fade } from 'svelte/transition';
 	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon } from '$lib/icons/solid';
 	import { goto } from '$app/navigation';
+	import CourseCatalogModal from './CourseCatalogModal.svelte';
+	import BenefitsModal from './BenefitsModal.svelte';
+
+	let isCatalogOpen = $state(false);
+	let isBenefitsOpen = $state(false);
 
 	const classroomSections = [
 		{ id: 'muro',           label: 'Muro' },
@@ -43,6 +48,7 @@
 		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
 		
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza'], loginTypes: ['admin'] },
+		{ name: 'Solicitudes', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
 		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
 		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
 		{ name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
@@ -62,6 +68,8 @@
 	let userRole = $derived($userStore?.role || $userStore?.user?.rol || 'student');
 	let loginType = $derived($userStore?.loginType);
 	let academicRole = $derived($userStore?.academicRole);
+
+	let isStudentUser = $derived(userRole === 'student' || academicRole === 'student');
 
 	let filteredNavigation = $derived(navigation.filter(item => {
 		const isStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza'].includes(userRole);
@@ -95,9 +103,17 @@
 {/if}
 
 <div class={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} ${isCollapsed ? 'lg:w-20' : 'w-72'}`}>
-	<div class="flex h-16 items-center justify-between px-6 border-b border-gray-200 dark:border-gray-800">
-		{#if !isCollapsed}<span class="text-xl font-bold text-light-tertiary dark:text-light-tertiary" in:fade>KyC</span>{/if}
-		<button type="button" class="hidden lg:block -m-2.5 p-2.5 text-gray-500 hover:text-primary-600 transition-colors" onclick={() => isCollapsed = !isCollapsed}><Menu2Icon class="size-6" /></button>
+	<div class="flex h-16 items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
+		{#if !isCollapsed}
+			<div class="flex items-center gap-2.5 min-w-0" in:fade>
+				<img src="/images/logo_uagrm_fondo_blanco.jpg" alt="UAGRM" class="h-9 w-9 shrink-0 rounded-md object-contain bg-white p-0.5 ring-1 ring-gray-200 dark:ring-gray-700" />
+				<div class="flex flex-col leading-tight min-w-0">
+					<span class="text-sm font-extrabold text-primary-700 dark:text-dark-tertiary truncate">Postgrado UAGRM</span>
+					<span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 truncate">Contaduría Pública</span>
+				</div>
+			</div>
+		{/if}
+		<button type="button" class="hidden lg:block -m-2.5 p-2.5 text-gray-500 hover:text-primary-700 transition-colors" onclick={() => isCollapsed = !isCollapsed}><Menu2Icon class="size-6" /></button>
 		<button type="button" class="-m-2.5 p-2.5 text-gray-700 dark:text-gray-200 lg:hidden" onclick={onClose}><XIcon class="size-6" /></button>
 	</div>
 	<div class="flex flex-col gap-y-5 overflow-y-auto px-4 pb-4 pt-8 h-[calc(100vh-4rem)] scrollbar-hide">
@@ -144,7 +160,33 @@
 						</ul>
 					</li>
 				{/if}
-				<li class="mt-auto">
+				<!-- Accesos informativos: Catálogo de Cursos y Beneficios del Postgrado (SOLO ESTUDIANTES) -->
+				{#if isStudentUser}
+					<li class="mt-auto border-t border-gray-200 dark:border-gray-800 pt-3 space-y-1">
+						<button
+							type="button"
+							onclick={() => isCatalogOpen = true}
+							title={isCollapsed ? 'Catálogo de Cursos' : ''}
+							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}
+						>
+							<BookIcon class="size-6 shrink-0 text-gray-400 group-hover:text-primary-600" />
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Catálogo de Cursos</span>{/if}
+						</button>
+						<button
+							type="button"
+							onclick={() => isBenefitsOpen = true}
+							title={isCollapsed ? 'Beneficios del Postgrado' : ''}
+							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}
+						>
+							<svg class="size-6 shrink-0 text-gray-400 group-hover:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+							</svg>
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Beneficios del Postgrado</span>{/if}
+						</button>
+					</li>
+				{/if}
+
+				<li class={isStudentUser ? '' : 'mt-auto'}>
 					<button onclick={logout} title={isCollapsed ? 'Cerrar Sesión' : ''} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 hover:bg-gray-50 hover:text-red-600 w-full text-left transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}>
 						<LogoutIcon class="size-6 shrink-0 text-gray-400 group-hover:text-red-600" />
 						{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Cerrar Sesión</span>{/if}
@@ -154,6 +196,11 @@
 		</nav>
 	</div>
 </div>
+
+{#if isStudentUser}
+	<CourseCatalogModal isOpen={isCatalogOpen} onClose={() => isCatalogOpen = false} />
+	<BenefitsModal isOpen={isBenefitsOpen} onClose={() => isBenefitsOpen = false} />
+{/if}
 
 <style>
     .scrollbar-hide::-webkit-scrollbar { display: none; }

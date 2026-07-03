@@ -9,6 +9,7 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { LOGIN_TYPE_KEY } from '$lib/constants';
+	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 
 	let showPassword = false;
 	let username = '';
@@ -82,19 +83,33 @@
 </script>
 
 <div class="relative flex min-h-dvh">
+	<div class="absolute top-4 right-4 z-30">
+		<ThemeToggle />
+	</div>
 	<div
 		class="relative z-20 flex flex-1 items-center justify-center bg-light-primary p-8 dark:bg-dark-primary"
 	>
 		<div class="w-full max-w-md">
-			<!-- Mobile Logo -->
+			<!-- Logo institucional UAGRM -->
 			<div class="mb-10 flex flex-col items-center justify-center">
-				<div class="mb-4 flex h-32 w-32 items-center justify-center">
-					<img src="/images/logo_empty_datahub.png" alt="" />
+				<div class="mb-4 flex items-center gap-3">
+					<img
+						src="/images/logo_uagrm_fondo_blanco.jpg"
+						alt="UAGRM"
+						class="h-20 w-20 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5"
+					/>
+					<img
+						src="/images/logo_contaduria_publica_fondo_blanco.jpg"
+						alt="Facultad de Contaduría Pública"
+						class="h-20 w-20 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5"
+					/>
 				</div>
-				<span class="text-3xl font-bold text-light-secondary dark:text-dark-secondary"
-					>DataHub<span class="ml-2 text-light-tertiary dark:text-dark-tertiary">Analytics</span
-					></span
-				>
+				<span class="text-2xl font-extrabold text-light-secondary dark:text-dark-tertiary text-center leading-tight">
+					Escuela de Postgrado
+				</span>
+				<span class="text-sm font-semibold text-light-tertiary dark:text-dark-secondary text-center">
+					Contaduría Pública · UAGRM
+				</span>
 				{#if loginType}
 					<span class="mt-2 text-lg font-medium text-light-black/60 dark:text-dark-white/60">
 						{getLoginTypeLabel()}
@@ -189,6 +204,21 @@
 					Iniciar Sesión
 				</Button>
 			</form>
+
+			<!-- Recuperar cuenta y solicitud -->
+			<div class="mt-5 space-y-2 text-center">
+				<p class="text-sm">
+					<a href="/auth/forgot-password" class="font-semibold text-light-tertiary hover:text-light-tertiary_d dark:text-dark-tertiary underline">
+						¿Olvidaste tu contraseña?
+					</a>
+				</p>
+				<p class="text-sm text-light-black/70 dark:text-dark-white/70">
+					¿No tienes cuenta?
+					<a href="/auth/register" class="font-semibold text-light-tertiary hover:text-light-tertiary_d dark:text-dark-tertiary underline">
+						Solicítala aquí
+					</a>
+				</p>
+			</div>
 
 			<!-- Switch Role -->
 			<div class="mt-6 text-center">

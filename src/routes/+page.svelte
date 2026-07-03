@@ -2,6 +2,7 @@
 	import { userStore } from '$lib/stores/userStore';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 
 	// Subscribe to user store
 	let isAuthenticated = false;
@@ -48,17 +49,30 @@
 
 {#if !isAuthenticated}
 <!-- Role Selection UI - 3 Puertas -->
-<div class="min-h-screen flex flex-col items-center justify-center bg-light-primary dark:bg-dark-primary p-4">
+<div class="relative min-h-screen flex flex-col items-center justify-center bg-light-primary dark:bg-dark-primary p-4">
+	<div class="absolute top-4 right-4">
+		<ThemeToggle />
+	</div>
 	<div class="w-full max-w-5xl text-center">
-		<!-- Encabezado -->
+		<!-- Encabezado institucional UAGRM -->
 		<div class="mb-12 flex flex-col items-center justify-center">
-			<div class="mb-4 flex h-32 w-32 items-center justify-center">
-				<img src="/images/logo_empty_datahub.png" alt="DataHub Logo" />
+			<div class="mb-5 flex items-center gap-4">
+				<img
+					src="/images/logo_uagrm_fondo_blanco.jpg"
+					alt="UAGRM"
+					class="h-24 w-24 rounded-2xl object-contain bg-white p-2 shadow-md ring-1 ring-black/5"
+				/>
+				<img
+					src="/images/logo_contaduria_publica_fondo_blanco.jpg"
+					alt="Facultad de Contaduría Pública"
+					class="h-24 w-24 rounded-2xl object-contain bg-white p-2 shadow-md ring-1 ring-black/5"
+				/>
 			</div>
-			<h1 class="text-4xl font-bold text-light-secondary dark:text-dark-secondary mb-2">
-				KyC DataHub
+			<h1 class="text-3xl sm:text-4xl font-extrabold text-light-secondary dark:text-dark-tertiary mb-1 text-center leading-tight">
+				Escuela de Postgrado
 			</h1>
-			<p class="text-light-black/70 dark:text-dark-white/70 text-lg">Selecciona tu perfil de acceso a la plataforma</p>
+			<p class="text-lg font-semibold text-light-tertiary dark:text-dark-secondary mb-3">Contaduría Pública · UAGRM</p>
+			<p class="text-light-black/70 dark:text-dark-white/70 text-base">Selecciona tu perfil de acceso a la plataforma</p>
 		</div>
 
 		<!-- Contenedor de Botones (3 Columnas) -->
@@ -112,13 +126,13 @@
 			<!-- PUERTA 3: ADMINISTRATIVOS -->
 			<button 
 				onclick={() => handleSelectRole('admin')}
-				class="group relative overflow-hidden flex-1 min-w-[250px] max-w-[300px] py-6 px-6 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-slate-800 dark:hover:border-slate-700 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/20 hover:-translate-y-1"
+				class="group relative overflow-hidden flex-1 min-w-[250px] max-w-[300px] py-6 px-6 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-primary-700 dark:hover:border-primary-500 transition-all duration-300 hover:shadow-xl hover:shadow-primary-700/20 hover:-translate-y-1"
 			>
-				<div class="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+				<div class="absolute inset-0 bg-gradient-to-br from-primary-700 to-primary-900 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
 				
 				<div class="relative z-10 flex flex-col items-center gap-4">
-					<div class="p-4 rounded-full bg-slate-100 dark:bg-slate-700 group-hover:bg-white/20 transition-colors duration-300">
-						<svg class="w-8 h-8 text-slate-700 dark:text-slate-300 group-hover:text-white transition-all duration-300 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<div class="p-4 rounded-full bg-primary-50 dark:bg-primary-900/30 group-hover:bg-white/20 transition-colors duration-300">
+						<svg class="w-8 h-8 text-primary-700 dark:text-primary-300 group-hover:text-white transition-all duration-300 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
 							<path stroke-linecap="round" stroke-linejoin="round" d="m9 12 2 2 4-4" />
 						</svg>
