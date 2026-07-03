@@ -10,47 +10,72 @@
 	--breakpoint-lg: 1024px;
 	--breakpoint-xl: 1280px;
 	--breakpoint-2xl: 1536px;
-	--color-light-primary: #f6fbfd; /*c4e2f2*/
-	--color-light-primary_d: #e1f2f9; /*9fcfe9*/
-	--color-light-secondary: #2889bc;
-	--color-light-secondary_d: #20709a;
-	--color-light-tertiary: #0b78b1;
-	--color-light-tertiary_d: #095f8d;
-	--color-light-four: #c4e2f2;
-	--color-light-four_d: #9fcfe9;
-	--color-light-accent: #9dbe8c;
-	--color-light-accent_d: #9dbe8c;
-	--color-light-error: #fa3842;
-	--color-light-success: #16a34a;
-	--color-light-warning: #f59e0b;
+	/* ==================================================================
+	   PALETA INSTITUCIONAL UAGRM (Manual de Identidad Corporativa)
+	   Azul #023273 · Rojo #C8102E · Oro #D19E23 · Verde #008244 · Celeste #4A90E2
+	   ================================================================== */
+
+	/* Colores de marca (uso directo: bg-uagrm-blue, text-uagrm-red, etc.) */
+	--color-uagrm-blue: #023273;
+	--color-uagrm-red: #c8102e;
+	--color-uagrm-gold: #d19e23;
+	--color-uagrm-green: #008244;
+	--color-uagrm-sky: #4a90e2;
+
+	/* Escala PRIMARY = GUINDO/ROJO INSTITUCIONAL (color dominante del sitio oficial UAGRM).
+	   Habilita todas las clases primary-50 ... primary-950 en toda la plataforma.
+	   El guindo #8a1f2f (600) es el tono del header oficial; se distingue del rojo de error. */
+	--color-primary-50: #f9ecee;
+	--color-primary-100: #f2d2d7;
+	--color-primary-200: #e5a8b1;
+	--color-primary-300: #d47c8a;
+	--color-primary-400: #b94f61;
+	--color-primary-500: #9f3145;
+	--color-primary-600: #8a1f2f; /* Guindo institucional (header oficial) */
+	--color-primary-700: #741a28;
+	--color-primary-800: #5f1622;
+	--color-primary-900: #4e141d;
+	--color-primary-950: #2b0a0f;
+
+	/* ---------- TOKENS SEMÁNTICOS TEMA CLARO ---------- */
+	--color-light-primary: #f5f8fc; /* fondo de página (blanco con leve tinte azul) */
+	--color-light-primary_d: #e7eef8;
+	--color-light-secondary: #023273; /* azul institucional */
+	--color-light-secondary_d: #04295c;
+	--color-light-tertiary: #124a8c; /* azul de acento para enlaces/realces */
+	--color-light-tertiary_d: #023273;
+	--color-light-four: #c3d5ea; /* bordes y superficies sutiles */
+	--color-light-four_d: #9cbbde;
+	--color-light-accent: #d19e23; /* oro institucional */
+	--color-light-accent_d: #b5871a;
+	--color-light-error: #c8102e; /* rojo institucional */
+	--color-light-success: #008244; /* verde laurel */
+	--color-light-warning: #d19e23; /* oro */
 	--color-light-white: #ffffff;
-	--color-light-black: #000000;
+	--color-light-black: #0d1b2a; /* casi negro con matiz navy, más profesional */
 
-	--color-dark-background: #0f1720; /* fondo principal - azul petróleo oscuro */
-	--color-dark-surface: #1a2530; /* tarjetas, inputs, secciones */
-	--color-dark-border: #24313f; /* bordes suaves y discretos */
+	/* ---------- TOKENS SEMÁNTICOS TEMA OSCURO (navy UAGRM) ---------- */
+	--color-dark-background: #0a1524; /* fondo principal navy profundo */
+	--color-dark-surface: #0f2136;    /* tarjetas, inputs, secciones */
+	--color-dark-border: #1d3450;     /* bordes suaves */
 
-	/* Primarios (baseados en tu primary light) */
-	--color-dark-primary: #0d2530; /* versión oscura del #f6fbfd */
-	--color-dark-primary_d: #142b3a; /* sutil más profunda */
+	--color-dark-primary: #0a1524;    /* fondo base en oscuro */
+	--color-dark-primary_d: #0d1c2f;
 
-	/* Secundarios (acentos) */
-	--color-dark-secondary: #3ca7db; /* derivado de #2889bc, más luminoso en dark */
-	--color-dark-secondary_d: #2d86b0; /* variante más profunda */
+	--color-dark-secondary: #4a90e2;  /* celeste UAGRM, luminoso sobre oscuro */
+	--color-dark-secondary_d: #3a78c4;
 
-	/* Terciarios (acentos secundarios) */
-	--color-dark-tertiary: #4ec0f0; /* más vibrante que #0b78b1 para resaltar */
-	--color-dark-tertiary_d: #3799c4; /* versión más oscura */
+	--color-dark-tertiary: #6ba6ec;   /* acento más vibrante para resaltar */
+	--color-dark-tertiary_d: #4a90e2;
 
-	/* Cuaternarios (suaves de apoyo) */
-	--color-dark-four: #223545; /* equivalente oscuro del #c4e2f2 */
-	--color-dark-four_d: #1a2a38; /* más profundo */
+	--color-dark-four: #1d3450;
+	--color-dark-four_d: #16283c;
 
-	--color-dark-accent: #9dbe8c;
-	--color-dark-accent_d: #9dbe8c;
-	--color-dark-error: #fa3842;
-	--color-dark-success: #16a34a;
-	--color-dark-warning: #f59e0b;
+	--color-dark-accent: #e0b445;     /* oro más brillante en oscuro */
+	--color-dark-accent_d: #d19e23;
+	--color-dark-error: #ef5a68;
+	--color-dark-success: #22a05f;
+	--color-dark-warning: #e0b445;
 	--color-dark-white: #ffffff;
 	--color-dark-black: #000000;
 
