@@ -502,98 +502,134 @@
 	{#if loading && payments.length === 0}
 		<TableSkeleton columns={11} rows={10} />
 	{:else}
-		<!-- UX/UI FIX: Se agregó whitespace-nowrap y se eliminó la columna Monto/Cuota -->
-		<div class="w-full overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-					<thead class="bg-gray-50 dark:bg-gray-800">
-						<tr>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nº Transacción</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Curso</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Remitente</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Método</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Banco</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Monto Depositado</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Fecha Transacción</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Concepto Prorrateo</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Estado</th>
-							<th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
-						</tr>
-					</thead>
-					<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-						{#each payments as payment (payment._id)}
-							<tr>
-								<td class="px-6 py-4 whitespace-nowrap text-sm font-mono font-medium text-gray-700 dark:text-gray-300">
+		<!-- ISSUE-X-COMPACT: Tabla consolidada SIN scroll horizontal (desktop) -->
+		<div class="hidden lg:block border border-gray-200 dark:border-dark-border rounded-lg shadow-sm overflow-hidden">
+			<table class="w-full table-fixed divide-y divide-gray-200 dark:divide-dark-border">
+				<thead class="bg-gray-50 dark:bg-dark-background">
+					<tr>
+						<th scope="col" class="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transacción</th>
+						<th scope="col" class="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
+						<th scope="col" class="w-[16%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
+						<th scope="col" class="w-[18%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto / Fecha</th>
+						<th scope="col" class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+						<th scope="col" class="w-[6%] relative px-4 py-3"><span class="sr-only">Acciones</span></th>
+					</tr>
+				</thead>
+				<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
+					{#each payments as payment (payment._id)}
+						<tr class="align-top hover:bg-gray-50 dark:hover:bg-dark-background/40 transition-colors">
+							<!-- Transacción + método + banco -->
+							<td class="px-4 py-4 text-sm">
+								<div class="font-mono text-xs font-medium text-gray-700 dark:text-gray-300 truncate" title={payment.numero_transaccion}>
 									{payment.numero_transaccion?.startsWith('CAJA-') ? 'Físico / ' + payment.numero_transaccion : payment.numero_transaccion}
-								</td>
-								<td class="px-6 py-4 text-sm max-w-[200px]">
-									{#if coursesMap[payment.curso_id]}
-										<button
-											type="button"
-											onclick={() => { filters.curso_id = payment.curso_id; page = 1; handleFilterChange(); }}
-											class="inline-flex flex-col items-start text-left group"
-											title="Filtrar por este curso"
-										>
-											<span class="text-gray-900 dark:text-white font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight line-clamp-2">{coursesMap[payment.curso_id].nombre_programa}</span>
-											<span class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{coursesMap[payment.curso_id].codigo}</span>
-										</button>
-									{:else}
-										<span class="text-gray-400 dark:text-gray-500 text-xs">—</span>
-									{/if}
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-									{payment.remitente || 'No disponible'}
-								</td>
-								<!-- Módulo ISSUE-P-CANALES: Columna de Método -->
-								<td class="px-6 py-4 whitespace-nowrap text-sm">
-									<span class={`px-2 py-0.5 inline-flex text-xs font-bold rounded-md ${payment.metodo_pago === 'Caja' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}>
+								</div>
+								<div class="flex items-center gap-1.5 mt-1 min-w-0">
+									<span class={`shrink-0 px-1.5 py-0.5 inline-flex text-[10px] font-bold rounded ${payment.metodo_pago === 'Caja' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'}`}>
 										{payment.metodo_pago || 'Transferencia'}
 									</span>
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-									{payment.banco || 'Caja UAGRM'}
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600 dark:text-green-400">
-									{payment.monto_comprobante ? formatCurrency(payment.monto_comprobante) : '0.00'}
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
-									{formatDate(payment.fecha_comprobante || '---')}
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm">
-									<span class={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getConceptBadgeColor(payment.concepto)}`}>
-										{payment.concepto || 'No especificado'}
-									</span>
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap">
-									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(payment.estado_pago)}`}>
-										{payment.estado_pago}
-									</span>
-								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-									<button onclick={() => toggleDropdown(payment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-										<DotsVerticalIcon class="size-5" />
+									<span class="text-[10px] text-gray-400 dark:text-gray-500 truncate">{payment.banco || 'Caja UAGRM'}</span>
+								</div>
+							</td>
+							<!-- Curso -->
+							<td class="px-4 py-4 text-sm">
+								{#if coursesMap[payment.curso_id]}
+									<button
+										type="button"
+										onclick={() => { filters.curso_id = payment.curso_id; page = 1; handleFilterChange(); }}
+										class="text-left group w-full"
+										title="Filtrar por este curso"
+									>
+										<span class="block text-gray-900 dark:text-white font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight line-clamp-2">{coursesMap[payment.curso_id].nombre_programa}</span>
+										<span class="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">{coursesMap[payment.curso_id].codigo}</span>
 									</button>
-									{#if openDropdownId === payment._id}
-										<div class="absolute right-0 mt-2 w-48 z-10">
-											<DropdownMenu 
-												options={getDropdownOptions(payment)} 
-												isOpen={true} 
-												width="w-48" 
-												class="origin-top-right right-0"
-											/>
-										</div>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-						{#if payments.length === 0}
-							<tr>
-								<td colspan={isStaff ? 10 : 9} class="px-6 py-4 text-center text-sm text-gray-500 dark:text-white">
-									No se encontraron pagos.
-								</td>
-							</tr>
-						{/if}
-					</tbody>
+								{:else}
+									<span class="text-gray-400 dark:text-gray-500 text-xs">—</span>
+								{/if}
+							</td>
+							<!-- Remitente -->
+							<td class="px-4 py-4 text-sm text-gray-900 dark:text-white truncate" title={payment.remitente || 'No disponible'}>
+								{payment.remitente || 'No disponible'}
+							</td>
+							<!-- Monto + fecha -->
+							<td class="px-4 py-4 text-sm">
+								<div class="font-bold text-green-600 dark:text-green-400">{payment.monto_comprobante ? formatCurrency(payment.monto_comprobante) : '0.00'}</div>
+								<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{formatDate(payment.fecha_comprobante || '---')}</div>
+							</td>
+							<!-- Estado -->
+							<td class="px-4 py-4 text-sm">
+								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(payment.estado_pago)}`}>
+									{payment.estado_pago}
+								</span>
+							</td>
+							<!-- Acciones -->
+							<td class="px-4 py-4 text-right text-sm font-medium relative">
+								<button onclick={() => toggleDropdown(payment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del pago">
+									<DotsVerticalIcon class="size-5" />
+								</button>
+								{#if openDropdownId === payment._id}
+									<div class="absolute right-0 mt-2 w-48 z-10">
+										<DropdownMenu options={getDropdownOptions(payment)} isOpen={true} width="w-48" class="origin-top-right right-0" />
+									</div>
+								{/if}
+							</td>
+						</tr>
+					{/each}
+					{#if payments.length === 0}
+						<tr>
+							<td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+								No se encontraron pagos.
+							</td>
+						</tr>
+					{/if}
+				</tbody>
 			</table>
+		</div>
+
+		<!-- ISSUE-X-COMPACT: Tarjetas para móvil y tablet -->
+		<div class="lg:hidden space-y-3">
+			{#each payments as payment (payment._id)}
+				<div class="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl p-4 shadow-sm">
+					<div class="flex items-start justify-between gap-3">
+						<div class="min-w-0">
+							{#if coursesMap[payment.curso_id]}
+								<button type="button" onclick={() => { filters.curso_id = payment.curso_id; page = 1; handleFilterChange(); }} class="text-left">
+									<span class="block text-sm font-semibold text-gray-900 dark:text-white line-clamp-2 leading-tight">{coursesMap[payment.curso_id].nombre_programa}</span>
+								</button>
+							{/if}
+							<span class="block font-mono text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 truncate" title={payment.numero_transaccion}>
+								{payment.numero_transaccion?.startsWith('CAJA-') ? 'Físico / ' + payment.numero_transaccion : payment.numero_transaccion}
+							</span>
+						</div>
+						<div class="relative shrink-0">
+							<button onclick={() => toggleDropdown(payment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del pago">
+								<DotsVerticalIcon class="size-5" />
+							</button>
+							{#if openDropdownId === payment._id}
+								<div class="absolute right-0 mt-2 w-48 z-10">
+									<DropdownMenu options={getDropdownOptions(payment)} isOpen={true} width="w-48" class="origin-top-right right-0" />
+								</div>
+							{/if}
+						</div>
+					</div>
+
+					<div class="mt-3 flex items-center justify-between">
+						<span class="text-base font-bold text-green-600 dark:text-green-400">{payment.monto_comprobante ? formatCurrency(payment.monto_comprobante) : '0.00'}</span>
+						<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(payment.estado_pago)}`}>{payment.estado_pago}</span>
+					</div>
+
+					<div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+						<span class={`px-1.5 py-0.5 inline-flex font-bold rounded ${payment.metodo_pago === 'Caja' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'}`}>{payment.metodo_pago || 'Transferencia'}</span>
+						<span class="truncate">{payment.remitente || 'No disponible'}</span>
+						<span>·</span>
+						<span class="shrink-0">{formatDate(payment.fecha_comprobante || '---')}</span>
+					</div>
+				</div>
+			{/each}
+			{#if payments.length === 0}
+				<div class="text-center py-8 text-sm text-gray-500 dark:text-gray-400 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl">
+					No se encontraron pagos.
+				</div>
+			{/if}
 		</div>
 
 		<Pagination

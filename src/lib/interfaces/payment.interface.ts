@@ -17,6 +17,7 @@ export interface Payment {
     cuenta_destino?: string;
     monto_comprobante?: number;
     fecha_comprobante?: string;
+    metodo_pago?: string;
 }
 
 export interface CreatePaymentFormData {
