@@ -18,6 +18,7 @@ export interface Payment {
     monto_comprobante?: number;
     fecha_comprobante?: string;
     metodo_pago?: string;
+    en_ventana_reversion?: boolean; // ISSUE-P-REVERSION
 }
 
 export interface CreatePaymentFormData {

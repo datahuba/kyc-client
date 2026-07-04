@@ -42,13 +42,14 @@
 
 	const navigation: NavigationItem[] = [
 		{ name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
-		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza'], loginTypes: ['admin'] },
+		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		
 		// ACCESO DIRECTO A INSCRIPCIONES
-		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
+		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza'], loginTypes: ['admin'] },
 		{ name: 'Solicitudes', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
+		{ name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
 		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
 		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
 		{ name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
@@ -62,6 +63,7 @@
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
 		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] }, 
 		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
+		{ name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
 		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	];
 
@@ -72,7 +74,8 @@
 	let isStudentUser = $derived(userRole === 'student' || academicRole === 'student');
 
 	let filteredNavigation = $derived(navigation.filter(item => {
-		const isStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza'].includes(userRole);
+		// ISSUE-R-ROLES: encargado_curso y coordinador son staff administrativo también
+		const isStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(userRole);
 		const isTeacher = userRole === 'docente' || academicRole === 'teacher';
 		const isStudent = userRole === 'student' || academicRole === 'student';
 

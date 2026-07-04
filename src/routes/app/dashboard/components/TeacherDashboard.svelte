@@ -63,7 +63,12 @@
 
                     const realIndex = module.modulo_index - 1;
                     if (enrollment.modulos && enrollment.modulos.length > realIndex) {
-                        const notaGuardada = enrollment.modulos[realIndex].nota;
+                        const modulo = enrollment.modulos[realIndex];
+                        // ISSUE-Q-NOTA-BORRADOR: si hay un borrador pendiente, mostrar ese valor;
+                        // si no, mostrar la nota oficial (comportamiento actual)
+                        const notaGuardada = modulo.estado_validacion_nota === 'pendiente_validacion'
+                            ? modulo.nota_borrador
+                            : modulo.nota;
                         calificacionInputs[enrollment._id] = notaGuardada !== null && notaGuardada !== undefined ? notaGuardada : '';
                     } else {
                         calificacionInputs[enrollment._id] = '';
@@ -209,6 +214,10 @@
         if (!enrollment.modulos || enrollment.modulos.length <= moduleIndexBase0) return { label: 'Sin Datos', class: 'bg-gray-100 text-gray-800' };
 
         const modulo = enrollment.modulos[moduleIndexBase0];
+        // ISSUE-Q-NOTA-BORRADOR: si hay un borrador pendiente, tiene prioridad visual sobre el estado académico
+        if (modulo.estado_validacion_nota === 'pendiente_validacion') {
+            return { label: `Borrador: ${modulo.nota_borrador} (esperando CPD)`, class: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' };
+        }
         if (modulo.nota === null || modulo.nota === undefined) return { label: 'Cursando', class: 'bg-blue-100 text-blue-800' };
         if (modulo.nota >= 51) return { label: 'Aprobado', class: 'bg-green-100 text-green-800' };
         return { label: 'Reprobado', class: 'bg-red-100 text-red-800' };

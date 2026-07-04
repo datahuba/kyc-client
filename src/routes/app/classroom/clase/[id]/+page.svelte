@@ -135,7 +135,7 @@
 
 	function statusClass(status: SubmissionStatus): string {
 		if (status === 'graded') return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-		if (status === 'submitted') return 'bg-yellow-100 text-yellow-800';
+		if (status === 'submitted') return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
 		return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
 	}
 
@@ -694,10 +694,10 @@
 					<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 						<thead class="bg-gray-50 dark:bg-gray-900">
 							<tr>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actividad</th>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nota</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actividad</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nota</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -710,7 +710,7 @@
 										{/if}
 									</td>
 									<td class="px-4 py-3">
-										<span class={`text-xs font-medium px-2 py-0.5 rounded-full ${grade.assignment_type === 'EXAM' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'}`}>
+										<span class={`text-xs font-medium px-2 py-0.5 rounded-full ${grade.assignment_type === 'EXAM' ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300' : 'bg-uagrm-blue/10 text-light-tertiary dark:bg-dark-secondary/20 dark:text-dark-tertiary'}`}>
 											{grade.assignment_type === 'EXAM' ? 'Examen' : 'Tarea'}
 										</span>
 									</td>
@@ -740,10 +740,10 @@
 					<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 						<thead class="bg-gray-50 dark:bg-gray-900">
 							<tr>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registro</th>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nombre</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Registro</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -816,10 +816,10 @@
 			<span class="inline-flex text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
 				Total: {submissionStats.total}
 			</span>
-			<span class="inline-flex text-xs font-medium px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800">
+			<span class="inline-flex text-xs font-medium px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
 				Pendientes: {submissionStats.pending}
 			</span>
-			<span class="inline-flex text-xs font-medium px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+			<span class="inline-flex text-xs font-medium px-2.5 py-1 rounded-full bg-uagrm-blue/10 text-light-tertiary dark:bg-dark-secondary/20 dark:text-dark-tertiary">
 				Entregados: {submissionStats.submitted}
 			</span>
 			<span class="inline-flex text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
@@ -831,11 +831,11 @@
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 				<thead class="bg-gray-50 dark:bg-gray-900">
 					<tr>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estudiante</th>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entrega</th>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nota</th>
-						<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Entrega</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nota</th>
+						<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acción</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-gray-200 dark:divide-gray-700">

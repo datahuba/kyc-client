@@ -132,9 +132,9 @@
                 </div>
 
                 {#if config.notas}
-                    <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6 border border-blue-100 dark:border-blue-800">
-                        <h4 class="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">Notas Adicionales</h4>
-                        <p class="text-sm text-blue-700 dark:text-blue-400 whitespace-pre-wrap">{config.notas}</p>
+                    <div class="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-6 border border-primary-100 dark:border-primary-800">
+                        <h4 class="text-sm font-semibold text-primary-800 dark:text-primary-300 mb-2">Notas Adicionales</h4>
+                        <p class="text-sm text-primary-700 dark:text-primary-400 whitespace-pre-wrap">{config.notas}</p>
                     </div>
                 {/if}
 

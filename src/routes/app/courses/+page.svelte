@@ -527,7 +527,7 @@
 								<td class="px-6 py-4 whitespace-nowrap">
 									<div class="flex items-center">
 										<div class="size-10 flex-shrink-0 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-											<span class="text-lg font-medium text-primary-600">
+											<span class="text-lg font-medium text-primary-600 dark:text-primary-400">
 												{student.nombre.charAt(0).toUpperCase()}
 											</span>
 										</div>
@@ -543,8 +543,8 @@
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-										${student.inscripcion.estado === 'pendiente_pago' ? 'bg-yellow-100 text-yellow-800' : 
-										  student.inscripcion.estado === 'pagado' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+										${student.inscripcion.estado === 'pendiente_pago' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' : 
+										  student.inscripcion.estado === 'pagado' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
 										{student.inscripcion.estado}
 									</span>
 									<div class="text-xs text-gray-500 dark:text-gray-400 mt-1 capitalize">{student.inscripcion.tipo_estudiante}</div>
@@ -552,8 +552,8 @@
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<div class="text-sm text-gray-900 dark:text-white">Total: {formatCurrency(student.financiero.total_a_pagar)}</div>
-									<div class="text-xs text-green-600">Pagado: {formatCurrency(student.financiero.total_pagado)}</div>
-									<div class="text-xs text-red-500">Saldo: {formatCurrency(student.financiero.saldo_pendiente)}</div>
+									<div class="text-xs text-green-600 dark:text-green-400">Pagado: {formatCurrency(student.financiero.total_pagado)}</div>
+									<div class="text-xs text-red-500 dark:text-red-400">Saldo: {formatCurrency(student.financiero.saldo_pendiente)}</div>
 									<div class="w-full bg-gray-200 rounded-full h-1.5 mt-2 dark:bg-dark-border">
 										<div class="bg-primary-600 h-1.5 rounded-full" style={`width: ${Math.min(student.financiero.avance_pago, 100)}%`}></div>
 									</div>

@@ -276,7 +276,7 @@
 								<div class="text-sm text-gray-900 dark:text-white">{user.email}</div>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
-								<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+								<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300">
 									{getRoleLabel(user.role)}
 								</span>
 							</td>

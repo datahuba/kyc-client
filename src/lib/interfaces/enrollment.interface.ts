@@ -19,6 +19,7 @@ export interface Enrollment {
 	total_pagado: number;
 	updated_at: string;
 	formulario_inscripcion_url?: string;
+	beca_respaldo_url?: string | null; // ISSUE-P-BECA-RESPALDO
 }
 
 export interface CreateEnrollmentRequest {

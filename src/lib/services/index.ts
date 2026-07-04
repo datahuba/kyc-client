@@ -8,3 +8,4 @@ export * from './discount.service';
 export * from './user.service';
 export * from './paymentConfig.service';
 export * from './classroom.service';
+export * from './bank-statement.service';

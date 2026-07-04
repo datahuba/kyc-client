@@ -22,7 +22,8 @@
 		nombre: '',
 		porcentaje: 0,
 		lista_estudiantes: [],
-		activo: true
+		activo: true,
+		nota_minima_requerida: null
 	});
 
 	// BUG 9 FIX: Validación reactiva y visual estricta
@@ -43,14 +44,16 @@
 				nombre: discount.nombre,
 				porcentaje: discount.porcentaje,
 				lista_estudiantes: discount.lista_estudiantes,
-				activo: discount.activo
+				activo: discount.activo,
+				nota_minima_requerida: discount.nota_minima_requerida ?? null
 			};
 		} else {
 			formData = {
 				nombre: '',
 				porcentaje: 0,
 				lista_estudiantes: [],
-				activo: true
+				activo: true,
+				nota_minima_requerida: null
 			};
 		}
 	});
@@ -126,6 +129,24 @@
 				{/if}
 			{/if}
 		</div>
+	</div>
+
+	<!-- ISSUE-P-RECALCULO-NOTA: condición académica opcional para conservar la beca -->
+	<div class="space-y-1">
+		<Input
+			label="Nota Mínima para Conservar la Beca (opcional)"
+			id="nota_minima_requerida"
+			type="number"
+			min="0"
+			max="100"
+			step="0.01"
+			bind:value={formData.nota_minima_requerida}
+			placeholder="Ej: 77 (deja vacío si no aplica)"
+		/>
+		<p class="text-xs text-gray-500 dark:text-gray-400">
+			Si se define, el estudiante debe mantener esta nota en cada módulo. Si reprueba el
+			mínimo en un módulo específico, ese módulo (solo ese) pierde el descuento automáticamente.
+		</p>
 	</div>
 
 	<div class="flex items-center gap-2 pt-4">
