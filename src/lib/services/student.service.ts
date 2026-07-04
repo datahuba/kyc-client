@@ -162,6 +162,11 @@ class StudentService {
 	async updateSelf(data: UpdateStudentSelfRequest): Promise<Student> {
 		return await apiKyC.put<Student>('/students/me', data);
 	}
+
+	// ISSUE-Q-PRE: aceptación del reglamento de Postgrado en el primer login
+	async acceptTerms(): Promise<Student> {
+		return await apiKyC.post<Student>('/students/me/accept-terms', {});
+	}
 }
 
 export const studentService = new StudentService();
