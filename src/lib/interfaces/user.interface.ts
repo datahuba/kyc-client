@@ -1,4 +1,13 @@
-export type Role = 'docente' | 'admin' | 'superadmin' | 'mae' | 'cpd' | 'cobranza' | null;
+export type Role =
+	| 'docente'
+	| 'admin'
+	| 'superadmin'
+	| 'mae'
+	| 'cpd'
+	| 'cobranza'
+	| 'encargado_curso' // NUEVO (ISSUE-R-ROLES)
+	| 'coordinador' // NUEVO (ISSUE-R-ROLES)
+	| null;
 export type UserType = 'user' | 'student';
 
 export interface User {
@@ -14,6 +23,8 @@ export interface User {
 	created_at: string;
 	updated_at: string;
 	foto_url?: string; // Optional as it wasn't in the snippet but used in header
+	nombre_funcional?: string | null; // ISSUE-R-ROLES: nombre por función/programa
+	cursos_asignados?: string[]; // ISSUE-R-ROLES: cursos que puede operar (encargado_curso/cobranza)
 }
 
 
@@ -23,6 +34,8 @@ export interface CreateUserRequest {
 	password?: string; // Optional for update? No, required for create.
 	role: Role;
 	activo?: boolean;
+	nombre_funcional?: string | null; // ISSUE-R-ROLES
+	cursos_asignados?: string[]; // ISSUE-R-ROLES
 }
 
 export interface UpdateUserRequest extends Partial<CreateUserRequest> {}

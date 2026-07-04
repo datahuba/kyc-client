@@ -49,11 +49,35 @@ class EnrollmentService {
 	}
 
 	// === ISSUE R: MÉTODO PARA CALIFICAR MÓDULOS DE ESTUDIANTES ===
+	// ISSUE-Q-NOTA-BORRADOR: si quien llama es DOCENTE, el backend guarda esto como borrador
+	// pendiente de validación de CPD; si es CPD/Admin/Superadmin, califica directamente.
 	async updateModuloNota(enrollmentId: string, moduloIndex: number, nota: number): Promise<Enrollment> {
 		return await apiKyC.patch<Enrollment>(
 			`/enrollments/${enrollmentId}/modulos/${moduloIndex}/nota`,
 			{ nota: nota }
 		);
+	}
+
+	// === ISSUE-Q-NOTA-BORRADOR: CPD valida o rechaza el borrador subido por el docente ===
+	async validarNotaModulo(enrollmentId: string, moduloIndex: number): Promise<Enrollment> {
+		return await apiKyC.post<Enrollment>(
+			`/enrollments/${enrollmentId}/modulos/${moduloIndex}/nota/validar`,
+			{}
+		);
+	}
+
+	async rechazarNotaModulo(enrollmentId: string, moduloIndex: number): Promise<Enrollment> {
+		return await apiKyC.post<Enrollment>(
+			`/enrollments/${enrollmentId}/modulos/${moduloIndex}/nota/rechazar`,
+			{}
+		);
+	}
+
+	// === ISSUE-P-BECA-RESPALDO: subir/reemplazar el documento de respaldo de la beca ===
+	async uploadBecaRespaldo(enrollmentId: string, file: File): Promise<Enrollment> {
+		const formData = new FormData();
+		formData.append('file', file);
+		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/beca-respaldo`, formData);
 	}
 }
 

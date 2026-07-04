@@ -560,6 +560,15 @@
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(payment.estado_pago)}`}>
 									{payment.estado_pago}
 								</span>
+								<!-- ISSUE-P-REVERSION -->
+								{#if payment.en_ventana_reversion}
+									<span
+										class="ml-1 px-2 inline-flex text-[10px] leading-5 font-bold uppercase tracking-wide rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+										title="Este pago por transferencia puede ser revertido por el banco hasta 48h después de su aprobación. Verifícalo contra el extracto bancario antes de darlo por definitivo."
+									>
+										En observación 48h
+									</span>
+								{/if}
 							</td>
 							<!-- Acciones -->
 							<td class="px-4 py-4 text-right text-sm font-medium relative">
@@ -614,7 +623,18 @@
 
 					<div class="mt-3 flex items-center justify-between">
 						<span class="text-base font-bold text-green-600 dark:text-green-400">{payment.monto_comprobante ? formatCurrency(payment.monto_comprobante) : '0.00'}</span>
-						<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(payment.estado_pago)}`}>{payment.estado_pago}</span>
+						<div class="flex items-center gap-1">
+							<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(payment.estado_pago)}`}>{payment.estado_pago}</span>
+							<!-- ISSUE-P-REVERSION -->
+							{#if payment.en_ventana_reversion}
+								<span
+									class="px-2 inline-flex text-[10px] leading-5 font-bold uppercase tracking-wide rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+									title="Este pago por transferencia puede ser revertido por el banco hasta 48h después de su aprobación."
+								>
+									48h
+								</span>
+							{/if}
+						</div>
 					</div>
 
 					<div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">

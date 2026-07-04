@@ -218,8 +218,8 @@
 							</td>
 							<td class="px-6 py-4 text-right text-sm font-medium space-x-2 whitespace-nowrap">
 								<button onclick={() => handleViewModules(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
-								<button onclick={() => handleEditTeacher(teacher)} class="text-amber-600 hover:text-amber-800 dark:text-amber-400">Editar</button>
-								<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-red-600 hover:text-red-800 dark:text-red-400">Eliminar</button>
+								<button onclick={() => handleEditTeacher(teacher)} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
+								<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-light-error hover:opacity-80 dark:text-dark-error">Eliminar</button>
 							</td>
 						</tr>
 					{/each}
@@ -247,8 +247,8 @@
 					</div>
 					<div class="mt-3 flex items-center gap-4 text-sm font-medium border-t border-gray-100 dark:border-dark-border pt-3">
 						<button onclick={() => handleViewModules(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
-						<button onclick={() => handleEditTeacher(teacher)} class="text-amber-600 hover:text-amber-800 dark:text-amber-400">Editar</button>
-						<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-red-600 hover:text-red-800 dark:text-red-400 ml-auto">Eliminar</button>
+						<button onclick={() => handleEditTeacher(teacher)} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
+						<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-light-error hover:opacity-80 dark:text-dark-error ml-auto">Eliminar</button>
 					</div>
 				</div>
 			{/each}
@@ -263,20 +263,20 @@
 				<div class="space-y-4">
 					<div>
 						<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuario</label>
-						<input type="text" bind:value={newTeacher.username} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="nombre_usuario" />
+						<input type="text" bind:value={newTeacher.username} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="nombre_usuario" />
 					</div>
 					<div>
 						<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
-						<input type="email" bind:value={newTeacher.email} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="docente@ejemplo.com" />
+						<input type="email" bind:value={newTeacher.email} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="docente@ejemplo.com" />
 					</div>
 					<div>
 						<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contraseña</label>
-						<input type="password" bind:value={newTeacher.password} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••" />
+						<input type="password" bind:value={newTeacher.password} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="••••••••" />
 					</div>
 				</div>
 				<div class="flex gap-3 mt-6">
 					<button onclick={() => (showNewTeacherModal = false)} class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
-					<button onclick={handleCreateTeacher} disabled={isSubmitting} class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">{isSubmitting ? 'Creando...' : 'Crear Docente'}</button>
+					<button onclick={handleCreateTeacher} disabled={isSubmitting} class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors">{isSubmitting ? 'Creando...' : 'Crear Docente'}</button>
 				</div>
 			</div>
 		</div>
@@ -290,15 +290,15 @@
 				<div class="space-y-4">
 					<div>
 						<label for="edit-username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuario</label>
-						<input id="edit-username" type="text" bind:value={editTeacherData.username} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+						<input id="edit-username" type="text" bind:value={editTeacherData.username} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
 					</div>
 					<div>
 						<label for="edit-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
-						<input id="edit-email" type="email" bind:value={editTeacherData.email} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+						<input id="edit-email" type="email" bind:value={editTeacherData.email} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
 					</div>
 					<div>
 						<label for="edit-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nueva Contraseña (Opcional)</label>
-						<input id="edit-password" type="password" bind:value={editTeacherData.password} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Dejar vacío para no cambiar" />
+						<input id="edit-password" type="password" bind:value={editTeacherData.password} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Dejar vacío para no cambiar" />
 					</div>
 					<div class="flex items-center gap-2 mt-4">
 						<input type="checkbox" id="edit-activo" bind:checked={editTeacherData.activo} class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded cursor-pointer" />
@@ -307,7 +307,7 @@
 				</div>
 				<div class="flex gap-3 mt-6">
 					<button onclick={() => { showEditTeacherModal = false; editingTeacher = null; }} class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
-					<button onclick={handleSaveEditTeacher} disabled={isSubmitting} class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">{isSubmitting ? 'Guardando...' : 'Guardar Cambios'}</button>
+					<button onclick={handleSaveEditTeacher} disabled={isSubmitting} class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors">{isSubmitting ? 'Guardando...' : 'Guardar Cambios'}</button>
 				</div>
 			</div>
 		</div>
@@ -319,7 +319,7 @@
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
                 <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
+                        <div class="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg text-primary-600 dark:text-primary-400">
 							<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
 							</svg>
@@ -339,7 +339,7 @@
                 <div class="flex-1 overflow-y-auto p-4 md:p-6">
                     {#if loadingModules}
                         <div class="flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
                         </div>
                     {:else if teacherModules.length === 0}
                         <div class="text-center py-12 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
@@ -351,18 +351,18 @@
                             <table class="w-full text-left border-collapse">
                                 <thead class="bg-gray-50 dark:bg-gray-900/50">
                                     <tr>
-                                        <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Módulo</th>
-                                        <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Programa / Curso</th>
-                                        <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Código</th>
-                                        <th scope="col" class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Costo Unitario</th>
+                                        <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Módulo</th>
+                                        <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Programa / Curso</th>
+                                        <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Código</th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Costo Unitario</th>
                                     </tr>
                                 </thead>
-                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:border-gray-700">
+                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                     {#each teacherModules as module}
                                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                             <td class="px-4 py-4 align-top">
                                                 <div class="flex items-start gap-2">
-                                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold shrink-0 mt-0.5">{module.modulo_index}</span>
+                                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-300 text-xs font-bold shrink-0 mt-0.5">{module.modulo_index}</span>
                                                     <span class="text-sm font-medium text-gray-900 dark:text-white whitespace-normal break-words max-w-[280px]">
                                                         {module.modulo_nombre}
                                                     </span>
@@ -374,7 +374,7 @@
                                                 </span>
                                             </td>
                                             <td class="px-4 py-4 align-top">
-                                                <span class="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200 whitespace-nowrap">
+                                                <span class="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600 whitespace-nowrap">
                                                     {module.curso_codigo}
                                                 </span>
                                             </td>

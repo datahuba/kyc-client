@@ -91,8 +91,8 @@
 			</div>
 		{/if}
 	{:else}
-		<div class="rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 px-3 py-2">
-			<p class="text-xs text-blue-700 dark:text-blue-300">
+		<div class="rounded-md bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 px-3 py-2">
+			<p class="text-xs text-primary-700 dark:text-primary-300">
 				Tienes {MAX_SUBMISSION_ATTEMPTS} intentos para esta actividad.
 			</p>
 		</div>

@@ -49,6 +49,13 @@
 	let isKardexOpen: boolean = $state(false);
 	let selectedKardex: Enrollment | null = $state(null);
 
+	// ISSUE-P-BECA-RESPALDO
+	let becaRespaldoUploading: boolean = $state(false);
+	let becaRespaldoInputEl: HTMLInputElement | null = $state(null);
+
+	// ISSUE-Q-NOTA-BORRADOR
+	let notaValidacionLoading: Record<string, boolean> = $state({});
+
 	// Dropdown state
 	let openDropdownId: string | null = $state(null);
 
@@ -60,6 +67,19 @@
 	let canCreateEnrollment = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canEditEnrollment = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canDeleteEnrollment = $derived(currentRole === 'superadmin');
+	// ISSUE-R-SOLICITUD-PASIVO: quién puede solicitar/aprobar el pasivo de una inscripción
+	let canRequestPassive = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'student'].includes(currentRole));
+	let canReactivate = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	// ISSUE-P-BECA-RESPALDO: quién puede subir/reemplazar el respaldo documental de una beca
+	let canManageBecaRespaldo = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
+	// ISSUE-Q-NOTA-BORRADOR: quién puede validar/rechazar el borrador de nota del docente
+	let canValidateNotaBorrador = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
+
+	// Modal de solicitud de pasivo
+	let passiveModalOpen: boolean = $state(false);
+	let passiveTarget: Enrollment | null = $state(null);
+	let passiveMotivo: string = $state('');
+	let passiveLoading: boolean = $state(false);
 
 	onMount(() => {
 		if (!$userStore.isAuthenticated) {
@@ -196,6 +216,99 @@
 		loadData();
 	}
 
+	// ISSUE-R-SOLICITUD-PASIVO
+	function openPassiveModal(enrollment: Enrollment) {
+		passiveTarget = enrollment;
+		passiveMotivo = '';
+		passiveModalOpen = true;
+		openDropdownId = null;
+	}
+
+	async function confirmPassiveRequest() {
+		if (!passiveTarget || passiveMotivo.trim().length < 3) return;
+		passiveLoading = true;
+		try {
+			const { apiKyC } = await import('$lib/config/apiKyC.config');
+			await apiKyC.post('/passive-requests/', {
+				enrollment_id: passiveTarget._id,
+				motivo: passiveMotivo.trim()
+			});
+			alert('success', 'Solicitud de pasivo enviada. El CPD la revisará.');
+			passiveModalOpen = false;
+			passiveTarget = null;
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo enviar la solicitud de pasivo');
+		} finally {
+			passiveLoading = false;
+		}
+	}
+
+	async function handleReactivate(enrollment: Enrollment) {
+		openDropdownId = null;
+		try {
+			const { apiKyC } = await import('$lib/config/apiKyC.config');
+			await apiKyC.post(`/passive-requests/enrollment/${enrollment._id}/reactivate`, {});
+			alert('success', 'Inscripción reactivada correctamente.');
+			loadData();
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo reactivar la inscripción');
+		}
+	}
+
+	// ISSUE-P-BECA-RESPALDO
+	function triggerBecaRespaldoUpload() {
+		becaRespaldoInputEl?.click();
+	}
+
+	async function handleBecaRespaldoFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file || !selectedKardex) return;
+
+		becaRespaldoUploading = true;
+		try {
+			const updated = await enrollmentService.uploadBecaRespaldo(selectedKardex._id, file);
+			selectedKardex = { ...selectedKardex, beca_respaldo_url: updated.beca_respaldo_url };
+			alert('success', 'Respaldo de beca subido correctamente.');
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo subir el respaldo de la beca');
+		} finally {
+			becaRespaldoUploading = false;
+			input.value = '';
+		}
+	}
+
+	// ISSUE-Q-NOTA-BORRADOR
+	async function handleValidarNotaBorrador(moduloIndex: number) {
+		if (!selectedKardex) return;
+		const key = `${selectedKardex._id}-${moduloIndex}`;
+		notaValidacionLoading[key] = true;
+		try {
+			const updated = await enrollmentService.validarNotaModulo(selectedKardex._id, moduloIndex);
+			selectedKardex = updated;
+			alert('success', 'Nota validada. Ya es oficial.');
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo validar la nota');
+		} finally {
+			notaValidacionLoading[key] = false;
+		}
+	}
+
+	async function handleRechazarNotaBorrador(moduloIndex: number) {
+		if (!selectedKardex) return;
+		const key = `${selectedKardex._id}-${moduloIndex}`;
+		notaValidacionLoading[key] = true;
+		try {
+			const updated = await enrollmentService.rechazarNotaModulo(selectedKardex._id, moduloIndex);
+			selectedKardex = updated;
+			alert('success', 'Borrador rechazado. El docente puede volver a subirlo.');
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo rechazar el borrador');
+		} finally {
+			notaValidacionLoading[key] = false;
+		}
+	}
+
 	function toggleDropdown(id: string) {
 		if (openDropdownId === id) {
 			openDropdownId = null;
@@ -214,6 +327,26 @@
 				action: () => handleViewKardex(enrollment)
 			}
 		];
+
+		// ISSUE-R-SOLICITUD-PASIVO: solicitar pausa solo sobre inscripciones activas/pendientes
+		const estadoActual = (enrollment as any).estado;
+		if (canRequestPassive && (estadoActual === 'activo' || estadoActual === 'pendiente_pago')) {
+			options.push({
+				label: 'Solicitar Pasivo',
+				id: 'request-passive',
+				icon: `<svg class="size-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+				action: () => openPassiveModal(enrollment)
+			});
+		}
+
+		if (canReactivate && estadoActual === 'suspendido') {
+			options.push({
+				label: 'Reactivar Inscripción',
+				id: 'reactivate',
+				icon: `<svg class="size-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>`,
+				action: () => handleReactivate(enrollment)
+			});
+		}
 
         if (currentRole === 'student') return options;
 
@@ -517,6 +650,36 @@
 					</div>
 				</div>
 
+				<!-- ISSUE-P-BECA-RESPALDO: respaldo documental de beca/descuento -->
+				{#if selectedKardex.descuento_estudiante_id || (selectedKardex.descuento_personalizado ?? 0) > 0}
+					<div class="bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-dark-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+						<div>
+							<p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold mb-1">Respaldo de Beca</p>
+							{#if selectedKardex.beca_respaldo_url}
+								<a href={selectedKardex.beca_respaldo_url} target="_blank" rel="noopener noreferrer" class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">
+									Ver documento de respaldo
+								</a>
+							{:else}
+								<span class="inline-block px-2.5 py-1 text-[11px] font-bold rounded-full uppercase tracking-wide bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400">
+									Respaldo pendiente
+								</span>
+							{/if}
+						</div>
+						{#if canManageBecaRespaldo}
+							<input
+								bind:this={becaRespaldoInputEl}
+								type="file"
+								accept="application/pdf,image/*"
+								class="hidden"
+								onchange={handleBecaRespaldoFileChange}
+							/>
+							<Button size="sm" variant="secondary" onclick={triggerBecaRespaldoUpload} loading={becaRespaldoUploading}>
+								{selectedKardex.beca_respaldo_url ? 'Reemplazar Respaldo' : 'Subir Respaldo'}
+							</Button>
+						{/if}
+					</div>
+				{/if}
+
 				<!-- Tabla de Módulos (Notas y Pagos) -->
 				<div class="overflow-x-auto border border-gray-200 dark:border-dark-border rounded-xl shadow-sm">
 					<table class="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
@@ -531,7 +694,7 @@
 						</thead>
 						<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
 							{#if selectedKardex.modulos && selectedKardex.modulos.length > 0}
-								{#each selectedKardex.modulos as mod}
+								{#each selectedKardex.modulos as mod, moduleIndex}
 									<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
 										<td class="px-4 py-4 text-sm font-medium text-slate-900 dark:text-white max-w-[200px]" title={mod.nombre}>
 											{mod.nombre}
@@ -547,12 +710,47 @@
 											<span class={`px-3 py-1.5 text-[11px] font-bold rounded-full uppercase tracking-wide ${mod.estado_academico === 'Aprobado' ? 'bg-green-100 text-green-700 border border-green-200' : mod.estado_academico === 'Reprobado' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600'}`}>
 												{mod.estado_academico || 'Cursando'}
 											</span>
+											<!-- ISSUE-Q-NOTA-BORRADOR: borrador del docente pendiente de validación -->
+											{#if mod.estado_validacion_nota === 'pendiente_validacion'}
+												<div class="mt-2 flex flex-col items-center gap-1">
+													<span class="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wide">
+														Borrador: {mod.nota_borrador}
+													</span>
+													{#if canValidateNotaBorrador}
+														{@const key = `${selectedKardex._id}-${moduleIndex}`}
+														<div class="flex gap-1">
+															<button
+																type="button"
+																onclick={() => handleValidarNotaBorrador(moduleIndex)}
+																disabled={notaValidacionLoading[key]}
+																class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 disabled:opacity-50"
+															>
+																Validar
+															</button>
+															<button
+																type="button"
+																onclick={() => handleRechazarNotaBorrador(moduleIndex)}
+																disabled={notaValidacionLoading[key]}
+																class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 disabled:opacity-50"
+															>
+																Rechazar
+															</button>
+														</div>
+													{/if}
+												</div>
+											{/if}
 										</td>
 
 										<!-- Columna Financiera -->
 										<td class="px-4 py-4 text-right text-sm text-slate-600 dark:text-slate-300">
 											<div class="font-bold text-slate-900 dark:text-white">{formatCurrency(mod.costo)}</div>
 											<div class="text-xs text-emerald-600 font-medium mt-0.5">Pagado: {formatCurrency(mod.monto_pagado || 0)}</div>
+											<!-- ISSUE-P-RECALCULO-NOTA: aviso si este módulo perdió la beca por nota -->
+											{#if mod.costo_sin_beca_personal !== null && mod.costo_sin_beca_personal !== undefined && mod.costo === mod.costo_sin_beca_personal}
+												<div class="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5 uppercase tracking-wide">
+													Beca perdida por nota
+												</div>
+											{/if}
 										</td>
 										<td class="px-4 py-4 text-center">
 											<span class={`px-2.5 py-1 text-xs font-bold rounded-full ${mod.estado === 'Pagado' ? 'bg-emerald-100 text-emerald-700' : mod.estado === 'Parcial' ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-100 text-orange-700'}`}>
@@ -595,4 +793,31 @@
 		}}
 		loading={deleteLoading}
 	/>
+
+	<!-- ISSUE-R-SOLICITUD-PASIVO: Modal de solicitud de pasivo -->
+	<Modal
+		isOpen={passiveModalOpen}
+		title="Solicitar Estado Pasivo"
+		onClose={() => { if (!passiveLoading) passiveModalOpen = false; }}
+		maxWidth="sm:max-w-lg"
+	>
+		<div class="p-4 space-y-4">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
+				Esta inscripción quedará en pausa (sin perder historial ni pagos) una vez que el CPD apruebe
+				la solicitud. Indica el motivo.
+			</p>
+			<textarea
+				bind:value={passiveMotivo}
+				rows="3"
+				class="w-full rounded-lg border border-light-four dark:border-dark-border bg-white dark:bg-dark-background py-2 px-3 text-sm text-light-black dark:text-dark-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+				placeholder="Ej: Licencia médica, dificultad económica temporal, etc."
+			></textarea>
+			<div class="flex justify-end gap-3">
+				<Button variant="secondary" onclick={() => passiveModalOpen = false} disabled={passiveLoading}>Cancelar</Button>
+				<Button onclick={confirmPassiveRequest} loading={passiveLoading} disabled={passiveMotivo.trim().length < 3}>
+					Enviar Solicitud
+				</Button>
+			</div>
+		</div>
+	</Modal>
 </div>

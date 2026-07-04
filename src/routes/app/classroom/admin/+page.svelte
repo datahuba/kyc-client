@@ -197,7 +197,7 @@
 					<div class="flex gap-2">
 						<button
 							onclick={() => openLinkTeacherModal(classroom)}
-							class="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+							class="flex-1 px-3 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
 						>
 							{classroom.teacher_user_id ? 'Cambiar Docente' : 'Asignar Docente'}
 						</button>
@@ -226,7 +226,7 @@
 						<input
 							type="text"
 							bind:value={newClassroom.nombre}
-							class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+							class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
 							placeholder="Ej: Matemática Avanzada"
 						/>
 					</div>
@@ -237,7 +237,7 @@
 						</label>
 						<textarea
 							bind:value={newClassroom.descripcion}
-							class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+							class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
 							placeholder="Descripción de la clase..."
 							rows="3"
 						></textarea>
@@ -249,7 +249,7 @@
 						</label>
 						<select
 							bind:value={newClassroom.teacher_user_id}
-							class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+							class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
 						>
 							<option value="">-- Sin docente --</option>
 							{#each teachers as teacher}
@@ -277,7 +277,7 @@
 					<button
 						onclick={handleCreateClassroom}
 						disabled={isSubmitting}
-						class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+						class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
 					>
 						{isSubmitting ? 'Creando...' : 'Crear Clase'}
 					</button>
@@ -303,7 +303,7 @@
 					</label>
 					<select
 						bind:value={newClassroom.teacher_user_id}
-						class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+						class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
 					>
 						<option value="">-- Sin docente --</option>
 						{#each teachers as teacher}
@@ -326,7 +326,7 @@
 					<button
 						onclick={handleLinkTeacher}
 						disabled={isSubmitting}
-						class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+						class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
 					>
 						{isSubmitting ? 'Guardando...' : 'Guardar'}
 					</button>

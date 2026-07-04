@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { discountService, studentService } from '$lib/services';
+	import { userStore } from '$lib/stores/userStore';
 	import type { Discount, Student } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
@@ -13,6 +14,12 @@
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
+
+	// ISSUE-P-DESCUENTO-ROL: solo Administrativo (admin/superadmin) gestiona descuentos.
+	// Cobranza conserva acceso de solo lectura a esta vista.
+	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let canManageDiscounts = $derived(['superadmin', 'admin'].includes(currentRole));
+	let canDeleteDiscount = $derived(currentRole === 'superadmin');
 
 	let discounts: Discount[] = $state([]);
 	let loading = $state(false);
@@ -130,33 +137,43 @@
 	}
 
 	function getDropdownOptions(discount: Discount) {
-		return [
-			{
+		// ISSUE-P-DESCUENTO-ROL: Cobranza ve la tabla pero no tiene acciones de gestión
+		const options: any[] = [];
+
+		if (canManageDiscounts) {
+			options.push({
 				label: 'Editar',
 				id: 'edit',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>`,
 				action: () => handleEdit(discount)
-			},
-			{
+			});
+		}
+
+		if (canDeleteDiscount) {
+			options.push({
 				label: 'Eliminar',
 				id: 'delete',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`,
 				action: () => confirmDelete(discount),
 				divider: true
-			}
-		];
+			});
+		}
+
+		return options;
 	}
 </script>
 
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<Heading level="h1">Descuentos</Heading>
-		<Button onclick={handleCreate}>
-			{#snippet leftIcon()}
-				<PlusIcon class="size-5" />
-			{/snippet}
-			Nuevo Descuento
-		</Button>
+		{#if canManageDiscounts}
+			<Button onclick={handleCreate}>
+				{#snippet leftIcon()}
+					<PlusIcon class="size-5" />
+				{/snippet}
+				Nuevo Descuento
+			</Button>
+		{/if}
 	</div>
 
 	{#if loading}
@@ -198,18 +215,20 @@
 								</span>
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-								<button onclick={() => toggleDropdown(discount._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-									<DotsVerticalIcon class="size-5" />
-								</button>
-								{#if openDropdownId === discount._id}
-									<div class="absolute right-0 mt-2 w-48 z-10">
-										<DropdownMenu 
-											options={getDropdownOptions(discount)} 
-											isOpen={true} 
-											width="w-48" 
-											class="origin-top-right right-0"
-										/>
-									</div>
+								{#if getDropdownOptions(discount).length > 0}
+									<button onclick={() => toggleDropdown(discount._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+										<DotsVerticalIcon class="size-5" />
+									</button>
+									{#if openDropdownId === discount._id}
+										<div class="absolute right-0 mt-2 w-48 z-10">
+											<DropdownMenu 
+												options={getDropdownOptions(discount)} 
+												isOpen={true} 
+												width="w-48" 
+												class="origin-top-right right-0"
+											/>
+										</div>
+									{/if}
 								{/if}
 							</td>
 						</tr>
@@ -240,18 +259,20 @@
 							<p class="text-xs text-gray-500 dark:text-gray-400">{discount.porcentaje}%</p>
 						</div>
 						<div class="relative">
-							<button onclick={() => toggleDropdown(discount._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-								<DotsVerticalIcon class="size-5" />
-							</button>
-							{#if openDropdownId === discount._id}
-								<div class="absolute right-0 mt-2 w-48 z-10">
-									<DropdownMenu 
-										options={getDropdownOptions(discount)} 
-										isOpen={true} 
-										width="w-48" 
-										class="origin-top-right right-0"
-									/>
-								</div>
+							{#if getDropdownOptions(discount).length > 0}
+								<button onclick={() => toggleDropdown(discount._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+									<DotsVerticalIcon class="size-5" />
+								</button>
+								{#if openDropdownId === discount._id}
+									<div class="absolute right-0 mt-2 w-48 z-10">
+										<DropdownMenu 
+											options={getDropdownOptions(discount)} 
+											isOpen={true} 
+											width="w-48" 
+											class="origin-top-right right-0"
+										/>
+									</div>
+								{/if}
 							{/if}
 						</div>
 					</div>

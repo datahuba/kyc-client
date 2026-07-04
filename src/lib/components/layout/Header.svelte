@@ -413,7 +413,7 @@
 					{/if}
 					<span class="hidden lg:flex lg:items-center">
 						<span class="ml-4 text-sm font-semibold leading-6 text-gray-900 dark:text-white" aria-hidden="true">
-							{user?.username || 'Usuario'}
+							{user?.nombre_funcional || user?.username || 'Usuario'}
 						</span>
 					</span>
 				</button>
