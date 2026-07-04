@@ -6,7 +6,22 @@ const getEnvVariable = (key: string): string => {
 	return value;
 };
 
-const API_BASE_URL = getEnvVariable('VITE_API_BASE_URL');
+/**
+ * ISSUE-DEV-APIURL: normaliza la URL base para evitar el duplicado `/api/api/v1`.
+ *
+ * El cliente (`apiKyC.config.ts`) siempre agrega el sufijo `/api/v1` a cada
+ * petición. Si `VITE_API_BASE_URL` viene configurada con un `/api` final
+ * (ej. `https://datahuba.com/api`, como quedó en producción), el resultado
+ * final duplicaba el segmento: `https://datahuba.com/api/api/v1/...`.
+ *
+ * Esta función deja la base siempre "limpia" (sin `/api` ni `/` finales),
+ * sin importar si la variable de entorno se configuró con o sin ese sufijo.
+ */
+const normalizeApiBaseUrl = (rawUrl: string): string => {
+	return rawUrl.trim().replace(/\/+$/, '').replace(/\/api$/i, '');
+};
+
+const API_BASE_URL = normalizeApiBaseUrl(getEnvVariable('VITE_API_BASE_URL'));
 
 export const defaultHeaders: HeadersInit = {
 	'Content-Type': 'application/json'
