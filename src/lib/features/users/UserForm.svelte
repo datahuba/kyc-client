@@ -44,12 +44,25 @@ interface Props {
 	let errorNombreFuncional = $state('');
 
 	$effect(() => {
-		// Cargar cursos activos una sola vez, se usan en el multi-select de Encargado de Curso
-		courseService.getAll(1, 200, { activo: true }).then((res) => {
-			cursosDisponibles = res.data;
-		}).catch(() => {
-			cursosDisponibles = [];
-		});
+		// Cargar cursos activos una sola vez, se usan en el multi-select de
+		// Encargado de Curso. El backend limita per_page a 100 (422 si se
+		// supera), por eso se pagina en silencio si hay más de 100 cursos.
+		(async () => {
+			try {
+				const todos: Course[] = [];
+				let currentPage = 1;
+				let hasMore = true;
+				while (hasMore) {
+					const res = await courseService.getAll(currentPage, 100, { activo: true });
+					todos.push(...res.data);
+					hasMore = res.meta.hasNextPage;
+					currentPage += 1;
+				}
+				cursosDisponibles = todos;
+			} catch {
+				cursosDisponibles = [];
+			}
+		})();
 	});
 
 	$effect(() => {
