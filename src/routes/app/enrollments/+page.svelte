@@ -74,6 +74,9 @@
 	let canManageBecaRespaldo = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
 	// ISSUE-Q-NOTA-BORRADOR: quién puede validar/rechazar el borrador de nota del docente
 	let canValidateNotaBorrador = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
+	// ISSUE-M-EXENCION: botón exclusivo de MAE (también admin/superadmin, que ya tienen todo)
+	let canManageMatriculaExenta = $derived(['mae', 'admin', 'superadmin'].includes(currentRole));
+	let matriculaExentaLoading: boolean = $state(false);
 
 	// Modal de solicitud de pasivo
 	let passiveModalOpen: boolean = $state(false);
@@ -246,12 +249,66 @@
 	async function handleReactivate(enrollment: Enrollment) {
 		openDropdownId = null;
 		try {
-			const { apiKyC } = await import('$lib/config/apiKyC.config');
-			await apiKyC.post(`/passive-requests/enrollment/${enrollment._id}/reactivate`, {});
+			// ISSUE-P-CONGELADO: si la suspensión fue por congelamiento o abandono,
+			// usar el endpoint específico (marca multa_reincorporacion_pendiente si
+			// corresponde). Si fue por 'Solicitar Pasivo' (o sin motivo registrado
+			// de inscripciones más antiguas), usar el endpoint original.
+			if (enrollment.motivo_suspension === 'congelado' || enrollment.motivo_suspension === 'abandono') {
+				await enrollmentService.reactivarDesdeCongeladoOAbandono(enrollment._id);
+			} else {
+				const { apiKyC } = await import('$lib/config/apiKyC.config');
+				await apiKyC.post(`/passive-requests/enrollment/${enrollment._id}/reactivate`, {});
+			}
 			alert('success', 'Inscripción reactivada correctamente.');
 			loadData();
 		} catch (e: any) {
 			alert('error', e?.message || 'No se pudo reactivar la inscripción');
+		}
+	}
+
+	// ISSUE-P-CONGELADO: congelamiento voluntario de estudios
+	async function handleCongelar(enrollment: Enrollment) {
+		openDropdownId = null;
+		try {
+			await enrollmentService.congelarInscripcion(enrollment._id);
+			alert('success', 'Inscripción congelada correctamente.');
+			loadData();
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo congelar la inscripción');
+		}
+	}
+
+	// ISSUE-M-EXENCION: bypass de matrícula otorgado por MAE (no condona la deuda)
+	async function handleGrantExencion(enrollment: Enrollment) {
+		openDropdownId = null;
+		if (matriculaExentaLoading) return;
+		matriculaExentaLoading = true;
+		try {
+			await enrollmentService.otorgarMatriculaExenta(enrollment._id);
+			alert(
+				'success',
+				'Matrícula Exenta otorgada. El estudiante ya puede cursar; la deuda financiera se mantiene visible para Cobranza.'
+			);
+			loadData();
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo otorgar la Matrícula Exenta');
+		} finally {
+			matriculaExentaLoading = false;
+		}
+	}
+
+	async function handleRevokeExencion(enrollment: Enrollment) {
+		openDropdownId = null;
+		if (matriculaExentaLoading) return;
+		matriculaExentaLoading = true;
+		try {
+			await enrollmentService.revocarMatriculaExenta(enrollment._id);
+			alert('success', 'Matrícula Exenta revocada.');
+			loadData();
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo revocar la Matrícula Exenta');
+		} finally {
+			matriculaExentaLoading = false;
 		}
 	}
 
@@ -346,6 +403,36 @@
 				icon: `<svg class="size-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>`,
 				action: () => handleReactivate(enrollment)
 			});
+		}
+
+		// ISSUE-P-CONGELADO: congelamiento voluntario sobre inscripciones activas/pendientes
+		if (canEditEnrollment && (estadoActual === 'activo' || estadoActual === 'pendiente_pago')) {
+			options.push({
+				label: 'Congelar Inscripción',
+				id: 'congelar',
+				icon: `<svg class="size-5 text-uagrm-sky" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v8m-4-4h8m6 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+				action: () => handleCongelar(enrollment)
+			});
+		}
+
+		// ISSUE-M-EXENCION: solo tiene sentido si la matrícula real NO está pagada.
+		// No condona la deuda, solo desbloquea el estado académico.
+		if (canManageMatriculaExenta && !enrollment.matricula_pagada) {
+			if (!enrollment.matricula_exenta) {
+				options.push({
+					label: 'Otorgar Matrícula Exenta',
+					id: 'grant-exencion',
+					icon: `<svg class="size-5 text-uagrm-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15a3 3 0 100-6 3 3 0 000 6z M12 1v6m0 10v6m4.22-15.22l4.24 4.24M1.54 8.46l4.24-4.24M1.54 15.54l4.24 4.24m12.44-4.24l4.24 4.24" /></svg>`,
+					action: () => handleGrantExencion(enrollment)
+				});
+			} else {
+				options.push({
+					label: 'Revocar Matrícula Exenta',
+					id: 'revoke-exencion',
+					icon: `<svg class="size-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>`,
+					action: () => handleRevokeExencion(enrollment)
+				});
+			}
 		}
 
         if (currentRole === 'student') return options;
@@ -522,6 +609,31 @@
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(enrollment.estado)}`}>
 									{enrollment.estado}
 								</span>
+								{#if enrollment.matricula_exenta}
+									<span
+										class="mt-1 block w-fit px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-light-warning/15 text-light-warning dark:bg-dark-warning/20 dark:text-dark-warning"
+										title={`Matrícula Exenta otorgada por ${enrollment.matricula_exenta_otorgada_por ?? 'MAE'}`}
+									>
+										Matrícula Exenta
+									</span>
+								{/if}
+								{#if enrollment.motivo_suspension === 'congelado'}
+									<span class="mt-1 block w-fit px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-uagrm-sky/15 text-uagrm-sky">
+										Congelado
+									</span>
+								{:else if enrollment.motivo_suspension === 'abandono'}
+									<span class="mt-1 block w-fit px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-light-error/15 text-light-error dark:bg-dark-error/20 dark:text-dark-error">
+										Abandono
+									</span>
+								{/if}
+								{#if enrollment.multa_reincorporacion_pendiente}
+									<span
+										class="mt-1 block w-fit px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-light-error/15 text-light-error dark:bg-dark-error/20 dark:text-dark-error"
+										title="Corresponde cobrar la multa de reincorporación por abandono"
+									>
+										Multa Pendiente
+									</span>
+								{/if}
 							</td>
 							<td class="px-4 py-4 text-right text-sm font-medium relative">
 								<button onclick={() => toggleDropdown(enrollment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones de la inscripción">
@@ -602,6 +714,35 @@
 								{enrollment.estado}
 							</span>
 						</div>
+						{#if enrollment.matricula_exenta}
+							<div class="flex justify-between">
+								<span class="text-gray-500 dark:text-gray-400">Matrícula:</span>
+								<span
+									class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-light-warning/15 text-light-warning dark:bg-dark-warning/20 dark:text-dark-warning"
+									title={`Matrícula Exenta otorgada por ${enrollment.matricula_exenta_otorgada_por ?? 'MAE'}`}
+								>
+									Exenta
+								</span>
+							</div>
+						{/if}
+						{#if enrollment.motivo_suspension === 'congelado' || enrollment.motivo_suspension === 'abandono'}
+							<div class="flex justify-between">
+								<span class="text-gray-500 dark:text-gray-400">Motivo:</span>
+								<span
+									class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.motivo_suspension === 'congelado' ? 'bg-uagrm-sky/15 text-uagrm-sky' : 'bg-light-error/15 text-light-error dark:bg-dark-error/20 dark:text-dark-error'}`}
+								>
+									{enrollment.motivo_suspension === 'congelado' ? 'Congelado' : 'Abandono'}
+								</span>
+							</div>
+						{/if}
+						{#if enrollment.multa_reincorporacion_pendiente}
+							<div class="flex justify-between">
+								<span class="text-gray-500 dark:text-gray-400">Multa:</span>
+								<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-light-error/15 text-light-error dark:bg-dark-error/20 dark:text-dark-error">
+									Pendiente
+								</span>
+							</div>
+						{/if}
 					</div>
 				</Card>
 			{/each}

@@ -33,8 +33,10 @@ interface Props {
 		cursos_asignados: []
 	});
 
-	// ISSUE-R-ROLES: roles que requieren nombre funcional (por función/programa, no por persona)
-	const ROLES_CON_NOMBRE_FUNCIONAL = ['encargado_curso', 'coordinador'];
+	// ISSUE-R-ROLES / ISSUE-R-PERFIL-GENERICO: roles que requieren nombre funcional
+	// (por función/programa, no por persona) para poder rotar al responsable sin
+	// perder historial ni migrar datos entre cuentas.
+	const ROLES_CON_NOMBRE_FUNCIONAL = ['encargado_curso', 'coordinador', 'cobranza'];
 	let requiereNombreFuncional = $derived(
 		!!formData.role && ROLES_CON_NOMBRE_FUNCIONAL.includes(formData.role)
 	);
@@ -101,7 +103,7 @@ interface Props {
 	function validarFormulario(): boolean {
 		errorNombreFuncional = '';
 		if (requiereNombreFuncional && !formData.nombre_funcional?.trim()) {
-			errorNombreFuncional = 'El nombre funcional es obligatorio para Encargado de Curso y Coordinador.';
+			errorNombreFuncional = 'El nombre funcional es obligatorio para Encargado de Curso, Coordinador y Cobranza.';
 			return false;
 		}
 		return true;
@@ -198,7 +200,7 @@ interface Props {
 					id="nombre_funcional"
 					bind:value={formData.nombre_funcional}
 					required
-					placeholder="Ej: Encargado Maestría Gerencia Tributaria"
+					placeholder="Ej: Encargado Maestría Gerencia Tributaria / Cajero Ventanilla 1"
 				/>
 				{#if errorNombreFuncional}
 					<p class="mt-1 text-xs text-red-600 dark:text-red-400">{errorNombreFuncional}</p>
