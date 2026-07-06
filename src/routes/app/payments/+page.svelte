@@ -503,9 +503,9 @@
 		<TableSkeleton columns={11} rows={10} />
 	{:else}
 		<!-- ISSUE-X-COMPACT: Tabla consolidada SIN scroll horizontal (desktop) -->
-		<div class="hidden lg:block border border-gray-200 dark:border-dark-border rounded-lg shadow-sm overflow-hidden">
+		<div class="hidden lg:block border border-gray-200 dark:border-dark-border rounded-lg shadow-sm">
 			<table class="w-full table-fixed divide-y divide-gray-200 dark:divide-dark-border">
-				<thead class="bg-gray-50 dark:bg-dark-background">
+				<thead class="bg-gray-50 dark:bg-dark-background rounded-t-lg">
 					<tr>
 						<th scope="col" class="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transacción</th>
 						<th scope="col" class="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>

@@ -37,9 +37,9 @@
 </script>
 
 <!-- ISSUE-X-COMPACT: Tabla consolidada SIN scroll horizontal (desktop) -->
-<div class="hidden md:block border border-gray-200 dark:border-dark-border rounded-lg shadow-sm animate-fade-in overflow-hidden">
+<div class="hidden md:block border border-gray-200 dark:border-dark-border rounded-lg shadow-sm animate-fade-in">
 	<table class="w-full table-fixed divide-y divide-gray-200 dark:divide-dark-border">
-		<thead class="bg-gray-50 dark:bg-dark-background">
+		<thead class="bg-gray-50 dark:bg-dark-background rounded-t-lg">
 			<tr>
 				{#if isSuperAdmin}
 					<th scope="col" class="w-10 px-4 py-3 text-left">

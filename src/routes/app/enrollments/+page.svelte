@@ -572,9 +572,9 @@
 		</div>
 	{:else}
 		<!-- ISSUE-X-COMPACT: Desktop Table consolidada SIN scroll horizontal -->
-		<div class="hidden md:block bg-white dark:bg-dark-surface rounded-lg shadow border border-gray-200 dark:border-dark-border overflow-hidden">
+		<div class="hidden md:block bg-white dark:bg-dark-surface rounded-lg shadow border border-gray-200 dark:border-dark-border">
 			<table class="w-full table-fixed divide-y divide-gray-200 dark:divide-dark-border">
-				<thead class="bg-gray-50 dark:bg-dark-background">
+				<thead class="bg-gray-50 dark:bg-dark-background rounded-t-lg">
 					<tr>
 						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
 						<th scope="col" class="w-[26%] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Curso</th>
