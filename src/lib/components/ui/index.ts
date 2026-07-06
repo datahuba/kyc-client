@@ -11,3 +11,5 @@ export { default as BlurOverlay } from './blurOverlay.svelte';
 export { default as FileUpload } from './fileUpload.svelte';
 export { default as Pagination } from './pagination.svelte';
 export { default as DocumentCard } from './documentCard.svelte';
+export { default as Checkbox } from './checkbox.svelte';
+export { default as Toggle } from './toggle.svelte';

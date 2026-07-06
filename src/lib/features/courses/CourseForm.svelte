@@ -6,6 +6,10 @@
 	import Select from '$lib/components/ui/select.svelte';
 	import TextArea from '$lib/components/ui/textArea.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
+	import Card from '$lib/components/ui/card.svelte';
+	import Checkbox from '$lib/components/ui/checkbox.svelte';
+	import Toggle from '$lib/components/ui/toggle.svelte';
+	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import { alert } from '$lib/utils';
 	import { CheckIcon } from '$lib/icons/outline';
 	import { onMount } from 'svelte';
@@ -22,13 +26,10 @@
 	let saving = $state(false);
 	let discounts: Discount[] = $state([]);
 	let teachers: User[] = $state([]);
-	let availableDiscounts = $derived(
-		discounts.filter((discount) => {
-			if (discount.activo) return true;
-			// En edición, conservar visible el descuento ya asociado al curso aunque esté inactivo
-			return Boolean(formData.descuento_id) && discount._id === formData.descuento_id;
-		})
-	);
+
+	// ISSUE-REFACTOR (UI): validación inline por campo (estilo DiscountForm)
+	// en vez de depender solo de alert() al fallar el submit.
+	let errors: Record<string, string> = $state({});
 
 	// BUG 3 FIX: Filtrado reactivo de descuentos para ocultar inactivos.
 	// Soporta tanto booleanos (`activo: true`) como strings heredados (`estado: 'Activo'`)
@@ -52,15 +53,22 @@
 		fecha_inicio: '',
 		fecha_fin: '',
 		activo: true,
-		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }] 
+		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }]
 	});
-	
+
 	let prevCuotas = $state(1);
 	let prevCostoTotal = $state(0);
 	let trackedCourseId = $state<string | undefined>(undefined);
 
-    // ISSUE F: Candado de Cálculo Manual vs Automático
-    let autoCalculateModules = $state(true); 
+	// ISSUE F: Candado de Cálculo Manual vs Automático
+	let autoCalculateModules = $state(true);
+
+	// ISSUE-REFACTOR (UI): reemplaza el confirm() nativo del navegador por un
+	// ModalConfirm propio del design system, para no romper la consistencia
+	// visual con el resto de la app.
+	let showDiscrepancyModal = $state(false);
+	let discrepancyMessage = $state('');
+	let pendingSubmitPayload: any = $state(null);
 
 	onMount(async () => {
 		try {
@@ -96,12 +104,18 @@
 					fecha_inicio: course.fecha_inicio.split('T')[0],
 					fecha_fin: course.fecha_fin.split('T')[0],
 					activo: course.activo,
-					modulos: course.modulos ? course.modulos.map(m => ({...m, docente_id: m.docente_id || ''})) : Array.from({ length: course.cantidad_cuotas || 1 }, (_, i) => ({ nombre: `Módulo ${i + 1}`, costo: 0, docente_id: '' }))
+					modulos: course.modulos
+						? course.modulos.map((m) => ({ ...m, docente_id: m.docente_id || '' }))
+						: Array.from({ length: course.cantidad_cuotas || 1 }, (_, i) => ({
+								nombre: `Módulo ${i + 1}`,
+								costo: 0,
+								docente_id: ''
+							}))
 				};
 				prevCuotas = course.cantidad_cuotas;
 				prevCostoTotal = course.costo_total_interno;
-                
-				autoCalculateModules = false; 
+
+				autoCalculateModules = false;
 			} else {
 				formData = {
 					codigo: '',
@@ -123,10 +137,11 @@
 				};
 				prevCuotas = 1;
 				prevCostoTotal = 0;
-                
-				autoCalculateModules = true; 
+
+				autoCalculateModules = true;
 			}
 			trackedCourseId = currentId;
+			errors = {};
 		}
 	});
 
@@ -153,13 +168,13 @@
 
 		if (count !== prevCuotas || totalCosto !== prevCostoTotal) {
 			const costoUnitario = count > 0 ? Number((totalCosto / count).toFixed(2)) : 0;
-			newModulos = newModulos.map(m => ({
-				nombre: m.nombre, 
-				costo: costoUnitario, 
-				docente_id: m.docente_id 
+			newModulos = newModulos.map((m) => ({
+				nombre: m.nombre,
+				costo: costoUnitario,
+				docente_id: m.docente_id
 			}));
 			changedArray = true;
-			
+
 			prevCuotas = count;
 			prevCostoTotal = totalCosto;
 		}
@@ -169,7 +184,52 @@
 		}
 	});
 
+	// ISSUE-REFACTOR (UI): validación inline por campo antes de enviar.
+	function validarFormulario(): boolean {
+		const nuevosErrores: Record<string, string> = {};
+
+		if (!formData.codigo?.trim()) {
+			nuevosErrores.codigo = 'El código es obligatorio.';
+		}
+		if (!formData.nombre_programa?.trim() || formData.nombre_programa.trim().length < 3) {
+			nuevosErrores.nombre_programa = 'El nombre del programa debe tener al menos 3 caracteres.';
+		}
+		if (!formData.fecha_inicio) {
+			nuevosErrores.fecha_inicio = 'La fecha de inicio es obligatoria.';
+		}
+		if (!formData.fecha_fin) {
+			nuevosErrores.fecha_fin = 'La fecha de fin es obligatoria.';
+		}
+		if (
+			formData.fecha_inicio &&
+			formData.fecha_fin &&
+			new Date(formData.fecha_fin) < new Date(formData.fecha_inicio)
+		) {
+			nuevosErrores.fecha_fin = 'La fecha de fin no puede ser anterior a la fecha de inicio.';
+		}
+		if (!formData.costo_total_interno || formData.costo_total_interno <= 0) {
+			nuevosErrores.costo_total_interno = 'El costo total interno debe ser mayor a 0.';
+		}
+		if (formData.matricula_interno === null || formData.matricula_interno === undefined || formData.matricula_interno < 0) {
+			nuevosErrores.matricula_interno = 'La matrícula interna no puede ser negativa.';
+		}
+		if (!formData.cantidad_cuotas || formData.cantidad_cuotas < 1) {
+			nuevosErrores.cantidad_cuotas = 'Debe haber al menos 1 módulo/cuota.';
+		}
+		if (formData.modulos?.some((m) => !m.nombre?.trim())) {
+			nuevosErrores.modulos = 'Todos los módulos deben tener un nombre.';
+		}
+
+		errors = nuevosErrores;
+		return Object.keys(nuevosErrores).length === 0;
+	}
+
 	async function handleSubmit() {
+		if (!validarFormulario()) {
+			alert('error', 'Revisa los campos marcados en rojo antes de continuar.');
+			return;
+		}
+
 		saving = true;
 		try {
 			const payload = { ...formData };
@@ -183,14 +243,22 @@
 				}
 			}
 
-			if (payload.costo_total_externo === null || payload.costo_total_externo === undefined || payload.costo_total_externo === '') {
+			if (
+				payload.costo_total_externo === null ||
+				payload.costo_total_externo === undefined ||
+				(payload.costo_total_externo as any) === ''
+			) {
 				payload.costo_total_externo = 0;
 			}
-			if (payload.matricula_externo === null || payload.matricula_externo === undefined || payload.matricula_externo === '') {
+			if (
+				payload.matricula_externo === null ||
+				payload.matricula_externo === undefined ||
+				(payload.matricula_externo as any) === ''
+			) {
 				payload.matricula_externo = 0;
 			}
 
-			payload.modulos = payload.modulos.map(m => {
+			payload.modulos = payload.modulos!.map((m) => {
 				const mod = { ...m };
 				if (!mod.docente_id) {
 					delete mod.docente_id;
@@ -198,16 +266,26 @@
 				return mod;
 			});
 
-            // ISSUE F: Verificador de congruencia financiera
-            const sumModulos = payload.modulos.reduce((acc, curr) => acc + Number(curr.costo), 0);
-            if (!autoCalculateModules && sumModulos !== payload.costo_total_interno) {
-                const proceed = confirm(`¡Atención!\nLa suma manual de los módulos (Bs. ${sumModulos}) no coincide con el Costo Total (Bs. ${payload.costo_total_interno}).\n\n¿Estás seguro de que deseas guardar el programa con esta discrepancia financiera?`);
-                if(!proceed) {
-                    saving = false;
-                    return;
-                }
-            }
-			
+			// ISSUE F: Verificador de congruencia financiera
+			const sumModulos = payload.modulos.reduce((acc, curr) => acc + Number(curr.costo), 0);
+			if (!autoCalculateModules && sumModulos !== payload.costo_total_interno) {
+				discrepancyMessage = `La suma manual de los módulos (Bs. ${sumModulos}) no coincide con el Costo Total (Bs. ${payload.costo_total_interno}). ¿Deseas guardar el programa con esta discrepancia?`;
+				pendingSubmitPayload = payload;
+				showDiscrepancyModal = true;
+				saving = false;
+				return;
+			}
+
+			await guardarCurso(payload);
+		} catch (e: any) {
+			alert('error', e.message || 'Error al guardar el curso');
+			saving = false;
+		}
+	}
+
+	async function guardarCurso(payload: any) {
+		saving = true;
+		try {
 			if (isEditMode && course) {
 				const updatePayload = {
 					...payload,
@@ -226,59 +304,123 @@
 			saving = false;
 		}
 	}
+
+	function handleConfirmDiscrepancy() {
+		showDiscrepancyModal = false;
+		if (pendingSubmitPayload) {
+			guardarCurso(pendingSubmitPayload);
+			pendingSubmitPayload = null;
+		}
+	}
+
+	function handleCancelDiscrepancy() {
+		showDiscrepancyModal = false;
+		pendingSubmitPayload = null;
+	}
 </script>
 
 <form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-	<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-		<Input label="Código" id="codigo" bind:value={formData.codigo} required placeholder="DIPL-2024-001" />
-		<Input label="Nombre del Programa" id="nombre_programa" bind:value={formData.nombre_programa} required placeholder="Diplomado en..." />
-		
-		<Select label="Tipo de Curso" bind:value={formData.tipo_curso} required>
-			<option value="">Seleccione un tipo de curso</option>						
-			{#each [
-				{ value: 'curso', label: 'Curso' },
-				{ value: 'taller', label: 'Taller' },
-				{ value: 'diplomado', label: 'Diplomado' },
-				{ value: 'maestría', label: 'Maestría' },
-				{ value: 'doctorado', label: 'Doctorado' },
-				{ value: 'seminario', label: 'Seminario' },
-				{ value: 'otro', label: 'Otro' }
-			] as tipo_curso}
-				<option value={tipo_curso.value}>{tipo_curso.label}</option>
-			{/each}
-		</Select>
+	<!-- SECCIÓN: Datos básicos -->
+	<Card variant="ghost" padding="none">
+		<Heading level="h4" class="mb-3">Datos Básicos</Heading>
+		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+			<Input
+				label="Código"
+				id="codigo"
+				bind:value={formData.codigo}
+				required
+				placeholder="DIPL-2024-001"
+				error={errors.codigo}
+			/>
+			<Input
+				label="Nombre del Programa"
+				id="nombre_programa"
+				bind:value={formData.nombre_programa}
+				required
+				placeholder="Diplomado en..."
+				error={errors.nombre_programa}
+			/>
 
-		<Select label="Modalidad" bind:value={formData.modalidad} required>
-			<option value="">Seleccione una modalidad</option>
-			{#each [
-				{ value: 'presencial', label: 'Presencial' },
-				{ value: 'virtual', label: 'Virtual' },
-				{ value: 'híbrido', label: 'Híbrido' }
-			] as modalidad}
-				<option value={modalidad.value}>{modalidad.label}</option>
-			{/each}
-		</Select>
-						
-		<Input label="Fecha Inicio" id="fecha_inicio" type="date" bind:value={formData.fecha_inicio} required />
-		<Input label="Fecha Fin" id="fecha_fin" type="date" bind:value={formData.fecha_fin} required />
+			<Select label="Tipo de Curso" bind:value={formData.tipo_curso} required>
+				<option value="">Seleccione un tipo de curso</option>
+				{#each [
+					{ value: 'curso', label: 'Curso' },
+					{ value: 'taller', label: 'Taller' },
+					{ value: 'diplomado', label: 'Diplomado' },
+					{ value: 'maestría', label: 'Maestría' },
+					{ value: 'doctorado', label: 'Doctorado' },
+					{ value: 'seminario', label: 'Seminario' },
+					{ value: 'otro', label: 'Otro' }
+				] as tipo_curso}
+					<option value={tipo_curso.value}>{tipo_curso.label}</option>
+				{/each}
+			</Select>
 
-		<div class="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
-			<Heading level="h3" class="mb-4 text-lg">Costos Internos</Heading>
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-				<Input label="Costo Total" id="costo_total_interno" type="number" bind:value={formData.costo_total_interno} required />
-				<Input label="Matrícula" id="matricula_interno" type="number" bind:value={formData.matricula_interno} required />
-			</div>
+			<Select label="Modalidad" bind:value={formData.modalidad} required>
+				<option value="">Seleccione una modalidad</option>
+				{#each [
+					{ value: 'presencial', label: 'Presencial' },
+					{ value: 'virtual', label: 'Virtual' },
+					{ value: 'híbrido', label: 'Híbrido' }
+				] as modalidad}
+					<option value={modalidad.value}>{modalidad.label}</option>
+				{/each}
+			</Select>
+
+			<Input
+				label="Fecha Inicio"
+				id="fecha_inicio"
+				type="date"
+				bind:value={formData.fecha_inicio}
+				required
+				error={errors.fecha_inicio}
+			/>
+			<Input
+				label="Fecha Fin"
+				id="fecha_fin"
+				type="date"
+				bind:value={formData.fecha_fin}
+				required
+				error={errors.fecha_fin}
+			/>
 		</div>
+	</Card>
 
-		<div class="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
-			<Heading level="h3" class="mb-4 text-lg">Costos Externos (Opcional)</Heading>
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-				<Input label="Costo Total" id="costo_total_externo" type="number" bind:value={formData.costo_total_externo} />
-				<Input label="Matrícula" id="matricula_externo" type="number" bind:value={formData.matricula_externo} />
-			</div>
+	<!-- SECCIÓN: Costos internos -->
+	<Card variant="bordered" padding="md">
+		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">Costos Internos</Heading>
+		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+			<Input
+				label="Costo Total"
+				id="costo_total_interno"
+				type="number"
+				bind:value={formData.costo_total_interno}
+				required
+				error={errors.costo_total_interno}
+			/>
+			<Input
+				label="Matrícula"
+				id="matricula_interno"
+				type="number"
+				bind:value={formData.matricula_interno}
+				required
+				error={errors.matricula_interno}
+			/>
 		</div>
+	</Card>
 
-		<div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+	<!-- SECCIÓN: Costos externos -->
+	<Card variant="bordered" padding="md">
+		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">Costos Externos (Opcional)</Heading>
+		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+			<Input label="Costo Total" id="costo_total_externo" type="number" bind:value={formData.costo_total_externo} />
+			<Input label="Matrícula" id="matricula_externo" type="number" bind:value={formData.matricula_externo} />
+		</div>
+	</Card>
+
+	<!-- SECCIÓN: Estructura de pago -->
+	<Card variant="ghost" padding="none">
+		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 			<Input
 				label="Cantidad de Módulos (Cuotas)"
 				id="cantidad_cuotas"
@@ -286,8 +428,9 @@
 				min="1"
 				bind:value={formData.cantidad_cuotas}
 				required
+				error={errors.cantidad_cuotas}
 			/>
-			
+
 			<!-- BUG 3 FIX: Iteración sobre activeDiscounts en lugar de discounts -->
 			<Select label="Descuento Global" bind:value={formData.descuento_id}>
 				<option value="">Ninguno</option>
@@ -296,81 +439,98 @@
 				{/each}
 			</Select>
 		</div>
+	</Card>
 
-		<!-- SECCIÓN DINÁMICA DE MÓDULOS CON ASIGNACIÓN DE DOCENTES -->
-		{#if formData.modulos && formData.modulos.length > 0}
-			<div class="md:col-span-2 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mt-2">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-3 gap-2">
-				    <Heading level="h3" class="text-md text-primary-600">Configuración de Módulos y Docentes</Heading>
-                    
-					<!-- TOGGLE SWITCH A PRUEBA DE BALAS -->
-					<label class="flex items-center cursor-pointer bg-white dark:bg-gray-900 px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-						<div class="relative w-10 h-5 shrink-0 flex items-center bg-gray-300 dark:bg-gray-600 rounded-full p-1 duration-300 ease-in-out" class:bg-primary-500={autoCalculateModules}>
-							<div class="bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out" class:translate-x-4={autoCalculateModules}></div>
-						</div>
-						<div class="ml-3 text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider select-none whitespace-nowrap">
-							{autoCalculateModules ? 'Cálculo Auto' : 'Edición Manual'}
-						</div>
-						<input type="checkbox" bind:checked={autoCalculateModules} class="hidden" />
-					</label>
-                </div>
+	<!-- SECCIÓN DINÁMICA DE MÓDULOS CON ASIGNACIÓN DE DOCENTES -->
+	{#if formData.modulos && formData.modulos.length > 0}
+		<Card variant="bordered" padding="md">
+			<div
+				class="mb-4 flex flex-col items-start justify-between gap-2 border-b border-gray-200 pb-3 sm:flex-row sm:items-center dark:border-gray-700"
+			>
+				<Heading level="h4" class="text-primary-700 dark:text-dark-tertiary">Configuración de Módulos y Docentes</Heading>
 
-				<div class="grid grid-cols-1 gap-4">
-					{#each formData.modulos as modulo, i}
-						<div class="flex flex-col xl:flex-row gap-4 items-center bg-white dark:bg-gray-800 p-3 rounded-md shadow-sm border border-gray-100 dark:border-gray-700 transition-colors {autoCalculateModules ? 'opacity-80' : ''}">
-							<span class="font-bold text-gray-400 bg-gray-100 dark:bg-gray-700 w-8 h-8 flex items-center justify-center rounded-full shrink-0">{i + 1}</span>
-							<div class="w-full xl:w-2/5">
-								<Input 
-									label="Nombre del Módulo" 
-									id={`modulo_nombre_${i}`} 
-									bind:value={formData.modulos[i].nombre} 
-									required 
-									placeholder="Ej: Introducción a la IA" 
-								/>
-							</div>
-							<div class="w-full xl:w-1/5">
-								<Input 
-                                    label="Costo (Bs)" 
-                                    id={`modulo_costo_${i}`} 
-                                    type="number" 
-                                    bind:value={formData.modulos[i].costo} 
-                                    required 
-                                    placeholder="Ej: 588" 
-                                    readonly={autoCalculateModules}
-                                    class={autoCalculateModules ? 'bg-gray-100 dark:bg-gray-900 text-gray-500 border-dashed' : 'border-primary-300 dark:border-primary-700 font-semibold'}
-                                />
-							</div>
-							<div class="w-full xl:w-2/5">
-								<Select label="Docente Titular (Opcional)" bind:value={formData.modulos[i].docente_id}>
-									<option value="">Sin asignar</option>
-									{#each teachers as teacher}
-										<option value={teacher._id}>{teacher.username} ({teacher.email})</option>
-									{/each}
-								</Select>
-							</div>
-						</div>
-					{/each}
-				</div>
-                {#if autoCalculateModules}
-                    <p class="text-xs text-blue-600 dark:text-blue-400 mt-3 flex items-center gap-1.5 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                        <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        El sistema está prorrateando el costo equitativamente. Cambia el switch superior a "Edición Manual" para alterar los precios y no perder los cambios.
-                    </p>
-                {/if}
+				<Toggle
+					bind:checked={autoCalculateModules}
+					labelOn="Cálculo Auto"
+					labelOff="Edición Manual"
+				/>
 			</div>
-		{/if}
 
-		<div class="md:col-span-2 pt-2">
-			<TextArea label="Observación" id="observacion" bind:value={formData.observacion} rows={3} />
-		</div>
-	</div>
+			{#if errors.modulos}
+				<p class="mb-3 text-sm text-light-error">{errors.modulos}</p>
+			{/if}
 
-	<div class="flex items-center gap-2 pt-4">
-		<input type="checkbox" id="activo" bind:checked={formData.activo} class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded" />
-		<label for="activo" class="text-sm font-medium text-gray-700 dark:text-gray-300">Curso Activo</label>
-	</div>
+			<div class="grid grid-cols-1 gap-4">
+				{#each formData.modulos as modulo, i}
+					<div
+						class="flex flex-col items-center gap-4 rounded-md border border-gray-100 bg-white p-3 shadow-sm transition-colors xl:flex-row dark:border-gray-700 dark:bg-gray-800 {autoCalculateModules
+							? 'opacity-80'
+							: ''}"
+					>
+						<span
+							class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 font-bold text-gray-400 dark:bg-gray-700"
+							>{i + 1}</span
+						>
+						<div class="w-full xl:w-2/5">
+							<Input
+								label="Nombre del Módulo"
+								id={`modulo_nombre_${i}`}
+								bind:value={formData.modulos[i].nombre}
+								required
+								placeholder="Ej: Introducción a la IA"
+							/>
+						</div>
+						<div class="w-full xl:w-1/5">
+							<Input
+								label="Costo (Bs)"
+								id={`modulo_costo_${i}`}
+								type="number"
+								bind:value={formData.modulos[i].costo}
+								required
+								placeholder="Ej: 588"
+								readonly={autoCalculateModules}
+								class={autoCalculateModules
+									? 'bg-gray-100 text-gray-500 border-dashed dark:bg-gray-900'
+									: 'border-primary-300 font-semibold dark:border-primary-700'}
+							/>
+						</div>
+						<div class="w-full xl:w-2/5">
+							<Select label="Docente Titular (Opcional)" bind:value={formData.modulos[i].docente_id}>
+								<option value="">Sin asignar</option>
+								{#each teachers as teacher}
+									<option value={teacher._id}>{teacher.username} ({teacher.email})</option>
+								{/each}
+							</Select>
+						</div>
+					</div>
+				{/each}
+			</div>
+			{#if autoCalculateModules}
+				<p
+					class="mt-3 flex items-center gap-1.5 rounded-md bg-uagrm-sky/10 p-2 text-xs text-uagrm-sky"
+				>
+					<svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+						><path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M13 16h-1v-4h-1m1-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+						/></svg
+					>
+					El sistema está prorrateando el costo equitativamente. Cambia el switch superior a "Edición
+					Manual" para alterar los precios y no perder los cambios.
+				</p>
+			{/if}
+		</Card>
+	{/if}
 
-	<div class="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+	<!-- SECCIÓN: Observación y estado -->
+	<Card variant="ghost" padding="none">
+		<TextArea label="Observación" id="observacion" bind:value={formData.observacion} rows={3} />
+		<Checkbox class="mt-4" id="activo" label="Curso Activo" bind:checked={formData.activo} />
+	</Card>
+
+	<div class="flex justify-end gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
 		<Button type="button" variant="secondary" onclick={onCancel}>Cancelar</Button>
 		<Button type="submit" loading={saving}>
 			{#snippet leftIcon()}
@@ -380,3 +540,11 @@
 		</Button>
 	</div>
 </form>
+
+<ModalConfirm
+	isOpen={showDiscrepancyModal}
+	message={discrepancyMessage}
+	onConfirm={handleConfirmDiscrepancy}
+	onCancel={handleCancelDiscrepancy}
+	loading={saving}
+/>
