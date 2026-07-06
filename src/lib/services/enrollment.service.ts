@@ -32,7 +32,11 @@ class EnrollmentService {
 	}
 
 	async update(id: string, data: UpdateEnrollmentRequest): Promise<Enrollment> {
-		return await apiKyC.put<Enrollment>(`/enrollments/${id}`, data);
+		// BUG PREEXISTENTE encontrado al verificar EnrollmentForm (ISSUE-REFACTOR):
+		// el backend expone PATCH /enrollments/{id}, pero este servicio llamaba a
+		// apiKyC.put() (método HTTP PUT) — la edición de inscripciones nunca
+		// había funcionado (405 Method Not Allowed). Corregido a patch().
+		return await apiKyC.patch<Enrollment>(`/enrollments/${id}`, data);
 	}
 
 	async delete(id: string): Promise<Enrollment> {
