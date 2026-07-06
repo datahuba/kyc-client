@@ -79,6 +79,24 @@ class EnrollmentService {
 		formData.append('file', file);
 		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/beca-respaldo`, formData);
 	}
+
+	// === ISSUE-M-EXENCION: bypass de matrícula otorgado por MAE ===
+	async otorgarMatriculaExenta(enrollmentId: string): Promise<Enrollment> {
+		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/matricula-exenta`, {});
+	}
+
+	async revocarMatriculaExenta(enrollmentId: string): Promise<Enrollment> {
+		return await apiKyC.delete<Enrollment>(`/enrollments/${enrollmentId}/matricula-exenta`);
+	}
+
+	// === ISSUE-P-CONGELADO: congelamiento voluntario y reactivación ===
+	async congelarInscripcion(enrollmentId: string): Promise<Enrollment> {
+		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/congelar`, {});
+	}
+
+	async reactivarDesdeCongeladoOAbandono(enrollmentId: string): Promise<Enrollment> {
+		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/reactivar-congelado`, {});
+	}
 }
 
 export const enrollmentService = new EnrollmentService();

@@ -44,6 +44,9 @@ export interface Student {
 	periodo?: string | null;
 	tipo_sangre?: string | null;
 	titulo_bachiller?: string | null;
+	// ISSUE-Q-PRE: Términos y Condiciones
+	terminos_aceptados?: boolean;
+	fecha_aceptacion_terminos?: string | null;
 }
 
 export interface CreateStudentRequest {

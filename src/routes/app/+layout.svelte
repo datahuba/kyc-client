@@ -1,6 +1,8 @@
 <script lang="ts">
 	import Sidebar from '$lib/components/layout/Sidebar.svelte';
 	import Header from '$lib/components/layout/Header.svelte';
+	import TermsAcceptanceModal from '$lib/components/layout/TermsAcceptanceModal.svelte';
+	import Watermark from '$lib/components/layout/Watermark.svelte';
 	import { onMount } from 'svelte';
 	import { userStore } from '$lib/stores/userStore';
 	import { goto } from '$app/navigation';
@@ -9,6 +11,15 @@
 
 	let { children } = $props();
 	let sidebarOpen = $state(false);
+
+	// ISSUE-Q-PRE: bloquea la navegación del estudiante hasta que acepte
+	// el reglamento de Postgrado. Personal admin/docente siempre tiene
+	// terminos_aceptados=true desde el backend (no aplica a ellos).
+	const showTermsModal = $derived(
+		$userStore.isAuthenticated &&
+			$userStore.user?.user_type === 'student' &&
+			$userStore.user?.terminos_aceptados === false
+	);
 
 	onMount(() => {
 		// Basic auth check or restore
@@ -89,11 +100,14 @@
 		isOpen={sidebarOpen} 
 		onClose={() => sidebarOpen = false} 
 	/>
-	<div class="flex flex-1 flex-col overflow-hidden transition-all duration-300">
+	<div class="relative flex flex-1 flex-col overflow-hidden transition-all duration-300">
+		<Watermark />
 		<Header onOpenSidebar={() => sidebarOpen = true} />
 
-		<main class="flex-1 overflow-y-auto p-6">
+		<main class="relative z-10 flex-1 overflow-y-auto p-6">
 			{@render children?.()}
 		</main>
 	</div>
 </div>
+
+<TermsAcceptanceModal isOpen={showTermsModal} />

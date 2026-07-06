@@ -20,6 +20,16 @@ export interface Enrollment {
 	updated_at: string;
 	formulario_inscripcion_url?: string;
 	beca_respaldo_url?: string | null; // ISSUE-P-BECA-RESPALDO
+	matricula_pagada?: boolean;
+	matricula_exenta?: boolean; // ISSUE-M-EXENCION
+	matricula_exenta_otorgada_por?: string | null; // ISSUE-M-EXENCION
+	matricula_exenta_fecha?: string | null; // ISSUE-M-EXENCION
+	// ISSUE-P-CONGELADO
+	motivo_suspension?: string | null;
+	fecha_congelamiento?: string | null;
+	tasa_congelamiento_pagada?: boolean;
+	fecha_abandono?: string | null;
+	multa_reincorporacion_pendiente?: boolean;
 }
 
 export interface CreateEnrollmentRequest {

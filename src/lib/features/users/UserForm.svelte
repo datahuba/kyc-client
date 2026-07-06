@@ -33,8 +33,10 @@ interface Props {
 		cursos_asignados: []
 	});
 
-	// ISSUE-R-ROLES: roles que requieren nombre funcional (por función/programa, no por persona)
-	const ROLES_CON_NOMBRE_FUNCIONAL = ['encargado_curso', 'coordinador'];
+	// ISSUE-R-ROLES / ISSUE-R-PERFIL-GENERICO: roles que requieren nombre funcional
+	// (por función/programa, no por persona) para poder rotar al responsable sin
+	// perder historial ni migrar datos entre cuentas.
+	const ROLES_CON_NOMBRE_FUNCIONAL = ['encargado_curso', 'coordinador', 'cobranza'];
 	let requiereNombreFuncional = $derived(
 		!!formData.role && ROLES_CON_NOMBRE_FUNCIONAL.includes(formData.role)
 	);
@@ -44,12 +46,25 @@ interface Props {
 	let errorNombreFuncional = $state('');
 
 	$effect(() => {
-		// Cargar cursos activos una sola vez, se usan en el multi-select de Encargado de Curso
-		courseService.getAll(1, 200, { activo: true }).then((res) => {
-			cursosDisponibles = res.data;
-		}).catch(() => {
-			cursosDisponibles = [];
-		});
+		// Cargar cursos activos una sola vez, se usan en el multi-select de
+		// Encargado de Curso. El backend limita per_page a 100 (422 si se
+		// supera), por eso se pagina en silencio si hay más de 100 cursos.
+		(async () => {
+			try {
+				const todos: Course[] = [];
+				let currentPage = 1;
+				let hasMore = true;
+				while (hasMore) {
+					const res = await courseService.getAll(currentPage, 100, { activo: true });
+					todos.push(...res.data);
+					hasMore = res.meta.hasNextPage;
+					currentPage += 1;
+				}
+				cursosDisponibles = todos;
+			} catch {
+				cursosDisponibles = [];
+			}
+		})();
 	});
 
 	$effect(() => {
@@ -88,7 +103,7 @@ interface Props {
 	function validarFormulario(): boolean {
 		errorNombreFuncional = '';
 		if (requiereNombreFuncional && !formData.nombre_funcional?.trim()) {
-			errorNombreFuncional = 'El nombre funcional es obligatorio para Encargado de Curso y Coordinador.';
+			errorNombreFuncional = 'El nombre funcional es obligatorio para Encargado de Curso, Coordinador y Cobranza.';
 			return false;
 		}
 		return true;
@@ -185,7 +200,7 @@ interface Props {
 					id="nombre_funcional"
 					bind:value={formData.nombre_funcional}
 					required
-					placeholder="Ej: Encargado Maestría Gerencia Tributaria"
+					placeholder="Ej: Encargado Maestría Gerencia Tributaria / Cajero Ventanilla 1"
 				/>
 				{#if errorNombreFuncional}
 					<p class="mt-1 text-xs text-red-600 dark:text-red-400">{errorNombreFuncional}</p>

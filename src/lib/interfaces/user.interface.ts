@@ -25,6 +25,7 @@ export interface User {
 	foto_url?: string; // Optional as it wasn't in the snippet but used in header
 	nombre_funcional?: string | null; // ISSUE-R-ROLES: nombre por función/programa
 	cursos_asignados?: string[]; // ISSUE-R-ROLES: cursos que puede operar (encargado_curso/cobranza)
+	terminos_aceptados?: boolean; // ISSUE-Q-PRE: siempre true para personal admin/docente, real para estudiantes
 }
 
 

@@ -188,6 +188,19 @@ function createUserStore() {
 			}
 		},
 
+		// ISSUE-Q-PRE: actualiza campos puntuales del usuario en memoria y en
+		// localStorage sin necesitar un nuevo login (ej. tras aceptar términos).
+		updateCurrentUser: (partial: Partial<UserResponse>) => {
+			update(state => {
+				if (!state.user) return state;
+				const updatedUser = { ...state.user, ...partial };
+				if (browser) {
+					localStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
+				}
+				return { ...state, user: updatedUser };
+			});
+		},
+
 		logout: () => {
 			if (browser) {
 				localStorage.removeItem(AUTH_TOKEN_KEY);
