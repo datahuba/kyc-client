@@ -5,13 +5,49 @@
 	import type { Enrollment, Course } from '$lib/interfaces';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
+	import Button from '$lib/components/ui/button.svelte';
+	import Modal from '$lib/components/ui/modal.svelte';
 	import DashboardSkeleton from '$lib/components/skeletons/DashboardSkeleton.svelte';
-	import { formatCurrency, formatDate } from '$lib/utils';
+	import { formatCurrency, formatDate, alert } from '$lib/utils';
+	import { apiKyC } from '$lib/config/apiKyC.config';
 
 	let enrollments: Enrollment[] = $state([]);
 	let coursesMap: Record<string, Course> = $state({});
 	let availableCourses: Course[] = $state([]);
 	let loading = $state(true);
+
+	// ISSUE-R-SOLICITUD-INSCRIPCION: solicitudes de inscripción ya enviadas
+	// por el estudiante (para deshabilitar el botón "Solicitar" en esa tarjeta).
+	let requestedCourseIds = $state<Set<string>>(new Set());
+	let requestModalOpen = $state(false);
+	let requestTargetCourse = $state<Course | null>(null);
+	let requestMensaje = $state('');
+	let requestLoading = $state(false);
+
+	function openRequestModal(course: Course) {
+		requestTargetCourse = course;
+		requestMensaje = '';
+		requestModalOpen = true;
+	}
+
+	async function confirmRequestEnrollment() {
+		if (!requestTargetCourse) return;
+		requestLoading = true;
+		try {
+			await apiKyC.post('/enrollment-requests/', {
+				curso_id: requestTargetCourse._id,
+				mensaje: requestMensaje.trim() || undefined
+			});
+			alert('success', 'Solicitud enviada. El CPD revisará tu inscripción pronto.');
+			requestedCourseIds = new Set([...requestedCourseIds, requestTargetCourse._id]);
+			requestModalOpen = false;
+			requestTargetCourse = null;
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo enviar la solicitud');
+		} finally {
+			requestLoading = false;
+		}
+	}
 
 	// Variables derivadas para las estadísticas rápidas
 	let totalDeuda = $derived(enrollments.reduce((sum, enr) => sum + (enr.saldo_pendiente || 0), 0));
@@ -36,9 +72,10 @@
 	onMount(async () => {
 		if ($userStore.user?._id) {
 			try {
-				const [enrRes, coursesRes] = await Promise.all([
+				const [enrRes, coursesRes, myRequestsRes] = await Promise.all([
 					enrollmentService.getByStudentId($userStore.user._id),
-					courseService.getAll(1, 100)
+					courseService.getAll(1, 100),
+					apiKyC.get<any[]>('/enrollment-requests/me').catch(() => [])
 				]);
 				
 				enrollments = Array.isArray(enrRes) ? enrRes : (enrRes as any).data || [];
@@ -54,6 +91,12 @@
 				// Programas disponibles = cursos activos en los que el estudiante NO está inscrito
 				const enrolledIds = new Set(enrollments.map((e) => e.curso_id));
 				availableCourses = courses.filter((c) => c.activo && !enrolledIds.has(c._id)).slice(0, 12);
+
+				// Solicitudes ya enviadas (pendientes o aprobadas) para deshabilitar el botón
+				const solicitudesActivas = (Array.isArray(myRequestsRes) ? myRequestsRes : []).filter(
+					(r: any) => r.estado === 'pendiente' || r.estado === 'aprobado'
+				);
+				requestedCourseIds = new Set(solicitudesActivas.map((r: any) => r.curso_id));
 			} catch (error) {
 				console.error("Error al cargar dashboard de estudiante", error);
 			} finally {
@@ -158,7 +201,17 @@
 								</div>
 								<div class="mt-3 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-dark-border">
 									<span class="text-sm font-black text-primary-700 dark:text-primary-300">{formatCurrency(course.costo_total_interno || 0)}</span>
-									<a href="/app/enrollments" class="text-xs font-semibold text-primary-600 hover:text-primary-800 dark:text-primary-400">Más info →</a>
+									{#if requestedCourseIds.has(course._id)}
+										<span class="text-xs font-semibold text-light-warning dark:text-dark-warning">Solicitud enviada</span>
+									{:else}
+										<button
+											type="button"
+											onclick={() => openRequestModal(course)}
+											class="text-xs font-semibold text-primary-600 hover:text-primary-800 dark:text-primary-400"
+										>
+											Solicitar Inscripción →
+										</button>
+									{/if}
 								</div>
 							</div>
 						</div>
@@ -238,3 +291,38 @@
 		</div>
 	{/if}
 </div>
+
+<!-- ISSUE-R-SOLICITUD-INSCRIPCION: modal de confirmación de solicitud -->
+<Modal
+	isOpen={requestModalOpen}
+	title="Solicitar Inscripción"
+	onClose={() => { if (!requestLoading) requestModalOpen = false; }}
+	maxWidth="sm:max-w-lg"
+>
+	<div class="p-4 space-y-4">
+		{#if requestTargetCourse}
+			<p class="text-sm text-gray-700 dark:text-gray-300">
+				Estás solicitando inscribirte a <strong>{requestTargetCourse.nombre_programa}</strong>.
+				El CPD revisará tu solicitud y, si la aprueba, se creará tu inscripción con la matrícula y
+				módulos correspondientes.
+			</p>
+			<div>
+				<label for="request-mensaje" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+					Comentario (opcional)
+				</label>
+				<textarea
+					id="request-mensaje"
+					bind:value={requestMensaje}
+					rows="3"
+					maxlength="500"
+					class="w-full rounded-lg border border-light-four dark:border-dark-border bg-white dark:bg-dark-background py-2 px-3 text-sm text-light-black dark:text-dark-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+					placeholder="Ej: Quisiera confirmar el horario del módulo 1..."
+				></textarea>
+			</div>
+			<div class="flex justify-end gap-3">
+				<Button variant="secondary" onclick={() => requestModalOpen = false} disabled={requestLoading}>Cancelar</Button>
+				<Button onclick={confirmRequestEnrollment} loading={requestLoading}>Enviar Solicitud</Button>
+			</div>
+		{/if}
+	</div>
+</Modal>
