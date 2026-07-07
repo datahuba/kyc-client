@@ -43,7 +43,7 @@ function createUserStore() {
 	): string | null {
 		// ISSUE M: Ampliación de validación de roles de la UAGRM
 		const userRole = user.role || user.rol;
-		const isAdminOrStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza'].includes(userRole as string);
+		const isAdminOrStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(userRole as string);
 		const isStudentUser = user.user_type === 'student';
 		const isTeacherUser = userRole === 'docente' || userRole === 'teacher';
 
@@ -147,7 +147,7 @@ function createUserStore() {
 				} else if (userRole === 'docente' || userRole === 'teacher') {
 					syncedLoginType = 'academic';
 					syncedAcademicRole = 'teacher';
-				} else if (['admin', 'superadmin', 'mae', 'cpd', 'cobranza'].includes(userRole as string)) {
+				} else if (['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(userRole as string)) {
 					syncedLoginType = 'admin';
 					syncedAcademicRole = null;
 				} else {
