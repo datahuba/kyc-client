@@ -33,6 +33,7 @@
 	let formData: CreateStudentRequest = $state({
 		registro: '',
 		carnet: '',
+		complemento_carnet: '',
 		nombre: '',
 		extension: '',
 		fecha_nacimiento: '',
@@ -94,6 +95,7 @@
 			formData = {
 				registro: student.registro,
 				carnet: student.carnet || '',
+				complemento_carnet: student.complemento_carnet || '',
 				password: '',
 				course_id: student.lista_cursos_ids?.[0] || '',
 				nombre: student.nombre,
@@ -136,6 +138,7 @@
 			formData = {
 				registro: '',
 				carnet: '',
+				complemento_carnet: '',
 				course_id: '',
 				nombre: '',
 				extension: '',
@@ -201,7 +204,12 @@
 
 		if (!isEditMode) {
 			if (!formData.course_id) nuevosErrores.course_id = 'Selecciona un curso/programa para inscribir al estudiante.';
-			if (!formData.password || formData.password.length < 5) nuevosErrores.password = 'La contraseña debe tener al menos 5 caracteres.';
+			// ISSUE-Q-PASSWORD-UNIFICADA: la contraseña ya no es obligatoria al
+			// crear -- si se deja en blanco, el backend genera 'Uagrm.<CI>'
+			// automáticamente (misma convención que docentes/staff).
+			if (formData.password && formData.password.length < 5) {
+				nuevosErrores.password = 'La contraseña debe tener al menos 5 caracteres, o déjala en blanco para autogenerarla.';
+			}
 		}
 
 		errors = nuevosErrores;
@@ -294,6 +302,9 @@
 			<Input label="Nombre Completo" id="nombre" bind:value={formData.nombre} required minlength={3} maxlength={200} placeholder="Juan Perez" class="md:col-span-2" error={errors.nombre} />
 			<Input label="Fecha de Nacimiento" id="fecha_nacimiento" type="date" bind:value={formData.fecha_nacimiento} required min="1940-01-01" max={hoyISO} error={errors.fecha_nacimiento} />
 			<Input label="Carnet" id="carnet" bind:value={formData.carnet} required inputmode="numeric" pattern="[0-9]*" minlength={5} maxlength={10} placeholder="12345678" error={errors.carnet} />
+			<!-- ISSUE-Q-COMPLEMENTO-CI (2026-07-08): complemento del CI (ej. '1D', '1J'),
+			     distinto de la Extensión (lugar de expedición del carnet). -->
+			<Input label="Complemento CI (opcional)" id="complemento_carnet" bind:value={formData.complemento_carnet} maxlength={10} placeholder="Ej: 1D" />
 			<Input label="Extensión CI" id="extension" bind:value={formData.extension} required maxlength={4} placeholder="LP" error={errors.extension} />
 
 			<Input label="Email" id="email" type="email" bind:value={formData.email} required placeholder="juan@example.com" class="md:col-span-2" error={errors.email} />
@@ -389,13 +400,12 @@
 			<div class="relative w-full">
 				<div class="relative">
 					<Input
-						label={isEditMode ? 'Nueva Contraseña' : 'Contraseña'}
+						label={isEditMode ? 'Nueva Contraseña' : 'Contraseña (opcional)'}
 						id="password"
 						type={showPassword ? 'text' : 'password'}
 						bind:value={formData.password}
-						required={!isEditMode}
 						minlength={5}
-						placeholder={isEditMode ? 'Opcional (para cambiar)' : 'Mínimo 5 caracteres'}
+						placeholder={isEditMode ? 'Opcional (para cambiar)' : `Uagrm.${formData.carnet?.trim() || '<CI>'}`}
 						error={errors.password}
 					/>
 					<button
@@ -407,6 +417,14 @@
 						{#if showPassword} <EyeIcon class="size-5" /> {:else} <EyeOffIcon class="size-5" /> {/if}
 					</button>
 				</div>
+				{#if !isEditMode}
+					<!-- ISSUE-Q-PASSWORD-UNIFICADA: si se deja en blanco, la contraseña
+					     inicial es 'Uagrm.<CI>' (misma convención que docentes/staff). -->
+					<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+						Si la dejas en blanco, la contraseña inicial será
+						<span class="font-mono">Uagrm.{formData.carnet?.trim() || '&lt;CI&gt;'}</span>.
+					</p>
+				{/if}
 			</div>
 		</div>
 	</Card>

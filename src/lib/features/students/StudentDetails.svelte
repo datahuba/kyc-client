@@ -229,7 +229,9 @@
 			</div>
 			<div>
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">CI / Extensión</label>
-				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">{student.carnet || 'N/A'} {student.extension}</p>
+				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">
+					{student.carnet || 'N/A'}{student.complemento_carnet ? `-${student.complemento_carnet}` : ''} {student.extension}
+				</p>
 			</div>
 			<div>
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Nacimiento</label>

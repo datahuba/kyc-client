@@ -55,7 +55,7 @@
 	let isImportModalOpen: boolean = $state(false);
 	let importFile: File | null = $state(null);
 	let importLoading = $state(false);
-	let importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[] } | null = $state(null);
+	let importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color?: Record<string, string[]> } | null = $state(null);
 	let importTipoEstudiante: 'interno' | 'externo' = $state('externo'); 
 	let importCursoId: string = $state(''); // Curso opcional para auto-inscripción en carga masiva
 

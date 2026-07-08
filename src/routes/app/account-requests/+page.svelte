@@ -58,7 +58,7 @@
 		processingId = req._id;
 		try {
 			await apiKyC.post(`/account-requests/${req._id}/approve`, {});
-			alert('success', `Cuenta de ${req.nombre} creada. Contraseña inicial: su carnet.`);
+			alert('success', `Cuenta de ${req.nombre} creada. Contraseña inicial: Uagrm.${req.carnet}`);
 			await loadRequests();
 		} catch (e: any) {
 			alert('error', e?.message || 'No se pudo aprobar la solicitud');

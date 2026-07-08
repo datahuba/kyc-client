@@ -48,14 +48,14 @@ class StudentService {
         file: File,
         tipoEstudiante: 'interno' | 'externo',
         cursoId?: string
-    ): Promise<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[] }> {
+    ): Promise<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color: Record<string, string[]> }> {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('tipo_estudiante', tipoEstudiante);
         if (cursoId) {
             formData.append('curso_id', cursoId);
         }
-        return await apiKyC.post<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[] }>(
+        return await apiKyC.post<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color: Record<string, string[]> }>(
             '/students/import/excel', 
             formData, 
             { customTimeout: 120000 }
