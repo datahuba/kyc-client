@@ -40,6 +40,13 @@
 	<div class="p-6 space-y-6">
 		<div class="text-sm text-gray-500 dark:text-gray-400 space-y-2">
 			<p>Sube una hoja de cálculo con la lista de estudiantes para registrarlos en lote de manera automática.</p>
+			<p class="text-xs">
+				El sistema detecta automáticamente columnas de Nombre, Apellido, Carnet, Registro, Email,
+				Celular, Domicilio, Fecha de Nacimiento y Grupo Sanguíneo (si el archivo las trae, sin
+				importar el orden). La fecha de nacimiento se interpreta como <span class="font-semibold">DÍA/MES/AÑO</span>.
+				Si un carnet trae un complemento con guion (ej. "2726683 - 1J"), solo se usa la parte numérica.
+				Si el archivo no trae columna de Registro, se usa el Carnet (ya limpio) como usuario/registro.
+			</p>
 		</div>
 
 		<div class="flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-100 dark:border-gray-700">
