@@ -167,6 +167,17 @@ class StudentService {
 	async acceptTerms(): Promise<Student> {
 		return await apiKyC.post<Student>('/students/me/accept-terms', {});
 	}
+
+	// ISSUE-P-RECORDATORIO-PAGO: Cobranza envía un recordatorio de pago manual al estudiante
+	async enviarRecordatorioPago(
+		id: string,
+		mensaje: string
+	): Promise<{ success: boolean; notificacion_in_app: boolean; email_enviado: boolean; detail: string }> {
+		return await apiKyC.post<{ success: boolean; notificacion_in_app: boolean; email_enviado: boolean; detail: string }>(
+			`/students/${id}/recordatorio-pago`,
+			{ mensaje }
+		);
+	}
 }
 
 export const studentService = new StudentService();
