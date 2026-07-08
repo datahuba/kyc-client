@@ -47,6 +47,9 @@ export interface Student {
 	// ISSUE-Q-PRE: Términos y Condiciones
 	terminos_aceptados?: boolean;
 	fecha_aceptacion_terminos?: string | null;
+	// ISSUE-A-VERIFICACION: no bloqueante, solo informativo
+	email_verificado?: boolean;
+	fecha_verificacion_email?: string | null;
 }
 
 export interface CreateStudentRequest {

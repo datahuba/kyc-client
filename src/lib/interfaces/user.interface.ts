@@ -26,6 +26,7 @@ export interface User {
 	nombre_funcional?: string | null; // ISSUE-R-ROLES: nombre por función/programa
 	cursos_asignados?: string[]; // ISSUE-R-ROLES: cursos que puede operar (encargado_curso/cobranza)
 	terminos_aceptados?: boolean; // ISSUE-Q-PRE: siempre true para personal admin/docente, real para estudiantes
+	email_verificado?: boolean; // ISSUE-A-VERIFICACION: no bloqueante, solo informativo
 }
 
 
