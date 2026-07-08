@@ -377,9 +377,13 @@
 								<div class="text-xs text-gray-500 dark:text-gray-400">M: {course.matricula_interno}</div>
 							</td>
 							<td class="px-3 py-4 whitespace-nowrap">
-								{#if course.cargo_adicional_monto}
-									<div class="text-xs text-gray-900 dark:text-white">{formatCurrency(course.cargo_adicional_monto)}</div>
-									<div class="text-xs text-gray-500 dark:text-gray-400 max-w-[140px] truncate" title={course.cargo_adicional_concepto || ''}>{course.cargo_adicional_concepto}</div>
+								{#if course.cargo_adicional_items && course.cargo_adicional_items.length > 0}
+									{#each course.cargo_adicional_items as item}
+										<div class="text-xs text-gray-900 dark:text-white">
+											{formatCurrency(item.costo)}
+											<span class="text-gray-500 dark:text-gray-400 max-w-[140px] truncate" title={item.nombre}>({item.nombre})</span>
+										</div>
+									{/each}
 								{:else}
 									<span class="text-xs text-gray-400 dark:text-gray-500">Sin cargo</span>
 								{/if}

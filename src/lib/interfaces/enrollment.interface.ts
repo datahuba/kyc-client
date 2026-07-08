@@ -11,10 +11,10 @@ export interface Enrollment {
 	descuento_curso_id?: string;
 	descuento_estudiante_id?: string;
 	es_estudiante_interno: string;
-	// ISSUE-P-PRECIO-UNICO (2026-07-08): snapshot del cargo adicional/complementario
-	// al programa, si el curso lo tenía definido al inscribirse.
-	cargo_adicional_monto?: number | null;
-	cargo_adicional_concepto?: string | null;
+	// ISSUE-P-CARGO-MULTIITEM (2026-07-08): snapshot de la lista de ítems de
+	// cargo adicional/complementario al programa, si el curso los tenía
+	// definidos al inscribirse.
+	cargo_adicional_items?: { nombre: string; costo: number }[];
 	estado: string;
 	estudiante_id: string;
 	fecha_inscripcion: string;

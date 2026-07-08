@@ -44,8 +44,7 @@
 		modalidad: 'presencial',
 		costo_total_interno: 0,
 		matricula_interno: 0,
-		cargo_adicional_monto: null,
-		cargo_adicional_concepto: '',
+		cargo_adicional_items: [],
 		cantidad_cuotas: 1,
 		descuento_curso: 0,
 		descuento_id: '',
@@ -95,8 +94,9 @@
 					modalidad: course.modalidad,
 					costo_total_interno: course.costo_total_interno,
 					matricula_interno: course.matricula_interno,
-					cargo_adicional_monto: course.cargo_adicional_monto ?? null,
-					cargo_adicional_concepto: course.cargo_adicional_concepto ?? '',
+					cargo_adicional_items: course.cargo_adicional_items
+						? course.cargo_adicional_items.map((it) => ({ ...it }))
+						: [],
 					cantidad_cuotas: course.cantidad_cuotas,
 					descuento_curso: course.descuento_curso,
 					descuento_id: (course as any).descuento_id || '',
@@ -124,8 +124,7 @@
 					modalidad: 'presencial',
 					costo_total_interno: 0,
 					matricula_interno: 0,
-					cargo_adicional_monto: null,
-					cargo_adicional_concepto: '',
+					cargo_adicional_items: [],
 					cantidad_cuotas: 1,
 					descuento_curso: 0,
 					descuento_id: '',
@@ -219,15 +218,10 @@
 		if (formData.modulos?.some((m) => !m.nombre?.trim())) {
 			nuevosErrores.modulos = 'Todos los módulos deben tener un nombre.';
 		}
-		// ISSUE-P-PRECIO-UNICO: si se define un monto de cargo adicional, el
-		// concepto es obligatorio (para que el estudiante sepa qué está pagando).
-		if (
-			formData.cargo_adicional_monto !== null &&
-			formData.cargo_adicional_monto !== undefined &&
-			Number(formData.cargo_adicional_monto) > 0 &&
-			!formData.cargo_adicional_concepto?.trim()
-		) {
-			nuevosErrores.cargo_adicional_concepto = 'Indica el concepto del cargo adicional (ej: Taller de Excel Avanzado).';
+		// ISSUE-P-CARGO-MULTIITEM: cada ítem de cargo adicional debe tener
+		// nombre (para que el estudiante sepa qué está pagando) y costo >= 0.
+		if (formData.cargo_adicional_items?.some((it) => !it.nombre?.trim())) {
+			nuevosErrores.cargo_adicional_items = 'Todos los ítems de cargo adicional deben tener un nombre.';
 		}
 
 		errors = nuevosErrores;
@@ -253,18 +247,11 @@
 				}
 			}
 
-			// ISSUE-P-PRECIO-UNICO: si no se definió monto, se envía null (sin
-			// cargo adicional) en vez de 0, para no confundir "sin cargo" con
-			// "cargo de 0 Bs".
-			if (
-				payload.cargo_adicional_monto === null ||
-				payload.cargo_adicional_monto === undefined ||
-				(payload.cargo_adicional_monto as any) === '' ||
-				Number(payload.cargo_adicional_monto) <= 0
-			) {
-				payload.cargo_adicional_monto = null;
-				payload.cargo_adicional_concepto = null;
-			}
+			// ISSUE-P-CARGO-MULTIITEM: descartar ítems vacíos (sin nombre o con
+			// costo 0 dejado a medio llenar) antes de enviar.
+			payload.cargo_adicional_items = (payload.cargo_adicional_items || []).filter(
+				(it) => it.nombre?.trim()
+			);
 
 			payload.modulos = payload.modulos!.map((m) => {
 				const mod = { ...m };
@@ -420,37 +407,82 @@
 		</div>
 	</Card>
 
-	<!-- SECCIÓN: Cargo adicional (ISSUE-P-PRECIO-UNICO, 2026-07-08) -->
+	<!-- SECCIÓN: Cargo adicional (ISSUE-P-CARGO-MULTIITEM, 2026-07-08) -->
 	<!-- El precio del programa (costo total + matrícula) es el MISMO para
 	     todos los estudiantes, sin distinción de procedencia. Este bloque es
-	     para un gasto complementario OPCIONAL al programa en su conjunto
-	     (ej. "Taller de Excel Avanzado" incluido, con un costo extra fijo
-	     que se suma a lo que paga cada estudiante inscrito a este curso). -->
+	     para gastos complementarios OPCIONALES al programa en su conjunto
+	     (ej. "Taller de Excel Avanzado" 100 Bs + "Certificación Internacional"
+	     50 Bs), cada uno con su propio nombre y costo, que se suman al total
+	     a pagar de cada estudiante inscrito a este curso. -->
 	<Card variant="bordered" padding="md">
-		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">Cargo Adicional (Opcional)</Heading>
-		<p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
-			Úsalo solo si este programa incluye un gasto complementario obligatorio (ej. un taller o
-			capacitación necesaria) con un costo aparte de la colegiatura. Se suma al total a pagar de
-			todos los estudiantes inscritos a este curso. Déjalo vacío si no aplica.
-		</p>
-		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-			<Input
-				label="Monto del Cargo Adicional (Bs)"
-				id="cargo_adicional_monto"
-				type="number"
-				min="0"
-				step="0.01"
-				bind:value={formData.cargo_adicional_monto}
-				placeholder="Ej: 100"
-			/>
-			<Input
-				label="Concepto del Cargo Adicional"
-				id="cargo_adicional_concepto"
-				bind:value={formData.cargo_adicional_concepto}
-				placeholder="Ej: Taller de Excel Avanzado"
-				error={errors.cargo_adicional_concepto}
-			/>
+		<div class="mb-3 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
+			<div>
+				<Heading level="h4" class="text-primary-700 dark:text-dark-tertiary">Cargo Adicional (Opcional)</Heading>
+				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+					Gastos complementarios al programa (ej. talleres o capacitaciones necesarias), cada uno
+					con su propio nombre y costo. Se suman al total a pagar de todos los estudiantes
+					inscritos a este curso. Deja la lista vacía si no aplica.
+				</p>
+			</div>
+			<Button
+				type="button"
+				variant="secondary"
+				onclick={() => {
+					formData.cargo_adicional_items = [
+						...(formData.cargo_adicional_items || []),
+						{ nombre: '', costo: 0 }
+					];
+				}}
+			>
+				+ Agregar Ítem
+			</Button>
 		</div>
+
+		{#if errors.cargo_adicional_items}
+			<p class="mb-3 text-sm text-light-error">{errors.cargo_adicional_items}</p>
+		{/if}
+
+		{#if formData.cargo_adicional_items && formData.cargo_adicional_items.length > 0}
+			<div class="grid grid-cols-1 gap-4">
+				{#each formData.cargo_adicional_items as _item, i}
+					<div
+						class="flex flex-col items-center gap-4 rounded-md border border-gray-100 bg-white p-3 shadow-sm xl:flex-row dark:border-gray-700 dark:bg-gray-800"
+					>
+						<div class="w-full xl:flex-1">
+							<Input
+								label="Concepto"
+								id={`cargo_adicional_nombre_${i}`}
+								bind:value={formData.cargo_adicional_items[i].nombre}
+								placeholder="Ej: Taller de Excel Avanzado"
+							/>
+						</div>
+						<div class="w-full xl:w-1/4">
+							<Input
+								label="Costo (Bs)"
+								id={`cargo_adicional_costo_${i}`}
+								type="number"
+								min="0"
+								step="0.01"
+								bind:value={formData.cargo_adicional_items[i].costo}
+								placeholder="Ej: 100"
+							/>
+						</div>
+						<Button
+							type="button"
+							variant="ghost"
+							class="mt-2 shrink-0 xl:mt-6"
+							onclick={() => {
+								formData.cargo_adicional_items = formData.cargo_adicional_items!.filter(
+									(_, idx) => idx !== i
+								);
+							}}
+						>
+							Quitar
+						</Button>
+					</div>
+				{/each}
+			</div>
+		{/if}
 	</Card>
 
 	<!-- SECCIÓN: Estructura de pago -->

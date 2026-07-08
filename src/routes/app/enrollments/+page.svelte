@@ -831,14 +831,16 @@
 					</div>
 				</div>
 
-				<!-- ISSUE-P-PRECIO-UNICO: transparencia del cargo adicional/complementario al programa -->
-				{#if selectedKardex.cargo_adicional_monto}
-					<div class="bg-light-warning/10 dark:bg-dark-warning/10 border border-light-warning/30 dark:border-dark-warning/30 p-4 rounded-xl flex items-center justify-between gap-3">
-						<div>
-							<p class="text-xs text-light-warning dark:text-dark-warning uppercase tracking-wider font-bold mb-1">Cargo Adicional Incluido</p>
-							<p class="text-sm text-slate-700 dark:text-slate-300">{selectedKardex.cargo_adicional_concepto}</p>
-						</div>
-						<span class="text-lg font-bold text-light-warning dark:text-dark-warning">+{formatCurrency(selectedKardex.cargo_adicional_monto)}</span>
+				<!-- ISSUE-P-CARGO-MULTIITEM: transparencia de los ítems de cargo adicional/complementario al programa -->
+				{#if selectedKardex.cargo_adicional_items && selectedKardex.cargo_adicional_items.length > 0}
+					<div class="bg-light-warning/10 dark:bg-dark-warning/10 border border-light-warning/30 dark:border-dark-warning/30 p-4 rounded-xl space-y-2">
+						<p class="text-xs text-light-warning dark:text-dark-warning uppercase tracking-wider font-bold">Cargo Adicional Incluido</p>
+						{#each selectedKardex.cargo_adicional_items as item}
+							<div class="flex items-center justify-between gap-3">
+								<p class="text-sm text-slate-700 dark:text-slate-300">{item.nombre}</p>
+								<span class="text-sm font-bold text-light-warning dark:text-dark-warning">+{formatCurrency(item.costo)}</span>
+							</div>
+						{/each}
 					</div>
 				{/if}
 

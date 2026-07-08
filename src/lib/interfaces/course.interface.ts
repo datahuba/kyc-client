@@ -4,6 +4,13 @@ export interface Modulo {
 	costo: number;
 }
 
+// ISSUE-P-CARGO-MULTIITEM (2026-07-08): un ítem individual del cargo
+// adicional/complementario al programa (ej. "Taller de Excel Avanzado").
+export interface CargoAdicionalItem {
+	nombre: string;
+	costo: number;
+}
+
 export interface Course {
 	_id: string;
 	activo: boolean;
@@ -16,11 +23,11 @@ export interface Course {
 	fecha_inicio: string;
 	inscritos: string[];
 	matricula_interno: number;
-	// ISSUE-P-PRECIO-UNICO (2026-07-08): precio único para todos los
-	// estudiantes. cargo_adicional_* es un gasto complementario opcional al
-	// programa (ej. un taller incluido), no un precio diferenciado.
-	cargo_adicional_monto?: number | null;
-	cargo_adicional_concepto?: string | null;
+	// ISSUE-P-CARGO-MULTIITEM (2026-07-08): precio único para todos los
+	// estudiantes. cargo_adicional_items es una lista de gastos
+	// complementarios opcionales al programa (ej. varios talleres
+	// incluidos), no un precio diferenciado.
+	cargo_adicional_items?: CargoAdicionalItem[];
 	modalidad: string;
 	nombre_programa: string;
 	observacion: string;
@@ -36,8 +43,7 @@ export interface CreateCourseRequest {
 	modalidad: string;
 	costo_total_interno: number;
 	matricula_interno: number;
-	cargo_adicional_monto?: number | null;
-	cargo_adicional_concepto?: string | null;
+	cargo_adicional_items?: CargoAdicionalItem[];
 	cantidad_cuotas: number;
 	descuento_curso: number;
 	observacion?: string;

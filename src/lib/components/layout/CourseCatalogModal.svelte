@@ -71,10 +71,14 @@
 									<span class="block text-gray-400 dark:text-gray-500">Colegiatura</span>
 									<span class="font-bold text-primary-700 dark:text-primary-300">{formatCurrency(course.costo_total_interno || 0)}</span>
 								</div>
-								{#if course.cargo_adicional_monto}
+								{#if course.cargo_adicional_items && course.cargo_adicional_items.length > 0}
 									<div class="text-xs text-right">
-										<span class="block text-gray-400 dark:text-gray-500">{course.cargo_adicional_concepto}</span>
-										<span class="font-bold text-gray-700 dark:text-gray-300">+{formatCurrency(course.cargo_adicional_monto)}</span>
+										{#each course.cargo_adicional_items as item}
+											<div>
+												<span class="block text-gray-400 dark:text-gray-500">{item.nombre}</span>
+												<span class="font-bold text-gray-700 dark:text-gray-300">+{formatCurrency(item.costo)}</span>
+											</div>
+										{/each}
 									</div>
 								{/if}
 							</div>
