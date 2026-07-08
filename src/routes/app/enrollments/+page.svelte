@@ -197,6 +197,14 @@
 		openDropdownId = null;
 	}
 
+	// Atajo directo desde la Libreta: lleva a /app/payments con la
+	// inscripción ya preseleccionada, sin que el estudiante tenga que
+	// volver a buscarla/seleccionarla manualmente.
+	function goToPagarSaldo() {
+		if (!selectedKardex) return;
+		goto(`/app/payments?pagar=${selectedKardex._id}`);
+	}
+
 	function confirmDelete(enrollment: Enrollment) {
 		enrollmentToDelete = enrollment;
 		showDeleteModal = true;
@@ -934,7 +942,7 @@
 				<div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
 					<!-- Si es estudiante y debe dinero, mostrar atajo rápido al pago -->
 					{#if currentRole === 'student' && selectedKardex.saldo_pendiente > 0}
-						<Button onclick={() => goto('/app/payments')} class="bg-blue-600 hover:bg-blue-700 text-white">
+						<Button onclick={() => goToPagarSaldo()} class="bg-blue-600 hover:bg-blue-700 text-white">
 							Pagar Saldo Pendiente
 						</Button>
 					{/if}

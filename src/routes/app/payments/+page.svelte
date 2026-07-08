@@ -58,6 +58,7 @@
 
 	// State Modals
 	let isCreateModalOpen = $state(false);
+	let preselectedEnrollmentId: string | undefined = $state(undefined);
 	let isApproveModalOpen = $state(false);
 	let isRejectModalOpen = $state(false);
 	let isRevertModalOpen = $state(false); // ISSUE-P-CANALES: Modal de anulación
@@ -159,6 +160,16 @@
 		if (cursoIdParam) {
 			filters.curso_id = cursoIdParam;
 		}
+
+		// Atajo directo desde "Ver Libreta -> Pagar Saldo Pendiente": abre el
+		// modal de registro de pago con esa inscripción ya preseleccionada,
+		// sin que el estudiante tenga que buscarla/seleccionarla de nuevo.
+		const pagarEnrollmentId = $appPage.url.searchParams.get('pagar');
+		if (pagarEnrollmentId && isStudent) {
+			preselectedEnrollmentId = pagarEnrollmentId;
+			isCreateModalOpen = true;
+		}
+
 		loadPayments();
 	});
 
@@ -683,15 +694,17 @@
 	<Modal
 		isOpen={isCreateModalOpen}
 		title="Registrar Nuevo Pago"
-		onClose={() => isCreateModalOpen = false}
+		onClose={() => { isCreateModalOpen = false; preselectedEnrollmentId = undefined; }}
 		maxWidth="sm:max-w-xl"
 	>
 		<PaymentForm 
+			{preselectedEnrollmentId}
 			onSuccess={() => {
 				isCreateModalOpen = false;
+				preselectedEnrollmentId = undefined;
 				loadPayments();
 			}}
-			onCancel={() => isCreateModalOpen = false}
+			onCancel={() => { isCreateModalOpen = false; preselectedEnrollmentId = undefined; }}
 		/>
 	</Modal>
 

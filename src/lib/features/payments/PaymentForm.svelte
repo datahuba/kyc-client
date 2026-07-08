@@ -16,9 +16,13 @@
 	interface Props {
 		onSuccess: () => void;
 		onCancel: () => void;
+		// Atajo directo desde "Ver Libreta -> Pagar Saldo Pendiente": si se
+		// provee, preselecciona esa inscripción sin que el estudiante tenga
+		// que volver a buscarla en el selector.
+		preselectedEnrollmentId?: string;
 	}
 
-	let { onSuccess, onCancel }: Props = $props();
+	let { onSuccess, onCancel, preselectedEnrollmentId }: Props = $props();
 
 	let enrollments: Enrollment[] = $state([]);
 	let coursesList: Course[] = $state([]);
@@ -66,28 +70,50 @@
 	let requiereBancoYVoucher = $derived(metodoPago !== 'Caja');
 
 	onMount(async () => {
-		try {
-			const [config, coursesRes] = await Promise.all([
-				paymentConfigService.get(),
-				courseService.getAll(1, 100)
-			]);
+		// BUG CORREGIDO: antes se usaba Promise.all() para las 3 cargas. Si la
+		// configuración de pago (QR/cuenta) no existía todavía (404, caso real
+		// en producción: la colección payment_config estaba vacía), TODO el
+		// bloque fallaba y las inscripciones nunca se cargaban -- el select
+		// de "Inscripción / Programa" quedaba vacío sin ningún error visible
+		// para el estudiante. Ahora cada carga es independiente: si el QR no
+		// existe, simplemente no se muestra esa sección, pero cursos e
+		// inscripciones cargan igual.
+		const resultados = await Promise.allSettled([
+			paymentConfigService.get(),
+			courseService.getAll(1, 100),
+			$userStore.user?._id ? enrollmentService.getByStudentId($userStore.user._id) : Promise.resolve([])
+		]);
 
-			if (config && config.qr_url) {
-				qrUrl = config.qr_url;
-			}
-			if (coursesRes && coursesRes.data) {
-				coursesList = coursesRes.data;
-			}
+		const [configResult, coursesResult, enrollmentsResult] = resultados;
 
-			if ($userStore.user?._id) {
-				enrollments = await enrollmentService.getByStudentId($userStore.user._id);
-			}
-		} catch (error) {
-			console.error(error);
-			alert('error', 'Error al cargar inscripciones');
-		} finally {
-			loading = false;
+		if (configResult.status === 'fulfilled' && configResult.value?.qr_url) {
+			qrUrl = configResult.value.qr_url;
 		}
+		// Si config falla (ej. 404 porque aún no se configuró el QR), no es un
+		// error bloqueante -- simplemente no se muestra el QR informativo.
+
+		if (coursesResult.status === 'fulfilled' && coursesResult.value?.data) {
+			coursesList = coursesResult.value.data;
+		} else if (coursesResult.status === 'rejected') {
+			console.error('Error al cargar cursos', coursesResult.reason);
+			alert('error', 'No se pudieron cargar los cursos. Recarga la página.');
+		}
+
+		if (enrollmentsResult.status === 'fulfilled') {
+			enrollments = enrollmentsResult.value;
+		} else if (enrollmentsResult.status === 'rejected') {
+			console.error('Error al cargar inscripciones', enrollmentsResult.reason);
+			alert('error', 'No se pudieron cargar tus inscripciones. Recarga la página.');
+		}
+
+		// Preselección directa desde "Ver Libreta -> Pagar Saldo Pendiente"
+		// (evita que el estudiante tenga que volver a buscar/seleccionar su
+		// propio curso e inscripción manualmente).
+		if (preselectedEnrollmentId && enrollments.some((e) => e._id === preselectedEnrollmentId)) {
+			selectedEnrollmentId = preselectedEnrollmentId;
+		}
+
+		loading = false;
 	});
 
 	$effect(() => {
