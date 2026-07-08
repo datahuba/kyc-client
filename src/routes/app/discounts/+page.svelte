@@ -15,10 +15,14 @@
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
 
-	// ISSUE-P-DESCUENTO-ROL: solo Administrativo (admin/superadmin) gestiona descuentos.
+	// ISSUE-P-DESCUENTO-CPD (2026-07-08, reunión de postgrado contaduría): CPD
+	// es el responsable único de crear/editar/asignar descuentos ("no hay un
+	// usuario inferior ni superior que lo haga, solamente CPD"). Admin/Superadmin
+	// conservan acceso por jerarquía. Reemplaza a ISSUE-P-DESCUENTO-ROL (que
+	// había movido esta gestión de Cobranza a Admin, sin incluir CPD).
 	// Cobranza conserva acceso de solo lectura a esta vista.
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
-	let canManageDiscounts = $derived(['superadmin', 'admin'].includes(currentRole));
+	let canManageDiscounts = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canDeleteDiscount = $derived(currentRole === 'superadmin');
 
 	let discounts: Discount[] = $state([]);

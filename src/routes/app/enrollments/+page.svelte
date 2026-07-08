@@ -75,6 +75,18 @@
 	let canManageBecaRespaldo = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
 	// ISSUE-Q-NOTA-BORRADOR: quién puede validar/rechazar el borrador de nota del docente
 	let canValidateNotaBorrador = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
+
+	// ISSUE-R-NOTA-CONDICIONADA-PAGO (2026-07-08, reunión de postgrado
+	// contaduría): el estudiante solo puede VER su nota oficial de un módulo
+	// si está al día con el pago de ese módulo (mod.estado === 'Pagado').
+	// Si debe, ve un aviso de "Falta pagar" en vez de la calificación -- esto
+	// es una restricción VISUAL para el estudiante únicamente; el personal
+	// (CPD/Admin/Superadmin/Docente) siempre ve la nota real sin restricción,
+	// ya que necesitan gestionar el kardex independientemente del pago.
+	function puedeVerNotaModulo(mod: any): boolean {
+		if (currentRole !== 'student') return true;
+		return mod.estado === 'Pagado';
+	}
 	// ISSUE-M-EXENCION: botón exclusivo de MAE (también admin/superadmin, que ya tienen todo)
 	let canManageMatriculaExenta = $derived(['mae', 'admin', 'superadmin'].includes(currentRole));
 	let matriculaExentaLoading: boolean = $state(false);
@@ -882,16 +894,31 @@
 										
 										<!-- Columna Académica -->
 										<td class="px-4 py-4 text-center bg-blue-50/10 dark:bg-blue-900/5">
-											<span class={`text-lg font-black ${mod.nota !== null && mod.nota !== undefined && mod.nota >= 64 ? 'text-green-600 dark:text-green-400' : mod.nota !== null && mod.nota !== undefined ? 'text-red-600 dark:text-red-400' : 'text-slate-400'}`}>
-												{mod.nota !== null && mod.nota !== undefined ? mod.nota : '--'}
-											</span>
+											{#if puedeVerNotaModulo(mod)}
+												<span class={`text-lg font-black ${mod.nota !== null && mod.nota !== undefined && mod.nota >= 64 ? 'text-green-600 dark:text-green-400' : mod.nota !== null && mod.nota !== undefined ? 'text-red-600 dark:text-red-400' : 'text-slate-400'}`}>
+													{mod.nota !== null && mod.nota !== undefined ? mod.nota : '--'}
+												</span>
+											{:else}
+												<span class="text-xs font-bold text-light-warning dark:text-dark-warning" title="Debes estar al día con el pago de este módulo para ver tu calificación">
+													Falta pagar
+												</span>
+											{/if}
 										</td>
 										<td class="px-4 py-4 text-center bg-blue-50/10 dark:bg-blue-900/5">
-											<span class={`px-3 py-1.5 text-[11px] font-bold rounded-full uppercase tracking-wide ${mod.estado_academico === 'Aprobado' ? 'bg-green-100 text-green-700 border border-green-200' : mod.estado_academico === 'Reprobado' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600'}`}>
-												{mod.estado_academico || 'Cursando'}
-											</span>
-											<!-- ISSUE-Q-NOTA-BORRADOR: borrador del docente pendiente de validación -->
-											{#if mod.estado_validacion_nota === 'pendiente_validacion'}
+											{#if puedeVerNotaModulo(mod)}
+												<span class={`px-3 py-1.5 text-[11px] font-bold rounded-full uppercase tracking-wide ${mod.estado_academico === 'Aprobado' ? 'bg-green-100 text-green-700 border border-green-200' : mod.estado_academico === 'Reprobado' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600'}`}>
+													{mod.estado_academico || 'Cursando'}
+												</span>
+											{:else}
+												<span class="px-3 py-1.5 text-[11px] font-bold rounded-full uppercase tracking-wide bg-light-warning/15 text-light-warning dark:bg-dark-warning/20 dark:text-dark-warning">
+													Pago Pendiente
+												</span>
+											{/if}
+											<!-- ISSUE-Q-NOTA-BORRADOR: borrador del docente pendiente de validación.
+											     El estudiante NUNCA ve el borrador (solo la nota oficial ya validada
+											     por CPD) -- confirmado en reunión de postgrado contaduría 2026-07-08:
+											     "el gente no ve las notas hasta que el CPD no las aprueba". -->
+											{#if mod.estado_validacion_nota === 'pendiente_validacion' && currentRole !== 'student'}
 												<div class="mt-2 flex flex-col items-center gap-1">
 													<span class="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wide">
 														Borrador: {mod.nota_borrador}
