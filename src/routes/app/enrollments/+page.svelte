@@ -11,6 +11,7 @@
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
 	import Select from '$lib/components/ui/select.svelte';
+	import Checkbox from '$lib/components/ui/checkbox.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
@@ -83,6 +84,13 @@
 	let passiveTarget: Enrollment | null = $state(null);
 	let passiveMotivo: string = $state('');
 	let passiveLoading: boolean = $state(false);
+
+	// ISSUE-P-CONGELADO / AUDITORÍA #6: modal de confirmación con checkbox de
+	// tasa pagada (el backend ya no la asume pagada por defecto)
+	let congelarModalOpen: boolean = $state(false);
+	let congelarTarget: Enrollment | null = $state(null);
+	let congelarTasaPagada: boolean = $state(false);
+	let congelarLoading: boolean = $state(false);
 
 	onMount(() => {
 		if (!$userStore.isAuthenticated) {
@@ -267,14 +275,26 @@
 	}
 
 	// ISSUE-P-CONGELADO: congelamiento voluntario de estudios
-	async function handleCongelar(enrollment: Enrollment) {
+	function openCongelarModal(enrollment: Enrollment) {
+		congelarTarget = enrollment;
+		congelarTasaPagada = false;
+		congelarModalOpen = true;
 		openDropdownId = null;
+	}
+
+	async function confirmCongelar() {
+		if (!congelarTarget) return;
+		congelarLoading = true;
 		try {
-			await enrollmentService.congelarInscripcion(enrollment._id);
+			await enrollmentService.congelarInscripcion(congelarTarget._id, congelarTasaPagada);
 			alert('success', 'Inscripción congelada correctamente.');
+			congelarModalOpen = false;
+			congelarTarget = null;
 			loadData();
 		} catch (e: any) {
 			alert('error', e?.message || 'No se pudo congelar la inscripción');
+		} finally {
+			congelarLoading = false;
 		}
 	}
 
@@ -411,7 +431,7 @@
 				label: 'Congelar Inscripción',
 				id: 'congelar',
 				icon: `<svg class="size-5 text-uagrm-sky" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v8m-4-4h8m6 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
-				action: () => handleCongelar(enrollment)
+				action: () => openCongelarModal(enrollment)
 			});
 		}
 
@@ -957,6 +977,38 @@
 				<Button variant="secondary" onclick={() => passiveModalOpen = false} disabled={passiveLoading}>Cancelar</Button>
 				<Button onclick={confirmPassiveRequest} loading={passiveLoading} disabled={passiveMotivo.trim().length < 3}>
 					Enviar Solicitud
+				</Button>
+			</div>
+		</div>
+	</Modal>
+
+	<!-- ISSUE-P-CONGELADO / AUDITORÍA #6: confirmación de congelamiento con tasa pagada -->
+	<Modal
+		isOpen={congelarModalOpen}
+		title="Congelar Inscripción"
+		onClose={() => { if (!congelarLoading) congelarModalOpen = false; }}
+		maxWidth="sm:max-w-lg"
+	>
+		<div class="p-4 space-y-4">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
+				La inscripción quedará suspendida (módulos y pagos se conservan) hasta que se reactive
+				manualmente. Corresponde una tasa de congelamiento.
+			</p>
+			<Checkbox
+				id="congelar-tasa-pagada"
+				label="Cobranza ya registró el cobro de la tasa de congelamiento"
+				bind:checked={congelarTasaPagada}
+			/>
+			{#if !congelarTasaPagada}
+				<p class="text-xs text-light-warning dark:text-dark-warning">
+					Si dejas esto sin marcar, la inscripción quedará congelada con la tasa marcada como
+					pendiente de cobro.
+				</p>
+			{/if}
+			<div class="flex justify-end gap-3">
+				<Button variant="secondary" onclick={() => congelarModalOpen = false} disabled={congelarLoading}>Cancelar</Button>
+				<Button onclick={confirmCongelar} loading={congelarLoading}>
+					Confirmar Congelamiento
 				</Button>
 			</div>
 		</div>

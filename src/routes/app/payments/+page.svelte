@@ -45,6 +45,17 @@
 	let studentsList: Student[] = $state([]);
 	let coursesList: Course[] = $state([]);
 
+	// ISSUE-P-SEGMENTACION: si el usuario (Cobranza/Encargado de Curso) tiene
+	// cursos_asignados no vacío, el selector de curso del filtro solo debe
+	// mostrar esos cursos (el backend ya rechaza/filtra el resto, esto es
+	// solo para no ofrecer una opción que de todos modos será vacía/403).
+	let cursosAsignadosUsuario = $derived($userStore.user?.cursos_asignados ?? []);
+	let coursesListFiltrada = $derived(
+		cursosAsignadosUsuario.length > 0
+			? coursesList.filter((c) => cursosAsignadosUsuario.includes(c._id))
+			: coursesList
+	);
+
 	// State Modals
 	let isCreateModalOpen = $state(false);
 	let isApproveModalOpen = $state(false);
@@ -399,6 +410,12 @@
 			<p class="text-gray-500 dark:text-gray-400 text-sm mt-1">
 				{#if isStaff}Administre los pagos recibidos{:else}Historial de sus pagos realizados{/if}
 			</p>
+			<!-- ISSUE-P-SEGMENTACION: aviso visible de por qué solo se ven ciertos cursos -->
+			{#if isCobranza && cursosAsignadosUsuario.length > 0}
+				<p class="mt-1 text-xs font-medium text-uagrm-sky">
+					Vista segmentada: solo se muestran pagos de los {cursosAsignadosUsuario.length} curso(s) asignado(s) a tu cuenta.
+				</p>
+			{/if}
 		</div>
 		
 		<div class="flex gap-3 w-full md:w-auto">
@@ -465,7 +482,7 @@
 								: 'ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-white dark:ring-gray-600'}"
 					>
 						<option value="">Todos los cursos</option>
-						{#each coursesList as course (course._id)}
+						{#each coursesListFiltrada as course (course._id)}
 							<option value={course._id}>{course.nombre_programa}</option>
 						{/each}
 						</select>

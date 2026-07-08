@@ -94,6 +94,8 @@
 	}
 
 	async function handleSubmit() {
+		// AUDITORÍA: guard explícito contra doble submit.
+		if (saving) return;
 		if (!validarFormulario()) return;
 
 		saving = true;

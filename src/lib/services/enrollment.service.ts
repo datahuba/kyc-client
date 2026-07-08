@@ -94,8 +94,15 @@ class EnrollmentService {
 	}
 
 	// === ISSUE-P-CONGELADO: congelamiento voluntario y reactivación ===
-	async congelarInscripcion(enrollmentId: string): Promise<Enrollment> {
-		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/congelar`, {});
+	// AUDITORÍA (#6): el backend ya NO asume por defecto que la tasa de
+	// congelamiento fue pagada (antes lo hacía sin ningún Payment real
+	// asociado). El caller debe indicar explícitamente si Cobranza ya
+	// registró el cobro de la tasa antes de congelar.
+	async congelarInscripcion(enrollmentId: string, tasaPagada: boolean): Promise<Enrollment> {
+		return await apiKyC.post<Enrollment>(
+			`/enrollments/${enrollmentId}/congelar?tasa_pagada=${tasaPagada}`,
+			{}
+		);
 	}
 
 	async reactivarDesdeCongeladoOAbandono(enrollmentId: string): Promise<Enrollment> {

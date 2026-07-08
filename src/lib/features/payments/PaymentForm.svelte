@@ -135,6 +135,10 @@
 	});
 
 	async function handleSubmit() {
+		// AUDITORÍA: guard explícito contra doble submit (doble click/doble
+		// Enter antes de que `saving=true` bloquee el botón visualmente).
+		if (saving) return;
+
 		if (!selectedEnrollmentId || montoComprobante === null || !concepto || !metodoPago) {
 			alert('error', 'Por favor complete todos los campos obligatorios del pago.');
 			return;

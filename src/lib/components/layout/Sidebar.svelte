@@ -42,7 +42,7 @@
 
 	const navigation: NavigationItem[] = [
 		{ name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
-		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		
 		// ACCESO DIRECTO A INSCRIPCIONES
 		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
