@@ -7,6 +7,7 @@ export interface Discount {
 	porcentaje: number;
 	updated_at: string;
 	nota_minima_requerida?: number | null; // ISSUE-P-RECALCULO-NOTA
+	resolucion_url?: string | null; // ISSUE-P-DESCUENTO-RESOLUCION
 }
 
 export interface CreateDiscountRequest {

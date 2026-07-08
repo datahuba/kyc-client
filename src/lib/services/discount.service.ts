@@ -34,6 +34,13 @@ class DiscountService {
 	async removeStudent(discountId: string, studentId: string): Promise<Discount> {
 		return await apiKyC.delete<Discount>(`/discounts/${discountId}/students/${studentId}`);
 	}
+
+	// ISSUE-P-DESCUENTO-RESOLUCION: subir/reemplazar el documento de resolución que respalda el descuento
+	async uploadResolucion(discountId: string, file: File): Promise<Discount> {
+		const formData = new FormData();
+		formData.append('file', file);
+		return await apiKyC.post<Discount>(`/discounts/${discountId}/resolucion`, formData);
+	}
 }
 
 export const discountService = new DiscountService();

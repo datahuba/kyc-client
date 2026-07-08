@@ -11,6 +11,7 @@
 	import Modal from '$lib/components/ui/modal.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import DiscountForm from '$lib/features/discounts/DiscountForm.svelte';
+	import FileUpload from '$lib/components/ui/fileUpload.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
@@ -45,6 +46,13 @@
 	let openDropdownId: string | null = $state(null);
 
 	let studentsList: Student[] = $state([]);
+
+	// ISSUE-P-DESCUENTO-RESOLUCION (2026-07-08): modal de subida/reemplazo del
+	// documento de resolución que respalda cada descuento.
+	let isResolucionModalOpen = $state(false);
+	let discountForResolucion: Discount | null = $state(null);
+	let resolucionFile: File | null = $state(null);
+	let resolucionUploading = $state(false);
 
 	onMount(() => {
 		loadDiscounts();
@@ -132,6 +140,30 @@
 		loadDiscounts();
 	}
 
+	function openResolucionModal(discount: Discount) {
+		discountForResolucion = discount;
+		resolucionFile = null;
+		isResolucionModalOpen = true;
+		openDropdownId = null;
+	}
+
+	async function handleUploadResolucion() {
+		if (!discountForResolucion || !resolucionFile) return;
+		resolucionUploading = true;
+		try {
+			const updated = await discountService.uploadResolucion(discountForResolucion._id, resolucionFile);
+			discounts = discounts.map((d) => (d._id === updated._id ? updated : d));
+			alert('success', 'Documento de resolución subido correctamente');
+			isResolucionModalOpen = false;
+			discountForResolucion = null;
+			resolucionFile = null;
+		} catch (e: any) {
+			alert('error', e.message || 'Error al subir el documento de resolución');
+		} finally {
+			resolucionUploading = false;
+		}
+	}
+
 	function toggleDropdown(id: string) {
 		if (openDropdownId === id) {
 			openDropdownId = null;
@@ -150,6 +182,12 @@
 				id: 'edit',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>`,
 				action: () => handleEdit(discount)
+			});
+			options.push({
+				label: discount.resolucion_url ? 'Reemplazar Resolución' : 'Subir Resolución',
+				id: 'resolucion',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>`,
+				action: () => openResolucionModal(discount)
 			});
 		}
 
@@ -196,6 +234,7 @@
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Porcentaje</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Beneficiarios</th>
 						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Resolución</th>
 						<th scope="col" class="relative px-6 py-3">
 							<span class="sr-only">Acciones</span>
 						</th>
@@ -217,6 +256,15 @@
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${discount.activo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
 									{discount.activo ? 'Activo' : 'Inactivo'}
 								</span>
+							</td>
+							<td class="px-6 py-4 whitespace-nowrap">
+								{#if discount.resolucion_url}
+									<a href={discount.resolucion_url} target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400">
+										Ver documento
+									</a>
+								{:else}
+									<span class="text-xs font-semibold text-light-warning dark:text-dark-warning">Respaldo pendiente</span>
+								{/if}
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
 								{#if getDropdownOptions(discount).length > 0}
@@ -291,6 +339,16 @@
 								{discount.activo ? 'Activo' : 'Inactivo'}
 							</span>
 						</div>
+						<div class="flex justify-between">
+							<span class="text-gray-500 dark:text-gray-400">Resolución:</span>
+							{#if discount.resolucion_url}
+								<a href={discount.resolucion_url} target="_blank" rel="noopener noreferrer" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">
+									Ver documento
+								</a>
+							{:else}
+								<span class="font-semibold text-light-warning dark:text-dark-warning">Respaldo pendiente</span>
+							{/if}
+						</div>
 					</div>
 				</Card>
 			{/each}
@@ -322,4 +380,33 @@
 		}}
 		loading={deleteLoading}
 	/>
+
+	<!-- ISSUE-P-DESCUENTO-RESOLUCION: modal de subida/reemplazo del documento de resolución -->
+	<Modal
+		isOpen={isResolucionModalOpen}
+		title={discountForResolucion?.resolucion_url ? 'Reemplazar Documento de Resolución' : 'Subir Documento de Resolución'}
+		onClose={() => { isResolucionModalOpen = false; discountForResolucion = null; }}
+	>
+		<div class="space-y-4">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
+				Adjunta el documento (PDF o imagen) que respalda institucionalmente el descuento
+				<span class="font-semibold text-gray-700 dark:text-gray-300">{discountForResolucion?.nombre}</span>.
+			</p>
+			<FileUpload
+				accept="application/pdf,image/jpeg,image/png,image/webp"
+				file={resolucionFile}
+				onFileSelect={(f) => (resolucionFile = f)}
+				loading={resolucionUploading}
+				initialUrl={discountForResolucion?.resolucion_url}
+			/>
+			<div class="flex justify-end gap-3 pt-2">
+				<Button variant="secondary" onclick={() => { isResolucionModalOpen = false; discountForResolucion = null; }}>
+					Cancelar
+				</Button>
+				<Button onclick={handleUploadResolucion} loading={resolucionUploading} disabled={!resolucionFile}>
+					Subir
+				</Button>
+			</div>
+		</div>
+	</Modal>
 </div>
