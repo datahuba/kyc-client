@@ -36,8 +36,16 @@ interface Props {
 		role: null,
 		activo: true,
 		nombre_funcional: '',
-		cursos_asignados: []
+		cursos_asignados: [],
+		carnet: ''
 	});
+
+	// GAP-1 (audio 2026-07-08): si se completa el CI y se deja la contraseña en
+	// blanco al crear, el backend genera automáticamente 'Uagrm.<CI>' como
+	// contraseña inicial (convención institucional confirmada por el usuario).
+	let passwordAutogenerada = $derived(
+		!isEditMode && !!formData.carnet?.trim() && !formData.password?.trim()
+	);
 
 	// ISSUE-R-ROLES / ISSUE-R-PERFIL-GENERICO: roles que requieren nombre funcional
 	// (por función/programa, no por persona) para poder rotar al responsable sin
@@ -81,7 +89,8 @@ interface Props {
 				role: user.role,
 				activo: user.activo,
 				nombre_funcional: user.nombre_funcional ?? '',
-				cursos_asignados: user.cursos_asignados ?? []
+				cursos_asignados: user.cursos_asignados ?? [],
+				carnet: user.carnet ?? ''
 			};
 		} else {
 			formData = {
@@ -91,7 +100,8 @@ interface Props {
 				role: null,
 				activo: true,
 				nombre_funcional: '',
-				cursos_asignados: []
+				cursos_asignados: [],
+				carnet: ''
 			};
 		}
 		errors = {};
@@ -119,8 +129,20 @@ interface Props {
 		if (!formData.role) {
 			nuevosErrores.role = 'Selecciona un rol.';
 		}
-		if (!isEditMode && (!formData.password || formData.password.length < 5)) {
-			nuevosErrores.password = 'La contraseña debe tener al menos 5 caracteres.';
+		if (formData.carnet?.trim() && !/^\d{5,10}$/.test(formData.carnet.trim())) {
+			nuevosErrores.carnet = 'El carnet debe tener entre 5 y 10 dígitos (solo números).';
+		}
+		// GAP-1: al crear, la contraseña es obligatoria SALVO que se provea un
+		// carnet (en ese caso el backend la autogenera como 'Uagrm.<CI>').
+		// Si se escribe una contraseña de todos modos, debe cumplir el mínimo.
+		if (!isEditMode) {
+			const tieneCarnet = !!formData.carnet?.trim();
+			const tienePassword = !!formData.password?.trim();
+			if (tienePassword && formData.password!.length < 5) {
+				nuevosErrores.password = 'La contraseña debe tener al menos 5 caracteres.';
+			} else if (!tienePassword && !tieneCarnet) {
+				nuevosErrores.password = 'La contraseña debe tener al menos 5 caracteres, o completa el Carnet de Identidad para generarla automáticamente.';
+			}
 		}
 		if (requiereNombreFuncional && !formData.nombre_funcional?.trim()) {
 			nuevosErrores.nombre_funcional = 'El nombre funcional es obligatorio para Encargado de Curso, Coordinador y Cobranza.';
@@ -151,18 +173,19 @@ interface Props {
 				return;
 			}
 
-			// Si el rol no requiere estos campos, no los enviamos con basura residual
+			// Si el rol no requiere estos campos, no los enviamos con basura residual.
+			// GAP-1: 'password' y 'carnet' vacíos se envían como undefined (una
+			// cadena vacía '' rompería la validación min_length=5 del backend).
 			const payload: CreateUserRequest = {
 				...formData,
+				password: formData.password?.trim() || undefined,
+				carnet: formData.carnet?.trim() || undefined,
 				nombre_funcional: requiereNombreFuncional ? formData.nombre_funcional : undefined,
 				cursos_asignados: requiereCursosAsignados ? formData.cursos_asignados : undefined
 			};
 
 			if (isEditMode && user) {
-				await userService.update(user._id, {
-					...payload,
-					password: formData.password || undefined
-				});
+				await userService.update(user._id, payload);
 				alert('success', 'Usuario actualizado correctamente');
 			} else {
 				await userService.create(payload);
@@ -198,6 +221,27 @@ interface Props {
 				error={errors.email}
 			/>
 
+			<!-- GAP-1 (audio 2026-07-08): CI del personal. Si se completa al crear
+			     y se deja la contraseña en blanco, el backend genera automáticamente
+			     'Uagrm.<CI>' como contraseña inicial (convención institucional). -->
+			<div>
+				<Input
+					label="Carnet de Identidad (CI)"
+					id="carnet"
+					bind:value={formData.carnet}
+					inputmode="numeric"
+					pattern="[0-9]*"
+					minlength={5}
+					maxlength={10}
+					placeholder="Ej: 1234567"
+					error={errors.carnet}
+				/>
+				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+					Opcional. Si lo completas y dejas la contraseña en blanco al crear, la contraseña inicial
+					será <span class="font-mono">Uagrm.{formData.carnet?.trim() || '&lt;CI&gt;'}</span>.
+				</p>
+			</div>
+
 			<!-- ISSUE L/M/R: Selector de Roles alineado a la jerarquía de Postgrado UAGRM -->
 			<div>
 				<Select
@@ -224,15 +268,22 @@ interface Props {
 			</div>
 
 			{#if !isEditMode}
-				<Input
-					label="Contraseña"
-					id="password"
-					type="password"
-					bind:value={formData.password}
-					required={!isEditMode}
-					placeholder="********"
-					error={errors.password}
-				/>
+				<div>
+					<Input
+						label="Contraseña"
+						id="password"
+						type="password"
+						bind:value={formData.password}
+						required={!formData.carnet?.trim()}
+						placeholder={formData.carnet?.trim() ? 'Opcional si completas el CI' : '********'}
+						error={errors.password}
+					/>
+					{#if passwordAutogenerada}
+						<p class="mt-1 text-xs text-light-tertiary dark:text-dark-tertiary">
+							Se generará automáticamente como <span class="font-mono">Uagrm.{formData.carnet?.trim()}</span>.
+						</p>
+					{/if}
+				</div>
 			{:else}
 				<Input
 					label="Nueva Contraseña (Opcional)"
