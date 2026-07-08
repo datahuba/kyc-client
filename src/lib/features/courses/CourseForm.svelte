@@ -44,8 +44,8 @@
 		modalidad: 'presencial',
 		costo_total_interno: 0,
 		matricula_interno: 0,
-		costo_total_externo: null,
-		matricula_externo: null,
+		cargo_adicional_monto: null,
+		cargo_adicional_concepto: '',
 		cantidad_cuotas: 1,
 		descuento_curso: 0,
 		descuento_id: '',
@@ -95,8 +95,8 @@
 					modalidad: course.modalidad,
 					costo_total_interno: course.costo_total_interno,
 					matricula_interno: course.matricula_interno,
-					costo_total_externo: course.costo_total_externo ?? null,
-					matricula_externo: course.matricula_externo ?? null,
+					cargo_adicional_monto: course.cargo_adicional_monto ?? null,
+					cargo_adicional_concepto: course.cargo_adicional_concepto ?? '',
 					cantidad_cuotas: course.cantidad_cuotas,
 					descuento_curso: course.descuento_curso,
 					descuento_id: (course as any).descuento_id || '',
@@ -124,8 +124,8 @@
 					modalidad: 'presencial',
 					costo_total_interno: 0,
 					matricula_interno: 0,
-					costo_total_externo: null,
-					matricula_externo: null,
+					cargo_adicional_monto: null,
+					cargo_adicional_concepto: '',
 					cantidad_cuotas: 1,
 					descuento_curso: 0,
 					descuento_id: '',
@@ -219,6 +219,16 @@
 		if (formData.modulos?.some((m) => !m.nombre?.trim())) {
 			nuevosErrores.modulos = 'Todos los módulos deben tener un nombre.';
 		}
+		// ISSUE-P-PRECIO-UNICO: si se define un monto de cargo adicional, el
+		// concepto es obligatorio (para que el estudiante sepa qué está pagando).
+		if (
+			formData.cargo_adicional_monto !== null &&
+			formData.cargo_adicional_monto !== undefined &&
+			Number(formData.cargo_adicional_monto) > 0 &&
+			!formData.cargo_adicional_concepto?.trim()
+		) {
+			nuevosErrores.cargo_adicional_concepto = 'Indica el concepto del cargo adicional (ej: Taller de Excel Avanzado).';
+		}
 
 		errors = nuevosErrores;
 		return Object.keys(nuevosErrores).length === 0;
@@ -243,19 +253,17 @@
 				}
 			}
 
+			// ISSUE-P-PRECIO-UNICO: si no se definió monto, se envía null (sin
+			// cargo adicional) en vez de 0, para no confundir "sin cargo" con
+			// "cargo de 0 Bs".
 			if (
-				payload.costo_total_externo === null ||
-				payload.costo_total_externo === undefined ||
-				(payload.costo_total_externo as any) === ''
+				payload.cargo_adicional_monto === null ||
+				payload.cargo_adicional_monto === undefined ||
+				(payload.cargo_adicional_monto as any) === '' ||
+				Number(payload.cargo_adicional_monto) <= 0
 			) {
-				payload.costo_total_externo = 0;
-			}
-			if (
-				payload.matricula_externo === null ||
-				payload.matricula_externo === undefined ||
-				(payload.matricula_externo as any) === ''
-			) {
-				payload.matricula_externo = 0;
+				payload.cargo_adicional_monto = null;
+				payload.cargo_adicional_concepto = null;
 			}
 
 			payload.modulos = payload.modulos!.map((m) => {
@@ -386,12 +394,15 @@
 		</div>
 	</Card>
 
-	<!-- SECCIÓN: Costos internos -->
+	<!-- SECCIÓN: Costo del Programa (precio único para todos los estudiantes) -->
 	<Card variant="bordered" padding="md">
-		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">Costos Internos</Heading>
+		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">Costo del Programa</Heading>
+		<p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+			Precio único: aplica por igual a todos los estudiantes, sin importar su lugar de procedencia.
+		</p>
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 			<Input
-				label="Costo Total"
+				label="Costo Total (Colegiatura)"
 				id="costo_total_interno"
 				type="number"
 				bind:value={formData.costo_total_interno}
@@ -409,12 +420,36 @@
 		</div>
 	</Card>
 
-	<!-- SECCIÓN: Costos externos -->
+	<!-- SECCIÓN: Cargo adicional (ISSUE-P-PRECIO-UNICO, 2026-07-08) -->
+	<!-- El precio del programa (costo total + matrícula) es el MISMO para
+	     todos los estudiantes, sin distinción de procedencia. Este bloque es
+	     para un gasto complementario OPCIONAL al programa en su conjunto
+	     (ej. "Taller de Excel Avanzado" incluido, con un costo extra fijo
+	     que se suma a lo que paga cada estudiante inscrito a este curso). -->
 	<Card variant="bordered" padding="md">
-		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">Costos Externos (Opcional)</Heading>
+		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">Cargo Adicional (Opcional)</Heading>
+		<p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+			Úsalo solo si este programa incluye un gasto complementario obligatorio (ej. un taller o
+			capacitación necesaria) con un costo aparte de la colegiatura. Se suma al total a pagar de
+			todos los estudiantes inscritos a este curso. Déjalo vacío si no aplica.
+		</p>
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-			<Input label="Costo Total" id="costo_total_externo" type="number" bind:value={formData.costo_total_externo} />
-			<Input label="Matrícula" id="matricula_externo" type="number" bind:value={formData.matricula_externo} />
+			<Input
+				label="Monto del Cargo Adicional (Bs)"
+				id="cargo_adicional_monto"
+				type="number"
+				min="0"
+				step="0.01"
+				bind:value={formData.cargo_adicional_monto}
+				placeholder="Ej: 100"
+			/>
+			<Input
+				label="Concepto del Cargo Adicional"
+				id="cargo_adicional_concepto"
+				bind:value={formData.cargo_adicional_concepto}
+				placeholder="Ej: Taller de Excel Avanzado"
+				error={errors.cargo_adicional_concepto}
+			/>
 		</div>
 	</Card>
 

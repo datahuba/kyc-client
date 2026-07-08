@@ -199,6 +199,11 @@
 									<span>·</span>
 									<span>{course.cantidad_cuotas} módulos</span>
 								</div>
+								{#if course.cargo_adicional_monto}
+									<p class="mt-2 text-[10px] text-light-warning dark:text-dark-warning">
+										+ {formatCurrency(course.cargo_adicional_monto)} ({course.cargo_adicional_concepto})
+									</p>
+								{/if}
 								<div class="mt-3 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-dark-border">
 									<span class="text-sm font-black text-primary-700 dark:text-primary-300">{formatCurrency(course.costo_total_interno || 0)}</span>
 									{#if requestedCourseIds.has(course._id)}

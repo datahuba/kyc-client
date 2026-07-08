@@ -130,20 +130,20 @@
 		const course = coursesList.find((c) => c._id === enrollment.curso_id);
 		if (!course) return;
 
-		const isInterno = enrollment.es_estudiante_interno === 'interno';
-
+		// ISSUE-P-PRECIO-UNICO (2026-07-08): el precio del programa es el
+		// mismo para todos los estudiantes, ya no distingue interno/externo.
 		if (!isMatriculaPagada) {
 			concepto = 'Matrícula';
 			// Solo auto-sugiere si el usuario recién seleccionó este curso
 			if (lastAutoFilledId !== selectedEnrollmentId) {
-				montoComprobante = isInterno ? course.matricula_interno : course.matricula_externo;
+				montoComprobante = course.matricula_interno;
 				lastAutoFilledId = selectedEnrollmentId;
 			}
 		} else {
 			concepto = 'Módulo';
 			// Solo auto-sugiere si el usuario recién seleccionó este curso
 			if (lastAutoFilledId !== selectedEnrollmentId) {
-				const total = isInterno ? course.costo_total_interno : course.costo_total_externo;
+				const total = course.costo_total_interno;
 				const cuotas = course.cantidad_cuotas || 1;
 				montoComprobante = Math.round((total / cuotas) * 100) / 100;
 				lastAutoFilledId = selectedEnrollmentId;

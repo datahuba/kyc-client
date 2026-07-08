@@ -819,6 +819,17 @@
 					</div>
 				</div>
 
+				<!-- ISSUE-P-PRECIO-UNICO: transparencia del cargo adicional/complementario al programa -->
+				{#if selectedKardex.cargo_adicional_monto}
+					<div class="bg-light-warning/10 dark:bg-dark-warning/10 border border-light-warning/30 dark:border-dark-warning/30 p-4 rounded-xl flex items-center justify-between gap-3">
+						<div>
+							<p class="text-xs text-light-warning dark:text-dark-warning uppercase tracking-wider font-bold mb-1">Cargo Adicional Incluido</p>
+							<p class="text-sm text-slate-700 dark:text-slate-300">{selectedKardex.cargo_adicional_concepto}</p>
+						</div>
+						<span class="text-lg font-bold text-light-warning dark:text-dark-warning">+{formatCurrency(selectedKardex.cargo_adicional_monto)}</span>
+					</div>
+				{/if}
+
 				<!-- ISSUE-P-BECA-RESPALDO: respaldo documental de beca/descuento -->
 				{#if selectedKardex.descuento_estudiante_id || (selectedKardex.descuento_personalizado ?? 0) > 0}
 					<div class="bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-dark-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

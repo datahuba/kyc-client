@@ -9,15 +9,18 @@ export interface Course {
 	activo: boolean;
 	cantidad_cuotas: number;
 	codigo: string;
-	costo_total_externo: number;
 	costo_total_interno: number;
 	created_at: string;
 	descuento_curso: number;
 	fecha_fin: string;
 	fecha_inicio: string;
 	inscritos: string[];
-	matricula_externo: number;
 	matricula_interno: number;
+	// ISSUE-P-PRECIO-UNICO (2026-07-08): precio único para todos los
+	// estudiantes. cargo_adicional_* es un gasto complementario opcional al
+	// programa (ej. un taller incluido), no un precio diferenciado.
+	cargo_adicional_monto?: number | null;
+	cargo_adicional_concepto?: string | null;
 	modalidad: string;
 	nombre_programa: string;
 	observacion: string;
@@ -33,8 +36,8 @@ export interface CreateCourseRequest {
 	modalidad: string;
 	costo_total_interno: number;
 	matricula_interno: number;
-	costo_total_externo?: number | null;
-	matricula_externo?: number | null;
+	cargo_adicional_monto?: number | null;
+	cargo_adicional_concepto?: string | null;
 	cantidad_cuotas: number;
 	descuento_curso: number;
 	observacion?: string;

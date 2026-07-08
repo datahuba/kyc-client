@@ -68,13 +68,15 @@
 							</div>
 							<div class="mt-3 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-dark-border">
 								<div class="text-xs">
-									<span class="block text-gray-400 dark:text-gray-500">Interno</span>
+									<span class="block text-gray-400 dark:text-gray-500">Colegiatura</span>
 									<span class="font-bold text-primary-700 dark:text-primary-300">{formatCurrency(course.costo_total_interno || 0)}</span>
 								</div>
-								<div class="text-xs text-right">
-									<span class="block text-gray-400 dark:text-gray-500">Externo</span>
-									<span class="font-bold text-gray-700 dark:text-gray-300">{formatCurrency(course.costo_total_externo || 0)}</span>
-								</div>
+								{#if course.cargo_adicional_monto}
+									<div class="text-xs text-right">
+										<span class="block text-gray-400 dark:text-gray-500">{course.cargo_adicional_concepto}</span>
+										<span class="font-bold text-gray-700 dark:text-gray-300">+{formatCurrency(course.cargo_adicional_monto)}</span>
+									</div>
+								{/if}
 							</div>
 						</div>
 					</div>
