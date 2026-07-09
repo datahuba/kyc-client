@@ -56,16 +56,12 @@
 	let importFile: File | null = $state(null);
 	let importLoading = $state(false);
 	let importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color?: Record<string, string[]> } | null = $state(null);
-	let importTipoEstudiante: 'interno' | 'externo' = $state('externo'); 
 	let importCursoId: string = $state(''); // Curso opcional para auto-inscripción en carga masiva
 
 	// Selección Múltiple
 	let selectedStudentIds: string[] = $state([]);
 	let showBulkDeleteModal = $state(false);
 	let bulkDeleteLoading = $state(false);
-
-	// Toggling State
-	let togglingTypeIds: Set<string> = $state(new Set());
 
 	// Filters
 	let filters = $state({
@@ -278,25 +274,6 @@
 		}
 	}
 
-	async function toggleStudentType(student: Student) {
-		if (!canEditStudent) return; 
-		const newType = student.es_estudiante_interno === 'interno' ? 'externo' : 'interno';
-		
-		togglingTypeIds.add(student._id);
-		togglingTypeIds = new Set(togglingTypeIds); 
-		
-		try {
-			const updatedStudent = await studentService.toggleTipoEstudiante(student._id, newType);
-			students = students.map(s => s._id === student._id ? { ...s, es_estudiante_interno: updatedStudent.es_estudiante_interno } : s);
-			alert('success', `El estudiante ahora es ${newType.toUpperCase()}`);
-		} catch (error: any) {
-			alert('error', error.message || 'Error al cambiar tipo de estudiante');
-		} finally {
-			togglingTypeIds.delete(student._id);
-			togglingTypeIds = new Set(togglingTypeIds);
-		}
-	}
-
 	function handleFormSuccess() {
 		isFormOpen = false;
 		loadStudents();
@@ -479,7 +456,7 @@
 		importLoading = true;
 		importReport = null;
 		try {
-			const response = await studentService.importFromExcel(importFile, importTipoEstudiante, importCursoId || undefined);
+			const response = await studentService.importFromExcel(importFile, importCursoId || undefined);
 			importReport = response;
 			if (response.success_count > 0) {
 				const inscritosMsg = response.enrolled_count > 0
@@ -538,7 +515,7 @@
 			</Button>
 
 			{#if canCreateStudent}
-				<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; importTipoEstudiante = 'externo'; importCursoId = ''; }} variant="secondary">
+				<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; importCursoId = ''; }} variant="secondary">
 					{#snippet leftIcon()}
 						<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
 					{/snippet}
@@ -574,11 +551,9 @@
 			{students}
 			{isSuperAdmin}
 			{canEditStudent}
-			{togglingTypeIds}
 			{getDropdownOptions}
 			{toggleSelectAll}
 			{toggleSelectStudent}
-			{toggleStudentType}
 			{toggleDropdown}
 			bind:selectedStudentIds={selectedStudentIds}
 			bind:openDropdownId={openDropdownId}
@@ -646,7 +621,6 @@
 		onSubmit={handleImportExcelSubmit}
 		courses={allCourses}
 		bind:importFile={importFile}
-		bind:importTipoEstudiante={importTipoEstudiante}
 		bind:importCursoId={importCursoId}
 		bind:importReport={importReport}
 	/>

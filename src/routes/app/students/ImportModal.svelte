@@ -7,7 +7,6 @@
 		isOpen: boolean;
 		importLoading: boolean;
 		importFile: File | null;
-		importTipoEstudiante: 'interno' | 'externo';
 		importCursoId: string;
 		importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color?: Record<string, string[]> } | null;
 		courses: Course[];
@@ -21,7 +20,6 @@
 		isOpen,
 		importLoading,
 		importFile = $bindable(),
-		importTipoEstudiante = $bindable(),
 		importCursoId = $bindable(),
 		importReport = $bindable(),
 		courses = [],
@@ -87,7 +85,6 @@
 				<p class="text-xs text-primary-600 dark:text-primary-400 pt-1">
 					Todos los estudiantes de esta importación se inscribirán automáticamente en
 					<span class="font-semibold">{selectedCourse.nombre_programa}</span>.
-					El costo aplicado será el de tipo <span class="font-semibold">{importTipoEstudiante}</span>.
 					Si el archivo incluye columnas de pago (Matrícula, M1, M2…), esos montos se registrarán como pagos aprobados. Si incluye un link de comprobante de matrícula, se registrará como pago pendiente de verificación con el enlace adjunto.
 				</p>
 			{/if}

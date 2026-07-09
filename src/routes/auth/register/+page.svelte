@@ -9,7 +9,6 @@
 	let carnet = $state('');
 	let celular = $state('');
 	let registro = $state('');
-	let tipo = $state<'interno' | 'externo'>('externo');
 	let mensaje = $state('');
 
 	let loading = $state(false);
@@ -39,7 +38,6 @@
 				carnet: carnet.trim(),
 				celular: celular.trim() || undefined,
 				registro: registro.trim() || undefined,
-				es_estudiante_interno: tipo,
 				mensaje: mensaje.trim() || undefined
 			});
 			success = true;

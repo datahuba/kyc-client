@@ -42,16 +42,13 @@ class StudentService {
 		return await apiKyC.post<Student>('/students/', data);
 	}
 
-    // ISSUE G: Añadido selector de tipo de estudiante
-    // NUEVO: cursoId opcional para auto-inscribir a los estudiantes importados a un curso/diplomado
+    // cursoId opcional para auto-inscribir a los estudiantes importados a un curso/diplomado
     async importFromExcel(
         file: File,
-        tipoEstudiante: 'interno' | 'externo',
         cursoId?: string
     ): Promise<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color: Record<string, string[]> }> {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('tipo_estudiante', tipoEstudiante);
         if (cursoId) {
             formData.append('curso_id', cursoId);
         }
@@ -66,11 +63,6 @@ class StudentService {
             formData, 
             { customTimeout: 180000 }
         );
-    }
-
-    // ISSUE H: Botón rápido de cambio de tipo
-    async toggleTipoEstudiante(id: string, tipo: 'interno' | 'externo'): Promise<Student> {
-        return await apiKyC.patch<Student>(`/students/${id}/toggle-tipo`, { tipo });
     }
 
     async bulkDelete(ids: string[]): Promise<{ message: string; deleted_count: number }> {

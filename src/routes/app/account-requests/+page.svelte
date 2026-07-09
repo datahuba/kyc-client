@@ -13,7 +13,6 @@
 		carnet: string;
 		celular?: string | null;
 		registro?: string | null;
-		es_estudiante_interno: string;
 		mensaje?: string | null;
 		estado: string;
 		motivo_rechazo?: string | null;

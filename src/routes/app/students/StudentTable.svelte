@@ -7,13 +7,11 @@
 		students: Student[];
 		isSuperAdmin: boolean;
 		canEditStudent: boolean;
-		togglingTypeIds: Set<string>;
 		selectedStudentIds: string[];
 		openDropdownId: string | null;
 		getDropdownOptions: (student: Student) => any[];
 		toggleSelectAll: () => void;
 		toggleSelectStudent: (id: string) => void;
-		toggleStudentType: (student: Student) => void;
 		toggleDropdown: (id: string) => void;
 	}
 
@@ -21,13 +19,11 @@
 		students,
 		isSuperAdmin,
 		canEditStudent,
-		togglingTypeIds,
 		selectedStudentIds = $bindable(),
 		openDropdownId = $bindable(),
 		getDropdownOptions,
 		toggleSelectAll,
 		toggleSelectStudent,
-		toggleStudentType,
 		toggleDropdown
 	}: Props = $props();
 

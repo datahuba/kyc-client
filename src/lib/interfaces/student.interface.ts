@@ -21,7 +21,6 @@ export interface Student {
 	created_at: string;
 	domicilio: string;
 	email: string;
-	es_estudiante_interno: string;
 	extension: string;
 	fecha_nacimiento: string;
 	fecha_registro: string;
@@ -70,7 +69,6 @@ export interface CreateStudentRequest {
 	celular: string;
 	email: string;
 	domicilio: string;
-	es_estudiante_interno: string;
 	// Datos oficiales UAGRM (opcionales)
 	sexo?: string;
 	estado_civil?: string;

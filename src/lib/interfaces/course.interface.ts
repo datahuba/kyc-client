@@ -75,7 +75,6 @@ export interface CourseStudent {
 		id: string;
 		fecha_inscripcion: string;
 		estado: string;
-		tipo_estudiante: string;
 	};
 	financiero: {
 		total_a_pagar: number;

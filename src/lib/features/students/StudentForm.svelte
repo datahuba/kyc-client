@@ -42,7 +42,6 @@
 		email: '',
 		domicilio: '',
 		carrera: '',
-		es_estudiante_interno: 'interno',
 		password: '',
 		course_id: '',
 		lista_cursos_ids: [],
@@ -105,7 +104,6 @@
 				celular: student.celular,
 				email: student.email,
 				domicilio: student.domicilio,
-				es_estudiante_interno: student.es_estudiante_interno,
 				// Datos oficiales UAGRM
 				sexo: student.sexo || '',
 				estado_civil: student.estado_civil || '',
@@ -147,7 +145,6 @@
 				celular: '',
 				email: '',
 				domicilio: '',
-				es_estudiante_interno: 'interno',
 				password: '',
 				sexo: '',
 				estado_civil: '',

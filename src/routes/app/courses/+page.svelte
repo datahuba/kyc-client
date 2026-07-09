@@ -240,7 +240,7 @@
             return;
         }
 
-        const headers = ["Estudiante", "CI", "Email", "Celular", "Estado", "Tipo", "Fecha Inscripcion", "Total", "Pagado", "Saldo"];
+        const headers = ["Estudiante", "CI", "Email", "Celular", "Estado", "Fecha Inscripcion", "Total", "Pagado", "Saldo"];
         
         try {
             const rows = courseStudents.map(s => [
@@ -249,7 +249,6 @@
                 s.contacto.email,
                 s.contacto.celular,
                 s.inscripcion.estado,
-                s.inscripcion.tipo_estudiante,
                 formatDate(s.inscripcion.fecha_inscripcion),
                 s.financiero.total_a_pagar,
                 s.financiero.total_pagado,
@@ -587,7 +586,6 @@
 										  student.inscripcion.estado === 'pagado' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
 										{student.inscripcion.estado}
 									</span>
-									<div class="text-xs text-gray-500 dark:text-gray-400 mt-1 capitalize">{student.inscripcion.tipo_estudiante}</div>
 									<div class="text-xs text-gray-400 mt-0.5">{formatDate(student.inscripcion.fecha_inscripcion)}</div>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">

@@ -22,7 +22,6 @@ export interface Enrollment {
 	descuento_personalizado: number;
 	descuento_curso_id?: string;
 	descuento_estudiante_id?: string;
-	es_estudiante_interno: string;
 	// ISSUE-P-CARGO-MULTIITEM (2026-07-08): snapshot de la lista de ítems de
 	// cargo adicional/complementario al programa, si el curso los tenía
 	// definidos al inscribirse.
