@@ -611,7 +611,6 @@
 	<ImportModal
 		isOpen={isImportModalOpen}
 		{importLoading}
-		{downloadTemplateCSV}
 		onClose={() => isImportModalOpen = false}
 		onDownloadTemplate={downloadTemplateCSV}
 		onFileChange={(e) => {

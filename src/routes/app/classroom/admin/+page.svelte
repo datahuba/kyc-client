@@ -38,7 +38,7 @@
 
 			classrooms = classrooms.map(c => ({
 				...c,
-				teacherName: teacherMap[c.teacher_user_id] || 'Sin asignar'
+				teacherName: teacherMap[c.teacher_user_id ?? ''] || 'Sin asignar'
 			}));
 
 			loading = false;
@@ -73,7 +73,7 @@
 
 			classrooms = classrooms.map(c => ({
 				...c,
-				teacherName: teacherMap[c.teacher_user_id] || 'Sin asignar'
+				teacherName: teacherMap[c.teacher_user_id ?? ''] || 'Sin asignar'
 			}));
 
 			// Reset form
@@ -100,7 +100,7 @@
 		isSubmitting = true;
 		try {
 			// Actualizar classroom con docente
-			await classroomService.update(selectedClassroom._id || selectedClassroom.id, {
+			await classroomService.update(selectedClassroom._id || selectedClassroom.id || '', {
 				teacher_user_id: newClassroom.teacher_user_id
 			});
 
@@ -115,7 +115,7 @@
 
 			classrooms = classrooms.map(c => ({
 				...c,
-				teacherName: teacherMap[c.teacher_user_id] || 'Sin asignar'
+				teacherName: teacherMap[c.teacher_user_id ?? ''] || 'Sin asignar'
 			}));
 
 			showLinkTeacherModal = false;
@@ -266,8 +266,7 @@
 							newClassroom = {
 								nombre: '',
 								descripcion: '',
-								codigo: '',
-								docente_id: ''
+								teacher_user_id: ''
 							};
 						}}
 						class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -317,7 +316,7 @@
 						onclick={() => {
 							showLinkTeacherModal = false;
 							selectedClassroom = null;
-							newClassroom.docente_id = '';
+							newClassroom.teacher_user_id = '';
 						}}
 						class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
 					>

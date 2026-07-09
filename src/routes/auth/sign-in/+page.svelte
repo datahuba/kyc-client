@@ -48,9 +48,9 @@
 				const currentAcademicRole = state.academicRole || '';
 
 				// ISSUE M: Enrutador Conmutador Inteligente Post-Auth de la UAGRM
-				if (userRole === 'student' || currentAcademicRole === 'student') {
+				if ((userRole as string) === 'student' || currentAcademicRole === 'student') {
 					goto('/app/dashboard'); // Estudiante va a su respectivo Dashboard académico
-				} else if (userRole === 'teacher' || userRole === 'docente' || currentAcademicRole === 'teacher') {
+				} else if ((userRole as string) === 'teacher' || userRole === 'docente' || currentAcademicRole === 'teacher') {
 					goto('/app/dashboard'); // Docente va a su respectivo Dashboard académico
 				} else if (userRole === 'cpd') {
 					goto('/app/students'); // CPD no tiene acceso financiero, inicia directo en gestión de estudiantes

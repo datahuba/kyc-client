@@ -235,7 +235,7 @@
 		loading = true;
 		error = '';
 		try {
-			if (role === 'student') {
+			if ((role as string) === 'student') {
 				profileData = await studentService.getById(id);
 				// Inicializar datos editables
 				editData = buildEditData();
@@ -369,7 +369,7 @@
 	}
 </script>
 
-{#if $userStore.role === 'student'}
+{#if ($userStore.role as string) === 'student'}
 	<div class="space-y-6 pb-8">
 		<div class="flex items-center justify-between">
 			<Heading level="h1">Mi Perfil</Heading>

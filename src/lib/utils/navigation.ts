@@ -14,8 +14,10 @@ export function getRouteByRole(
 		}
 	}
 
-	// For admin and regular logins, use the role
-	switch (role) {
+	// For admin and regular logins, use the role. Se compara como string porque
+	// el tipo Role no incluye 'student' (los estudiantes entran por academicRole
+	// arriba); mantener el case preserva el comportamiento sin error de tipos.
+	switch (role as string) {
 		case 'superadmin':
 		case 'admin':
 			return '/app/dashboard';

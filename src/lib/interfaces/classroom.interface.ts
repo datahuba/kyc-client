@@ -6,6 +6,8 @@ export type SubmissionStatus = 'pending' | 'submitted' | 'graded';
 
 export interface Classroom {
 	_id: string;
+	// Fallback defensivo de `._id` usado en algunos componentes.
+	id?: string;
 	nombre: string;
 	descripcion?: string;
 	course_id?: string;

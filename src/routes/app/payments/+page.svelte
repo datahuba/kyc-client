@@ -75,7 +75,7 @@
 
 	// Computed
 	let isAdmin = $derived($userStore.role === 'admin' || $userStore.role === 'superadmin');
-	let isStudent = $derived($userStore.role === 'student');
+	let isStudent = $derived(($userStore.role as string) === 'student');
 	let isCPD = $derived($userStore.role === 'cpd');
 	let isCobranza = $derived($userStore.role === 'cobranza');
 	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae'].includes($userStore.role || ''));
