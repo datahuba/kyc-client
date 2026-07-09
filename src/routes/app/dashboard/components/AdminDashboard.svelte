@@ -17,11 +17,20 @@
 	// ingreso) solo aplica a los roles que ven finanzas, igual que los reportes.
 	// NOTA: este componente está en modo legacy (Svelte 4, sin runas); se
 	// mantiene ese estilo aquí para no romper la reactividad de `loading`/`stats`.
-	const ROLES_ECONOMICOS = ['superadmin', 'admin', 'cobranza', 'mae'];
+	// 'coordinador' incluido para el coordinador financiero (ve todo lo económico).
+	// El rol genérico no distingue financiero/académico/investigación aún; cuando
+	// se modele el subtipo (ISSUE-R-PERFIL-GENERICO) restringir a financiero.
+	const ROLES_ECONOMICOS = ['superadmin', 'admin', 'cobranza', 'mae', 'coordinador'];
 	let resumenEconomico: ResumenEconomico | null = null;
 
 	$: currentRole = $userStore.role || $userStore.user?.rol || '';
 	$: verResumenEconomico = ROLES_ECONOMICOS.includes(currentRole);
+
+	// Perfiles segmentados (cobranza/encargado con cursos_asignados) NO necesitan
+	// el "Desglose por Curso": su vista ya está acotada a sus cursos, así que sería
+	// redundante. Solo los perfiles globales (superadmin/admin/mae sin cursos) lo ven.
+	$: cursosAsignados = $userStore.user?.cursos_asignados ?? [];
+	$: esSegmentado = cursosAsignados.length > 0;
 
 	let loading = true;
 	let stats = {
@@ -377,7 +386,8 @@
 			</a>
 		</div>
 
-		<!-- Course Breakdown Section -->
+		<!-- Course Breakdown Section (oculto para perfiles segmentados por curso) -->
+		{#if !esSegmentado}
 		<div>
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Desglose por Curso</h2>
@@ -506,6 +516,7 @@
 				</div>
 			{/if}
 		</div>
+		{/if}
 
 	{/if}
 </div>
