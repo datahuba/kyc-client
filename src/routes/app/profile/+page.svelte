@@ -6,10 +6,11 @@
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import { alert } from '$lib/utils';
-	import { UserIcon, MailIcon, MapPinIcon, PhoneIcon, IdentificationIcon, AcademicCapIcon, PencilIcon, CheckIcon, XMarkIcon, DocumentAddIcon } from '$lib/icons/outline';
+	import { UserIcon, MailIcon, MapPinIcon, PhoneIcon, IdentificationIcon, AcademicCapIcon, PencilIcon, CheckIcon, XMarkIcon, DocumentAddIcon, DownloadIcon } from '$lib/icons/outline';
 	import { BriefcaseIcon } from '$lib/icons/solid';
 	import { FileUpload, Modal, Button, Select } from '$lib/components/ui';
 	import DocumentRow from '$lib/components/ui/documentRow.svelte';
+	import FormularioInscripcionModal from '$lib/features/enrollments/FormularioInscripcionModal.svelte';
 	import type { Student, UpdateStudentSelfRequest, TituloData } from '$lib/interfaces/student.interface';
 	import { authService } from '$lib/services';
 	import { ExclamationCircleIcon } from '$lib/icons/solid';
@@ -97,6 +98,39 @@
 	// clave: `${enrollmentId}-${index}` -> bool (loading)
 	let subiendoReq = $state<Record<string, boolean>>({});
 	let reqInputEls = $state<Record<string, HTMLInputElement | null>>({});
+
+	// Formulario de inscripción: modal editable en línea + subida del lleno
+	let formularioModalOpen = $state(false);
+	let formularioPrograma = $state('');
+	let subiendoFormulario = $state<Record<string, boolean>>({});
+	let formularioInputEls = $state<Record<string, HTMLInputElement | null>>({});
+
+	function abrirFormularioModal(programa: string) {
+		formularioPrograma = programa;
+		formularioModalOpen = true;
+	}
+
+	function triggerFormularioUpload(enrollmentId: string) {
+		formularioInputEls[enrollmentId]?.click();
+	}
+
+	async function handleFormularioUpload(event: Event, enrollmentId: string) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		subiendoFormulario[enrollmentId] = true;
+		try {
+			const actualizado = await enrollmentService.uploadFormularioInscripcion(enrollmentId, file);
+			misEnrollments = misEnrollments.map((e) => (e._id === enrollmentId ? { ...e, ...actualizado } : e));
+			alert('success', 'Formulario de inscripción subido correctamente.');
+		} catch (e: any) {
+			console.error(e);
+			alert('error', e?.message || 'No se pudo subir el formulario.');
+		} finally {
+			subiendoFormulario[enrollmentId] = false;
+			if (input) input.value = '';
+		}
+	}
 
 	async function cargarDocumentosEstudiante(studentId: string) {
 		try {
@@ -778,6 +812,70 @@
 						</Card>
 					{/each}
 
+					<!-- Formulario de Inscripción oficial (por programa) -->
+					{#each misEnrollments as enr (enr._id + '-form')}
+						<Card>
+							{#snippet header()}
+								<Heading level="h4" class="text-lg font-semibold">
+									Formulario de Inscripción — {coursesMapProfile[enr.curso_id] || 'Curso'}
+								</Heading>
+							{/snippet}
+
+							<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+								Descarga el formulario oficial, llénalo y súbelo. También puedes llenarlo en línea y
+								guardarlo como PDF. Formatos para subir: PDF o imagen.
+							</p>
+
+							<div class="flex flex-wrap items-center gap-2 mb-3">
+								{#if enr.formulario_inscripcion_url}
+									<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-success/15 text-light-success dark:bg-dark-success/20 dark:text-dark-success">Cargado</span>
+									<a href={enr.formulario_inscripcion_url} target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-light-secondary dark:text-dark-secondary hover:underline">Ver documento</a>
+								{:else}
+									<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Sin subir</span>
+								{/if}
+							</div>
+
+							<div class="flex flex-wrap gap-2">
+								<a
+									href="/formularios/formulario-inscripcion.docx"
+									download
+									class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-light-secondary dark:text-dark-secondary border border-light-secondary/40 dark:border-dark-secondary/40 hover:bg-light-primary dark:hover:bg-dark-surface rounded-lg transition-colors"
+								>
+									<DownloadIcon class="h-4 w-4" />
+									<span>Descargar plantilla</span>
+								</a>
+								<button
+									type="button"
+									onclick={() => abrirFormularioModal(coursesMapProfile[enr.curso_id] || '')}
+									class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-light-secondary dark:text-dark-secondary border border-light-secondary/40 dark:border-dark-secondary/40 hover:bg-light-primary dark:hover:bg-dark-surface rounded-lg transition-colors"
+								>
+									<PencilIcon class="h-4 w-4" />
+									<span>Llenar en línea</span>
+								</button>
+								<input
+									bind:this={formularioInputEls[enr._id]}
+									type="file"
+									accept="application/pdf,image/*"
+									class="hidden"
+									onchange={(e) => handleFormularioUpload(e, enr._id)}
+								/>
+								<button
+									type="button"
+									onclick={() => triggerFormularioUpload(enr._id)}
+									disabled={subiendoFormulario[enr._id]}
+									class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-light-secondary dark:bg-dark-secondary hover:bg-light-secondary_d dark:hover:bg-dark-secondary_d rounded-lg transition-colors disabled:opacity-50"
+								>
+									{#if subiendoFormulario[enr._id]}
+										<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+									{:else}
+										<DocumentAddIcon class="h-4 w-4" />
+									{/if}
+									<span>{enr.formulario_inscripcion_url ? 'Reemplazar' : 'Subir formulario'}</span>
+								</button>
+							</div>
+						</Card>
+					{/each}
+
 					<!-- Información Académica -->
 					{#if profileData.titulo}
 						<Card>
@@ -902,6 +1000,14 @@
 			</div>
 		</div>
 	</Modal>
+
+	<!-- Modal editable del Formulario de Inscripción -->
+	<FormularioInscripcionModal
+		isOpen={formularioModalOpen}
+		programa={formularioPrograma}
+		student={profileData}
+		onClose={() => (formularioModalOpen = false)}
+	/>
 {:else}
 <div>
 	data de admin profile proceso
