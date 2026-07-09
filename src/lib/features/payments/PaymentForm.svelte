@@ -258,8 +258,32 @@
 		}
 
 		if (requiereBancoYVoucher) {
-			if (!transactionNumber || !file || !banco || !remitente || !cuentaDestino || !fechaComprobante) {
-				alert('error', 'Debe adjuntar el voucher, el banco y el número de transacción para pagos digitales.');
+			// Validación por campo con mensajes específicos: antes un único mensaje
+			// culpaba al voucher aunque el voucher SÍ estuviera cargado y el campo
+			// realmente faltante fuera otro (típicamente la cuenta destino, que queda
+			// vacía si nadie configuró la cuenta institucional en /app/payment-config).
+			if (!file) {
+				alert('error', 'Debes adjuntar el comprobante (voucher) del pago.');
+				return;
+			}
+			if (!banco) {
+				alert('error', 'Selecciona el banco o cooperativa de origen.');
+				return;
+			}
+			if (!remitente) {
+				alert('error', 'Ingresa el nombre del remitente del pago.');
+				return;
+			}
+			if (!fechaComprobante) {
+				alert('error', 'Ingresa la fecha del voucher.');
+				return;
+			}
+			if (!transactionNumber) {
+				alert('error', 'Ingresa el número de transacción o referencia del voucher.');
+				return;
+			}
+			if (!cuentaDestino) {
+				alert('error', 'La cuenta institucional de destino no está configurada. Contacta a administración.');
 				return;
 			}
 			const regexSoloNumeros = /^[0-9]+$/;
