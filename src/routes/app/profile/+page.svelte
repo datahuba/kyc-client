@@ -8,7 +8,7 @@
 	import { alert } from '$lib/utils';
 	import { UserIcon, MailIcon, MapPinIcon, PhoneIcon, IdentificationIcon, AcademicCapIcon, PencilIcon, CheckIcon, XMarkIcon, DocumentAddIcon } from '$lib/icons/outline';
 	import { BriefcaseIcon } from '$lib/icons/solid';
-	import { FileUpload, Modal, Button } from '$lib/components/ui';
+	import { FileUpload, Modal, Button, Select } from '$lib/components/ui';
 	import DocumentRow from '$lib/components/ui/documentRow.svelte';
 	import type { Student, UpdateStudentSelfRequest, TituloData } from '$lib/interfaces/student.interface';
 	import { authService } from '$lib/services';
@@ -147,6 +147,26 @@
 		domicilio: ''
 	});
 
+	// Snapshot editable del perfil actual (incluye datos oficiales UAGRM que el
+	// estudiante ahora puede completar/editar él mismo — reunión 2026-07-09).
+	function buildEditData(): UpdateStudentSelfRequest {
+		return {
+			celular: profileData?.celular || '',
+			domicilio: profileData?.domicilio || '',
+			telefono: profileData?.telefono || '',
+			sexo: profileData?.sexo || '',
+			estado_civil: profileData?.estado_civil || '',
+			tipo_sangre: profileData?.tipo_sangre || '',
+			pais: profileData?.pais || '',
+			departamento: profileData?.departamento || '',
+			provincia: profileData?.provincia || '',
+			nacionalidad: profileData?.nacionalidad || '',
+			modalidad_ingreso: profileData?.modalidad_ingreso || '',
+			periodo: profileData?.periodo || '',
+			titulo_bachiller: profileData?.titulo_bachiller || ''
+		};
+	}
+
 	$effect(() => {
 		if ($userStore.isAuthenticated && $userStore.user?._id && !profileData && !loading) {
 			loadProfile();
@@ -184,10 +204,7 @@
 			if (role === 'student') {
 				profileData = await studentService.getById(id);
 				// Inicializar datos editables
-				editData = {
-					celular: profileData.celular || '',
-					domicilio: profileData.domicilio || ''
-				};
+				editData = buildEditData();
 				// ISSUE-Q-DOCUMENTOS-KYC: cargar sus inscripciones para mostrar documentos requeridos
 				await cargarDocumentosEstudiante(id);
 			} else {
@@ -218,18 +235,23 @@
 
 	function startEdit() {
 		editMode = true;
-		editData = {
-			celular: profileData.celular || '',
-			domicilio: profileData.domicilio || ''
-		};
+		editData = buildEditData();
 	}
 
 	function cancelEdit() {
 		editMode = false;
-		editData = {
-			celular: profileData.celular || '',
-			domicilio: profileData.domicilio || ''
-		};
+		editData = buildEditData();
+	}
+
+	// Edición independiente de los Datos Oficiales UAGRM por el propio estudiante.
+	let editOficial = $state(false);
+	function startEditOficial() {
+		editOficial = true;
+		editData = buildEditData();
+	}
+	function cancelEditOficial() {
+		editOficial = false;
+		editData = buildEditData();
 	}
 
 	async function saveChanges() {
@@ -240,6 +262,7 @@
 			const updated = await studentService.updateSelf(editData);
 			profileData = updated;
 			editMode = false;
+			editOficial = false;
 			alert('success', 'Datos actualizados correctamente');
 		} catch (e: any) {
 			console.error(e);
@@ -512,22 +535,94 @@
 					<!-- Datos Oficiales UAGRM -->
 					<Card>
 						{#snippet header()}
-							<Heading level="h4" class="text-lg font-semibold">Datos Oficiales (UAGRM)</Heading>
+							<div class="flex items-center justify-between w-full">
+								<Heading level="h4" class="text-lg font-semibold">Datos Oficiales (UAGRM)</Heading>
+								{#if !editOficial}
+									<button
+										onclick={startEditOficial}
+										class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-light-secondary dark:text-dark-secondary hover:bg-light-primary dark:hover:bg-dark-surface rounded-lg transition-colors"
+									>
+										<PencilIcon class="h-4 w-4" />
+										<span>Editar</span>
+									</button>
+								{/if}
+							</div>
 						{/snippet}
 
-						<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-							<Input label="Sexo" value={profileData.sexo || '—'} disabled />
-							<Input label="Estado Civil" value={profileData.estado_civil || '—'} disabled />
-							<Input label="Tipo de Sangre" value={profileData.tipo_sangre || '—'} disabled />
-							<Input label="Teléfono" value={profileData.telefono || '—'} disabled icon={PhoneIcon} />
-							<Input label="Nacionalidad" value={profileData.nacionalidad || '—'} disabled />
-							<Input label="País" value={profileData.pais || '—'} disabled />
-							<Input label="Departamento" value={profileData.departamento || '—'} disabled />
-							<Input label="Provincia" value={profileData.provincia || '—'} disabled />
-							<Input label="Modalidad de Ingreso" value={profileData.modalidad_ingreso || '—'} disabled />
-							<Input label="Periodo" value={profileData.periodo || '—'} disabled />
-							<Input label="Título de Bachiller" value={profileData.titulo_bachiller || '—'} disabled />
-						</div>
+						{#if editOficial}
+							<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+								Completa tus datos oficiales. Esta información será revisada por la unidad de postgrado.
+							</p>
+							<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+								<Select label="Sexo" bind:value={editData.sexo}>
+									<option value="">— Seleccione —</option>
+									<option value="masculino">Masculino</option>
+									<option value="femenino">Femenino</option>
+								</Select>
+								<Select label="Estado Civil" bind:value={editData.estado_civil}>
+									<option value="">— Seleccione —</option>
+									<option value="soltero">Soltero(a)</option>
+									<option value="casado">Casado(a)</option>
+									<option value="divorciado">Divorciado(a)</option>
+									<option value="viudo">Viudo(a)</option>
+									<option value="otro">Otro</option>
+								</Select>
+								<Select label="Tipo de Sangre" bind:value={editData.tipo_sangre}>
+									<option value="">— Seleccione —</option>
+									<option value="A+">A+</option>
+									<option value="A-">A-</option>
+									<option value="B+">B+</option>
+									<option value="B-">B-</option>
+									<option value="AB+">AB+</option>
+									<option value="AB-">AB-</option>
+									<option value="O+">O+</option>
+									<option value="O-">O-</option>
+								</Select>
+								<Input label="Teléfono" bind:value={editData.telefono} icon={PhoneIcon} inputmode="numeric" pattern="[0-9]*" placeholder="Solo números" />
+								<Input label="Nacionalidad" bind:value={editData.nacionalidad} />
+								<Input label="País" bind:value={editData.pais} />
+								<Input label="Departamento" bind:value={editData.departamento} />
+								<Input label="Provincia" bind:value={editData.provincia} />
+								<Input label="Modalidad de Ingreso" bind:value={editData.modalidad_ingreso} />
+								<Input label="Periodo" bind:value={editData.periodo} />
+								<Input label="Título de Bachiller" bind:value={editData.titulo_bachiller} />
+							</div>
+							<div class="flex items-center justify-end gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-dark-border">
+								<button
+									onclick={cancelEditOficial}
+									class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-surface rounded-lg transition-colors"
+									disabled={loading}
+								>
+									Cancelar
+								</button>
+								<button
+									onclick={saveChanges}
+									class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-light-secondary dark:bg-dark-secondary hover:bg-light-secondary_d dark:hover:bg-dark-secondary_d rounded-lg transition-colors disabled:opacity-50"
+									disabled={loading}
+								>
+									{#if loading}
+										<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+									{:else}
+										<CheckIcon class="h-4 w-4" />
+									{/if}
+									<span>Guardar Cambios</span>
+								</button>
+							</div>
+						{:else}
+							<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+								<Input label="Sexo" value={profileData.sexo || '—'} disabled />
+								<Input label="Estado Civil" value={profileData.estado_civil || '—'} disabled />
+								<Input label="Tipo de Sangre" value={profileData.tipo_sangre || '—'} disabled />
+								<Input label="Teléfono" value={profileData.telefono || '—'} disabled icon={PhoneIcon} />
+								<Input label="Nacionalidad" value={profileData.nacionalidad || '—'} disabled />
+								<Input label="País" value={profileData.pais || '—'} disabled />
+								<Input label="Departamento" value={profileData.departamento || '—'} disabled />
+								<Input label="Provincia" value={profileData.provincia || '—'} disabled />
+								<Input label="Modalidad de Ingreso" value={profileData.modalidad_ingreso || '—'} disabled />
+								<Input label="Periodo" value={profileData.periodo || '—'} disabled />
+								<Input label="Título de Bachiller" value={profileData.titulo_bachiller || '—'} disabled />
+							</div>
+						{/if}
 					</Card>
 
 					<!-- ISSUE-Q-DOCUMENTOS-GENERAL (2026-07-09): documentos generales del
@@ -543,7 +638,7 @@
 						</p>
 
 						<div class="space-y-3">
-							{#each [{ tipo: 'cv', label: 'Curriculum Vitae (CV)', url: profileData.cv_url }, { tipo: 'ci', label: 'Carnet de Identidad', url: profileData.ci_url }, { tipo: 'afiliacion', label: 'Certificado de Afiliación', url: profileData.afiliacion_url }] as doc}
+							{#each [{ tipo: 'cv', label: 'Curriculum Vitae (CV)', url: profileData.cv_url }, { tipo: 'ci', label: 'Carnet de Identidad', url: profileData.ci_url }, { tipo: 'afiliacion', label: 'Certificado de Afiliación (Colegio o convenios)', url: profileData.afiliacion_url }] as doc}
 								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-dark-border pb-3 last:border-b-0 last:pb-0">
 									<div class="min-w-0">
 										<p class="text-sm font-medium text-gray-900 dark:text-white">{doc.label}</p>

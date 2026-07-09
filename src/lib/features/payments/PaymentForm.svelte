@@ -53,17 +53,35 @@
 	let lastAutoFilledId = $state('');
 
 	const metodosDisponibles = ['Transferencia', 'Depósito', 'Caja'];
+	// Reunión postgrado 2026-07-09: separar Bancos y Cooperativas (mucha gente
+	// paga por cooperativa). Se quitaron las billeteras móviles (Yape/Yolo/Altoke)
+	// porque, según se aclaró, un pago por banca móvil se registra igual como
+	// transferencia/depósito bancario, no como una categoría aparte.
 	const bancosDisponibles = [
 		'Banco Unión',
-		'BNB',
-		'Mercantil Santa Cruz',
-		'Banco Bisa',
+		'Banco Nacional de Bolivia (BNB)',
+		'Banco Mercantil Santa Cruz',
+		'Banco BISA',
 		'Banco Ganadero',
 		'Banco Económico',
-		'Yape',
-		'Altoke',
-		'Yolo',
-		'Otro'
+		'Banco de Crédito de Bolivia (BCP)',
+		'Banco FIE',
+		'Banco Sol',
+		'Banco Fortaleza',
+		'Banco Prodem',
+		'Banco PYME Ecofuturo'
+	];
+	const cooperativasDisponibles = [
+		'Cooperativa Jesús Nazareno',
+		'Cooperativa Fátima',
+		'Cooperativa La Merced',
+		'Cooperativa San Martín de Porres',
+		'Cooperativa Catedral',
+		'Cooperativa San Antonio',
+		'Cooperativa Comarapa',
+		'Cooperativa El Chorolque',
+		'Cooperativa Magisterio Rural',
+		'Cooperativa Progreso'
 	];
 
 
@@ -74,6 +92,47 @@
 	);
 
 	let requiereBancoYVoucher = $derived(metodoPago !== 'Caja');
+
+	// Selector de cuotas a pagar (reunión postgrado 2026-07-09): el estudiante
+	// elige CUÁNTO pagar (1 cuota, 2 cuotas, ..., o pago completo) y el monto se
+	// autocompleta, pero sigue siendo editable -- el backend prorratea en cascada
+	// igual. Reemplaza la sugerencia fija de "una cuota" anterior.
+	let opcionCuota = $state('');
+
+	let selectedEnrollment = $derived(
+		selectedEnrollmentId ? enrollments.find((e) => e._id === selectedEnrollmentId) : undefined
+	);
+
+	// Módulos aún NO pagados (Pendiente/Parcial), en orden, con su saldo restante.
+	let modulosPendientes = $derived.by(() => {
+		const enr = selectedEnrollment;
+		if (!enr || !Array.isArray(enr.modulos)) return [] as { nombre: string; restante: number }[];
+		return enr.modulos
+			.filter((m: any) => m.estado !== 'Pagado')
+			.map((m: any) => ({
+				nombre: m.nombre || 'Módulo',
+				restante: Math.max(0, Math.round(((m.costo || 0) - (m.monto_pagado || 0)) * 100) / 100)
+			}))
+			.filter((m: { restante: number }) => m.restante > 0);
+	});
+
+	function montoParaOpcion(op: string): number | null {
+		const enr = selectedEnrollment;
+		if (!enr) return null;
+		if (op === 'completo') return enr.saldo_pendiente;
+		const n = parseInt(op, 10);
+		if (!isNaN(n)) {
+			let sum = 0;
+			for (let i = 0; i < n && i < modulosPendientes.length; i++) sum += modulosPendientes[i].restante;
+			return Math.round(sum * 100) / 100;
+		}
+		return null;
+	}
+
+	function aplicarOpcionCuota() {
+		const m = montoParaOpcion(opcionCuota);
+		if (m !== null) montoComprobante = m;
+	}
 
 	onMount(async () => {
 		// BUG CORREGIDO: antes se usaba Promise.all() para las 3 cargas. Si la
@@ -137,6 +196,7 @@
 		if (!selectedEnrollmentId) {
 			montoComprobante = null;
 			concepto = '';
+			opcionCuota = '';
 			lastAutoFilledId = '';
 			return;
 		}
@@ -160,9 +220,14 @@
 			concepto = 'Módulo';
 			// Solo auto-sugiere si el usuario recién seleccionó este curso
 			if (lastAutoFilledId !== selectedEnrollmentId) {
-				const total = course.costo_total_interno;
-				const cuotas = course.cantidad_cuotas || 1;
-				montoComprobante = Math.round((total / cuotas) * 100) / 100;
+				// Por defecto sugiere 1 cuota (el próximo módulo pendiente); si no
+				// quedan módulos pendientes, sugiere el pago completo del saldo.
+				opcionCuota = modulosPendientes.length > 0 ? '1' : 'completo';
+				const m = montoParaOpcion(opcionCuota);
+				montoComprobante =
+					m !== null
+						? m
+						: Math.round((course.costo_total_interno / (course.cantidad_cuotas || 1)) * 100) / 100;
 				lastAutoFilledId = selectedEnrollmentId;
 			}
 		}
@@ -306,6 +371,23 @@
 			</div>
 		</div>
 
+		{#if selectedEnrollmentId && isMatriculaPagada && modulosPendientes.length > 0}
+			<div class="rounded-lg border border-primary-200 bg-primary-50/50 p-3 dark:border-primary-800 dark:bg-primary-900/10">
+				<Select label="¿Cuántas cuotas deseas pagar?" id="opcionCuota" bind:value={opcionCuota} onchange={aplicarOpcionCuota}>
+					{#each modulosPendientes as _m, i}
+						<option value={String(i + 1)}>
+							{i + 1 === 1 ? '1 cuota' : `${i + 1} cuotas`} — Bs {(montoParaOpcion(String(i + 1)) ?? 0).toFixed(2)}
+						</option>
+					{/each}
+					<option value="completo">Pago completo (todo el saldo) — Bs {(selectedEnrollment?.saldo_pendiente ?? 0).toFixed(2)}</option>
+				</Select>
+				<p class="mt-1.5 text-xs text-uagrm-sky">
+					Elige cuántas cuotas quieres cubrir; el monto se completa solo. Puedes ajustarlo abajo si
+					pagaste una cantidad distinta — el sistema distribuye el pago en cascada.
+				</p>
+			</div>
+		{/if}
+
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 			{#if requiereBancoYVoucher}
 				<Input
@@ -316,11 +398,21 @@
 					placeholder="Como figura en el voucher"
 				/>
 
-				<Select label="Banco Origen" id="banco" bind:value={banco} required={requiereBancoYVoucher}>
-					<option value="">Seleccione Banco</option>
-					{#each bancosDisponibles as b}
-						<option value={b}>{b}</option>
-					{/each}
+				<Select label="Banco / Cooperativa Origen" id="banco" bind:value={banco} required={requiereBancoYVoucher}>
+					<option value="">Seleccione entidad</option>
+					<optgroup label="Bancos">
+						{#each bancosDisponibles as b}
+							<option value={b}>{b}</option>
+						{/each}
+					</optgroup>
+					<optgroup label="Cooperativas">
+						{#each cooperativasDisponibles as c}
+							<option value={c}>{c}</option>
+						{/each}
+					</optgroup>
+					<optgroup label="Otro">
+						<option value="Otro">Otro (especificar en remitente)</option>
+					</optgroup>
 				</Select>
 			{/if}
 

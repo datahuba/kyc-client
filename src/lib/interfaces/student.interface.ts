@@ -116,4 +116,17 @@ export interface VerifyTituloData {
 export interface UpdateStudentSelfRequest {
 	celular?: string;
 	domicilio?: string;
+	// Datos oficiales UAGRM que el estudiante puede completar/editar por sí mismo
+	// (reunión postgrado 2026-07-09), para aliviar la carga de CPD.
+	telefono?: string;
+	sexo?: string;
+	estado_civil?: string;
+	tipo_sangre?: string;
+	pais?: string;
+	departamento?: string;
+	provincia?: string;
+	nacionalidad?: string;
+	modalidad_ingreso?: string;
+	periodo?: string;
+	titulo_bachiller?: string;
 }
