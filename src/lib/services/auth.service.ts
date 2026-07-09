@@ -26,7 +26,7 @@ class AuthService {
 	}
 
 	// ISSUE-A-VERIFICACION: el usuario logueado pide un nuevo correo de verificación
-	async resendVerification(): Promise<{ message: string }> {
+	async resendVerification(): Promise<{ message: string; enviado?: boolean }> {
 		return await apiKyC.post<{ message: string }>('/auth/resend-verification', {});
 	}
 }

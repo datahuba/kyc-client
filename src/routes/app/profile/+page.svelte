@@ -143,7 +143,7 @@
 		resendingVerification = true;
 		try {
 			const res = await authService.resendVerification();
-			alert('success', res.message);
+			alert(res.enviado === false ? 'warning' : 'success', res.message);
 		} catch (e: any) {
 			alert('error', e?.message || 'No se pudo enviar el correo de verificación');
 		} finally {
