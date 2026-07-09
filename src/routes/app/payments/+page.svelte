@@ -878,8 +878,32 @@
 					{/if}
 				</div>
 
-				<div class="flex justify-end">
+				<!-- ISSUE-Q-MODAL-PAGO-ACCIONES: botones de Aprobar/Rechazar directamente
+				     en el modal de detalles/comprobante, para no tener que cerrarlo y
+				     buscarlos en el menú de tres puntos de la tabla. Reutiliza
+				     canApproveReject/handleApproveClick/handleRejectClick tal cual
+				     (mismo criterio de autorización por rol y concepto de pago). -->
+				<div class="flex justify-end gap-3">
 					<Button variant="secondary" onclick={() => selectedPayment = null}>Cerrar</Button>
+					{#if canApproveReject(selectedPayment)}
+						<Button
+							variant="destructive"
+							onclick={() => { const p = selectedPayment; selectedPayment = null; if (p) handleRejectClick(p); }}
+						>
+							{#snippet leftIcon()}
+								<XIcon class="size-5" />
+							{/snippet}
+							Rechazar
+						</Button>
+						<Button
+							onclick={() => { const p = selectedPayment; selectedPayment = null; if (p) handleApproveClick(p); }}
+						>
+							{#snippet leftIcon()}
+								<CheckIcon class="size-5" />
+							{/snippet}
+							Aprobar
+						</Button>
+					{/if}
 				</div>
 			</div>
 		{/if}
