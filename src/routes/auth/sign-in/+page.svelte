@@ -136,7 +136,7 @@
 						for="username"
 						class="mb-2 block text-sm font-semibold text-light-black dark:text-dark-white"
 					>
-						Usuario o Email
+						Usuario, Correo, Registro o Carnet
 					</label>
 					<div class="relative">
 						<UserIcon
@@ -148,7 +148,7 @@
 							bind:value={username}
 							onkeypress={handleKeyPress}
 							class="w-full rounded-xl border-2 border-light-four bg-light-primary py-3.5 pr-4 pl-12 text-light-black transition-all outline-none placeholder:text-light-four/50 hover:border-light-four focus:border-light-tertiary dark:border-dark-four dark:bg-dark-primary dark:text-dark-white dark:placeholder:text-dark-four dark:hover:border-dark-four dark:focus:border-dark-tertiary dark:focus:ring-dark-tertiary"
-							placeholder="usuario@ejemplo.com"
+							placeholder="Correo, registro o carnet"
 							disabled={isLoading}
 						/>
 					</div>
