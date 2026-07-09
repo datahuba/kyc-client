@@ -1055,7 +1055,7 @@
 								</div>
 								<div class="flex items-center gap-2 shrink-0">
 									<!-- El estudiante sube/reemplaza su propio documento (salvo si ya está aprobado) -->
-									{#if currentRole === 'student' && req.estado !== 'aprobado'}
+									{#if (currentRole === 'student' || canManageRequisitos) && req.estado !== 'aprobado'}
 										<input
 											bind:this={requisitoInputEls[reqIndex]}
 											type="file"

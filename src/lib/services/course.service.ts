@@ -51,6 +51,14 @@ class CourseService {
 	async getModulesByTeacher(teacherId: string): Promise<any[]> {
 		return await apiKyC.get<any[]>(`/courses/modules/by-teacher/${teacherId}`);
 	}
+
+	// Comunicado por correo a todos los estudiantes del programa (Encargado/CPD)
+	async enviarComunicado(
+		courseId: string,
+		data: { asunto: string; mensaje: string }
+	): Promise<{ success: boolean; total_estudiantes: number; correos_enviados: number; detail: string }> {
+		return await apiKyC.post(`/courses/${courseId}/comunicado`, data);
+	}
 }
 
 export const courseService = new CourseService();

@@ -9,6 +9,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
+	import ComunicadoModal from '$lib/features/courses/ComunicadoModal.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
 	import { alert } from '$lib/utils';
@@ -56,6 +57,20 @@
 	let canCreateCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canEditCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canDeleteCourse = $derived(currentRole === 'superadmin');
+	// Comunicados: Encargado de Programa / Coordinador / CPD / Admin / Superadmin.
+	// (El Encargado solo a sus programas: lo valida el backend con 403.)
+	let canSendComunicado = $derived(
+		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole)
+	);
+	let comunicadoOpen = $state(false);
+	let comunicadoCourseId = $state('');
+	let comunicadoPrograma = $state('');
+	function openComunicado(course: Course) {
+		comunicadoCourseId = course._id;
+		comunicadoPrograma = course.nombre_programa;
+		comunicadoOpen = true;
+		openDropdownId = null;
+	}
 
 	onMount(() => {
 		loadCourses();
@@ -193,6 +208,15 @@
 				id: 'edit',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>`,
 				action: () => handleEdit(course)
+			});
+		}
+
+		if (canSendComunicado) {
+			options.push({
+				label: 'Enviar Comunicado',
+				id: 'comunicado',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>`,
+				action: () => openComunicado(course)
 			});
 		}
 
@@ -492,6 +516,14 @@
 			courseToDelete = null;
 		}}
 		loading={deleteLoading}
+	/>
+
+	<!-- Comunicado por programa (Encargado/Coordinador/CPD/Admin/Superadmin) -->
+	<ComunicadoModal
+		isOpen={comunicadoOpen}
+		courseId={comunicadoCourseId}
+		programa={comunicadoPrograma}
+		onClose={() => (comunicadoOpen = false)}
 	/>
 
 	<!-- Course Students Modal -->
