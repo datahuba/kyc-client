@@ -53,6 +53,13 @@
 	// ISSUE P: Kardex Académico State
 	let isKardexOpen: boolean = $state(false);
 	let selectedKardex: Enrollment | null = $state(null);
+	// ISSUE-P-COBRANZA-LIBRETA: saldo a favor = excedente pagado sobre el total del
+	// programa. Se calcula en cliente (cero cambios de backend) a partir de campos
+	// ya expuestos; visible en el kardex para todos los roles (Cobranza incluida).
+	function calcSaldoAFavor(e: Enrollment | null): number {
+		if (!e) return 0;
+		return Math.max(0, Math.round(((e.total_pagado || 0) - (e.total_a_pagar || 0)) * 100) / 100);
+	}
 
 	// ISSUE-P-BECA-RESPALDO
 	let becaRespaldoUploading: boolean = $state(false);
@@ -1189,6 +1196,31 @@
 							{/if}
 						</tbody>
 					</table>
+				</div>
+
+				<!-- Resumen Financiero de la inscripción (visible para todos los roles).
+				     El SALDO A FAVOR se calcula en el cliente como max(0, total_pagado -
+				     total_a_pagar): refleja un excedente real de pago (ISSUE-P-COBRANZA-LIBRETA,
+				     pedido de Cobranza para ver sobrepagos que hoy solo veía el estudiante). -->
+				<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+					<div class="bg-white dark:bg-dark-surface p-3 rounded-xl border border-gray-200 dark:border-dark-border">
+						<p class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">Total del Programa</p>
+						<p class="text-base font-black text-slate-900 dark:text-white mt-0.5">{formatCurrency(selectedKardex.total_a_pagar || 0)}</p>
+					</div>
+					<div class="bg-white dark:bg-dark-surface p-3 rounded-xl border border-gray-200 dark:border-dark-border">
+						<p class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">Total Pagado</p>
+						<p class="text-base font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{formatCurrency(selectedKardex.total_pagado || 0)}</p>
+					</div>
+					<div class="bg-white dark:bg-dark-surface p-3 rounded-xl border border-gray-200 dark:border-dark-border">
+						<p class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">Saldo Pendiente</p>
+						<p class="text-base font-black text-orange-600 dark:text-orange-400 mt-0.5">{formatCurrency(selectedKardex.saldo_pendiente || 0)}</p>
+					</div>
+					<div class={`p-3 rounded-xl border ${calcSaldoAFavor(selectedKardex) > 0 ? 'bg-uagrm-blue/5 border-uagrm-blue/30 dark:bg-uagrm-blue/10' : 'bg-white dark:bg-dark-surface border-gray-200 dark:border-dark-border'}`}>
+						<p class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">Saldo a Favor</p>
+						<p class={`text-base font-black mt-0.5 ${calcSaldoAFavor(selectedKardex) > 0 ? 'text-uagrm-blue dark:text-blue-300' : 'text-slate-400'}`} title="Excedente pagado por encima del total del programa">
+							{formatCurrency(calcSaldoAFavor(selectedKardex))}
+						</p>
+					</div>
 				</div>
 
 				<div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
