@@ -166,7 +166,7 @@
 		
 		try {
 			await courseService.delete(idToDelete);
-			alert('success', 'Curso eliminado correctamente');
+			alert('success', 'Programa eliminado correctamente');
 			courses = courses.filter(c => c._id !== idToDelete);
 			showDeleteModal = false;
 		} catch (e: any) {
@@ -282,15 +282,15 @@
 
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-		<Heading level="h1">Cursos</Heading>
+		<Heading level="h1">Programas</Heading>
 		
-		<!-- ISSUE N: Ocultar botón Nuevo Curso si no tiene permisos -->
+		<!-- ISSUE N: Ocultar botón Nuevo Programa si no tiene permisos -->
 		{#if canCreateCourse}
 			<Button onclick={handleCreate}>
 				{#snippet leftIcon()}
 					<PlusIcon class="size-5" />
 				{/snippet}
-				Nuevo Curso
+				Nuevo Programa
 			</Button>
 		{/if}
 	</div>
@@ -366,7 +366,7 @@
 		<TableSkeleton columns={6} rows={10} />
 	{:else if courses.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-			<p class="text-gray-500 dark:text-gray-400">No hay cursos registrados.</p>
+			<p class="text-gray-500 dark:text-gray-400">No hay programas registrados.</p>
 		</div>
 	{:else}
 		<!-- Desktop Table -->
@@ -496,7 +496,7 @@
 	<!-- Create/Edit Modal -->
 	<Modal
 		isOpen={isFormOpen}
-		title={selectedCourse ? 'Editar Curso' : 'Nuevo Curso'}
+		title={selectedCourse ? 'Editar Programa' : 'Nuevo Programa'}
 		onClose={() => isFormOpen = false}
 		maxWidth="sm:max-w-4xl"
 	>
@@ -509,7 +509,7 @@
 
 	<ModalConfirm
 		isOpen={showDeleteModal}
-		message={`¿Estás seguro de que deseas eliminar el curso ${courseToDelete?.nombre_programa || ''}? Esta acción no se puede deshacer.`}
+		message={`¿Estás seguro de que deseas eliminar el programa ${courseToDelete?.nombre_programa || ''}? Esta acción no se puede deshacer.`}
 		onConfirm={handleDelete}
 		onCancel={() => {
 			showDeleteModal = false;
