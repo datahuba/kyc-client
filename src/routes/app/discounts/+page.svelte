@@ -61,11 +61,21 @@
 	async function loadDiscounts() {
 		loading = true;
 		try {
-			// Populate students list if needed (for form)
-			// Assuming we still need it for assigning students to discounts
+			// Cargar TODOS los estudiantes (paginado en bucle) para el
+			// selector de beneficiarios del DiscountForm -- con solo
+			// per_page=100 (máximo permitido por el backend) se truncaba
+			// silenciosamente si había más de 100 estudiantes.
 			if (studentsList.length === 0) {
-				const studentsRes = await studentService.getAll(1, 100);
-				studentsList = studentsRes.data;
+				let allStudents: Student[] = [];
+				let studentsPage = 1;
+				let hasNext = true;
+				while (hasNext) {
+					const studentsRes = await studentService.getAll(studentsPage, 100);
+					allStudents = [...allStudents, ...studentsRes.data];
+					hasNext = studentsRes.meta.hasNextPage;
+					studentsPage++;
+				}
+				studentsList = allStudents;
 			}
 			
 			const result = await discountService.getAll(page, limit);

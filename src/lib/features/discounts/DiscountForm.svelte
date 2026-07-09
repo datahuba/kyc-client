@@ -4,6 +4,7 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import FileUpload from '$lib/components/ui/fileUpload.svelte';
+	import Checkbox from '$lib/components/ui/checkbox.svelte';
 	import { alert } from '$lib/utils';
 	import { CheckIcon } from '$lib/icons/outline';
 
@@ -33,6 +34,32 @@
 		activo: true,
 		nota_minima_requerida: null
 	});
+
+	// BUG (2026-07-09, reportado por el usuario: "no pude seleccionar los
+	// estudiantes para asignar becas cuando se cargan masivamente"): la prop
+	// `students` se recibía pero nunca se usaba en el template -- no había
+	// ningún selector visible. Se agrega multi-select con checkboxes (mismo
+	// patrón de UserForm.svelte para cursos_asignados), con buscador porque
+	// la lista de estudiantes puede tener decenas/cientos de registros.
+	let studentSearch = $state('');
+	let filteredStudents = $derived(
+		studentSearch.trim()
+			? students.filter((s) =>
+					(s.nombre ?? '').toLowerCase().includes(studentSearch.trim().toLowerCase()) ||
+					(s.carnet ?? '').includes(studentSearch.trim()) ||
+					(s.registro ?? '').toLowerCase().includes(studentSearch.trim().toLowerCase())
+				)
+			: students
+	);
+
+	function toggleStudent(studentId: string) {
+		const actuales = formData.lista_estudiantes ?? [];
+		if (actuales.includes(studentId)) {
+			formData.lista_estudiantes = actuales.filter((id) => id !== studentId);
+		} else {
+			formData.lista_estudiantes = [...actuales, studentId];
+		}
+	}
 
 	// BUG 9 FIX: Validación reactiva y visual estricta
 	let isNameValid = $derived(formData.nombre && formData.nombre.trim().length > 1);
@@ -84,6 +111,23 @@
 				savedDiscount = await discountService.update(discount._id, formData);
 			} else {
 				savedDiscount = await discountService.create(formData);
+			}
+
+			// BUG (2026-07-09): DiscountCreate/DiscountUpdate no aceptan
+			// lista_estudiantes en el payload principal (por diseño, para
+			// forzar el uso de los endpoints dedicados add/removeStudent que
+			// ya existían en el backend pero nunca se llamaban desde ninguna
+			// UI). Se sincroniza aquí comparando contra la lista original.
+			const originales = new Set(discount?.lista_estudiantes ?? []);
+			const seleccionados = new Set(formData.lista_estudiantes ?? []);
+			const aAgregar = [...seleccionados].filter((id) => !originales.has(id));
+			const aQuitar = [...originales].filter((id) => !seleccionados.has(id));
+
+			for (const studentId of aAgregar) {
+				await discountService.addStudent(savedDiscount._id, studentId);
+			}
+			for (const studentId of aQuitar) {
+				await discountService.removeStudent(savedDiscount._id, studentId);
 			}
 
 			// ISSUE-P-DESCUENTO-RESOLUCION: subir el respaldo si se seleccionó
@@ -167,6 +211,36 @@
 			Si se define, el estudiante debe mantener esta nota en cada módulo. Si reprueba el
 			mínimo en un módulo específico, ese módulo (solo ese) pierde el descuento automáticamente.
 		</p>
+	</div>
+
+	<!-- BUG (2026-07-09): selector real de estudiantes beneficiarios, antes ausente del formulario -->
+	<div class="space-y-1">
+		<p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+			Estudiantes Beneficiarios ({(formData.lista_estudiantes ?? []).length} seleccionados)
+		</p>
+		<p class="text-xs text-gray-500 dark:text-gray-400">
+			Marca los estudiantes que tendrán esta beca. También puedes asignarla individualmente desde
+			la inscripción de cada estudiante (Editar Inscripción → Descuento Personal).
+		</p>
+		<Input
+			id="student-search"
+			bind:value={studentSearch}
+			placeholder="Buscar por nombre, carnet o registro..."
+		/>
+		<div class="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+			{#if filteredStudents.length === 0}
+				<p class="text-xs text-gray-400 dark:text-gray-500">No se encontraron estudiantes.</p>
+			{:else}
+				{#each filteredStudents as student (student._id)}
+					<Checkbox
+						id={`student_${student._id}`}
+						label={`${student.nombre} (${student.registro})`}
+						checked={(formData.lista_estudiantes ?? []).includes(student._id)}
+						onchange={() => toggleStudent(student._id)}
+					/>
+				{/each}
+			{/if}
+		</div>
 	</div>
 
 	<!-- ISSUE-P-DESCUENTO-RESOLUCION: documento de resolución (opcional, no bloqueante) -->
