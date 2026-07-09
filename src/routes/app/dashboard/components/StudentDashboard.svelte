@@ -5,13 +5,49 @@
 	import type { Enrollment, Course } from '$lib/interfaces';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
+	import Button from '$lib/components/ui/button.svelte';
+	import Modal from '$lib/components/ui/modal.svelte';
 	import DashboardSkeleton from '$lib/components/skeletons/DashboardSkeleton.svelte';
-	import { formatCurrency, formatDate } from '$lib/utils';
+	import { formatCurrency, formatDate, alert } from '$lib/utils';
+	import { apiKyC } from '$lib/config/apiKyC.config';
 
 	let enrollments: Enrollment[] = $state([]);
 	let coursesMap: Record<string, Course> = $state({});
 	let availableCourses: Course[] = $state([]);
 	let loading = $state(true);
+
+	// ISSUE-R-SOLICITUD-INSCRIPCION: solicitudes de inscripción ya enviadas
+	// por el estudiante (para deshabilitar el botón "Solicitar" en esa tarjeta).
+	let requestedCourseIds = $state<Set<string>>(new Set());
+	let requestModalOpen = $state(false);
+	let requestTargetCourse = $state<Course | null>(null);
+	let requestMensaje = $state('');
+	let requestLoading = $state(false);
+
+	function openRequestModal(course: Course) {
+		requestTargetCourse = course;
+		requestMensaje = '';
+		requestModalOpen = true;
+	}
+
+	async function confirmRequestEnrollment() {
+		if (!requestTargetCourse) return;
+		requestLoading = true;
+		try {
+			await apiKyC.post('/enrollment-requests/', {
+				curso_id: requestTargetCourse._id,
+				mensaje: requestMensaje.trim() || undefined
+			});
+			alert('success', 'Solicitud enviada. El CPD revisará tu inscripción pronto.');
+			requestedCourseIds = new Set([...requestedCourseIds, requestTargetCourse._id]);
+			requestModalOpen = false;
+			requestTargetCourse = null;
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo enviar la solicitud');
+		} finally {
+			requestLoading = false;
+		}
+	}
 
 	// Variables derivadas para las estadísticas rápidas
 	let totalDeuda = $derived(enrollments.reduce((sum, enr) => sum + (enr.saldo_pendiente || 0), 0));
@@ -36,9 +72,10 @@
 	onMount(async () => {
 		if ($userStore.user?._id) {
 			try {
-				const [enrRes, coursesRes] = await Promise.all([
+				const [enrRes, coursesRes, myRequestsRes] = await Promise.all([
 					enrollmentService.getByStudentId($userStore.user._id),
-					courseService.getAll(1, 100)
+					courseService.getAll(1, 100),
+					apiKyC.get<any[]>('/enrollment-requests/me').catch(() => [])
 				]);
 				
 				enrollments = Array.isArray(enrRes) ? enrRes : (enrRes as any).data || [];
@@ -54,6 +91,12 @@
 				// Programas disponibles = cursos activos en los que el estudiante NO está inscrito
 				const enrolledIds = new Set(enrollments.map((e) => e.curso_id));
 				availableCourses = courses.filter((c) => c.activo && !enrolledIds.has(c._id)).slice(0, 12);
+
+				// Solicitudes ya enviadas (pendientes o aprobadas) para deshabilitar el botón
+				const solicitudesActivas = (Array.isArray(myRequestsRes) ? myRequestsRes : []).filter(
+					(r: any) => r.estado === 'pendiente' || r.estado === 'aprobado'
+				);
+				requestedCourseIds = new Set(solicitudesActivas.map((r: any) => r.curso_id));
 			} catch (error) {
 				console.error("Error al cargar dashboard de estudiante", error);
 			} finally {
@@ -101,38 +144,53 @@
 		</div>
 
 		<!-- 2. Tarjetas de Estadísticas Globales -->
-		<!-- BUG 5 FIX: Reestructuración de grid responsiva para Tablet/iPad -->
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-			<Card class="flex items-center justify-between p-5 hover:shadow-md transition-shadow min-w-0">
-				<div class="min-w-0">
-					<p class="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Programas</p>
-					<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1">{enrollments.length}</p>
-				</div>
-				<div class="p-3 sm:p-4 bg-primary-50 dark:bg-primary-900/20 rounded-xl sm:rounded-2xl text-primary-600 dark:text-primary-300 shrink-0">
-					<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+		<!-- ISSUE-X-COMPACT (fix 2026-07-09, reportado por el usuario: las tarjetas
+		     quedaban demasiado grandes con mucho espacio vacío para lo poco que
+		     muestran). Reducido padding/ícono/tipografía, quitado el col-span-2 de
+		     la tercera tarjeta (ya no hace falta ocupar 2 columnas en tablet). -->
+		<!-- FIX (2026-07-09, reportado por el usuario: "los iconos no encajan bien"):
+		     Card envuelve el contenido en su propio <div class="card-content">, así
+		     que "flex items-center justify-between" puesto directamente en Card no
+		     actúa sobre estos 2 divs (quedan apilados verticalmente por defecto,
+		     descolocando el ícono debajo del texto en vez de al lado). Se mueve el
+		     flex a un wrapper propio DENTRO del Card. -->
+		<div class="grid grid-cols-3 gap-3 sm:gap-4">
+			<Card padding="none" class="p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
+				<div class="flex items-center justify-between gap-2">
+					<div class="min-w-0">
+						<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Total Programas</p>
+						<p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{enrollments.length}</p>
+					</div>
+					<div class="p-2 sm:p-2.5 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-primary-600 dark:text-primary-300 shrink-0">
+						<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+					</div>
 				</div>
 			</Card>
 			
-			<Card class="flex items-center justify-between p-5 hover:shadow-md transition-shadow min-w-0">
-				<div class="min-w-0">
-					<p class="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Programas Activos</p>
-					<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1">{cursosActivos}</p>
-				</div>
-				<div class="p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-xl sm:rounded-2xl text-green-600 dark:text-green-400 shrink-0">
-					<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+			<Card padding="none" class="p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
+				<div class="flex items-center justify-between gap-2">
+					<div class="min-w-0">
+						<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Activos</p>
+						<p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{cursosActivos}</p>
+					</div>
+					<div class="p-2 sm:p-2.5 bg-green-50 dark:bg-green-900/20 rounded-lg text-green-600 dark:text-green-400 shrink-0">
+						<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+					</div>
 				</div>
 			</Card>
 			
-			<Card class="flex items-center justify-between p-5 hover:shadow-md transition-shadow sm:col-span-2 lg:col-span-1 min-w-0">
-				<div class="min-w-0">
-					<p class="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Deuda Global</p>
-					<!-- BUG 5 FIX: Truncamiento inteligente si la cifra es muy larga -->
-					<p class="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-400 mt-1 truncate" title={formatCurrency(totalDeuda)}>
-						{formatCurrency(totalDeuda)}
-					</p>
-				</div>
-				<div class="p-3 sm:p-4 bg-red-50 dark:bg-red-900/20 rounded-xl sm:rounded-2xl text-red-600 dark:text-red-400 shrink-0">
-					<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+			<Card padding="none" class="p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
+				<div class="flex items-center justify-between gap-2">
+					<div class="min-w-0">
+						<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Deuda Global</p>
+						<!-- BUG 5 FIX: Truncamiento inteligente si la cifra es muy larga -->
+						<p class="text-sm sm:text-lg font-bold text-red-600 dark:text-red-400 mt-0.5 truncate" title={formatCurrency(totalDeuda)}>
+							{formatCurrency(totalDeuda)}
+						</p>
+					</div>
+					<div class="p-2 sm:p-2.5 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400 shrink-0">
+						<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+					</div>
 				</div>
 			</Card>
 		</div>
@@ -156,9 +214,28 @@
 									<span>·</span>
 									<span>{course.cantidad_cuotas} módulos</span>
 								</div>
+								{#if course.cargo_adicional_items && course.cargo_adicional_items.length > 0}
+									<div class="mt-2 space-y-0.5">
+										{#each course.cargo_adicional_items as item}
+											<p class="text-[10px] text-light-warning dark:text-dark-warning">
+												+ {formatCurrency(item.costo)} ({item.nombre})
+											</p>
+										{/each}
+									</div>
+								{/if}
 								<div class="mt-3 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-dark-border">
 									<span class="text-sm font-black text-primary-700 dark:text-primary-300">{formatCurrency(course.costo_total_interno || 0)}</span>
-									<a href="/app/enrollments" class="text-xs font-semibold text-primary-600 hover:text-primary-800 dark:text-primary-400">Más info →</a>
+									{#if requestedCourseIds.has(course._id)}
+										<span class="text-xs font-semibold text-light-warning dark:text-dark-warning">Solicitud enviada</span>
+									{:else}
+										<button
+											type="button"
+											onclick={() => openRequestModal(course)}
+											class="text-xs font-semibold text-primary-600 hover:text-primary-800 dark:text-primary-400"
+										>
+											Solicitar Inscripción →
+										</button>
+									{/if}
 								</div>
 							</div>
 						</div>
@@ -225,10 +302,17 @@
 											<span class={`block text-sm font-bold ${enr.saldo_pendiente > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(enr.saldo_pendiente)}</span>
 										</div>
 									</div>
-									<a href="/app/enrollments" class="mt-3 flex items-center justify-center gap-2 w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg text-xs font-bold transition-colors">
-										<span>Ver Módulos y Pagos</span>
-										<svg class="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-									</a>
+									<div class="mt-3 flex gap-2">
+										<a href="/app/enrollments" class="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 dark:bg-dark-background/60 dark:hover:bg-dark-background text-gray-700 dark:text-gray-200 py-2 rounded-lg text-xs font-bold transition-colors">
+											<span>Ver Módulos</span>
+										</a>
+										{#if enr.saldo_pendiente > 0}
+											<a href={`/app/payments?pagar=${enr._id}`} class="flex-1 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg text-xs font-bold transition-colors">
+												<span>Pagar</span>
+												<svg class="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+											</a>
+										{/if}
+									</div>
 								</div>
 							{/if}
 						</div>
@@ -238,3 +322,38 @@
 		</div>
 	{/if}
 </div>
+
+<!-- ISSUE-R-SOLICITUD-INSCRIPCION: modal de confirmación de solicitud -->
+<Modal
+	isOpen={requestModalOpen}
+	title="Solicitar Inscripción"
+	onClose={() => { if (!requestLoading) requestModalOpen = false; }}
+	maxWidth="sm:max-w-lg"
+>
+	<div class="p-4 space-y-4">
+		{#if requestTargetCourse}
+			<p class="text-sm text-gray-700 dark:text-gray-300">
+				Estás solicitando inscribirte a <strong>{requestTargetCourse.nombre_programa}</strong>.
+				El CPD revisará tu solicitud y, si la aprueba, se creará tu inscripción con la matrícula y
+				módulos correspondientes.
+			</p>
+			<div>
+				<label for="request-mensaje" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+					Comentario (opcional)
+				</label>
+				<textarea
+					id="request-mensaje"
+					bind:value={requestMensaje}
+					rows="3"
+					maxlength="500"
+					class="w-full rounded-lg border border-light-four dark:border-dark-border bg-white dark:bg-dark-background py-2 px-3 text-sm text-light-black dark:text-dark-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+					placeholder="Ej: Quisiera confirmar el horario del módulo 1..."
+				></textarea>
+			</div>
+			<div class="flex justify-end gap-3">
+				<Button variant="secondary" onclick={() => requestModalOpen = false} disabled={requestLoading}>Cancelar</Button>
+				<Button onclick={confirmRequestEnrollment} loading={requestLoading}>Enviar Solicitud</Button>
+			</div>
+		{/if}
+	</div>
+</Modal>

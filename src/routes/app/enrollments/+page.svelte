@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { enrollmentService, studentService, courseService } from '$lib/services';
+	import { enrollmentService, studentService, courseService, discountService } from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
-	import type { Enrollment, Student, Course } from '$lib/interfaces';
+	import type { Enrollment, Student, Course, Discount } from '$lib/interfaces';
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
@@ -11,6 +11,7 @@
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
 	import Select from '$lib/components/ui/select.svelte';
+	import Checkbox from '$lib/components/ui/checkbox.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
@@ -30,11 +31,15 @@
 	let totalPages: number = $state(1);
 
 	// Filter state (reactivo para bind:value sin warnings)
+	// ISSUE-P-VISIBILIDAD-DESCUENTO (fix 2026-07-09, reportado por el usuario:
+	// "no pude seleccionar los que están con descuento y cuál descuento"):
+	// nuevo filtro con_descuento ('all' | 'con' | 'sin').
 	let filters = $state({
 		q: '',
 		estado: 'all',
 		curso_id: 'all',
-		estudiante_id: 'all'
+		estudiante_id: 'all',
+		con_descuento: 'all'
 	});
 	let debounceTimer: any;
 
@@ -61,6 +66,9 @@
 
 	let studentsList: Student[] = $state([]);
 	let coursesList: Course[] = $state([]);
+	// ISSUE-P-VISIBILIDAD-DESCUENTO (fix 2026-07-09): mapa id->Discount para
+	// mostrar el nombre real del descuento aplicado en cada inscripción.
+	let discountsMap: Record<string, Discount> = $state({});
 
 	// ISSUE N: Control de Permisos Visuales (RBAC Frontend)
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
@@ -74,6 +82,26 @@
 	let canManageBecaRespaldo = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
 	// ISSUE-Q-NOTA-BORRADOR: quién puede validar/rechazar el borrador de nota del docente
 	let canValidateNotaBorrador = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
+
+	// ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): quién puede aprobar/rechazar documentos
+	// subidos por el estudiante. Ampliado a Encargado de Curso/Coordinador (el
+	// backend restringe a Encargado de Curso solo sus cursos_asignados) para no
+	// sobrecargar solo a CPD -- explícitamente pedido por el usuario.
+	let canManageRequisitos = $derived(
+		['cpd', 'admin', 'superadmin', 'encargado_curso', 'coordinador'].includes(currentRole)
+	);
+
+	// ISSUE-R-NOTA-CONDICIONADA-PAGO (2026-07-08, reunión de postgrado
+	// contaduría): el estudiante solo puede VER su nota oficial de un módulo
+	// si está al día con el pago de ese módulo (mod.estado === 'Pagado').
+	// Si debe, ve un aviso de "Falta pagar" en vez de la calificación -- esto
+	// es una restricción VISUAL para el estudiante únicamente; el personal
+	// (CPD/Admin/Superadmin/Docente) siempre ve la nota real sin restricción,
+	// ya que necesitan gestionar el kardex independientemente del pago.
+	function puedeVerNotaModulo(mod: any): boolean {
+		if (currentRole !== 'student') return true;
+		return mod.estado === 'Pagado';
+	}
 	// ISSUE-M-EXENCION: botón exclusivo de MAE (también admin/superadmin, que ya tienen todo)
 	let canManageMatriculaExenta = $derived(['mae', 'admin', 'superadmin'].includes(currentRole));
 	let matriculaExentaLoading: boolean = $state(false);
@@ -83,6 +111,13 @@
 	let passiveTarget: Enrollment | null = $state(null);
 	let passiveMotivo: string = $state('');
 	let passiveLoading: boolean = $state(false);
+
+	// ISSUE-P-CONGELADO / AUDITORÍA #6: modal de confirmación con checkbox de
+	// tasa pagada (el backend ya no la asume pagada por defecto)
+	let congelarModalOpen: boolean = $state(false);
+	let congelarTarget: Enrollment | null = $state(null);
+	let congelarTasaPagada: boolean = $state(false);
+	let congelarLoading: boolean = $state(false);
 
 	onMount(() => {
 		if (!$userStore.isAuthenticated) {
@@ -112,6 +147,19 @@
 				coursesMap = cMap;
 			}
 
+			// ISSUE-P-VISIBILIDAD-DESCUENTO: cargar descuentos una sola vez para
+			// resolver el nombre real (no solo el porcentaje) en la tabla.
+			if (Object.keys(discountsMap).length === 0 && currentRole !== 'student') {
+				try {
+					const discountsRes = await discountService.getAll(1, 100);
+					const dMap: Record<string, Discount> = {};
+					for (const d of discountsRes.data) dMap[d._id] = d;
+					discountsMap = dMap;
+				} catch (e) {
+					console.error('Error cargando descuentos', e);
+				}
+			}
+
 			let enrollmentsPromise;
 			if (currentRole === 'student') {
 				enrollmentsPromise = enrollmentService.getByStudentId($userStore.user?._id || '');
@@ -121,6 +169,7 @@
 				if (filters.estado !== 'all') filterParams.estado = filters.estado;
 				if (filters.curso_id !== 'all') filterParams.curso_id = filters.curso_id;
 				if (filters.estudiante_id !== 'all') filterParams.estudiante_id = filters.estudiante_id;
+				if (filters.con_descuento !== 'all') filterParams.con_descuento = filters.con_descuento === 'con';
 
 				enrollmentsPromise = enrollmentService.getAll(page, limit, filterParams);
 			}
@@ -187,6 +236,14 @@
 		selectedKardex = enrollment;
 		isKardexOpen = true;
 		openDropdownId = null;
+	}
+
+	// Atajo directo desde la Libreta: lleva a /app/payments con la
+	// inscripción ya preseleccionada, sin que el estudiante tenga que
+	// volver a buscarla/seleccionarla manualmente.
+	function goToPagarSaldo() {
+		if (!selectedKardex) return;
+		goto(`/app/payments?pagar=${selectedKardex._id}`);
 	}
 
 	function confirmDelete(enrollment: Enrollment) {
@@ -267,14 +324,26 @@
 	}
 
 	// ISSUE-P-CONGELADO: congelamiento voluntario de estudios
-	async function handleCongelar(enrollment: Enrollment) {
+	function openCongelarModal(enrollment: Enrollment) {
+		congelarTarget = enrollment;
+		congelarTasaPagada = false;
+		congelarModalOpen = true;
 		openDropdownId = null;
+	}
+
+	async function confirmCongelar() {
+		if (!congelarTarget) return;
+		congelarLoading = true;
 		try {
-			await enrollmentService.congelarInscripcion(enrollment._id);
+			await enrollmentService.congelarInscripcion(congelarTarget._id, congelarTasaPagada);
 			alert('success', 'Inscripción congelada correctamente.');
+			congelarModalOpen = false;
+			congelarTarget = null;
 			loadData();
 		} catch (e: any) {
 			alert('error', e?.message || 'No se pudo congelar la inscripción');
+		} finally {
+			congelarLoading = false;
 		}
 	}
 
@@ -366,6 +435,86 @@
 		}
 	}
 
+	// ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): el estudiante sube el documento de un
+	// requisito de su propia inscripción; CPD/Encargado de Curso lo aprueban o
+	// rechazan desde la misma libreta.
+	let requisitoUploading: Record<number, boolean> = $state({});
+	let requisitoInputEls: Record<number, HTMLInputElement | null> = $state({});
+	let requisitoRejectIndex: number | null = $state(null);
+	let requisitoRejectMotivo = $state('');
+	let requisitoRejectLoading = $state(false);
+
+	function triggerRequisitoUpload(index: number) {
+		requisitoInputEls[index]?.click();
+	}
+
+	async function handleRequisitoFileChange(event: Event, index: number) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file || !selectedKardex) return;
+
+		requisitoUploading[index] = true;
+		try {
+			const updatedReq = await enrollmentService.subirRequisito(selectedKardex._id, index, file);
+			const nuevosRequisitos = [...(selectedKardex.requisitos || [])];
+			nuevosRequisitos[index] = updatedReq;
+			selectedKardex = { ...selectedKardex, requisitos: nuevosRequisitos };
+			alert('success', 'Documento subido. Queda pendiente de revisión.');
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo subir el documento');
+		} finally {
+			requisitoUploading[index] = false;
+			input.value = '';
+		}
+	}
+
+	async function handleAprobarRequisito(index: number) {
+		if (!selectedKardex) return;
+		requisitoUploading[index] = true;
+		try {
+			const updatedReq = await enrollmentService.aprobarRequisito(selectedKardex._id, index);
+			const nuevosRequisitos = [...(selectedKardex.requisitos || [])];
+			nuevosRequisitos[index] = updatedReq;
+			selectedKardex = { ...selectedKardex, requisitos: nuevosRequisitos };
+			alert('success', 'Documento aprobado.');
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo aprobar el documento');
+		} finally {
+			requisitoUploading[index] = false;
+		}
+	}
+
+	function openRequisitoRejectModal(index: number) {
+		requisitoRejectIndex = index;
+		requisitoRejectMotivo = '';
+	}
+
+	async function confirmRechazarRequisito() {
+		if (!selectedKardex || requisitoRejectIndex === null) return;
+		if (!requisitoRejectMotivo.trim()) {
+			alert('error', 'Debe ingresar un motivo');
+			return;
+		}
+		requisitoRejectLoading = true;
+		try {
+			const updatedReq = await enrollmentService.rechazarRequisito(
+				selectedKardex._id,
+				requisitoRejectIndex,
+				requisitoRejectMotivo
+			);
+			const nuevosRequisitos = [...(selectedKardex.requisitos || [])];
+			nuevosRequisitos[requisitoRejectIndex] = updatedReq;
+			selectedKardex = { ...selectedKardex, requisitos: nuevosRequisitos };
+			alert('success', 'Documento rechazado.');
+			requisitoRejectIndex = null;
+			requisitoRejectMotivo = '';
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo rechazar el documento');
+		} finally {
+			requisitoRejectLoading = false;
+		}
+	}
+
 	function toggleDropdown(id: string) {
 		if (openDropdownId === id) {
 			openDropdownId = null;
@@ -411,7 +560,7 @@
 				label: 'Congelar Inscripción',
 				id: 'congelar',
 				icon: `<svg class="size-5 text-uagrm-sky" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v8m-4-4h8m6 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
-				action: () => handleCongelar(enrollment)
+				action: () => openCongelarModal(enrollment)
 			});
 		}
 
@@ -561,6 +710,19 @@
 					{/each}
 				</select>
 			</div>
+
+			<!-- ISSUE-P-VISIBILIDAD-DESCUENTO (fix 2026-07-09): filtro por si tiene descuento aplicado -->
+			<div>
+				<select
+					bind:value={filters.con_descuento}
+					onchange={handleFilterChange}
+					class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+				>
+					<option value="all">Con o sin descuento</option>
+					<option value="con">Solo con descuento</option>
+					<option value="sin">Solo sin descuento</option>
+				</select>
+			</div>
 		</div>
 	{/if}
 
@@ -572,9 +734,9 @@
 		</div>
 	{:else}
 		<!-- ISSUE-X-COMPACT: Desktop Table consolidada SIN scroll horizontal -->
-		<div class="hidden md:block bg-white dark:bg-dark-surface rounded-lg shadow border border-gray-200 dark:border-dark-border overflow-hidden">
+		<div class="hidden md:block bg-white dark:bg-dark-surface rounded-lg shadow border border-gray-200 dark:border-dark-border">
 			<table class="w-full table-fixed divide-y divide-gray-200 dark:divide-dark-border">
-				<thead class="bg-gray-50 dark:bg-dark-background">
+				<thead class="bg-gray-50 dark:bg-dark-background rounded-t-lg">
 					<tr>
 						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
 						<th scope="col" class="w-[26%] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Curso</th>
@@ -604,6 +766,15 @@
 								<div class="flex justify-between gap-2"><span class="text-gray-400 dark:text-gray-500">Total</span><span class="font-medium text-gray-700 dark:text-gray-300">{formatCurrency(enrollment.total_a_pagar)}</span></div>
 								<div class="flex justify-between gap-2"><span class="text-gray-400 dark:text-gray-500">Pagado</span><span class="font-medium text-green-600 dark:text-green-400">{formatCurrency(enrollment.total_pagado)}</span></div>
 								<div class="flex justify-between gap-2"><span class="text-gray-400 dark:text-gray-500">Saldo</span><span class={`font-bold ${enrollment.saldo_pendiente > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(enrollment.saldo_pendiente)}</span></div>
+								<!-- ISSUE-P-VISIBILIDAD-DESCUENTO (fix 2026-07-09): mostrar nombre y % del descuento aplicado, si hay -->
+								{#if enrollment.descuento_estudiante_id || (enrollment.descuento_personalizado ?? 0) > 0}
+									<div class="flex justify-between gap-2 pt-0.5 border-t border-gray-100 dark:border-gray-700 mt-1">
+										<span class="text-gray-400 dark:text-gray-500">Beca</span>
+										<span class="font-semibold text-light-tertiary dark:text-dark-tertiary truncate max-w-[110px]" title={enrollment.descuento_estudiante_id ? discountsMap[enrollment.descuento_estudiante_id]?.nombre : 'Descuento libre'}>
+											{enrollment.descuento_estudiante_id ? (discountsMap[enrollment.descuento_estudiante_id]?.nombre ?? '—') : 'Libre'} ({enrollment.descuento_personalizado}%)
+										</span>
+									</div>
+								{/if}
 							</td>
 							<td class="px-4 py-4">
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(enrollment.estado)}`}>
@@ -708,6 +879,15 @@
 								{formatCurrency(enrollment.saldo_pendiente)}
 							</span>
 						</div>
+						<!-- ISSUE-P-VISIBILIDAD-DESCUENTO (fix 2026-07-09): mostrar nombre y % del descuento aplicado, si hay -->
+						{#if enrollment.descuento_estudiante_id || (enrollment.descuento_personalizado ?? 0) > 0}
+							<div class="flex justify-between">
+								<span class="text-gray-500 dark:text-gray-400">Beca:</span>
+								<span class="font-semibold text-light-tertiary dark:text-dark-tertiary">
+									{enrollment.descuento_estudiante_id ? (discountsMap[enrollment.descuento_estudiante_id]?.nombre ?? '—') : 'Libre'} ({enrollment.descuento_personalizado}%)
+								</span>
+							</div>
+						{/if}
 						<div class="flex justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Estado:</span>
 							<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(enrollment.estado)}`}>
@@ -791,6 +971,19 @@
 					</div>
 				</div>
 
+				<!-- ISSUE-P-CARGO-MULTIITEM: transparencia de los ítems de cargo adicional/complementario al programa -->
+				{#if selectedKardex.cargo_adicional_items && selectedKardex.cargo_adicional_items.length > 0}
+					<div class="bg-light-warning/10 dark:bg-dark-warning/10 border border-light-warning/30 dark:border-dark-warning/30 p-4 rounded-xl space-y-2">
+						<p class="text-xs text-light-warning dark:text-dark-warning uppercase tracking-wider font-bold">Cargo Adicional Incluido</p>
+						{#each selectedKardex.cargo_adicional_items as item}
+							<div class="flex items-center justify-between gap-3">
+								<p class="text-sm text-slate-700 dark:text-slate-300">{item.nombre}</p>
+								<span class="text-sm font-bold text-light-warning dark:text-dark-warning">+{formatCurrency(item.costo)}</span>
+							</div>
+						{/each}
+					</div>
+				{/if}
+
 				<!-- ISSUE-P-BECA-RESPALDO: respaldo documental de beca/descuento -->
 				{#if selectedKardex.descuento_estudiante_id || (selectedKardex.descuento_personalizado ?? 0) > 0}
 					<div class="bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-dark-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -821,6 +1014,78 @@
 					</div>
 				{/if}
 
+				<!-- ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): documentos requeridos por el
+				     curso -- el estudiante los sube desde aquí, CPD/Encargado de Curso
+				     los aprueban o rechazan. Solo se muestra si el curso definió al
+				     menos un documento requerido (lista no vacía). -->
+				{#if selectedKardex.requisitos && selectedKardex.requisitos.length > 0}
+					<div class="bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-dark-border space-y-3">
+						<p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">Documentos Requeridos</p>
+						{#each selectedKardex.requisitos as req, reqIndex}
+							<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-gray-100 dark:border-dark-border pt-3 first:border-t-0 first:pt-0">
+								<div class="min-w-0">
+									<p class="text-sm font-medium text-slate-900 dark:text-white">{req.descripcion}</p>
+									<div class="mt-1 flex items-center gap-2">
+										{#if req.estado === 'pendiente'}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+												Sin subir
+											</span>
+										{:else if req.estado === 'en_proceso'}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+												Pendiente de revisión
+											</span>
+										{:else if req.estado === 'aprobado'}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+												Aprobado
+											</span>
+										{:else if req.estado === 'rechazado'}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" title={req.motivo_rechazo || ''}>
+												Rechazado
+											</span>
+										{/if}
+										{#if req.url}
+											<a href={req.url} target="_blank" rel="noopener noreferrer" class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
+												Ver documento
+											</a>
+										{/if}
+									</div>
+									{#if req.estado === 'rechazado' && req.motivo_rechazo}
+										<p class="mt-1 text-xs text-light-error dark:text-dark-error">Motivo: {req.motivo_rechazo}</p>
+									{/if}
+								</div>
+								<div class="flex items-center gap-2 shrink-0">
+									<!-- El estudiante sube/reemplaza su propio documento (salvo si ya está aprobado) -->
+									{#if currentRole === 'student' && req.estado !== 'aprobado'}
+										<input
+											bind:this={requisitoInputEls[reqIndex]}
+											type="file"
+											accept="application/pdf,image/*"
+											class="hidden"
+											onchange={(e) => handleRequisitoFileChange(e, reqIndex)}
+										/>
+										<Button size="sm" variant="secondary" onclick={() => triggerRequisitoUpload(reqIndex)} loading={requisitoUploading[reqIndex]}>
+											{req.url ? 'Reemplazar' : 'Subir Documento'}
+										</Button>
+									{/if}
+									<!-- CPD/Encargado de Curso aprueban o rechazan una vez subido -->
+									{#if canManageRequisitos && req.estado === 'en_proceso'}
+										<Button size="sm" variant="destructive" onclick={() => openRequisitoRejectModal(reqIndex)} loading={requisitoUploading[reqIndex]}>
+											Rechazar
+										</Button>
+										<Button size="sm" onclick={() => handleAprobarRequisito(reqIndex)} loading={requisitoUploading[reqIndex]}>
+											Aprobar
+										</Button>
+									{:else if canManageRequisitos && req.estado === 'rechazado'}
+										<Button size="sm" onclick={() => handleAprobarRequisito(reqIndex)} loading={requisitoUploading[reqIndex]}>
+											Aprobar de todos modos
+										</Button>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+
 				<!-- Tabla de Módulos (Notas y Pagos) -->
 				<div class="overflow-x-auto border border-gray-200 dark:border-dark-border rounded-xl shadow-sm">
 					<table class="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
@@ -843,16 +1108,31 @@
 										
 										<!-- Columna Académica -->
 										<td class="px-4 py-4 text-center bg-blue-50/10 dark:bg-blue-900/5">
-											<span class={`text-lg font-black ${mod.nota !== null && mod.nota !== undefined && mod.nota >= 64 ? 'text-green-600 dark:text-green-400' : mod.nota !== null && mod.nota !== undefined ? 'text-red-600 dark:text-red-400' : 'text-slate-400'}`}>
-												{mod.nota !== null && mod.nota !== undefined ? mod.nota : '--'}
-											</span>
+											{#if puedeVerNotaModulo(mod)}
+												<span class={`text-lg font-black ${mod.nota !== null && mod.nota !== undefined && mod.nota >= 64 ? 'text-green-600 dark:text-green-400' : mod.nota !== null && mod.nota !== undefined ? 'text-red-600 dark:text-red-400' : 'text-slate-400'}`}>
+													{mod.nota !== null && mod.nota !== undefined ? mod.nota : '--'}
+												</span>
+											{:else}
+												<span class="text-xs font-bold text-light-warning dark:text-dark-warning" title="Debes estar al día con el pago de este módulo para ver tu calificación">
+													Falta pagar
+												</span>
+											{/if}
 										</td>
 										<td class="px-4 py-4 text-center bg-blue-50/10 dark:bg-blue-900/5">
-											<span class={`px-3 py-1.5 text-[11px] font-bold rounded-full uppercase tracking-wide ${mod.estado_academico === 'Aprobado' ? 'bg-green-100 text-green-700 border border-green-200' : mod.estado_academico === 'Reprobado' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600'}`}>
-												{mod.estado_academico || 'Cursando'}
-											</span>
-											<!-- ISSUE-Q-NOTA-BORRADOR: borrador del docente pendiente de validación -->
-											{#if mod.estado_validacion_nota === 'pendiente_validacion'}
+											{#if puedeVerNotaModulo(mod)}
+												<span class={`px-3 py-1.5 text-[11px] font-bold rounded-full uppercase tracking-wide ${mod.estado_academico === 'Aprobado' ? 'bg-green-100 text-green-700 border border-green-200' : mod.estado_academico === 'Reprobado' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600'}`}>
+													{mod.estado_academico || 'Cursando'}
+												</span>
+											{:else}
+												<span class="px-3 py-1.5 text-[11px] font-bold rounded-full uppercase tracking-wide bg-light-warning/15 text-light-warning dark:bg-dark-warning/20 dark:text-dark-warning">
+													Pago Pendiente
+												</span>
+											{/if}
+											<!-- ISSUE-Q-NOTA-BORRADOR: borrador del docente pendiente de validación.
+											     El estudiante NUNCA ve el borrador (solo la nota oficial ya validada
+											     por CPD) -- confirmado en reunión de postgrado contaduría 2026-07-08:
+											     "el gente no ve las notas hasta que el CPD no las aprueba". -->
+											{#if mod.estado_validacion_nota === 'pendiente_validacion' && currentRole !== 'student'}
 												<div class="mt-2 flex flex-col items-center gap-1">
 													<span class="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wide">
 														Borrador: {mod.nota_borrador}
@@ -914,7 +1194,7 @@
 				<div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
 					<!-- Si es estudiante y debe dinero, mostrar atajo rápido al pago -->
 					{#if currentRole === 'student' && selectedKardex.saldo_pendiente > 0}
-						<Button onclick={() => goto('/app/payments')} class="bg-blue-600 hover:bg-blue-700 text-white">
+						<Button onclick={() => goToPagarSaldo()} class="bg-blue-600 hover:bg-blue-700 text-white">
 							Pagar Saldo Pendiente
 						</Button>
 					{/if}
@@ -957,6 +1237,64 @@
 				<Button variant="secondary" onclick={() => passiveModalOpen = false} disabled={passiveLoading}>Cancelar</Button>
 				<Button onclick={confirmPassiveRequest} loading={passiveLoading} disabled={passiveMotivo.trim().length < 3}>
 					Enviar Solicitud
+				</Button>
+			</div>
+		</div>
+	</Modal>
+
+	<!-- ISSUE-Q-DOCUMENTOS-KYC: Modal de motivo de rechazo de un documento -->
+	<Modal
+		isOpen={requisitoRejectIndex !== null}
+		title="Rechazar Documento"
+		onClose={() => { if (!requisitoRejectLoading) requisitoRejectIndex = null; }}
+		maxWidth="sm:max-w-lg"
+	>
+		<div class="p-4 space-y-4">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
+				Indica el motivo del rechazo para que el estudiante sepa qué corregir antes de volver a subirlo.
+			</p>
+			<textarea
+				bind:value={requisitoRejectMotivo}
+				rows="3"
+				class="w-full rounded-lg border border-light-four dark:border-dark-border bg-white dark:bg-dark-background py-2 px-3 text-sm text-light-black dark:text-dark-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+				placeholder="Ej: Documento ilegible, no corresponde al requisito solicitado, etc."
+			></textarea>
+			<div class="flex justify-end gap-3">
+				<Button variant="secondary" onclick={() => requisitoRejectIndex = null} disabled={requisitoRejectLoading}>Cancelar</Button>
+				<Button variant="destructive" onclick={confirmRechazarRequisito} loading={requisitoRejectLoading} disabled={requisitoRejectMotivo.trim().length < 1}>
+					Rechazar
+				</Button>
+			</div>
+		</div>
+	</Modal>
+
+	<!-- ISSUE-P-CONGELADO / AUDITORÍA #6: confirmación de congelamiento con tasa pagada -->
+	<Modal
+		isOpen={congelarModalOpen}
+		title="Congelar Inscripción"
+		onClose={() => { if (!congelarLoading) congelarModalOpen = false; }}
+		maxWidth="sm:max-w-lg"
+	>
+		<div class="p-4 space-y-4">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
+				La inscripción quedará suspendida (módulos y pagos se conservan) hasta que se reactive
+				manualmente. Corresponde una tasa de congelamiento.
+			</p>
+			<Checkbox
+				id="congelar-tasa-pagada"
+				label="Cobranza ya registró el cobro de la tasa de congelamiento"
+				bind:checked={congelarTasaPagada}
+			/>
+			{#if !congelarTasaPagada}
+				<p class="text-xs text-light-warning dark:text-dark-warning">
+					Si dejas esto sin marcar, la inscripción quedará congelada con la tasa marcada como
+					pendiente de cobro.
+				</p>
+			{/if}
+			<div class="flex justify-end gap-3">
+				<Button variant="secondary" onclick={() => congelarModalOpen = false} disabled={congelarLoading}>Cancelar</Button>
+				<Button onclick={confirmCongelar} loading={congelarLoading}>
+					Confirmar Congelamiento
 				</Button>
 			</div>
 		</div>

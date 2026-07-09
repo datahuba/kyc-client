@@ -24,7 +24,7 @@
 		<BlurOverlay class="overflow-y-auto">
 			<div class="flex items-center justify-center text-center sm:p-0">
 				<div
-					class={`relative transform overflow-hidden rounded-2xl bg-white dark:bg-dark-surface text-left shadow-xl transition-all sm:my-8 sm:w-full ${maxWidth}`}
+					class={`relative w-full transform overflow-hidden rounded-2xl bg-white dark:bg-dark-surface text-left shadow-xl transition-all sm:my-8 ${maxWidth}`}
 				>
 					<!-- Header -->
 					<div class="bg-white dark:bg-dark-surface px-4 py-3 sm:px-6 border-b border-gray-200 dark:border-dark-border flex justify-between items-center">

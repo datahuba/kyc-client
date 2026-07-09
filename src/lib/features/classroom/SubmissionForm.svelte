@@ -3,8 +3,9 @@
 	import type { Assignment, Submission } from '$lib/interfaces';
 	import { MAX_SUBMISSION_ATTEMPTS } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
+	import TextArea from '$lib/components/ui/textArea.svelte';
+	import FileUpload from '$lib/components/ui/fileUpload.svelte';
 	import { alert } from '$lib/utils';
-	import { UploadIcon } from '$lib/icons/outline';
 
 	interface Props {
 		assignment: Assignment;
@@ -30,9 +31,11 @@
 		'image/jpeg', 'image/png', 'image/webp'
 	];
 
-	function handleFileChange(e: Event) {
-		const f = (e.target as HTMLInputElement).files?.[0];
-		if (!f) return;
+	function handleFileSelect(f: File | null) {
+		if (!f) {
+			selectedFile = null;
+			return;
+		}
 		if (!ALLOWED_TYPES.includes(f.type)) {
 			alert('error', 'Tipo no permitido. Use PDF, Word o imágenes.');
 			return;
@@ -72,9 +75,9 @@
 	<!-- Contador de intentos -->
 	{#if existing}
 		{#if limitReached}
-			<div class="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 px-3 py-2">
-				<p class="text-sm font-medium text-red-800 dark:text-red-300">Límite de entregas alcanzado</p>
-				<p class="text-xs text-red-600 dark:text-red-400 mt-0.5">
+			<div class="rounded-md bg-light-error/10 dark:bg-dark-error/10 border border-light-error/30 dark:border-dark-error/30 px-3 py-2">
+				<p class="text-sm font-medium text-light-error dark:text-dark-error">Límite de entregas alcanzado</p>
+				<p class="text-xs text-light-error/80 dark:text-dark-error/80 mt-0.5">
 					Has utilizado los {MAX_SUBMISSION_ATTEMPTS} intentos permitidos para esta actividad.
 					{#if existing.score != null}
 						Tu nota: <strong>{existing.score}</strong>
@@ -82,8 +85,8 @@
 				</p>
 			</div>
 		{:else}
-			<div class="rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 px-3 py-2">
-				<p class="text-xs text-yellow-800 dark:text-yellow-300">
+			<div class="rounded-md bg-light-warning/10 dark:bg-dark-warning/10 border border-light-warning/30 dark:border-dark-warning/30 px-3 py-2">
+				<p class="text-xs text-light-warning dark:text-dark-warning">
 					Intento {attemptsUsed} de {MAX_SUBMISSION_ATTEMPTS} usado.
 					Te {attemptsLeft === 1 ? 'queda 1 intento' : `quedan ${attemptsLeft} intentos`}.
 					Al enviar de nuevo, se reemplazará la entrega anterior.
@@ -99,41 +102,24 @@
 	{/if}
 
 	{#if !limitReached}
-		<!-- Texto -->
-		<div>
-			<label for="sub-text" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-				Respuesta / Comentario
-			</label>
-			<textarea
-				id="sub-text"
-				bind:value={textContent}
-				rows="5"
-				maxlength="5000"
-				placeholder="Escribe tu respuesta aquí..."
-				class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-			></textarea>
-		</div>
+		<TextArea
+			label="Respuesta / Comentario"
+			id="sub-text"
+			bind:value={textContent}
+			rows={5}
+			maxlength={5000}
+			placeholder="Escribe tu respuesta aquí..."
+		/>
 
-		<!-- Archivo -->
-		<div>
-			<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-				Archivo adjunto (opcional)
-			</label>
-			<label
-				class="flex items-center gap-3 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 cursor-pointer hover:border-primary-400 transition-colors"
-			>
-				<UploadIcon class="size-5 text-gray-400" />
-				<span class="text-sm text-gray-600 dark:text-gray-400">
-					{selectedFile ? selectedFile.name : existing?.file_url ? 'Reemplazar archivo actual' : 'Seleccionar archivo (PDF, Word, imagen)'}
-				</span>
-				<input
-					type="file"
-					class="sr-only"
-					accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
-					onchange={handleFileChange}
-				/>
-			</label>
-		</div>
+		<FileUpload
+			label="Archivo adjunto (opcional)"
+			id="sub-file"
+			accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+			file={selectedFile}
+			onFileSelect={handleFileSelect}
+			initialUrl={existing?.file_url}
+			isEditable={!!existing}
+		/>
 	{/if}
 
 	<div class="flex justify-end gap-3 pt-2">

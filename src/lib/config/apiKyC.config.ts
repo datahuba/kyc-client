@@ -182,6 +182,25 @@ class ApiKyC {
 	async postPublic<T>(endpoint: string, data: unknown): Promise<T> {
 		return this.post<T>(endpoint, data, { requireAuth: false });
 	}
+
+	// ISSUE-P-REPORTE: descarga de archivos binarios autenticados (Excel/PDF).
+	// Los endpoints de descarga requieren el mismo Authorization header que
+	// cualquier otra request, por eso no puede usarse un <a href> directo.
+	async getBlob(endpoint: string, options: RequestOptions = {}): Promise<Blob> {
+		const headers = this.buildHeaders(options);
+		const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1${endpoint}`, {
+			method: 'GET',
+			headers
+		});
+
+		if (!response.ok) {
+			const errorBody = await response.json().catch(() => ({}));
+			const errorType = errorService.mapHttpToErrorType(response.status);
+			throw new AppError(extractErrorMessage(errorBody), errorType, response.status);
+		}
+
+		return response.blob();
+	}
 }
 
 export const apiKyC = new ApiKyC();

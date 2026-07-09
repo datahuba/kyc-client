@@ -14,6 +14,9 @@ export interface Student {
 	_id: string;
 	activo: boolean;
 	carnet?: string;
+	// ISSUE-Q-COMPLEMENTO-CI (2026-07-08): complemento del CI (ej. '1D', '1J'),
+	// distinto de `extension` (lugar de expedición del carnet).
+	complemento_carnet?: string | null;
 	celular: string;
 	created_at: string;
 	domicilio: string;
@@ -47,12 +50,18 @@ export interface Student {
 	// ISSUE-Q-PRE: Términos y Condiciones
 	terminos_aceptados?: boolean;
 	fecha_aceptacion_terminos?: string | null;
+	// ISSUE-A-VERIFICACION: no bloqueante, solo informativo
+	email_verificado?: boolean;
+	fecha_verificacion_email?: string | null;
 }
 
 export interface CreateStudentRequest {
 	registro: string;
 	carnet: string;
-	password: string;
+	complemento_carnet?: string;
+	// ISSUE-Q-PASSWORD-UNIFICADA: opcional -- si se omite, el backend genera
+	// 'Uagrm.<CI>' automáticamente (misma convención que docentes/staff).
+	password?: string;
 	course_id: string;
 	nombre: string;
 	extension: string;

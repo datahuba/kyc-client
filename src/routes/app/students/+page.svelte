@@ -55,7 +55,7 @@
 	let isImportModalOpen: boolean = $state(false);
 	let importFile: File | null = $state(null);
 	let importLoading = $state(false);
-	let importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[] } | null = $state(null);
+	let importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color?: Record<string, string[]> } | null = $state(null);
 	let importTipoEstudiante: 'interno' | 'externo' = $state('externo'); 
 	let importCursoId: string = $state(''); // Curso opcional para auto-inscripción en carga masiva
 
@@ -506,8 +506,12 @@
 	}
 
 	function downloadTemplateCSV() {
-		const headers = ["Nombre Completo", "Registro Academico", "Carnet de Identidad", "Extension", "Email", "Celular", "Domicilio"];
-		const sampleRow = ["Juan Perez Gomez", "", "1234567", "SC", "juan.perez@email.com", "77012345", "Calle Falsa 123"];
+		// Fecha de Nacimiento se interpreta como DIA/MES/AÑO (no mes/dia como
+		// sugeriría un formato "mm/dd/aaaa" en inglés). Registro Académico es
+		// opcional: si se deja vacío, el sistema usa el Carnet de Identidad
+		// (sin el complemento tras el guion, si lo tuviera) como usuario/registro.
+		const headers = ["Nombre Completo", "Registro Academico (opcional)", "Carnet de Identidad", "Extension", "Email", "Celular", "Domicilio", "Fecha de Nacimiento (DD/MM/AAAA)", "Grupo Sanguineo"];
+		const sampleRow = ["Juan Perez Gomez", "", "1234567", "SC", "juan.perez@email.com", "77012345", "Calle Falsa 123", "15/08/1990", "A+"];
 		const csvContent = [headers, sampleRow].map(e => e.join(",")).join("\n");
 		const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
 		const url = URL.createObjectURL(blob);

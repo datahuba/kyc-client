@@ -352,8 +352,8 @@
 					<tr>
 						<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Código/Prog.</th>
 						<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Detalles</th>
-						<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Costos Int.</th>
-						<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Costos Ext.</th>
+						<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Costo Programa</th>
+						<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cargo Adicional</th>
 						<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Financiero</th>
 						
 						<th scope="col" class="relative px-3 py-3">
@@ -377,8 +377,16 @@
 								<div class="text-xs text-gray-500 dark:text-gray-400">M: {course.matricula_interno}</div>
 							</td>
 							<td class="px-3 py-4 whitespace-nowrap">
-								<div class="text-xs text-gray-900 dark:text-white">T: {course.costo_total_externo}</div>
-								<div class="text-xs text-gray-500 dark:text-gray-400">M: {course.matricula_externo}</div>
+								{#if course.cargo_adicional_items && course.cargo_adicional_items.length > 0}
+									{#each course.cargo_adicional_items as item}
+										<div class="text-xs text-gray-900 dark:text-white">
+											{formatCurrency(item.costo)}
+											<span class="text-gray-500 dark:text-gray-400 max-w-[140px] truncate" title={item.nombre}>({item.nombre})</span>
+										</div>
+									{/each}
+								{:else}
+									<span class="text-xs text-gray-400 dark:text-gray-500">Sin cargo</span>
+								{/if}
 							</td>
 							<td class="px-3 py-4 whitespace-nowrap">
 								<div class="text-xs text-gray-900 dark:text-white">Cuotas: {course.cantidad_cuotas}</div>

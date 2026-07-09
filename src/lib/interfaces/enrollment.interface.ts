@@ -1,6 +1,18 @@
+// ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): estado de un documento/requisito que
+// el estudiante debe subir para su inscripción (ej. CV, fotocopia de CI).
+export interface Requisito {
+	descripcion: string;
+	estado: 'pendiente' | 'en_proceso' | 'aprobado' | 'rechazado';
+	url?: string | null;
+	motivo_rechazo?: string | null;
+	revisado_por?: string | null;
+	fecha_subida?: string | null;
+}
+
 export interface Enrollment {
 	modulos: any;
 	_id: string;
+	requisitos?: Requisito[]; // ISSUE-Q-DOCUMENTOS-KYC
 	cantidad_cuotas: number;
 	costo_matricula: number;
 	costo_total: number;
@@ -11,6 +23,10 @@ export interface Enrollment {
 	descuento_curso_id?: string;
 	descuento_estudiante_id?: string;
 	es_estudiante_interno: string;
+	// ISSUE-P-CARGO-MULTIITEM (2026-07-08): snapshot de la lista de ítems de
+	// cargo adicional/complementario al programa, si el curso los tenía
+	// definidos al inscribirse.
+	cargo_adicional_items?: { nombre: string; costo: number }[];
 	estado: string;
 	estudiante_id: string;
 	fecha_inscripcion: string;

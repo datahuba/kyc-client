@@ -19,6 +19,16 @@ class AuthService {
 		const response = await apiKyC.get<UserResponse>('/auth/me');
 		return response;
 	}
+
+	// ISSUE-A-VERIFICACION: confirma el correo con el token recibido (público, sin auth)
+	async verifyEmail(token: string): Promise<{ message: string }> {
+		return await apiKyC.postPublic<{ message: string }>('/auth/verify-email', { token });
+	}
+
+	// ISSUE-A-VERIFICACION: el usuario logueado pide un nuevo correo de verificación
+	async resendVerification(): Promise<{ message: string }> {
+		return await apiKyC.post<{ message: string }>('/auth/resend-verification', {});
+	}
 }
 
 export const authService = new AuthService();

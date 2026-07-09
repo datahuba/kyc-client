@@ -26,17 +26,21 @@ export interface User {
 	nombre_funcional?: string | null; // ISSUE-R-ROLES: nombre por función/programa
 	cursos_asignados?: string[]; // ISSUE-R-ROLES: cursos que puede operar (encargado_curso/cobranza)
 	terminos_aceptados?: boolean; // ISSUE-Q-PRE: siempre true para personal admin/docente, real para estudiantes
+	email_verificado?: boolean; // ISSUE-A-VERIFICACION: no bloqueante, solo informativo
+	carnet?: string | null; // GAP-1 (audio 2026-07-08): CI del personal, usado para la contraseña por defecto 'Uagrm.<CI>'
 }
 
 
 export interface CreateUserRequest {
 	username: string;
 	email: string;
-	password?: string; // Optional for update? No, required for create.
+	// GAP-1: opcional al crear si se provee `carnet` (se autogenera 'Uagrm.<CI>').
+	password?: string;
 	role: Role;
 	activo?: boolean;
 	nombre_funcional?: string | null; // ISSUE-R-ROLES
 	cursos_asignados?: string[]; // ISSUE-R-ROLES
+	carnet?: string | null; // GAP-1
 }
 
 export interface UpdateUserRequest extends Partial<CreateUserRequest> {}

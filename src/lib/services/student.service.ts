@@ -48,17 +48,23 @@ class StudentService {
         file: File,
         tipoEstudiante: 'interno' | 'externo',
         cursoId?: string
-    ): Promise<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[] }> {
+    ): Promise<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color: Record<string, string[]> }> {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('tipo_estudiante', tipoEstudiante);
         if (cursoId) {
             formData.append('curso_id', cursoId);
         }
-        return await apiKyC.post<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[] }>(
+        // ISSUE-Q-IMPORT-TIMEOUT (2026-07-09): el backend redujo el tiempo real de
+        // importación con auto-inscripción de ~2s/estudiante a ~0.27s/estudiante
+        // (paralelización controlada + batching de referencias cruzadas, ver
+        // student_service.import_students_from_excel). Aun así se alinea este
+        // timeout con el límite de 180s ya configurado en nginx (proxy_read_timeout)
+        // como colchón adicional para lotes más grandes a futuro.
+        return await apiKyC.post<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color: Record<string, string[]> }>(
             '/students/import/excel', 
             formData, 
-            { customTimeout: 120000 }
+            { customTimeout: 180000 }
         );
     }
 
@@ -166,6 +172,17 @@ class StudentService {
 	// ISSUE-Q-PRE: aceptación del reglamento de Postgrado en el primer login
 	async acceptTerms(): Promise<Student> {
 		return await apiKyC.post<Student>('/students/me/accept-terms', {});
+	}
+
+	// ISSUE-P-RECORDATORIO-PAGO: Cobranza envía un recordatorio de pago manual al estudiante
+	async enviarRecordatorioPago(
+		id: string,
+		mensaje: string
+	): Promise<{ success: boolean; notificacion_in_app: boolean; email_enviado: boolean; detail: string }> {
+		return await apiKyC.post<{ success: boolean; notificacion_in_app: boolean; email_enviado: boolean; detail: string }>(
+			`/students/${id}/recordatorio-pago`,
+			{ mensaje }
+		);
 	}
 }
 

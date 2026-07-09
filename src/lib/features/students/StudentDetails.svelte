@@ -7,6 +7,8 @@
 	import Heading from '$lib/components/ui/heading.svelte';
 	import FileUpload from '$lib/components/ui/fileUpload.svelte';
 	import PdfPreview from '$lib/components/ui/PdfPreview.svelte';
+	import TextArea from '$lib/components/ui/textArea.svelte';
+	import Modal from '$lib/components/ui/modal.svelte';
 	import { alert } from '$lib/utils';
 	import { CheckIcon, XIcon, DownloadIcon, UserIcon, IdentificationIcon, AcademicCapIcon, CollectionIcon, FileTextIcon, LoaderIcon } from '$lib/icons/outline';
 
@@ -35,6 +37,38 @@
 	// Permisos granulares de escritura de archivos académicos y verificación KYC (Bug 4)
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
 	let canUploadAndVerify = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+
+	// ISSUE-P-RECORDATORIO-PAGO (2026-07-08, reunión de postgrado contaduría):
+	// Cobranza necesita poder enviar un recordatorio de pago manual desde el
+	// perfil del estudiante. El backend (require_cobranza) también permite
+	// CPD/Admin/Superadmin, así que se replican los mismos roles aquí.
+	let canSendReminder = $derived(['cobranza', 'cpd', 'admin', 'superadmin'].includes(currentRole));
+	let isReminderModalOpen = $state(false);
+	let reminderMessage = $state('');
+	let sendingReminder = $state(false);
+
+	async function handleSendReminder() {
+		if (!reminderMessage.trim()) {
+			alert('error', 'Escribe un mensaje para el recordatorio.');
+			return;
+		}
+		sendingReminder = true;
+		try {
+			const result = await studentService.enviarRecordatorioPago(student._id, reminderMessage.trim());
+			alert(
+				'success',
+				result.email_enviado
+					? 'Recordatorio enviado (notificación in-app + correo).'
+					: 'Recordatorio enviado (notificación in-app). El estudiante no tiene correo o el envío falló.'
+			);
+			isReminderModalOpen = false;
+			reminderMessage = '';
+		} catch (e: any) {
+			alert('error', e.message || 'Error al enviar el recordatorio de pago');
+		} finally {
+			sendingReminder = false;
+		}
+	}
 
 	// Only populate if student has title data
 	$effect(() => {
@@ -171,14 +205,21 @@
 <div class="space-y-8 w-full h-full">
 	<!-- Personal Information -->
 	<div class=" border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-		<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-gray-700">
-			<div class="rounded-lg bg-primary-50 p-2 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400">
-				<UserIcon class="size-6" />
+		<div class="mb-6 flex items-center justify-between gap-3 border-b border-gray-100 pb-4 dark:border-gray-700">
+			<div class="flex items-center gap-3">
+				<div class="rounded-lg bg-primary-50 p-2 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400">
+					<UserIcon class="size-6" />
+				</div>
+				<div>
+					<Heading level="h4" class="text-lg font-semibold text-gray-900 dark:text-white">Información Personal</Heading>
+					<p class="text-sm text-gray-500 dark:text-gray-400">Datos básicos del estudiante</p>
+				</div>
 			</div>
-			<div>
-				<Heading level="h4" class="text-lg font-semibold text-gray-900 dark:text-white">Información Personal</Heading>
-				<p class="text-sm text-gray-500 dark:text-gray-400">Datos básicos del estudiante</p>
-			</div>
+			{#if canSendReminder}
+				<Button variant="secondary" onclick={() => (isReminderModalOpen = true)}>
+					Enviar Recordatorio de Pago
+				</Button>
+			{/if}
 		</div>
 
 		<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -188,7 +229,9 @@
 			</div>
 			<div>
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">CI / Extensión</label>
-				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">{student.carnet || 'N/A'} {student.extension}</p>
+				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">
+					{student.carnet || 'N/A'}{student.complemento_carnet ? `-${student.complemento_carnet}` : ''} {student.extension}
+				</p>
 			</div>
 			<div>
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Nacimiento</label>
@@ -467,4 +510,33 @@
 			{/if}
 		</div>
 	</div>
+
+	<!-- ISSUE-P-RECORDATORIO-PAGO: modal de envío de recordatorio manual de pago -->
+	<Modal
+		isOpen={isReminderModalOpen}
+		title="Enviar Recordatorio de Pago"
+		onClose={() => { isReminderModalOpen = false; reminderMessage = ''; }}
+	>
+		<div class="space-y-4">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
+				Se enviará una notificación in-app y, si el estudiante tiene correo registrado, también un
+				correo electrónico a <span class="font-semibold text-gray-700 dark:text-gray-300">{student.nombre}</span>.
+			</p>
+			<TextArea
+				label="Mensaje del recordatorio"
+				id="reminder-message"
+				bind:value={reminderMessage}
+				rows={4}
+				placeholder="Ej: Tienes un saldo pendiente de Bs 500 en el módulo 2. Por favor regulariza tu pago a la brevedad."
+			/>
+			<div class="flex justify-end gap-3 pt-2">
+				<Button variant="secondary" onclick={() => { isReminderModalOpen = false; reminderMessage = ''; }}>
+					Cancelar
+				</Button>
+				<Button onclick={handleSendReminder} loading={sendingReminder} disabled={!reminderMessage.trim()}>
+					Enviar
+				</Button>
+			</div>
+		</div>
+	</Modal>
 </div>

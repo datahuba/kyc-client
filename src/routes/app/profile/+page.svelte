@@ -11,6 +11,8 @@
 	import { FileUpload } from '$lib/components/ui';
 	import DocumentRow from '$lib/components/ui/documentRow.svelte';
 	import type { Student, UpdateStudentSelfRequest, TituloData } from '$lib/interfaces/student.interface';
+	import { authService } from '$lib/services';
+	import { ExclamationCircleIcon } from '$lib/icons/solid';
 
 	let loading = $state(false);
 	let profileData: any = $state(null);
@@ -18,6 +20,9 @@
 	let editMode = $state(false);
 	let uploadingPhoto = $state(false);
 	let uploadingDoc = $state<string | null>(null);
+
+	// ISSUE-A-VERIFICACION: no bloqueante, solo informativo
+	let resendingVerification = $state(false);
 
 	// Datos editables
 	let editData = $state<UpdateStudentSelfRequest>({
@@ -74,6 +79,21 @@
 			error = e.message || 'Error al cargar perfil';
 		} finally {
 			loading = false;
+		}
+	}
+
+	// ISSUE-A-VERIFICACION: reenvío manual desde el perfil. No bloqueante --
+	// si falla o el usuario nunca lo hace, el sistema sigue funcionando igual.
+	async function handleResendVerification() {
+		if (resendingVerification) return;
+		resendingVerification = true;
+		try {
+			const res = await authService.resendVerification();
+			alert('success', res.message);
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo enviar el correo de verificación');
+		} finally {
+			resendingVerification = false;
 		}
 	}
 
@@ -288,7 +308,29 @@
 						<div class="space-y-6">
 							<div class="grid gap-6 sm:grid-cols-2">
 								<Input label="Nombre Completo" value={profileData.nombre} disabled />
-								<Input label="Email" value={profileData.email} disabled icon={MailIcon} />
+								<div>
+									<Input label="Email" value={profileData.email} disabled icon={MailIcon} />
+									<!-- ISSUE-A-VERIFICACION: aviso no bloqueante, solo informativo -->
+									{#if profileData.email && !profileData.email_verificado}
+										<p class="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-light-warning dark:text-dark-warning">
+											<ExclamationCircleIcon class="size-3.5 shrink-0" />
+											Correo sin verificar.
+											<button
+												type="button"
+												onclick={handleResendVerification}
+												disabled={resendingVerification}
+												class="font-semibold underline hover:no-underline disabled:opacity-50"
+											>
+												{resendingVerification ? 'Enviando...' : 'Reenviar enlace'}
+											</button>
+										</p>
+									{:else if profileData.email && profileData.email_verificado}
+										<p class="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-light-success dark:text-dark-success">
+											<CheckIcon class="size-3.5 shrink-0" />
+											Correo verificado
+										</p>
+									{/if}
+								</div>
 								<Input label="Carnet" value={profileData.carnet} disabled icon={IdentificationIcon} />
 								<Input label="Extensión" value={profileData.extension} disabled />
 								<Input 

@@ -75,6 +75,59 @@ class PaymentService {
 		return await apiKyC.put<Payment>(`/payments/${id}/anular`, { motivo });
 	}
 
+	// ISSUE-P-REPORTE: tabla interactiva de ingresos por fecha/curso/estado
+	async getReporteCaja(
+		page = 1,
+		per_page = 20,
+		filters?: {
+			fecha_desde?: string;
+			fecha_hasta?: string;
+			curso_id?: string;
+			estado?: string;
+		}
+	): Promise<import('$lib/interfaces/response.interface').PaginatedResponse<Payment> & { resumen: ReporteCajaResumen }> {
+		const params = new URLSearchParams({
+			page: page.toString(),
+			per_page: per_page.toString()
+		});
+		if (filters?.fecha_desde) params.append('fecha_desde', filters.fecha_desde);
+		if (filters?.fecha_hasta) params.append('fecha_hasta', filters.fecha_hasta);
+		if (filters?.curso_id) params.append('curso_id', filters.curso_id);
+		if (filters?.estado) params.append('estado', filters.estado);
+
+		return await apiKyC.get(`/payments/reportes/caja?${params.toString()}`);
+	}
+
+	// ISSUE-P-REPORTE: descarga el Excel autenticado (requiere Authorization header,
+	// por eso no se puede usar un <a href> directo como en un endpoint público)
+	async downloadReporteCajaExcel(filters?: {
+		fecha_desde?: string;
+		fecha_hasta?: string;
+		curso_id?: string;
+		estado?: string;
+	}): Promise<void> {
+		const params = new URLSearchParams();
+		if (filters?.fecha_desde) params.append('fecha_desde', filters.fecha_desde);
+		if (filters?.fecha_hasta) params.append('fecha_hasta', filters.fecha_hasta);
+		if (filters?.curso_id) params.append('curso_id', filters.curso_id);
+		if (filters?.estado) params.append('estado', filters.estado);
+
+		const blob = await apiKyC.getBlob(`/payments/reportes/excel?${params.toString()}`);
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = `reporte_caja_${filters?.fecha_desde ?? ''}_${filters?.fecha_hasta ?? ''}.xlsx`;
+		link.click();
+		URL.revokeObjectURL(url);
+	}
+
+}
+
+export interface ReporteCajaResumen {
+	cantidad_pagos: number;
+	total_aprobado: number;
+	total_pendiente: number;
+	total_anulado: number;
 }
 
 export const paymentService = new PaymentService();

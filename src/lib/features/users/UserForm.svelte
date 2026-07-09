@@ -5,6 +5,8 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import Select from '$lib/components/ui/select.svelte';
+	import Card from '$lib/components/ui/card.svelte';
+	import Checkbox from '$lib/components/ui/checkbox.svelte';
 	import { alert } from '$lib/utils';
 	import { CheckIcon } from '$lib/icons/outline';
 
@@ -23,6 +25,10 @@ interface Props {
 	let disableRoleSelect = $derived(isEditMode && isEditingSelf);
 	let saving = $state(false);
 
+	// ISSUE-REFACTOR (UI): validación inline por campo (estilo CourseForm/StudentForm)
+	// en vez de depender solo de un único mensaje mostrado con alert().
+	let errors: Record<string, string> = $state({});
+
 	let formData: CreateUserRequest = $state({
 		username: '',
 		email: '',
@@ -30,8 +36,16 @@ interface Props {
 		role: null,
 		activo: true,
 		nombre_funcional: '',
-		cursos_asignados: []
+		cursos_asignados: [],
+		carnet: ''
 	});
+
+	// GAP-1 (audio 2026-07-08): si se completa el CI y se deja la contraseña en
+	// blanco al crear, el backend genera automáticamente 'Uagrm.<CI>' como
+	// contraseña inicial (convención institucional confirmada por el usuario).
+	let passwordAutogenerada = $derived(
+		!isEditMode && !!formData.carnet?.trim() && !formData.password?.trim()
+	);
 
 	// ISSUE-R-ROLES / ISSUE-R-PERFIL-GENERICO: roles que requieren nombre funcional
 	// (por función/programa, no por persona) para poder rotar al responsable sin
@@ -43,7 +57,6 @@ interface Props {
 	let requiereCursosAsignados = $derived(formData.role === 'encargado_curso');
 
 	let cursosDisponibles: Course[] = $state([]);
-	let errorNombreFuncional = $state('');
 
 	$effect(() => {
 		// Cargar cursos activos una sola vez, se usan en el multi-select de
@@ -76,7 +89,8 @@ interface Props {
 				role: user.role,
 				activo: user.activo,
 				nombre_funcional: user.nombre_funcional ?? '',
-				cursos_asignados: user.cursos_asignados ?? []
+				cursos_asignados: user.cursos_asignados ?? [],
+				carnet: user.carnet ?? ''
 			};
 		} else {
 			formData = {
@@ -86,9 +100,11 @@ interface Props {
 				role: null,
 				activo: true,
 				nombre_funcional: '',
-				cursos_asignados: []
+				cursos_asignados: [],
+				carnet: ''
 			};
 		}
+		errors = {};
 	});
 
 	function toggleCurso(cursoId: string) {
@@ -100,17 +116,48 @@ interface Props {
 		}
 	}
 
+	// ISSUE-REFACTOR (UI): validación inline por campo antes de enviar.
 	function validarFormulario(): boolean {
-		errorNombreFuncional = '';
-		if (requiereNombreFuncional && !formData.nombre_funcional?.trim()) {
-			errorNombreFuncional = 'El nombre funcional es obligatorio para Encargado de Curso, Coordinador y Cobranza.';
-			return false;
+		const nuevosErrores: Record<string, string> = {};
+
+		if (!formData.username?.trim()) {
+			nuevosErrores.username = 'El nombre de usuario es obligatorio.';
 		}
-		return true;
+		if (!formData.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+			nuevosErrores.email = 'Ingresa un correo electrónico válido.';
+		}
+		if (!formData.role) {
+			nuevosErrores.role = 'Selecciona un rol.';
+		}
+		if (formData.carnet?.trim() && !/^\d{5,10}$/.test(formData.carnet.trim())) {
+			nuevosErrores.carnet = 'El carnet debe tener entre 5 y 10 dígitos (solo números).';
+		}
+		// GAP-1: al crear, la contraseña es obligatoria SALVO que se provea un
+		// carnet (en ese caso el backend la autogenera como 'Uagrm.<CI>').
+		// Si se escribe una contraseña de todos modos, debe cumplir el mínimo.
+		if (!isEditMode) {
+			const tieneCarnet = !!formData.carnet?.trim();
+			const tienePassword = !!formData.password?.trim();
+			if (tienePassword && formData.password!.length < 5) {
+				nuevosErrores.password = 'La contraseña debe tener al menos 5 caracteres.';
+			} else if (!tienePassword && !tieneCarnet) {
+				nuevosErrores.password = 'La contraseña debe tener al menos 5 caracteres, o completa el Carnet de Identidad para generarla automáticamente.';
+			}
+		}
+		if (requiereNombreFuncional && !formData.nombre_funcional?.trim()) {
+			nuevosErrores.nombre_funcional = 'El nombre funcional es obligatorio para Encargado de Curso, Coordinador y Cobranza.';
+		}
+		if (requiereCursosAsignados && (formData.cursos_asignados ?? []).length === 0) {
+			nuevosErrores.cursos_asignados = 'Selecciona al menos un curso para este Encargado de Curso.';
+		}
+
+		errors = nuevosErrores;
+		return Object.keys(nuevosErrores).length === 0;
 	}
 
 	async function handleSubmit() {
 		if (!validarFormulario()) {
+			alert('error', 'Revisa los campos marcados en rojo antes de continuar.');
 			return;
 		}
 
@@ -126,18 +173,19 @@ interface Props {
 				return;
 			}
 
-			// Si el rol no requiere estos campos, no los enviamos con basura residual
+			// Si el rol no requiere estos campos, no los enviamos con basura residual.
+			// GAP-1: 'password' y 'carnet' vacíos se envían como undefined (una
+			// cadena vacía '' rompería la validación min_length=5 del backend).
 			const payload: CreateUserRequest = {
 				...formData,
+				password: formData.password?.trim() || undefined,
+				carnet: formData.carnet?.trim() || undefined,
 				nombre_funcional: requiereNombreFuncional ? formData.nombre_funcional : undefined,
 				cursos_asignados: requiereCursosAsignados ? formData.cursos_asignados : undefined
 			};
 
 			if (isEditMode && user) {
-				await userService.update(user._id, {
-					...payload,
-					password: formData.password || undefined
-				});
+				await userService.update(user._id, payload);
 				alert('success', 'Usuario actualizado correctamente');
 			} else {
 				await userService.create(payload);
@@ -153,136 +201,164 @@ interface Props {
 </script>
 
 <form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-	<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-		<Input
-			label="Nombre de Usuario"
-			id="username"
-			bind:value={formData.username}
-			required
-			placeholder="usuario1"
-		/>
-		<Input
-			label="Email"
-			id="email"
-			type="email"
-			bind:value={formData.email}
-			required
-			placeholder="usuario@kyc.com"
-		/>
-		
-		<!-- ISSUE L/M/R: Selector de Roles alineado a la jerarquía de Postgrado UAGRM -->
-		<Select
-			label="Rol"
-			bind:value={formData.role}
-			disabled={disableRoleSelect}
-			required
-		>
-			<option value="superadmin">Superadmin (Soporte Técnico)</option>
-			<option value="admin">Administrador General</option>
-			<option value="mae">MAE (Decano / Director / JAF)</option>
-			<option value="cpd">CPD (Gestión Académica)</option>
-			<option value="cobranza">Cobranza (Cuentas por Cobrar)</option>
-			<option value="coordinador">Coordinador (Área)</option>
-			<option value="encargado_curso">Encargado de Curso/Programa</option>
-			<option value="docente">Docente</option>
-		</Select>
+	<Card variant="ghost" padding="none">
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+			<Input
+				label="Nombre de Usuario"
+				id="username"
+				bind:value={formData.username}
+				required
+				placeholder="usuario1"
+				error={errors.username}
+			/>
+			<Input
+				label="Email"
+				id="email"
+				type="email"
+				bind:value={formData.email}
+				required
+				placeholder="usuario@kyc.com"
+				error={errors.email}
+			/>
 
-		{#if disableRoleSelect}
-			<p class="-mt-3 text-xs text-amber-600 dark:text-amber-400 md:col-span-2">
-				No puedes cambiar tu propio rol.
-			</p>
-		{/if}
-
-		{#if requiereNombreFuncional}
-			<div class="md:col-span-2">
+			<!-- GAP-1 (audio 2026-07-08): CI del personal. Si se completa al crear
+			     y se deja la contraseña en blanco, el backend genera automáticamente
+			     'Uagrm.<CI>' como contraseña inicial (convención institucional). -->
+			<div>
 				<Input
-					label="Nombre Funcional (por función/programa, no por persona)"
-					id="nombre_funcional"
-					bind:value={formData.nombre_funcional}
-					required
-					placeholder="Ej: Encargado Maestría Gerencia Tributaria / Cajero Ventanilla 1"
+					label="Carnet de Identidad (CI)"
+					id="carnet"
+					bind:value={formData.carnet}
+					inputmode="numeric"
+					pattern="[0-9]*"
+					minlength={5}
+					maxlength={10}
+					placeholder="Ej: 1234567"
+					error={errors.carnet}
 				/>
-				{#if errorNombreFuncional}
-					<p class="mt-1 text-xs text-red-600 dark:text-red-400">{errorNombreFuncional}</p>
-				{:else}
-					<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-						Este nombre es visible en notificaciones y reportes; permite rotar al responsable sin
-						perder el historial.
+				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+					Opcional. Si lo completas y dejas la contraseña en blanco al crear, la contraseña inicial
+					será <span class="font-mono">Uagrm.{formData.carnet?.trim() || '<CI>'}</span>.
+				</p>
+			</div>
+
+			<!-- ISSUE L/M/R: Selector de Roles alineado a la jerarquía de Postgrado UAGRM -->
+			<div>
+				<Select
+					label="Rol"
+					bind:value={formData.role}
+					disabled={disableRoleSelect}
+					required
+					error={errors.role}
+				>
+					<option value="superadmin">Superadmin (Soporte Técnico)</option>
+					<option value="admin">Administrador General</option>
+					<option value="mae">MAE (Decano / Director / JAF)</option>
+					<option value="cpd">CPD (Gestión Académica)</option>
+					<option value="cobranza">Cobranza (Cuentas por Cobrar)</option>
+					<option value="coordinador">Coordinador (Área)</option>
+					<option value="encargado_curso">Encargado de Curso/Programa</option>
+					<option value="docente">Docente</option>
+				</Select>
+				{#if disableRoleSelect}
+					<p class="mt-1 text-xs text-light-warning dark:text-dark-warning">
+						No puedes cambiar tu propio rol.
 					</p>
 				{/if}
 			</div>
-		{/if}
 
-		{#if requiereCursosAsignados}
-			<div class="md:col-span-2">
-				<span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-					Cursos Asignados
-				</span>
-				<div
-					class="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-gray-300 p-3 dark:border-gray-600"
-				>
-					{#if cursosDisponibles.length === 0}
-						<p class="text-sm text-gray-500 dark:text-gray-400">No hay cursos activos disponibles.</p>
-					{:else}
-						{#each cursosDisponibles as curso (curso._id)}
-							<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-								<input
-									type="checkbox"
-									checked={(formData.cursos_asignados ?? []).includes(curso._id)}
-									onchange={() => toggleCurso(curso._id)}
-									class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-								/>
-								{curso.nombre_programa} ({curso.codigo})
-							</label>
-						{/each}
+			{#if !isEditMode}
+				<div>
+					<Input
+						label="Contraseña"
+						id="password"
+						type="password"
+						bind:value={formData.password}
+						required={!formData.carnet?.trim()}
+						placeholder={formData.carnet?.trim() ? 'Opcional si completas el CI' : '********'}
+						error={errors.password}
+					/>
+					{#if passwordAutogenerada}
+						<p class="mt-1 text-xs text-light-tertiary dark:text-dark-tertiary">
+							Se generará automáticamente como <span class="font-mono">Uagrm.{formData.carnet?.trim()}</span>.
+						</p>
 					{/if}
 				</div>
-				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-					Este usuario solo verá e inscribirá estudiantes en los cursos marcados.
-				</p>
-			</div>
+			{:else}
+				<Input
+					label="Nueva Contraseña (Opcional)"
+					id="password"
+					type="password"
+					bind:value={formData.password}
+					placeholder="Dejar en blanco para mantener actual"
+					error={errors.password}
+				/>
+			{/if}
+
+			{#if requiereNombreFuncional}
+				<div class="md:col-span-2">
+					<Input
+						label="Nombre Funcional (por función/programa, no por persona)"
+						id="nombre_funcional"
+						bind:value={formData.nombre_funcional}
+						required
+						placeholder="Ej: Encargado Maestría Gerencia Tributaria / Cajero Ventanilla 1"
+						error={errors.nombre_funcional}
+					/>
+					{#if !errors.nombre_funcional}
+						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+							Este nombre es visible en notificaciones y reportes; permite rotar al responsable sin
+							perder el historial.
+						</p>
+					{/if}
+				</div>
+			{/if}
+
+			{#if requiereCursosAsignados}
+				<div class="md:col-span-2">
+					<span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+						Cursos Asignados <span class="text-light-error">*</span>
+					</span>
+					<div
+						class="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-light-four bg-white p-3 dark:border-dark-border dark:bg-dark-surface {errors.cursos_asignados
+							? 'border-light-error dark:border-dark-error'
+							: ''}"
+					>
+						{#if cursosDisponibles.length === 0}
+							<p class="text-sm text-gray-500 dark:text-gray-400">No hay cursos activos disponibles.</p>
+						{:else}
+							{#each cursosDisponibles as curso (curso._id)}
+								<Checkbox
+									id={`curso_${curso._id}`}
+									label={`${curso.nombre_programa} (${curso.codigo})`}
+									checked={(formData.cursos_asignados ?? []).includes(curso._id)}
+									onchange={() => toggleCurso(curso._id)}
+								/>
+							{/each}
+						{/if}
+					</div>
+					{#if errors.cursos_asignados}
+						<p class="mt-1 text-sm text-light-error">{errors.cursos_asignados}</p>
+					{:else}
+						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+							Este usuario solo verá e inscribirá estudiantes en los cursos marcados.
+						</p>
+					{/if}
+				</div>
+			{/if}
+		</div>
+	</Card>
+
+	<Card variant="ghost" padding="none">
+		<Checkbox id="activo" label="Usuario Activo" bind:checked={formData.activo} disabled={disableActivoCheckbox} />
+		{#if disableActivoCheckbox}
+			<p class="mt-1 ml-6 text-xs text-light-warning dark:text-dark-warning">
+				No puedes desactivar tu propia cuenta.
+			</p>
 		{/if}
+	</Card>
 
-		{#if !isEditMode}
-			<Input
-				label="Contraseña"
-				id="password"
-				type="password"
-				bind:value={formData.password}
-				required={!isEditMode}
-				placeholder="********"
-			/>
-		{:else}
-			<Input
-				label="Nueva Contraseña (Opcional)"
-				id="password"
-				type="password"
-				bind:value={formData.password}
-				placeholder="Dejar en blanco para mantener actual"
-			/>
-		{/if}
-	</div>
-
-	<div class="flex items-center gap-2 pt-4">
-		<input
-			type="checkbox"
-			id="activo"
-			bind:checked={formData.activo}
-			disabled={disableActivoCheckbox}
-			class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-		/>
-		<label for="activo" class="text-sm font-medium text-gray-700 dark:text-gray-300">
-			Usuario Activo
-		</label>
-	</div>
-
-	{#if disableActivoCheckbox}
-		<p class="-mt-3 text-xs text-amber-600 dark:text-amber-400">
-			No puedes desactivar tu propia cuenta.
-		</p>
-	{/if}
-
-	<div class="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+	<div class="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-dark-border">
 		<Button type="button" variant="secondary" onclick={onCancel}>
 			Cancelar
 		</Button>

@@ -10,6 +10,8 @@ class EnrollmentService {
 			estado?: string;
 			curso_id?: string;
 			estudiante_id?: string;
+			con_descuento?: boolean;
+			descuento_id?: string;
 		}
 	): Promise<import('$lib/interfaces/response.interface').PaginatedResponse<Enrollment>> {
 		const params = new URLSearchParams({
@@ -21,6 +23,8 @@ class EnrollmentService {
 		if (filters?.estado) params.append('estado', filters.estado);
 		if (filters?.curso_id) params.append('curso_id', filters.curso_id);
 		if (filters?.estudiante_id) params.append('estudiante_id', filters.estudiante_id);
+		if (filters?.con_descuento !== undefined) params.append('con_descuento', filters.con_descuento.toString());
+		if (filters?.descuento_id) params.append('descuento_id', filters.descuento_id);
 
 		return await apiKyC.get<import('$lib/interfaces/response.interface').PaginatedResponse<Enrollment>>(
 			`/enrollments/?${params.toString()}`
@@ -32,7 +36,11 @@ class EnrollmentService {
 	}
 
 	async update(id: string, data: UpdateEnrollmentRequest): Promise<Enrollment> {
-		return await apiKyC.put<Enrollment>(`/enrollments/${id}`, data);
+		// BUG PREEXISTENTE encontrado al verificar EnrollmentForm (ISSUE-REFACTOR):
+		// el backend expone PATCH /enrollments/{id}, pero este servicio llamaba a
+		// apiKyC.put() (método HTTP PUT) — la edición de inscripciones nunca
+		// había funcionado (405 Method Not Allowed). Corregido a patch().
+		return await apiKyC.patch<Enrollment>(`/enrollments/${id}`, data);
 	}
 
 	async delete(id: string): Promise<Enrollment> {
@@ -90,12 +98,44 @@ class EnrollmentService {
 	}
 
 	// === ISSUE-P-CONGELADO: congelamiento voluntario y reactivación ===
-	async congelarInscripcion(enrollmentId: string): Promise<Enrollment> {
-		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/congelar`, {});
+	// AUDITORÍA (#6): el backend ya NO asume por defecto que la tasa de
+	// congelamiento fue pagada (antes lo hacía sin ningún Payment real
+	// asociado). El caller debe indicar explícitamente si Cobranza ya
+	// registró el cobro de la tasa antes de congelar.
+	async congelarInscripcion(enrollmentId: string, tasaPagada: boolean): Promise<Enrollment> {
+		return await apiKyC.post<Enrollment>(
+			`/enrollments/${enrollmentId}/congelar?tasa_pagada=${tasaPagada}`,
+			{}
+		);
 	}
 
 	async reactivarDesdeCongeladoOAbandono(enrollmentId: string): Promise<Enrollment> {
 		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/reactivar-congelado`, {});
+	}
+
+	// === ISSUE-Q-DOCUMENTOS-KYC: el estudiante sube el documento de un requisito ===
+	async subirRequisito(enrollmentId: string, index: number, file: File): Promise<import('$lib/interfaces').Requisito> {
+		const formData = new FormData();
+		formData.append('file', file);
+		return await apiKyC.put<import('$lib/interfaces').Requisito>(
+			`/enrollments/${enrollmentId}/requisitos/${index}`,
+			formData
+		);
+	}
+
+	// === ISSUE-Q-DOCUMENTOS-KYC: CPD/Encargado de Curso aprueban o rechazan el documento ===
+	async aprobarRequisito(enrollmentId: string, index: number): Promise<import('$lib/interfaces').Requisito> {
+		return await apiKyC.put<import('$lib/interfaces').Requisito>(
+			`/enrollments/${enrollmentId}/requisitos/${index}/aprobar`,
+			{}
+		);
+	}
+
+	async rechazarRequisito(enrollmentId: string, index: number, motivo: string): Promise<import('$lib/interfaces').Requisito> {
+		return await apiKyC.put<import('$lib/interfaces').Requisito>(
+			`/enrollments/${enrollmentId}/requisitos/${index}/rechazar`,
+			{ motivo }
+		);
 	}
 }
 

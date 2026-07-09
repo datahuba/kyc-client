@@ -216,7 +216,12 @@
         const modulo = enrollment.modulos[moduleIndexBase0];
         // ISSUE-Q-NOTA-BORRADOR: si hay un borrador pendiente, tiene prioridad visual sobre el estado académico
         if (modulo.estado_validacion_nota === 'pendiente_validacion') {
-            return { label: `Borrador: ${modulo.nota_borrador} (esperando CPD)`, class: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' };
+            // ISSUE-Q-TEXTO-BORRADOR (2026-07-08, reunión de postgrado contaduría):
+            // el texto "(esperando CPD)" sonaba negativo/como si algo estuviera
+            // detenido por el docente. Cambiado a un texto neutral/positivo que
+            // confirma que la nota YA fue cargada y solo falta el paso de
+            // validación institucional (no depende de que el docente haga nada más).
+            return { label: `Cargada: ${modulo.nota_borrador} (pendiente de validación)`, class: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' };
         }
         if (modulo.nota === null || modulo.nota === undefined) return { label: 'Cursando', class: 'bg-blue-100 text-blue-800' };
         if (modulo.nota >= 51) return { label: 'Aprobado', class: 'bg-green-100 text-green-800' };

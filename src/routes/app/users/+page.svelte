@@ -75,7 +75,12 @@
 				currentPage += 1;
 			}
 			coursesById = map;
-		} catch {
+		} catch (e) {
+			// AUDITORÍA: catch totalmente silencioso (sin log ni alerta al
+			// usuario) -- si esto fallaba, los badges de curso quedaban
+			// vacíos sin ninguna pista de que algo salió mal.
+			console.error('Error al cargar el mapa de cursos para Usuarios', e);
+			alert('error', 'No se pudieron cargar los nombres de los cursos asignados.');
 			coursesById = {};
 		}
 	}

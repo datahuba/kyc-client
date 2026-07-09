@@ -9,7 +9,7 @@
 		importFile: File | null;
 		importTipoEstudiante: 'interno' | 'externo';
 		importCursoId: string;
-		importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[] } | null;
+		importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color?: Record<string, string[]> } | null;
 		courses: Course[];
 		onClose: () => void;
 		onDownloadTemplate: () => void;
@@ -40,6 +40,15 @@
 	<div class="p-6 space-y-6">
 		<div class="text-sm text-gray-500 dark:text-gray-400 space-y-2">
 			<p>Sube una hoja de cálculo con la lista de estudiantes para registrarlos en lote de manera automática.</p>
+			<ul class="text-xs list-disc pl-4 space-y-1">
+				<li>El sistema detecta automáticamente columnas de Nombre, Apellido, Carnet, Registro, Email, Celular, Domicilio, Fecha de Nacimiento y Grupo Sanguíneo (sin importar el orden).</li>
+				<li>La fecha de nacimiento se interpreta automáticamente, sin importar si el archivo la trae en formato DD/MM/AAAA o MM/DD/AAAA.</li>
+				<li>Si un carnet trae un complemento con guion (ej. "2726683 - 1J"), se separa: el número se usa para el CI y el complemento se guarda aparte (visible en el detalle del estudiante).</li>
+				<li>Si el archivo no trae columna de Registro, se usa el Carnet (ya limpio) como usuario/registro.</li>
+				<li>La contraseña inicial siempre es <span class="font-mono">Uagrm.&lt;CI&gt;</span> (misma convención que docentes/staff).</li>
+				<li>El tipo Interno/Externo se infiere automáticamente si el archivo trae la Extensión del CI (Santa Cruz = Interno, cualquier otro lugar = Externo); si no la trae, se usa la opción seleccionada abajo.</li>
+				<li>Si el archivo marca filas con colores y trae una leyenda (ej. una celda amarilla junto al texto "Descuento Facultad"), el reporte final indicará qué estudiantes quedaron marcados con cada color — no se crea ni asigna ningún descuento automáticamente, eso lo decides tú después.</li>
+			</ul>
 		</div>
 
 		<div class="flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-100 dark:border-gray-700">
@@ -109,6 +118,19 @@
 				{/if}
 				{#if importReport.matricula_vouchers_count > 0}
 					<p class="text-xs text-amber-600 dark:text-amber-400 font-semibold">✓ {importReport.matricula_vouchers_count} comprobantes de matrícula registrados como pago PENDIENTE (requieren verificación de Cobranza/CPD).</p>
+				{/if}
+				{#if importReport.marcados_por_color && Object.keys(importReport.marcados_por_color).length > 0}
+					<div class="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+						<p class="text-xs font-bold text-amber-600 dark:text-amber-400">
+							🎨 El archivo tenía filas marcadas con colores. Revisa manualmente si corresponde crear/asignar un descuento:
+						</p>
+						{#each Object.entries(importReport.marcados_por_color) as [significado, nombres]}
+							<div class="text-[11px]">
+								<span class="font-semibold text-gray-700 dark:text-gray-300">{significado} ({nombres.length}):</span>
+								<span class="text-gray-500 dark:text-gray-400"> {nombres.join(', ')}</span>
+							</div>
+						{/each}
+					</div>
 				{/if}
 				{#if importReport.errors.length > 0}
 					<div class="space-y-1">

@@ -45,8 +45,20 @@
 	let studentsList: Student[] = $state([]);
 	let coursesList: Course[] = $state([]);
 
+	// ISSUE-P-SEGMENTACION: si el usuario (Cobranza/Encargado de Curso) tiene
+	// cursos_asignados no vacío, el selector de curso del filtro solo debe
+	// mostrar esos cursos (el backend ya rechaza/filtra el resto, esto es
+	// solo para no ofrecer una opción que de todos modos será vacía/403).
+	let cursosAsignadosUsuario = $derived($userStore.user?.cursos_asignados ?? []);
+	let coursesListFiltrada = $derived(
+		cursosAsignadosUsuario.length > 0
+			? coursesList.filter((c) => cursosAsignadosUsuario.includes(c._id))
+			: coursesList
+	);
+
 	// State Modals
 	let isCreateModalOpen = $state(false);
+	let preselectedEnrollmentId: string | undefined = $state(undefined);
 	let isApproveModalOpen = $state(false);
 	let isRejectModalOpen = $state(false);
 	let isRevertModalOpen = $state(false); // ISSUE-P-CANALES: Modal de anulación
@@ -148,6 +160,16 @@
 		if (cursoIdParam) {
 			filters.curso_id = cursoIdParam;
 		}
+
+		// Atajo directo desde "Ver Libreta -> Pagar Saldo Pendiente": abre el
+		// modal de registro de pago con esa inscripción ya preseleccionada,
+		// sin que el estudiante tenga que buscarla/seleccionarla de nuevo.
+		const pagarEnrollmentId = $appPage.url.searchParams.get('pagar');
+		if (pagarEnrollmentId && isStudent) {
+			preselectedEnrollmentId = pagarEnrollmentId;
+			isCreateModalOpen = true;
+		}
+
 		loadPayments();
 	});
 
@@ -399,6 +421,12 @@
 			<p class="text-gray-500 dark:text-gray-400 text-sm mt-1">
 				{#if isStaff}Administre los pagos recibidos{:else}Historial de sus pagos realizados{/if}
 			</p>
+			<!-- ISSUE-P-SEGMENTACION: aviso visible de por qué solo se ven ciertos cursos -->
+			{#if isCobranza && cursosAsignadosUsuario.length > 0}
+				<p class="mt-1 text-xs font-medium text-uagrm-sky">
+					Vista segmentada: solo se muestran pagos de los {cursosAsignadosUsuario.length} curso(s) asignado(s) a tu cuenta.
+				</p>
+			{/if}
 		</div>
 		
 		<div class="flex gap-3 w-full md:w-auto">
@@ -465,7 +493,7 @@
 								: 'ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-white dark:ring-gray-600'}"
 					>
 						<option value="">Todos los cursos</option>
-						{#each coursesList as course (course._id)}
+						{#each coursesListFiltrada as course (course._id)}
 							<option value={course._id}>{course.nombre_programa}</option>
 						{/each}
 						</select>
@@ -503,9 +531,9 @@
 		<TableSkeleton columns={11} rows={10} />
 	{:else}
 		<!-- ISSUE-X-COMPACT: Tabla consolidada SIN scroll horizontal (desktop) -->
-		<div class="hidden lg:block border border-gray-200 dark:border-dark-border rounded-lg shadow-sm overflow-hidden">
+		<div class="hidden lg:block border border-gray-200 dark:border-dark-border rounded-lg shadow-sm">
 			<table class="w-full table-fixed divide-y divide-gray-200 dark:divide-dark-border">
-				<thead class="bg-gray-50 dark:bg-dark-background">
+				<thead class="bg-gray-50 dark:bg-dark-background rounded-t-lg">
 					<tr>
 						<th scope="col" class="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transacción</th>
 						<th scope="col" class="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
@@ -666,15 +694,17 @@
 	<Modal
 		isOpen={isCreateModalOpen}
 		title="Registrar Nuevo Pago"
-		onClose={() => isCreateModalOpen = false}
+		onClose={() => { isCreateModalOpen = false; preselectedEnrollmentId = undefined; }}
 		maxWidth="sm:max-w-xl"
 	>
 		<PaymentForm 
+			{preselectedEnrollmentId}
 			onSuccess={() => {
 				isCreateModalOpen = false;
+				preselectedEnrollmentId = undefined;
 				loadPayments();
 			}}
-			onCancel={() => isCreateModalOpen = false}
+			onCancel={() => { isCreateModalOpen = false; preselectedEnrollmentId = undefined; }}
 		/>
 	</Modal>
 
@@ -848,8 +878,32 @@
 					{/if}
 				</div>
 
-				<div class="flex justify-end">
+				<!-- ISSUE-Q-MODAL-PAGO-ACCIONES: botones de Aprobar/Rechazar directamente
+				     en el modal de detalles/comprobante, para no tener que cerrarlo y
+				     buscarlos en el menú de tres puntos de la tabla. Reutiliza
+				     canApproveReject/handleApproveClick/handleRejectClick tal cual
+				     (mismo criterio de autorización por rol y concepto de pago). -->
+				<div class="flex justify-end gap-3">
 					<Button variant="secondary" onclick={() => selectedPayment = null}>Cerrar</Button>
+					{#if canApproveReject(selectedPayment)}
+						<Button
+							variant="destructive"
+							onclick={() => { const p = selectedPayment; selectedPayment = null; if (p) handleRejectClick(p); }}
+						>
+							{#snippet leftIcon()}
+								<XIcon class="size-5" />
+							{/snippet}
+							Rechazar
+						</Button>
+						<Button
+							onclick={() => { const p = selectedPayment; selectedPayment = null; if (p) handleApproveClick(p); }}
+						>
+							{#snippet leftIcon()}
+								<CheckIcon class="size-5" />
+							{/snippet}
+							Aprobar
+						</Button>
+					{/if}
 				</div>
 			</div>
 		{/if}

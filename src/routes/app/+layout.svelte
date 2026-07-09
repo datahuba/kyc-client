@@ -104,7 +104,7 @@
 		<Watermark />
 		<Header onOpenSidebar={() => sidebarOpen = true} />
 
-		<main class="relative z-10 flex-1 overflow-y-auto p-6">
+		<main class="relative flex-1 overflow-y-auto p-6">
 			{@render children?.()}
 		</main>
 	</div>

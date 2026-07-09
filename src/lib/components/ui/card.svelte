@@ -6,7 +6,9 @@
 		// Variantes de diseño
 		variant?: 'default' | 'bordered' | 'elevated' | 'ghost';
 
-		// Tamaños
+		// Tamaños: SOLO limita el ancho máximo si se especifica explícitamente.
+		// Por defecto el Card ocupa el 100% del ancho de su contenedor (uso más
+		// común: secciones de formulario, grids de tarjetas, tablas responsive).
 		size?: 'sm' | 'md' | 'lg';
 
 		// Estados
@@ -29,7 +31,7 @@
 
 	let {
 		variant = 'default',
-		size = 'md',
+		size,
 		interactive = false,
 		disabled = false,
 		padding = 'md',
@@ -52,8 +54,11 @@
 		ghost: 'bg-transparent border-0 shadow-none'
 	};
 
-	// Tamaños
-	const sizeClasses = {
+	// Tamaños: mapa opcional. Sin `size`, el Card no restringe su ancho
+	// (bug encontrado 2026-07-06: antes el default 'md' forzaba max-w-md en
+	// TODO Card sin excepción, aplastando secciones de formulario de varias
+	// columnas dentro de modales anchos — ver CourseForm/StudentForm).
+	const sizeClasses: Record<string, string> = {
 		sm: 'max-w-sm',
 		md: 'max-w-md',
 		lg: 'max-w-lg xl:max-w-xl'
@@ -80,7 +85,7 @@
 	const cardClasses = [
 		baseClasses,
 		variantClasses[variant],
-		sizeClasses[size],
+		size ? sizeClasses[size] : '',
 		paddingClasses[padding],
 		interactiveClasses,
 		disabledClasses,

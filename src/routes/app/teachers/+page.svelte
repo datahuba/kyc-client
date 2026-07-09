@@ -13,10 +13,14 @@
 	let error = $state('');
 	
 	let showNewTeacherModal = $state(false);
+	// GAP-1 (audio 2026-07-08): al crear un docente, si se completa el Carnet
+	// de Identidad (CI) y se deja la contraseña en blanco, el backend genera
+	// automáticamente la contraseña inicial 'Uagrm.<CI>' (convención institucional).
 	let newTeacher = $state({
 		username: '',
 		email: '',
 		password: '',
+		carnet: '',
 		role: TEACHER_ROLE
 	});
 	
@@ -26,6 +30,7 @@
 		username: '',
 		email: '',
 		password: '',
+		carnet: '',
 		activo: true
 	});
 
@@ -47,8 +52,14 @@
 	});
 
 	async function handleCreateTeacher() {
-		if (!newTeacher.username || !newTeacher.email || !newTeacher.password) {
-			error = 'Todos los campos son obligatorios';
+		// GAP-1: la contraseña ya no es obligatoria si se completa el Carnet
+		// (el backend la autogenera como 'Uagrm.<CI>').
+		if (!newTeacher.username || !newTeacher.email || (!newTeacher.password && !newTeacher.carnet)) {
+			error = 'Usuario y Email son obligatorios. Completa la Contraseña o el Carnet de Identidad.';
+			return;
+		}
+		if (newTeacher.carnet && !/^\d{5,10}$/.test(newTeacher.carnet.trim())) {
+			error = 'El carnet debe tener entre 5 y 10 dígitos (solo números).';
 			return;
 		}
 
@@ -57,7 +68,8 @@
 			await userService.create({
 				username: newTeacher.username,
 				email: newTeacher.email,
-				password: newTeacher.password,
+				password: newTeacher.password?.trim() || undefined,
+				carnet: newTeacher.carnet?.trim() || undefined,
 				role: TEACHER_ROLE,
 				activo: true
 			});
@@ -69,6 +81,7 @@
 				username: '',
 				email: '',
 				password: '',
+				carnet: '',
 				role: TEACHER_ROLE
 			};
 			showNewTeacherModal = false;
@@ -86,6 +99,7 @@
 			username: teacher.username,
 			email: teacher.email,
 			password: '', 
+			carnet: teacher.carnet ?? '',
 			activo: teacher.activo
 		};
 		showEditTeacherModal = true;
@@ -98,6 +112,10 @@
 			error = 'Usuario y Email son obligatorios';
 			return;
 		}
+		if (editTeacherData.carnet && !/^\d{5,10}$/.test(editTeacherData.carnet.trim())) {
+			error = 'El carnet debe tener entre 5 y 10 dígitos (solo números).';
+			return;
+		}
 
 		isSubmitting = true;
 		try {
@@ -105,6 +123,7 @@
 				username: editTeacherData.username,
 				email: editTeacherData.email,
 				password: editTeacherData.password || undefined,
+				carnet: editTeacherData.carnet?.trim() || undefined,
 				activo: editTeacherData.activo
 			});
 
@@ -262,16 +281,24 @@
 				<h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Crear Nuevo Docente</h2>
 				<div class="space-y-4">
 					<div>
-						<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuario</label>
-						<input type="text" bind:value={newTeacher.username} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="nombre_usuario" />
+						<label for="new-teacher-username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuario</label>
+						<input id="new-teacher-username" type="text" bind:value={newTeacher.username} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="nombre_usuario" />
 					</div>
 					<div>
-						<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
-						<input type="email" bind:value={newTeacher.email} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="docente@ejemplo.com" />
+						<label for="new-teacher-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+						<input id="new-teacher-email" type="email" bind:value={newTeacher.email} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="docente@ejemplo.com" />
 					</div>
 					<div>
-						<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contraseña</label>
-						<input type="password" bind:value={newTeacher.password} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="••••••••" />
+						<label for="new-teacher-carnet" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Carnet de Identidad (CI)</label>
+						<input id="new-teacher-carnet" type="text" inputmode="numeric" pattern="[0-9]*" maxlength={10} bind:value={newTeacher.carnet} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Ej: 1234567" />
+						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+							Opcional. Si lo completas y dejas la contraseña en blanco, la contraseña inicial será
+							<span class="font-mono">Uagrm.{newTeacher.carnet.trim() || '<CI>'}</span>.
+						</p>
+					</div>
+					<div>
+						<label for="new-teacher-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contraseña</label>
+						<input id="new-teacher-password" type="password" bind:value={newTeacher.password} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder={newTeacher.carnet.trim() ? 'Opcional si completas el CI' : '••••••••'} />
 					</div>
 				</div>
 				<div class="flex gap-3 mt-6">
@@ -295,6 +322,10 @@
 					<div>
 						<label for="edit-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
 						<input id="edit-email" type="email" bind:value={editTeacherData.email} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+					</div>
+					<div>
+						<label for="edit-carnet" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Carnet de Identidad (CI)</label>
+						<input id="edit-carnet" type="text" inputmode="numeric" pattern="[0-9]*" maxlength={10} bind:value={editTeacherData.carnet} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Ej: 1234567" />
 					</div>
 					<div>
 						<label for="edit-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nueva Contraseña (Opcional)</label>

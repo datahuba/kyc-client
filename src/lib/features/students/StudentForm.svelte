@@ -6,6 +6,8 @@
 	import Select from '$lib/components/ui/select.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import FileUpload from '$lib/components/ui/fileUpload.svelte';
+	import Card from '$lib/components/ui/card.svelte';
+	import Checkbox from '$lib/components/ui/checkbox.svelte';
 	import { alert } from '$lib/utils';
 	import { CheckIcon, EyeIcon, EyeOffIcon, AcademicCapIcon, UserIcon, IdentificationIcon, CollectionIcon } from '$lib/icons/outline';
 
@@ -23,10 +25,15 @@
 	let showPassword = $state(false);
 	let uploadProgress = $state('');
 
+	// ISSUE-REFACTOR (UI): validación inline por campo (estilo CourseForm/DiscountForm)
+	// en vez de depender solo de alert() al fallar el submit.
+	let errors: Record<string, string> = $state({});
+
 	// Form Data
 	let formData: CreateStudentRequest = $state({
 		registro: '',
 		carnet: '',
+		complemento_carnet: '',
 		nombre: '',
 		extension: '',
 		fecha_nacimiento: '',
@@ -67,7 +74,7 @@
 		año_expedicion: '',
 		universidad: ''
 	});
-	
+
 	let courses: Course[] = $state([]);
 	let selectedCourseName = $derived(courses.find((course) => course._id === formData.course_id)?.nombre_programa || '');
 
@@ -88,6 +95,7 @@
 			formData = {
 				registro: student.registro,
 				carnet: student.carnet || '',
+				complemento_carnet: student.complemento_carnet || '',
 				password: '',
 				course_id: student.lista_cursos_ids?.[0] || '',
 				nombre: student.nombre,
@@ -110,11 +118,9 @@
 				periodo: student.periodo || '',
 				tipo_sangre: student.tipo_sangre || '',
 				titulo_bachiller: student.titulo_bachiller || ''
-				// password: '',
-				//lista_cursos_ids: student.lista_cursos_ids || []
 			};
 			active = student.activo;
-			
+
 			if (student.titulo) {
 				tituloData = {
 					titulo: student.titulo.titulo,
@@ -125,12 +131,14 @@
 			} else {
 				tituloData = { titulo: '', numero_titulo: '', año_expedicion: '', universidad: '' };
 			}
-			// Note: We don't populate files for edit mode as they are re-uploads. (Except displaying previews which is handled by prop)
+			// Nota: en modo edición no se prellenan los inputs de archivo (son re-subidas);
+			// las vistas previas existentes se muestran vía la prop initialUrl de FileUpload.
 		} else {
 			// Reset form for new student
 			formData = {
 				registro: '',
 				carnet: '',
+				complemento_carnet: '',
 				course_id: '',
 				nombre: '',
 				extension: '',
@@ -152,46 +160,65 @@
 				periodo: '',
 				tipo_sangre: '',
 				titulo_bachiller: ''
-				//lista_cursos_ids: []
 			};
 			active = true;
 			tituloData = { titulo: '', numero_titulo: '', año_expedicion: '', universidad: '' };
 			photoFile = null; cvFile = null; carnetFile = null; afiliacionFile = null; tituloFile = null;
 		}
+		errors = {};
 	});
 
 	// Fecha máxima permitida para nacimiento (hoy; no se permiten fechas futuras)
 	const hoyISO = new Date().toISOString().split('T')[0];
 
-	// Validación de escritura en el cliente (feedback inmediato antes de enviar)
-	function validarFormulario(): string | null {
+	// ISSUE-REFACTOR (UI): validación inline por campo antes de enviar.
+	function validarFormulario(): boolean {
+		const nuevosErrores: Record<string, string> = {};
+
 		const nombre = (formData.nombre || '').trim();
 		const carnet = (formData.carnet || '').trim();
+		const extension = (formData.extension || '').trim();
 		const email = (formData.email || '').trim();
 		const celular = (formData.celular || '').trim();
+		const domicilio = (formData.domicilio || '').trim();
+		const registro = (formData.registro || '').trim();
 		const telefono = (formData.telefono || '').trim();
 
-		if (nombre.length < 3) return 'Ingresa el nombre completo (mínimo 3 caracteres).';
-		if (!/^\d{5,10}$/.test(carnet)) return 'El carnet debe tener entre 5 y 10 dígitos (solo números).';
-		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Ingresa un correo electrónico válido.';
-		if (celular && !/^\d{6,15}$/.test(celular)) return 'El celular debe contener solo números (6 a 15 dígitos).';
-		if (telefono && !/^\d{6,15}$/.test(telefono)) return 'El teléfono debe contener solo números.';
-		if (formData.fecha_nacimiento) {
+		if (nombre.length < 3) nuevosErrores.nombre = 'Ingresa el nombre completo (mínimo 3 caracteres).';
+		if (!/^\d{5,10}$/.test(carnet)) nuevosErrores.carnet = 'El carnet debe tener entre 5 y 10 dígitos (solo números).';
+		if (!extension) nuevosErrores.extension = 'La extensión del CI es obligatoria.';
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) nuevosErrores.email = 'Ingresa un correo electrónico válido.';
+		if (!celular || !/^\d{6,15}$/.test(celular)) nuevosErrores.celular = 'El celular debe contener solo números (6 a 15 dígitos).';
+		if (!domicilio) nuevosErrores.domicilio = 'El domicilio es obligatorio.';
+		if (telefono && !/^\d{6,15}$/.test(telefono)) nuevosErrores.telefono = 'El teléfono debe contener solo números.';
+		if (!registro) nuevosErrores.registro = 'El registro es obligatorio.';
+
+		if (!formData.fecha_nacimiento) {
+			nuevosErrores.fecha_nacimiento = 'La fecha de nacimiento es obligatoria.';
+		} else {
 			const f = new Date(formData.fecha_nacimiento);
-			if (isNaN(f.getTime())) return 'La fecha de nacimiento no es válida.';
-			if (f > new Date()) return 'La fecha de nacimiento no puede ser futura.';
-			if (f.getFullYear() < 1940) return 'La fecha de nacimiento no es válida (año demasiado antiguo).';
+			if (isNaN(f.getTime())) nuevosErrores.fecha_nacimiento = 'La fecha de nacimiento no es válida.';
+			else if (f > new Date()) nuevosErrores.fecha_nacimiento = 'La fecha de nacimiento no puede ser futura.';
+			else if (f.getFullYear() < 1940) nuevosErrores.fecha_nacimiento = 'La fecha de nacimiento no es válida (año demasiado antiguo).';
 		}
-		if (!isEditMode && (!formData.password || formData.password.length < 5)) {
-			return 'La contraseña debe tener al menos 5 caracteres.';
+
+		if (!isEditMode) {
+			if (!formData.course_id) nuevosErrores.course_id = 'Selecciona un curso/programa para inscribir al estudiante.';
+			// ISSUE-Q-PASSWORD-UNIFICADA: la contraseña ya no es obligatoria al
+			// crear -- si se deja en blanco, el backend genera 'Uagrm.<CI>'
+			// automáticamente (misma convención que docentes/staff).
+			if (formData.password && formData.password.length < 5) {
+				nuevosErrores.password = 'La contraseña debe tener al menos 5 caracteres, o déjala en blanco para autogenerarla.';
+			}
 		}
-		return null;
+
+		errors = nuevosErrores;
+		return Object.keys(nuevosErrores).length === 0;
 	}
 
 	async function handleSubmit() {
-		const errorValidacion = validarFormulario();
-		if (errorValidacion) {
-			alert('error', errorValidacion);
+		if (!validarFormulario()) {
+			alert('error', 'Revisa los campos marcados en rojo antes de continuar.');
 			return;
 		}
 		saving = true;
@@ -201,10 +228,10 @@
 
 			if (isEditMode && student) {
 				const hasTituloData = tituloData.titulo || tituloData.universidad;
-				
+
 				// Excluir course_id del payload de actualización para evitar envíos huérfanos a la API
 				const { course_id, ...updatePayload } = formData;
-				
+
 				savedStudent = await studentService.update(student._id, {
 					...updatePayload,
 					activo: active,
@@ -239,9 +266,8 @@
 				uploadProgress = 'Subiendo Título...';
 				if (!tituloData.titulo || !tituloData.universidad) {
 					alert('warning', 'Se subió el archivo de título pero faltan datos del título. Por favor actualice en detalles.');
-				} /* else { */
-					await studentService.uploadTitulo(id, tituloFile, tituloData);
-				/* } */
+				}
+				await studentService.uploadTitulo(id, tituloFile, tituloData);
 			}
 
 			if (!isEditMode) {
@@ -258,11 +284,11 @@
 	}
 </script>
 
-<form class="space-y-8" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-	
-	<!-- Personal Information -->
-	<div class="p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-		<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-gray-700">
+<form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+
+	<!-- Información Personal -->
+	<Card variant="default" padding="lg">
+		<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-dark-border">
 			<div class="rounded-lg bg-primary-50 p-2 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400">
 				<UserIcon class="size-6" />
 			</div>
@@ -273,20 +299,23 @@
 		</div>
 
 		<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-			<Input label="Nombre Completo" id="nombre" bind:value={formData.nombre} required minlength={3} maxlength={200} placeholder="Juan Perez" class="md:col-span-2" />
-			<Input label="Fecha de Nacimiento" id="fecha_nacimiento" type="date" bind:value={formData.fecha_nacimiento} required min="1940-01-01" max={hoyISO} />
-			<Input label="Carnet" id="carnet" bind:value={formData.carnet} required inputmode="numeric" pattern="[0-9]*" minlength={5} maxlength={10} placeholder="12345678" />
-			<Input label="Extensión CI" id="extension" bind:value={formData.extension} required maxlength={4} placeholder="LP" />
-			
-			<Input label="Email" id="email" type="email" bind:value={formData.email} required placeholder="juan@example.com" class="md:col-span-2" />
-			<Input label="Celular" id="celular" bind:value={formData.celular} required inputmode="numeric" pattern="[0-9]*" maxlength={15} placeholder="70000000" />
-			<Input label="Domicilio" id="domicilio" bind:value={formData.domicilio} required maxlength={200} placeholder="Av. Principal #123" />
+			<Input label="Nombre Completo" id="nombre" bind:value={formData.nombre} required minlength={3} maxlength={200} placeholder="Juan Perez" class="md:col-span-2" error={errors.nombre} />
+			<Input label="Fecha de Nacimiento" id="fecha_nacimiento" type="date" bind:value={formData.fecha_nacimiento} required min="1940-01-01" max={hoyISO} error={errors.fecha_nacimiento} />
+			<Input label="Carnet" id="carnet" bind:value={formData.carnet} required inputmode="numeric" pattern="[0-9]*" minlength={5} maxlength={10} placeholder="12345678" error={errors.carnet} />
+			<!-- ISSUE-Q-COMPLEMENTO-CI (2026-07-08): complemento del CI (ej. '1D', '1J'),
+			     distinto de la Extensión (lugar de expedición del carnet). -->
+			<Input label="Complemento CI (opcional)" id="complemento_carnet" bind:value={formData.complemento_carnet} maxlength={10} placeholder="Ej: 1D" />
+			<Input label="Extensión CI" id="extension" bind:value={formData.extension} required maxlength={4} placeholder="LP" error={errors.extension} />
+
+			<Input label="Email" id="email" type="email" bind:value={formData.email} required placeholder="juan@example.com" class="md:col-span-2" error={errors.email} />
+			<Input label="Celular" id="celular" bind:value={formData.celular} required inputmode="numeric" pattern="[0-9]*" maxlength={15} placeholder="70000000" error={errors.celular} />
+			<Input label="Domicilio" id="domicilio" bind:value={formData.domicilio} required maxlength={200} placeholder="Av. Principal #123" error={errors.domicilio} />
 		</div>
-	</div>
+	</Card>
 
 	<!-- Datos Oficiales UAGRM -->
-	<div class="p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-		<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-gray-700">
+	<Card variant="default" padding="lg">
+		<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-dark-border">
 			<div class="rounded-lg bg-primary-50 p-2 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300">
 				<IdentificationIcon class="size-6" />
 			</div>
@@ -321,7 +350,7 @@
 				<option value="O+">O+</option>
 				<option value="O-">O-</option>
 			</Select>
-			<Input label="Teléfono (fijo)" id="telefono" bind:value={formData.telefono} inputmode="numeric" pattern="[0-9]*" maxlength={15} placeholder="Solo números" />
+			<Input label="Teléfono (fijo)" id="telefono" bind:value={formData.telefono} inputmode="numeric" pattern="[0-9]*" maxlength={15} placeholder="Solo números" error={errors.telefono} />
 
 			<Input label="Nacionalidad" id="nacionalidad" bind:value={formData.nacionalidad} placeholder="Boliviana" />
 			<Input label="País" id="pais" bind:value={formData.pais} placeholder="Bolivia" />
@@ -332,13 +361,13 @@
 			<Input label="Periodo" id="periodo" bind:value={formData.periodo} placeholder="1/2019" />
 			<Input label="Título de Bachiller" id="titulo_bachiller" bind:value={formData.titulo_bachiller} placeholder="Nº de título" class="md:col-span-2" />
 		</div>
-	</div>
+	</Card>
 
-	<!-- Academic & Account Info -->
-	<div class="p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-		<div class="mb-6 flex items-center gap-3 pb-4">
-			<div class="rounded-lg bg-orange-50 p-2 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400">
-				<CollectionIcon class="size-6" /> <!-- Using Collection as surrogate for Academic/Folder -->
+	<!-- Información Académica y Cuenta -->
+	<Card variant="default" padding="lg">
+		<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-dark-border">
+			<div class="rounded-lg bg-light-secondary/10 p-2 text-light-secondary dark:bg-dark-secondary/20 dark:text-dark-secondary">
+				<CollectionIcon class="size-6" />
 			</div>
 			<div>
 				<Heading level="h4" class="text-lg font-semibold text-gray-900 dark:text-white">Información Académica</Heading>
@@ -347,18 +376,19 @@
 		</div>
 
 		<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-			<Input label="Registro" id="registro" bind:value={formData.registro} required placeholder="EST-2024-001" />
+			<Input label="Registro" id="registro" bind:value={formData.registro} required placeholder="EST-2024-001" error={errors.registro} />
 			<Select label="Tipo de Estudiante" bind:value={formData.es_estudiante_interno} required>
 				<option value="interno">Interno</option>
 				<option value="externo">Externo</option>
 			</Select>
-			
+
 			{#if !isEditMode}
 				<Select
 					label="Curso / Programa"
 					bind:value={formData.course_id}
 					required={true}
 					title={selectedCourseName}
+					error={errors.course_id}
 				>
 					<option value="" disabled selected>Seleccione un curso activo</option>
 					{#each courses as course}
@@ -370,13 +400,13 @@
 			<div class="relative w-full">
 				<div class="relative">
 					<Input
-						label={isEditMode ? 'Nueva Contraseña' : 'Contraseña'}
+						label={isEditMode ? 'Nueva Contraseña' : 'Contraseña (opcional)'}
 						id="password"
 						type={showPassword ? 'text' : 'password'}
 						bind:value={formData.password}
-						required={!isEditMode}
 						minlength={5}
-						placeholder={isEditMode ? 'Opcional (para cambiar)' : 'Mínimo 5 caracteres'}
+						placeholder={isEditMode ? 'Opcional (para cambiar)' : `Uagrm.${formData.carnet?.trim() || '<CI>'}`}
+						error={errors.password}
 					/>
 					<button
 						type="button"
@@ -387,36 +417,44 @@
 						{#if showPassword} <EyeIcon class="size-5" /> {:else} <EyeOffIcon class="size-5" /> {/if}
 					</button>
 				</div>
+				{#if !isEditMode}
+					<!-- ISSUE-Q-PASSWORD-UNIFICADA: si se deja en blanco, la contraseña
+					     inicial es 'Uagrm.<CI>' (misma convención que docentes/staff). -->
+					<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+						Si la dejas en blanco, la contraseña inicial será
+						<span class="font-mono">Uagrm.{formData.carnet?.trim() || '<CI>'}</span>.
+					</p>
+				{/if}
 			</div>
 		</div>
-	</div>
+	</Card>
 
 	<!-- Documents & Title -->
 	<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 		<!-- Documents -->
-		<div class="p-6 shadow-sm">
-			<div class="mb-6 flex items-center gap-3 pb-4">
-				<div class="rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
+		<Card variant="default" padding="lg">
+			<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-dark-border">
+				<div class="rounded-lg bg-light-tertiary/10 p-2 text-light-tertiary dark:bg-dark-tertiary/20 dark:text-dark-tertiary">
 					<IdentificationIcon class="size-6" />
 				</div>
 				<div>
 					<Heading level="h4" class="text-lg font-semibold text-gray-900 dark:text-white">Documentación</Heading>
 					<p class="text-sm text-gray-500 dark:text-gray-400">Archivos adjuntos</p>
-				</div>	
+				</div>
 			</div>
-			
+
 			<div class="grid grid-cols-2 gap-4">
 				<FileUpload label="Foto de Perfil" accept="image/*" file={photoFile} onFileSelect={(f) => photoFile = f} initialUrl={student?.foto_url} isEditable={isEditMode} />
 				<FileUpload label="Carnet (PDF)" accept=".pdf" file={carnetFile} onFileSelect={(f) => carnetFile = f} initialUrl={student?.ci_url} isEditable={isEditMode} />
 				<FileUpload label="Curriculum (PDF)" accept=".pdf" file={cvFile} onFileSelect={(f) => cvFile = f} initialUrl={student?.cv_url} isEditable={isEditMode} />
 				<FileUpload label="Afiliación (PDF)" accept=".pdf" file={afiliacionFile} onFileSelect={(f) => afiliacionFile = f} initialUrl={student?.afiliacion_url} isEditable={isEditMode} />
 			</div>
-		</div>
+		</Card>
 
 		<!-- Title -->
-		<div class="p-6 shadow-sm">
-			<div class="mb-6 flex items-center gap-3 pb-4">
-				<div class="rounded-lg bg-purple-50 p-2 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400">
+		<Card variant="default" padding="lg">
+			<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-dark-border">
+				<div class="rounded-lg bg-light-accent/10 p-2 text-light-accent dark:bg-dark-accent/10 dark:text-dark-accent">
 					<AcademicCapIcon class="size-6" />
 				</div>
 				<div>
@@ -436,17 +474,16 @@
 				</div>
 				<FileUpload label="Documento de Título (PDF)" accept=".pdf" file={tituloFile} onFileSelect={(f) => tituloFile = f} initialUrl={student?.titulo?.titulo_url} />
 			</div>
-		</div>
+		</Card>
 	</div>
 
 	{#if isEditMode}
-		<div class="flex items-center gap-2 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
-			<input type="checkbox" id="activo" bind:checked={active} class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded" />
-			<label for="activo" class="text-sm font-medium text-gray-700 dark:text-gray-300">Estudiante Activo</label>
-		</div>
+		<Card variant="ghost" padding="sm">
+			<Checkbox id="activo" label="Estudiante Activo" bind:checked={active} />
+		</Card>
 	{/if}
 
-	<div class="sticky bottom-0 -mx-6 -mb-6 mt-8 flex items-center justify-between border-t border-gray-200 bg-gray-50/90 px-6 py-4 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/90">
+	<div class="sticky bottom-0 -mx-6 -mb-6 mt-8 flex items-center justify-between border-t border-gray-200 bg-gray-50/90 px-6 py-4 backdrop-blur-sm dark:border-dark-border dark:bg-dark-background/90">
 		<div class="text-sm text-gray-500">
 			{#if uploadProgress}
 				<span class="flex items-center gap-2 text-primary-600">
