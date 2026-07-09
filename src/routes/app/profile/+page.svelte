@@ -465,6 +465,59 @@
 						</div>
 					</Card>
 
+					<!-- ISSUE-Q-DOCUMENTOS-GENERAL (2026-07-09): documentos generales del
+					     estudiante (CV, Carnet, Afiliación). Opcionales, iguales para
+					     TODOS los perfiles de estudiante, independientes del curso. -->
+					<Card>
+						{#snippet header()}
+							<Heading level="h4" class="text-lg font-semibold">Mis Documentos</Heading>
+						{/snippet}
+
+						<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+							Sube tus documentos personales (opcional). Formatos permitidos: PDF o imagen.
+						</p>
+
+						<div class="space-y-3">
+							{#each [{ tipo: 'cv', label: 'Curriculum Vitae (CV)', url: profileData.cv_url }, { tipo: 'ci', label: 'Carnet de Identidad', url: profileData.ci_url }, { tipo: 'afiliacion', label: 'Certificado de Afiliación', url: profileData.afiliacion_url }] as doc}
+								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-dark-border pb-3 last:border-b-0 last:pb-0">
+									<div class="min-w-0">
+										<p class="text-sm font-medium text-gray-900 dark:text-white">{doc.label}</p>
+										<div class="mt-1 flex items-center gap-2">
+											{#if doc.url}
+												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-success/15 text-light-success dark:bg-dark-success/20 dark:text-dark-success">Cargado</span>
+												<a href={doc.url} target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-light-secondary dark:text-dark-secondary hover:underline">Ver documento</a>
+											{:else}
+												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Sin subir</span>
+											{/if}
+										</div>
+									</div>
+									<div class="shrink-0">
+										<FileUpload
+											accept="application/pdf,image/*"
+											onFileSelect={(f) => handleDocumentUpload(doc.tipo as 'ci' | 'cv' | 'afiliacion', f)}
+											label=""
+											preview={false}
+											disabled={uploadingDoc === doc.tipo}
+										>
+											<button
+												type="button"
+												class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-light-secondary dark:bg-dark-secondary hover:bg-light-secondary_d dark:hover:bg-dark-secondary_d rounded-lg transition-colors disabled:opacity-50"
+												disabled={uploadingDoc === doc.tipo}
+											>
+												{#if uploadingDoc === doc.tipo}
+													<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+												{:else}
+													<DocumentAddIcon class="h-4 w-4" />
+												{/if}
+												<span>{doc.url ? 'Reemplazar' : 'Subir'}</span>
+											</button>
+										</FileUpload>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</Card>
+
 					<!-- ISSUE-Q-DOCUMENTOS-KYC: Documentos requeridos por cada curso inscrito.
 					     El estudiante los sube desde aquí; quedan "en revisión" hasta que
 					     CPD/Encargado de Curso los apruebe o rechace. -->

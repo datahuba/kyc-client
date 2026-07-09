@@ -43,6 +43,12 @@
 	let fechaComprobante = $state(new Date().toISOString().split('T')[0]);
 	let cuentaDestino = $state('');
 
+	// ISSUE-P-CUENTA-UNICA (2026-07-09): la cuenta destino ya NO es un
+	// desplegable de cuentas hardcodeadas. Es la ÚNICA cuenta institucional
+	// configurada por superadmin/admin desde /app/payment-config (Banco Unión
+	// de la unidad). Se muestra fija (solo lectura) y se autocompleta.
+	let cuentaInstitucional = $state<{ numero_cuenta?: string; banco?: string; titular?: string; tipo_cuenta?: string } | null>(null);
+
 	// Seguro para evitar auto-relleno infinito (UX FIX)
 	let lastAutoFilledId = $state('');
 
@@ -59,7 +65,7 @@
 		'Yolo',
 		'Otro'
 	];
-	const cuentasInstitucion = ['Cta. Corriente BNB - 1234567', 'Cta. Ahorros Unión - 9876543'];
+
 
 	let isMatriculaPagada = $derived(
 		selectedEnrollmentId
@@ -86,10 +92,21 @@
 
 		const [configResult, coursesResult, enrollmentsResult] = resultados;
 
-		if (configResult.status === 'fulfilled' && configResult.value?.qr_url) {
-			qrUrl = configResult.value.qr_url;
+		if (configResult.status === 'fulfilled' && configResult.value) {
+			if (configResult.value.qr_url) qrUrl = configResult.value.qr_url;
+			// ISSUE-P-CUENTA-UNICA: capturar la cuenta institucional configurada
+			// y autocompletar cuentaDestino (cuenta única, no desplegable).
+			cuentaInstitucional = {
+				numero_cuenta: configResult.value.numero_cuenta,
+				banco: configResult.value.banco,
+				titular: configResult.value.titular,
+				tipo_cuenta: configResult.value.tipo_cuenta
+			};
+			if (configResult.value.numero_cuenta) {
+				cuentaDestino = `${configResult.value.banco ? configResult.value.banco + ' - ' : ''}${configResult.value.numero_cuenta}`;
+			}
 		}
-		// Si config falla (ej. 404 porque aún no se configuró el QR), no es un
+		// Si config falla (ej. 404 porque aún no se configuró el QR/cuenta), no es un
 		// error bloqueante -- simplemente no se muestra el QR informativo.
 
 		if (coursesResult.status === 'fulfilled' && coursesResult.value?.data) {
@@ -337,13 +354,32 @@
 					required
 				/>
 
+				<!-- ISSUE-P-CUENTA-UNICA: cuenta institucional única (Banco Unión de
+				     la unidad), configurable solo por superadmin/admin desde
+				     /app/payment-config. Se muestra fija, no como desplegable. -->
 				<div class="md:col-span-2">
-					<Select label="Cuenta Destino (Nuestra Institución)" id="cuentaDestino" bind:value={cuentaDestino} required>
-						<option value="">¿A qué cuenta realizó el pago?</option>
-						{#each cuentasInstitucion as c}
-							<option value={c}>{c}</option>
-						{/each}
-					</Select>
+					<p class="mb-1.5 block text-sm font-medium text-light-black dark:text-dark-white">
+						Cuenta Destino (Nuestra Institución)
+					</p>
+					{#if cuentaInstitucional?.numero_cuenta}
+						<div class="rounded-lg border border-light-four bg-light-primary/40 p-3 dark:border-dark-border dark:bg-dark-background/40">
+							<p class="text-base font-bold text-light-black dark:text-dark-white">
+								{cuentaInstitucional.banco || 'Banco'} — {cuentaInstitucional.numero_cuenta}
+							</p>
+							{#if cuentaInstitucional.titular || cuentaInstitucional.tipo_cuenta}
+								<p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+									{cuentaInstitucional.titular || ''}{cuentaInstitucional.titular && cuentaInstitucional.tipo_cuenta ? ' · ' : ''}{cuentaInstitucional.tipo_cuenta || ''}
+								</p>
+							{/if}
+							<p class="mt-1 text-xs text-uagrm-sky">Realiza tu pago a esta cuenta.</p>
+						</div>
+					{:else}
+						<div class="rounded-lg border border-light-warning/40 bg-light-warning/10 p-3 dark:border-dark-warning/40 dark:bg-dark-warning/10">
+							<p class="text-sm text-light-warning dark:text-dark-warning">
+								La cuenta institucional aún no ha sido configurada. Contacta a administración.
+							</p>
+						</div>
+					{/if}
 				</div>
 
 				<div class="md:col-span-2">
