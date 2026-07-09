@@ -1,6 +1,18 @@
+// ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): estado de un documento/requisito que
+// el estudiante debe subir para su inscripción (ej. CV, fotocopia de CI).
+export interface Requisito {
+	descripcion: string;
+	estado: 'pendiente' | 'en_proceso' | 'aprobado' | 'rechazado';
+	url?: string | null;
+	motivo_rechazo?: string | null;
+	revisado_por?: string | null;
+	fecha_subida?: string | null;
+}
+
 export interface Enrollment {
 	modulos: any;
 	_id: string;
+	requisitos?: Requisito[]; // ISSUE-Q-DOCUMENTOS-KYC
 	cantidad_cuotas: number;
 	costo_matricula: number;
 	costo_total: number;

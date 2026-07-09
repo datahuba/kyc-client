@@ -112,6 +112,31 @@ class EnrollmentService {
 	async reactivarDesdeCongeladoOAbandono(enrollmentId: string): Promise<Enrollment> {
 		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/reactivar-congelado`, {});
 	}
+
+	// === ISSUE-Q-DOCUMENTOS-KYC: el estudiante sube el documento de un requisito ===
+	async subirRequisito(enrollmentId: string, index: number, file: File): Promise<import('$lib/interfaces').Requisito> {
+		const formData = new FormData();
+		formData.append('file', file);
+		return await apiKyC.put<import('$lib/interfaces').Requisito>(
+			`/enrollments/${enrollmentId}/requisitos/${index}`,
+			formData
+		);
+	}
+
+	// === ISSUE-Q-DOCUMENTOS-KYC: CPD/Encargado de Curso aprueban o rechazan el documento ===
+	async aprobarRequisito(enrollmentId: string, index: number): Promise<import('$lib/interfaces').Requisito> {
+		return await apiKyC.put<import('$lib/interfaces').Requisito>(
+			`/enrollments/${enrollmentId}/requisitos/${index}/aprobar`,
+			{}
+		);
+	}
+
+	async rechazarRequisito(enrollmentId: string, index: number, motivo: string): Promise<import('$lib/interfaces').Requisito> {
+		return await apiKyC.put<import('$lib/interfaces').Requisito>(
+			`/enrollments/${enrollmentId}/requisitos/${index}/rechazar`,
+			{ motivo }
+		);
+	}
 }
 
 export const enrollmentService = new EnrollmentService();

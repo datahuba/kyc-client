@@ -34,6 +34,10 @@ export interface Course {
 	tipo_curso: string;
 	updated_at: string;
 	modulos?: Modulo[]; // <--- ¡Añadimos los Módulos aquí!
+	// ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): plantilla de documentos que el
+	// estudiante debe subir al inscribirse (ej. CV, fotocopia de CI). Se
+	// copian a Enrollment.requisitos con estado "pendiente" al inscribirse.
+	requisitos?: { descripcion: string }[];
 }
 
 export interface CreateCourseRequest {
@@ -52,6 +56,7 @@ export interface CreateCourseRequest {
 	activo: boolean;
 	descuento_id?: string | null;
 	modulos?: Modulo[]; // <--- ¡Y aquí también!
+	requisitos?: { descripcion: string }[]; // ISSUE-Q-DOCUMENTOS-KYC
 }
 
 export interface UpdateCourseRequest extends Partial<CreateCourseRequest> {

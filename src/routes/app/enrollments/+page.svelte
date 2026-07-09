@@ -83,6 +83,14 @@
 	// ISSUE-Q-NOTA-BORRADOR: quién puede validar/rechazar el borrador de nota del docente
 	let canValidateNotaBorrador = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
 
+	// ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): quién puede aprobar/rechazar documentos
+	// subidos por el estudiante. Ampliado a Encargado de Curso/Coordinador (el
+	// backend restringe a Encargado de Curso solo sus cursos_asignados) para no
+	// sobrecargar solo a CPD -- explícitamente pedido por el usuario.
+	let canManageRequisitos = $derived(
+		['cpd', 'admin', 'superadmin', 'encargado_curso', 'coordinador'].includes(currentRole)
+	);
+
 	// ISSUE-R-NOTA-CONDICIONADA-PAGO (2026-07-08, reunión de postgrado
 	// contaduría): el estudiante solo puede VER su nota oficial de un módulo
 	// si está al día con el pago de ese módulo (mod.estado === 'Pagado').
@@ -424,6 +432,86 @@
 			alert('error', e?.message || 'No se pudo rechazar el borrador');
 		} finally {
 			notaValidacionLoading[key] = false;
+		}
+	}
+
+	// ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): el estudiante sube el documento de un
+	// requisito de su propia inscripción; CPD/Encargado de Curso lo aprueban o
+	// rechazan desde la misma libreta.
+	let requisitoUploading: Record<number, boolean> = $state({});
+	let requisitoInputEls: Record<number, HTMLInputElement | null> = $state({});
+	let requisitoRejectIndex: number | null = $state(null);
+	let requisitoRejectMotivo = $state('');
+	let requisitoRejectLoading = $state(false);
+
+	function triggerRequisitoUpload(index: number) {
+		requisitoInputEls[index]?.click();
+	}
+
+	async function handleRequisitoFileChange(event: Event, index: number) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file || !selectedKardex) return;
+
+		requisitoUploading[index] = true;
+		try {
+			const updatedReq = await enrollmentService.subirRequisito(selectedKardex._id, index, file);
+			const nuevosRequisitos = [...(selectedKardex.requisitos || [])];
+			nuevosRequisitos[index] = updatedReq;
+			selectedKardex = { ...selectedKardex, requisitos: nuevosRequisitos };
+			alert('success', 'Documento subido. Queda pendiente de revisión.');
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo subir el documento');
+		} finally {
+			requisitoUploading[index] = false;
+			input.value = '';
+		}
+	}
+
+	async function handleAprobarRequisito(index: number) {
+		if (!selectedKardex) return;
+		requisitoUploading[index] = true;
+		try {
+			const updatedReq = await enrollmentService.aprobarRequisito(selectedKardex._id, index);
+			const nuevosRequisitos = [...(selectedKardex.requisitos || [])];
+			nuevosRequisitos[index] = updatedReq;
+			selectedKardex = { ...selectedKardex, requisitos: nuevosRequisitos };
+			alert('success', 'Documento aprobado.');
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo aprobar el documento');
+		} finally {
+			requisitoUploading[index] = false;
+		}
+	}
+
+	function openRequisitoRejectModal(index: number) {
+		requisitoRejectIndex = index;
+		requisitoRejectMotivo = '';
+	}
+
+	async function confirmRechazarRequisito() {
+		if (!selectedKardex || requisitoRejectIndex === null) return;
+		if (!requisitoRejectMotivo.trim()) {
+			alert('error', 'Debe ingresar un motivo');
+			return;
+		}
+		requisitoRejectLoading = true;
+		try {
+			const updatedReq = await enrollmentService.rechazarRequisito(
+				selectedKardex._id,
+				requisitoRejectIndex,
+				requisitoRejectMotivo
+			);
+			const nuevosRequisitos = [...(selectedKardex.requisitos || [])];
+			nuevosRequisitos[requisitoRejectIndex] = updatedReq;
+			selectedKardex = { ...selectedKardex, requisitos: nuevosRequisitos };
+			alert('success', 'Documento rechazado.');
+			requisitoRejectIndex = null;
+			requisitoRejectMotivo = '';
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo rechazar el documento');
+		} finally {
+			requisitoRejectLoading = false;
 		}
 	}
 
@@ -926,6 +1014,78 @@
 					</div>
 				{/if}
 
+				<!-- ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): documentos requeridos por el
+				     curso -- el estudiante los sube desde aquí, CPD/Encargado de Curso
+				     los aprueban o rechazan. Solo se muestra si el curso definió al
+				     menos un documento requerido (lista no vacía). -->
+				{#if selectedKardex.requisitos && selectedKardex.requisitos.length > 0}
+					<div class="bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-dark-border space-y-3">
+						<p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">Documentos Requeridos</p>
+						{#each selectedKardex.requisitos as req, reqIndex}
+							<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-gray-100 dark:border-dark-border pt-3 first:border-t-0 first:pt-0">
+								<div class="min-w-0">
+									<p class="text-sm font-medium text-slate-900 dark:text-white">{req.descripcion}</p>
+									<div class="mt-1 flex items-center gap-2">
+										{#if req.estado === 'pendiente'}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+												Sin subir
+											</span>
+										{:else if req.estado === 'en_proceso'}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+												Pendiente de revisión
+											</span>
+										{:else if req.estado === 'aprobado'}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+												Aprobado
+											</span>
+										{:else if req.estado === 'rechazado'}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" title={req.motivo_rechazo || ''}>
+												Rechazado
+											</span>
+										{/if}
+										{#if req.url}
+											<a href={req.url} target="_blank" rel="noopener noreferrer" class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
+												Ver documento
+											</a>
+										{/if}
+									</div>
+									{#if req.estado === 'rechazado' && req.motivo_rechazo}
+										<p class="mt-1 text-xs text-light-error dark:text-dark-error">Motivo: {req.motivo_rechazo}</p>
+									{/if}
+								</div>
+								<div class="flex items-center gap-2 shrink-0">
+									<!-- El estudiante sube/reemplaza su propio documento (salvo si ya está aprobado) -->
+									{#if currentRole === 'student' && req.estado !== 'aprobado'}
+										<input
+											bind:this={requisitoInputEls[reqIndex]}
+											type="file"
+											accept="application/pdf,image/*"
+											class="hidden"
+											onchange={(e) => handleRequisitoFileChange(e, reqIndex)}
+										/>
+										<Button size="sm" variant="secondary" onclick={() => triggerRequisitoUpload(reqIndex)} loading={requisitoUploading[reqIndex]}>
+											{req.url ? 'Reemplazar' : 'Subir Documento'}
+										</Button>
+									{/if}
+									<!-- CPD/Encargado de Curso aprueban o rechazan una vez subido -->
+									{#if canManageRequisitos && req.estado === 'en_proceso'}
+										<Button size="sm" variant="destructive" onclick={() => openRequisitoRejectModal(reqIndex)} loading={requisitoUploading[reqIndex]}>
+											Rechazar
+										</Button>
+										<Button size="sm" onclick={() => handleAprobarRequisito(reqIndex)} loading={requisitoUploading[reqIndex]}>
+											Aprobar
+										</Button>
+									{:else if canManageRequisitos && req.estado === 'rechazado'}
+										<Button size="sm" onclick={() => handleAprobarRequisito(reqIndex)} loading={requisitoUploading[reqIndex]}>
+											Aprobar de todos modos
+										</Button>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+
 				<!-- Tabla de Módulos (Notas y Pagos) -->
 				<div class="overflow-x-auto border border-gray-200 dark:border-dark-border rounded-xl shadow-sm">
 					<table class="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
@@ -1077,6 +1237,32 @@
 				<Button variant="secondary" onclick={() => passiveModalOpen = false} disabled={passiveLoading}>Cancelar</Button>
 				<Button onclick={confirmPassiveRequest} loading={passiveLoading} disabled={passiveMotivo.trim().length < 3}>
 					Enviar Solicitud
+				</Button>
+			</div>
+		</div>
+	</Modal>
+
+	<!-- ISSUE-Q-DOCUMENTOS-KYC: Modal de motivo de rechazo de un documento -->
+	<Modal
+		isOpen={requisitoRejectIndex !== null}
+		title="Rechazar Documento"
+		onClose={() => { if (!requisitoRejectLoading) requisitoRejectIndex = null; }}
+		maxWidth="sm:max-w-lg"
+	>
+		<div class="p-4 space-y-4">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
+				Indica el motivo del rechazo para que el estudiante sepa qué corregir antes de volver a subirlo.
+			</p>
+			<textarea
+				bind:value={requisitoRejectMotivo}
+				rows="3"
+				class="w-full rounded-lg border border-light-four dark:border-dark-border bg-white dark:bg-dark-background py-2 px-3 text-sm text-light-black dark:text-dark-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+				placeholder="Ej: Documento ilegible, no corresponde al requisito solicitado, etc."
+			></textarea>
+			<div class="flex justify-end gap-3">
+				<Button variant="secondary" onclick={() => requisitoRejectIndex = null} disabled={requisitoRejectLoading}>Cancelar</Button>
+				<Button variant="destructive" onclick={confirmRechazarRequisito} loading={requisitoRejectLoading} disabled={requisitoRejectMotivo.trim().length < 1}>
+					Rechazar
 				</Button>
 			</div>
 		</div>

@@ -52,7 +52,8 @@
 		fecha_inicio: '',
 		fecha_fin: '',
 		activo: true,
-		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }]
+		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }],
+		requisitos: []
 	});
 
 	let prevCuotas = $state(1);
@@ -110,7 +111,8 @@
 								nombre: `Módulo ${i + 1}`,
 								costo: 0,
 								docente_id: ''
-							}))
+							})),
+					requisitos: course.requisitos ? course.requisitos.map((r) => ({ ...r })) : []
 				};
 				prevCuotas = course.cantidad_cuotas;
 				prevCostoTotal = course.costo_total_interno;
@@ -132,7 +134,8 @@
 					fecha_inicio: '',
 					fecha_fin: '',
 					activo: true,
-					modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }]
+					modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }],
+					requisitos: []
 				};
 				prevCuotas = 1;
 				prevCostoTotal = 0;
@@ -252,6 +255,9 @@
 			payload.cargo_adicional_items = (payload.cargo_adicional_items || []).filter(
 				(it) => it.nombre?.trim()
 			);
+
+			// ISSUE-Q-DOCUMENTOS-KYC: descartar requisitos vacíos (sin descripción)
+			payload.requisitos = (payload.requisitos || []).filter((r) => r.descripcion?.trim());
 
 			payload.modulos = payload.modulos!.map((m) => {
 				const mod = { ...m };
@@ -475,6 +481,62 @@
 								formData.cargo_adicional_items = formData.cargo_adicional_items!.filter(
 									(_, idx) => idx !== i
 								);
+							}}
+						>
+							Quitar
+						</Button>
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</Card>
+
+	<!-- SECCIÓN: Documentos requeridos (ISSUE-Q-DOCUMENTOS-KYC, 2026-07-09) -->
+	<!-- Define qué documentos debe subir el estudiante al inscribirse a este
+	     curso (ej. CV, fotocopia de CI, título en provisión nacional). El
+	     CPD/Encargado de Curso podrá aprobar o rechazar cada documento desde
+	     la libreta de la inscripción una vez que el estudiante lo suba. -->
+	<Card variant="bordered" padding="md">
+		<div class="mb-3 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
+			<div>
+				<Heading level="h4" class="text-primary-700 dark:text-dark-tertiary">Documentos Requeridos (Opcional)</Heading>
+				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+					Documentos que el estudiante deberá subir desde su perfil al inscribirse (ej. CV,
+					fotocopia de carnet). CPD o el Encargado de Curso los revisan y aprueban/rechazan.
+					Deja la lista vacía si este curso no requiere documentación adicional.
+				</p>
+			</div>
+			<Button
+				type="button"
+				variant="secondary"
+				onclick={() => {
+					formData.requisitos = [...(formData.requisitos || []), { descripcion: '' }];
+				}}
+			>
+				+ Agregar Documento
+			</Button>
+		</div>
+
+		{#if formData.requisitos && formData.requisitos.length > 0}
+			<div class="grid grid-cols-1 gap-4">
+				{#each formData.requisitos as _req, i}
+					<div
+						class="flex flex-col items-center gap-4 rounded-md border border-gray-100 bg-white p-3 shadow-sm sm:flex-row dark:border-gray-700 dark:bg-gray-800"
+					>
+						<div class="w-full flex-1">
+							<Input
+								label="Nombre del Documento"
+								id={`requisito_descripcion_${i}`}
+								bind:value={formData.requisitos[i].descripcion}
+								placeholder="Ej: Fotocopia de Carnet de Identidad"
+							/>
+						</div>
+						<Button
+							type="button"
+							variant="ghost"
+							class="mt-2 shrink-0 sm:mt-6"
+							onclick={() => {
+								formData.requisitos = formData.requisitos!.filter((_, idx) => idx !== i);
 							}}
 						>
 							Quitar

@@ -148,37 +148,49 @@
 		     quedaban demasiado grandes con mucho espacio vacío para lo poco que
 		     muestran). Reducido padding/ícono/tipografía, quitado el col-span-2 de
 		     la tercera tarjeta (ya no hace falta ocupar 2 columnas en tablet). -->
+		<!-- FIX (2026-07-09, reportado por el usuario: "los iconos no encajan bien"):
+		     Card envuelve el contenido en su propio <div class="card-content">, así
+		     que "flex items-center justify-between" puesto directamente en Card no
+		     actúa sobre estos 2 divs (quedan apilados verticalmente por defecto,
+		     descolocando el ícono debajo del texto en vez de al lado). Se mueve el
+		     flex a un wrapper propio DENTRO del Card. -->
 		<div class="grid grid-cols-3 gap-3 sm:gap-4">
-			<Card padding="none" class="flex items-center justify-between p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
-				<div class="min-w-0">
-					<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Total Programas</p>
-					<p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{enrollments.length}</p>
-				</div>
-				<div class="p-2 sm:p-2.5 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-primary-600 dark:text-primary-300 shrink-0">
-					<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-				</div>
-			</Card>
-			
-			<Card padding="none" class="flex items-center justify-between p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
-				<div class="min-w-0">
-					<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Activos</p>
-					<p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{cursosActivos}</p>
-				</div>
-				<div class="p-2 sm:p-2.5 bg-green-50 dark:bg-green-900/20 rounded-lg text-green-600 dark:text-green-400 shrink-0">
-					<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+			<Card padding="none" class="p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
+				<div class="flex items-center justify-between gap-2">
+					<div class="min-w-0">
+						<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Total Programas</p>
+						<p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{enrollments.length}</p>
+					</div>
+					<div class="p-2 sm:p-2.5 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-primary-600 dark:text-primary-300 shrink-0">
+						<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+					</div>
 				</div>
 			</Card>
 			
-			<Card padding="none" class="flex items-center justify-between p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
-				<div class="min-w-0">
-					<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Deuda Global</p>
-					<!-- BUG 5 FIX: Truncamiento inteligente si la cifra es muy larga -->
-					<p class="text-sm sm:text-lg font-bold text-red-600 dark:text-red-400 mt-0.5 truncate" title={formatCurrency(totalDeuda)}>
-						{formatCurrency(totalDeuda)}
-					</p>
+			<Card padding="none" class="p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
+				<div class="flex items-center justify-between gap-2">
+					<div class="min-w-0">
+						<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Activos</p>
+						<p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{cursosActivos}</p>
+					</div>
+					<div class="p-2 sm:p-2.5 bg-green-50 dark:bg-green-900/20 rounded-lg text-green-600 dark:text-green-400 shrink-0">
+						<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+					</div>
 				</div>
-				<div class="p-2 sm:p-2.5 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400 shrink-0">
-					<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+			</Card>
+			
+			<Card padding="none" class="p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
+				<div class="flex items-center justify-between gap-2">
+					<div class="min-w-0">
+						<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Deuda Global</p>
+						<!-- BUG 5 FIX: Truncamiento inteligente si la cifra es muy larga -->
+						<p class="text-sm sm:text-lg font-bold text-red-600 dark:text-red-400 mt-0.5 truncate" title={formatCurrency(totalDeuda)}>
+							{formatCurrency(totalDeuda)}
+						</p>
+					</div>
+					<div class="p-2 sm:p-2.5 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400 shrink-0">
+						<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+					</div>
 				</div>
 			</Card>
 		</div>
