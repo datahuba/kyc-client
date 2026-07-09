@@ -1,7 +1,7 @@
 <script lang="ts">
 	//profile/+page.svelte
 	import { userStore } from '$lib/stores/userStore';
-	import { studentService, userService } from '$lib/services';
+	import { studentService, userService, enrollmentService, courseService } from '$lib/services';
 	import Card from '$lib/components/ui/card.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Input from '$lib/components/ui/input.svelte';
@@ -23,6 +23,58 @@
 
 	// ISSUE-A-VERIFICACION: no bloqueante, solo informativo
 	let resendingVerification = $state(false);
+
+	// ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): el estudiante sube sus documentos
+	// requeridos (definidos por el curso) directamente desde su perfil; al
+	// subirlos quedan "en revisión" para que CPD/Encargado de Curso los apruebe.
+	let misEnrollments = $state<any[]>([]);
+	let coursesMapProfile = $state<Record<string, string>>({});
+	// clave: `${enrollmentId}-${index}` -> bool (loading)
+	let subiendoReq = $state<Record<string, boolean>>({});
+	let reqInputEls = $state<Record<string, HTMLInputElement | null>>({});
+
+	async function cargarDocumentosEstudiante(studentId: string) {
+		try {
+			const [enr, cursos] = await Promise.all([
+				enrollmentService.getByStudentId(studentId),
+				courseService.getAll(1, 100).catch(() => ({ data: [] }))
+			]);
+			misEnrollments = Array.isArray(enr) ? enr : ((enr as any).data ?? []);
+			const mapa: Record<string, string> = {};
+			for (const c of (cursos.data ?? [])) mapa[c._id] = c.nombre_programa;
+			coursesMapProfile = mapa;
+		} catch (e) {
+			console.error('Error cargando documentos del estudiante', e);
+		}
+	}
+
+	function triggerReqUpload(enrollmentId: string, index: number) {
+		reqInputEls[`${enrollmentId}-${index}`]?.click();
+	}
+
+	async function handleReqUpload(event: Event, enrollmentId: string, index: number) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		const key = `${enrollmentId}-${index}`;
+		subiendoReq[key] = true;
+		try {
+			const updatedReq = await enrollmentService.subirRequisito(enrollmentId, index, file);
+			// Actualizar el requisito en la inscripción local sin recargar todo
+			misEnrollments = misEnrollments.map((e) => {
+				if (e._id !== enrollmentId) return e;
+				const nuevos = [...(e.requisitos || [])];
+				nuevos[index] = updatedReq;
+				return { ...e, requisitos: nuevos };
+			});
+			alert('success', 'Documento subido. Quedó pendiente de revisión por CPD.');
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo subir el documento');
+		} finally {
+			subiendoReq[key] = false;
+			input.value = '';
+		}
+	}
 
 	// Datos editables
 	let editData = $state<UpdateStudentSelfRequest>({
@@ -71,6 +123,8 @@
 					celular: profileData.celular || '',
 					domicilio: profileData.domicilio || ''
 				};
+				// ISSUE-Q-DOCUMENTOS-KYC: cargar sus inscripciones para mostrar documentos requeridos
+				await cargarDocumentosEstudiante(id);
 			} else {
 				profileData = $userStore.user; 
 			}
@@ -410,6 +464,70 @@
 							<Input label="Título de Bachiller" value={profileData.titulo_bachiller || '—'} disabled />
 						</div>
 					</Card>
+
+					<!-- ISSUE-Q-DOCUMENTOS-KYC: Documentos requeridos por cada curso inscrito.
+					     El estudiante los sube desde aquí; quedan "en revisión" hasta que
+					     CPD/Encargado de Curso los apruebe o rechace. -->
+					{#each misEnrollments.filter((e) => (e.requisitos?.length ?? 0) > 0) as enr (enr._id)}
+						<Card>
+							{#snippet header()}
+								<Heading level="h4" class="text-lg font-semibold">
+									Documentos Requeridos — {coursesMapProfile[enr.curso_id] || 'Curso'}
+								</Heading>
+							{/snippet}
+
+							<div class="space-y-3">
+								{#each enr.requisitos as req, reqIndex}
+									<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-dark-border pb-3 last:border-b-0 last:pb-0">
+										<div class="min-w-0">
+											<p class="text-sm font-medium text-gray-900 dark:text-white">{req.descripcion}</p>
+											<div class="mt-1 flex flex-wrap items-center gap-2">
+												{#if req.estado === 'pendiente'}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Sin subir</span>
+												{:else if req.estado === 'en_proceso'}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-warning/15 text-light-warning dark:bg-dark-warning/20 dark:text-dark-warning">En revisión</span>
+												{:else if req.estado === 'aprobado'}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-success/15 text-light-success dark:bg-dark-success/20 dark:text-dark-success">Aprobado</span>
+												{:else if req.estado === 'rechazado'}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-error/15 text-light-error dark:bg-dark-error/20 dark:text-dark-error">Rechazado</span>
+												{/if}
+												{#if req.url}
+													<a href={req.url} target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-light-secondary dark:text-dark-secondary hover:underline">Ver documento</a>
+												{/if}
+											</div>
+											{#if req.estado === 'rechazado' && req.motivo_rechazo}
+												<p class="mt-1 text-xs text-light-error dark:text-dark-error">Motivo: {req.motivo_rechazo}</p>
+											{/if}
+										</div>
+										{#if req.estado !== 'aprobado'}
+											<div class="shrink-0">
+												<input
+													bind:this={reqInputEls[`${enr._id}-${reqIndex}`]}
+													type="file"
+													accept="application/pdf,image/*"
+													class="hidden"
+													onchange={(e) => handleReqUpload(e, enr._id, reqIndex)}
+												/>
+												<button
+													type="button"
+													onclick={() => triggerReqUpload(enr._id, reqIndex)}
+													disabled={subiendoReq[`${enr._id}-${reqIndex}`]}
+													class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-light-secondary dark:bg-dark-secondary hover:bg-light-secondary_d dark:hover:bg-dark-secondary_d rounded-lg transition-colors disabled:opacity-50"
+												>
+													{#if subiendoReq[`${enr._id}-${reqIndex}`]}
+														<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+													{:else}
+														<DocumentAddIcon class="h-4 w-4" />
+													{/if}
+													<span>{req.url ? 'Reemplazar' : 'Subir'}</span>
+												</button>
+											</div>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						</Card>
+					{/each}
 
 					<!-- Información Académica -->
 					{#if profileData.titulo}
