@@ -293,7 +293,7 @@
 						<input id="new-teacher-carnet" type="text" inputmode="numeric" pattern="[0-9]*" maxlength={10} bind:value={newTeacher.carnet} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Ej: 1234567" />
 						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
 							Opcional. Si lo completas y dejas la contraseña en blanco, la contraseña inicial será
-							<span class="font-mono">Uagrm.{newTeacher.carnet.trim() || '&lt;CI&gt;'}</span>.
+							<span class="font-mono">Uagrm.{newTeacher.carnet.trim() || '<CI>'}</span>.
 						</p>
 					</div>
 					<div>

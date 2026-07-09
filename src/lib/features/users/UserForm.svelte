@@ -238,7 +238,7 @@ interface Props {
 				/>
 				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
 					Opcional. Si lo completas y dejas la contraseña en blanco al crear, la contraseña inicial
-					será <span class="font-mono">Uagrm.{formData.carnet?.trim() || '&lt;CI&gt;'}</span>.
+					será <span class="font-mono">Uagrm.{formData.carnet?.trim() || '<CI>'}</span>.
 				</p>
 			</div>
 

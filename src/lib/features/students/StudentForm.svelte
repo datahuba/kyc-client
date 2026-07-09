@@ -422,7 +422,7 @@
 					     inicial es 'Uagrm.<CI>' (misma convención que docentes/staff). -->
 					<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
 						Si la dejas en blanco, la contraseña inicial será
-						<span class="font-mono">Uagrm.{formData.carnet?.trim() || '&lt;CI&gt;'}</span>.
+						<span class="font-mono">Uagrm.{formData.carnet?.trim() || '<CI>'}</span>.
 					</p>
 				{/if}
 			</div>
