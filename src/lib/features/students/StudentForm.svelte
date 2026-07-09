@@ -375,12 +375,8 @@
 			</div>
 		</div>
 
-		<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+		<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
 			<Input label="Registro" id="registro" bind:value={formData.registro} required placeholder="EST-2024-001" error={errors.registro} />
-			<Select label="Tipo de Estudiante" bind:value={formData.es_estudiante_interno} required>
-				<option value="interno">Interno</option>
-				<option value="externo">Externo</option>
-			</Select>
 
 			{#if !isEditMode}
 				<Select

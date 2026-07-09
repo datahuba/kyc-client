@@ -134,7 +134,6 @@
 
 					<div class="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
 						<div><span class="text-gray-400 dark:text-gray-500">CI:</span> <span class="text-gray-800 dark:text-gray-200 font-medium">{req.carnet}</span></div>
-						<div><span class="text-gray-400 dark:text-gray-500">Tipo:</span> <span class="text-gray-800 dark:text-gray-200 font-medium capitalize">{req.es_estudiante_interno}</span></div>
 						<div><span class="text-gray-400 dark:text-gray-500">Celular:</span> <span class="text-gray-800 dark:text-gray-200 font-medium">{req.celular || '—'}</span></div>
 						<div><span class="text-gray-400 dark:text-gray-500">Registro:</span> <span class="text-gray-800 dark:text-gray-200 font-medium">{req.registro || '—'}</span></div>
 					</div>

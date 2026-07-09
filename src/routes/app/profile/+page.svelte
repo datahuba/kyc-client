@@ -518,7 +518,6 @@
 									})} 
 									disabled 
 								/>
-								<Input label="Tipo de Estudiante" value={profileData.es_estudiante_interno === 'interno' ? 'Interno' : 'Externo'} disabled />
 							</div>
 
 							<div class="border-t border-gray-200 dark:border-dark-border pt-6">

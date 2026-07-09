@@ -370,6 +370,10 @@
 				</div>
 			</a>
 
+			<!-- La tarjeta "Ingresos" es redundante para roles económicos (ya ven
+			     "Total Ingresos" en el Resumen Económico, y esta muestra solo los
+			     pagos filtrados por rol, lo que confunde). Se oculta para ellos. -->
+			{#if !verResumenEconomico}
 			<a href="/app/payments" class="block">
 				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg min-w-0">
 					<div class="flex-1 min-w-0 mr-3">
@@ -384,6 +388,7 @@
 					</div>
 				</div>
 			</a>
+			{/if}
 		</div>
 
 		<!-- Course Breakdown Section (oculto para perfiles segmentados por curso) -->

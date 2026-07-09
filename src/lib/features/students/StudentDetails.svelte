@@ -275,10 +275,6 @@
 				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">{student.registro}</p>
 			</div>
 			
-			<div>
-				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</label>
-				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white capitalize">{student.es_estudiante_interno}</p>
-			</div>
 
 			<div class="md:col-span-2">
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Curso / Programa</label>

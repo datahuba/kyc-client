@@ -83,32 +83,6 @@
 					</td>
 					<td class="px-4 py-4">
 						<div class="text-sm text-gray-900 dark:text-white truncate">{student.celular}</div>
-						<!-- ISSUE H: BOTÓN DE MUTACIÓN RÁPIDA -->
-						<div class="mt-1">
-							<button 
-								type="button"
-								disabled={!canEditStudent || togglingTypeIds.has(student._id)}
-								onclick={() => toggleStudentType(student)}
-								class={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition-colors
-									${student.es_estudiante_interno === 'interno' 
-										? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400' 
-										: 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400'}
-									${!canEditStudent ? 'cursor-default opacity-80' : 'cursor-pointer'}
-									${togglingTypeIds.has(student._id) ? 'opacity-50 pointer-events-none' : ''}
-								`}
-								title={canEditStudent ? 'Haga clic para cambiar entre Interno/Externo' : 'Tipo de Estudiante'}
-							>
-								{#if togglingTypeIds.has(student._id)}
-									<svg class="animate-spin -ml-0.5 mr-1 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-									</svg>
-									Cambiando...
-								{:else}
-									{student.es_estudiante_interno}
-								{/if}
-							</button>
-						</div>
 					</td>
 					<td class="px-4 py-4">
 						<div class="text-sm text-gray-900 dark:text-white truncate" title={student.domicilio}>{student.domicilio || '—'}</div>
@@ -179,22 +153,6 @@
 				<div class="min-w-0">
 					<span class="block text-gray-400 dark:text-gray-500 uppercase tracking-wide text-[10px] font-bold">Celular</span>
 					<span class="block text-gray-900 dark:text-white truncate">{student.celular || '—'}</span>
-				</div>
-				<div class="min-w-0">
-					<span class="block text-gray-400 dark:text-gray-500 uppercase tracking-wide text-[10px] font-bold">Tipo</span>
-					<button 
-						type="button"
-						disabled={!canEditStudent || togglingTypeIds.has(student._id)}
-						onclick={() => toggleStudentType(student)}
-						class={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition-colors
-							${student.es_estudiante_interno === 'interno' 
-								? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-								: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}
-							${!canEditStudent ? 'cursor-default opacity-80' : 'cursor-pointer'}
-							${togglingTypeIds.has(student._id) ? 'opacity-50 pointer-events-none' : ''}`}
-					>
-						{togglingTypeIds.has(student._id) ? '...' : student.es_estudiante_interno}
-					</button>
 				</div>
 				<div class="col-span-2 min-w-0">
 					<span class="block text-gray-400 dark:text-gray-500 uppercase tracking-wide text-[10px] font-bold">Domicilio</span>

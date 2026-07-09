@@ -110,16 +110,6 @@
 						</div>
 					</div>
 
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<div>
-							<label for="r-tipo" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Tipo de estudiante</label>
-							<select id="r-tipo" bind:value={tipo} class="block w-full rounded-lg border border-light-four dark:border-dark-border bg-white dark:bg-dark-background py-2 px-3 text-sm text-light-black dark:text-dark-white focus:outline-none focus:ring-2 focus:ring-primary-500">
-								<option value="externo">Externo (Público General)</option>
-								<option value="interno">Interno (UAGRM)</option>
-							</select>
-						</div>
-					</div>
-
 					<div>
 						<label for="r-mensaje" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Programa de interés / Mensaje <span class="text-gray-400 font-normal">(opcional)</span></label>
 						<textarea id="r-mensaje" bind:value={mensaje} rows="3" class="block w-full rounded-lg border border-light-four dark:border-dark-border bg-white dark:bg-dark-background py-2 px-3 text-sm text-light-black dark:text-dark-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Ej: Me interesa el Diplomado en..."></textarea>
