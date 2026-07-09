@@ -28,6 +28,10 @@ export interface User {
 	terminos_aceptados?: boolean; // ISSUE-Q-PRE: siempre true para personal admin/docente, real para estudiantes
 	email_verificado?: boolean; // ISSUE-A-VERIFICACION: no bloqueante, solo informativo
 	carnet?: string | null; // GAP-1 (audio 2026-07-08): CI del personal, usado para la contraseña por defecto 'Uagrm.<CI>'
+	// Cuando el usuario autenticado es un estudiante, el objeto en el store
+	// (UserResponse) trae también estos campos propios del Student.
+	registro?: string | null;
+	codigo_registro?: string | null;
 }
 
 

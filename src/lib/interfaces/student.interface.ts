@@ -12,6 +12,8 @@ export interface Titulo {
 
 export interface Student {
 	_id: string;
+	// Algunas respuestas/patrones defensivos usan `.id` como fallback de `._id`.
+	id?: string;
 	activo: boolean;
 	carnet?: string;
 	// ISSUE-Q-COMPLEMENTO-CI (2026-07-08): complemento del CI (ej. '1D', '1J'),

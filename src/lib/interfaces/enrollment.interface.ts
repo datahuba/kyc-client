@@ -12,6 +12,8 @@ export interface Requisito {
 export interface Enrollment {
 	modulos: any;
 	_id: string;
+	// Fallback defensivo de `._id` usado en algunos componentes (ej. cobro en Caja).
+	id?: string;
 	requisitos?: Requisito[]; // ISSUE-Q-DOCUMENTOS-KYC
 	cantidad_cuotas: number;
 	costo_matricula: number;
@@ -33,6 +35,12 @@ export interface Enrollment {
 	total_a_pagar: number;
 	total_pagado: number;
 	updated_at: string;
+	// Campos académicos y calculados que el backend (EnrollmentResponse) ya
+	// devuelve; declarados aquí para eliminar errores de tipo en el kardex/libreta.
+	nota_final?: number | null;
+	nota_minima_beca?: number | null;
+	siguiente_pago?: { concepto: string; numero_cuota: number; monto_sugerido: number } | null;
+	cuotas_pagadas_info?: { cuotas_pagadas: number; cuotas_totales: number; porcentaje: number } | null;
 	formulario_inscripcion_url?: string;
 	beca_respaldo_url?: string | null; // ISSUE-P-BECA-RESPALDO
 	matricula_pagada?: boolean;
