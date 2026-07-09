@@ -8,7 +8,7 @@
 	import { alert } from '$lib/utils';
 	import { UserIcon, MailIcon, MapPinIcon, PhoneIcon, IdentificationIcon, AcademicCapIcon, PencilIcon, CheckIcon, XMarkIcon, DocumentAddIcon } from '$lib/icons/outline';
 	import { BriefcaseIcon } from '$lib/icons/solid';
-	import { FileUpload } from '$lib/components/ui';
+	import { FileUpload, Modal, Button } from '$lib/components/ui';
 	import DocumentRow from '$lib/components/ui/documentRow.svelte';
 	import type { Student, UpdateStudentSelfRequest, TituloData } from '$lib/interfaces/student.interface';
 	import { authService } from '$lib/services';
@@ -23,6 +23,71 @@
 
 	// ISSUE-A-VERIFICACION: no bloqueante, solo informativo
 	let resendingVerification = $state(false);
+
+	// Carga de Título Profesional desde el perfil. A diferencia de CV/Carnet/Afiliación,
+	// el título lleva metadata (nombre, número, año, universidad) que el backend exige,
+	// por eso se captura en un modal en vez de una subida directa de archivo.
+	let showTituloModal = $state(false);
+	let uploadingTitulo = $state(false);
+	let tituloFile = $state<File | null>(null);
+	let tituloForm = $state({ titulo: '', numero_titulo: '', año_expedicion: '', universidad: '' });
+	let tituloErrors = $state<Record<string, string>>({});
+
+	function abrirModalTitulo() {
+		if (profileData?.titulo?.estado === 'verificado') {
+			alert('error', 'No puedes actualizar un título ya verificado');
+			return;
+		}
+		tituloForm = {
+			titulo: profileData?.titulo?.titulo || '',
+			numero_titulo: profileData?.titulo?.numero_titulo || '',
+			año_expedicion: profileData?.titulo?.año_expedicion || '',
+			universidad: profileData?.titulo?.universidad || ''
+		};
+		tituloFile = null;
+		tituloErrors = {};
+		showTituloModal = true;
+	}
+
+	async function submitTitulo() {
+		const errs: Record<string, string> = {};
+		if (!tituloForm.titulo.trim()) errs.titulo = 'El nombre del título es obligatorio';
+		if (!tituloForm.numero_titulo.trim()) errs.numero_titulo = 'El número de título es obligatorio';
+		if (!tituloForm.universidad.trim()) errs.universidad = 'La universidad es obligatoria';
+		if (!tituloForm.año_expedicion.trim()) errs.año_expedicion = 'El año de expedición es obligatorio';
+		if (!tituloFile && !profileData?.titulo?.titulo_url) errs.file = 'Debes adjuntar el documento del título';
+		tituloErrors = errs;
+		if (Object.keys(errs).length > 0) return;
+
+		const id = $userStore.user?._id;
+		if (!id) return;
+
+		// Si no se seleccionó archivo nuevo pero ya existe uno, no hay nada que subir aquí
+		// (este modal siempre re-sube; exigimos archivo salvo que ya exista y solo se editen datos,
+		// pero el endpoint requiere el archivo, así que pedimos uno si no hay URL previa).
+		if (!tituloFile) {
+			alert('error', 'Selecciona el archivo del título para actualizar');
+			return;
+		}
+
+		uploadingTitulo = true;
+		try {
+			const updated = await studentService.uploadTitulo(id, tituloFile, {
+				titulo: tituloForm.titulo.trim(),
+				numero_titulo: tituloForm.numero_titulo.trim(),
+				año_expedicion: tituloForm.año_expedicion.trim(),
+				universidad: tituloForm.universidad.trim()
+			});
+			profileData = updated;
+			showTituloModal = false;
+			alert('success', 'Título subido correctamente. Quedará pendiente de verificación por CPD.');
+		} catch (e: any) {
+			console.error(e);
+			alert('error', 'Error al subir el título');
+		} finally {
+			uploadingTitulo = false;
+		}
+	}
 
 	// ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): el estudiante sube sus documentos
 	// requeridos (definidos por el curso) directamente desde su perfil; al
@@ -515,6 +580,42 @@
 									</div>
 								</div>
 							{/each}
+
+							<!-- Título Profesional: lleva metadata, se sube desde un modal -->
+							<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-dark-border pb-3 last:border-b-0 last:pb-0">
+								<div class="min-w-0">
+									<p class="text-sm font-medium text-gray-900 dark:text-white">Título Profesional</p>
+									<div class="mt-1 flex flex-wrap items-center gap-2">
+										{#if profileData.titulo?.titulo_url}
+											{#if profileData.titulo.estado === 'verificado'}
+												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-success/15 text-light-success dark:bg-dark-success/20 dark:text-dark-success">Verificado</span>
+											{:else if profileData.titulo.estado === 'rechazado'}
+												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-error/15 text-light-error dark:bg-dark-error/20 dark:text-dark-error">Rechazado</span>
+											{:else}
+												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-warning/15 text-light-warning dark:bg-dark-warning/20 dark:text-dark-warning">En verificación</span>
+											{/if}
+											<a href={profileData.titulo.titulo_url} target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-light-secondary dark:text-dark-secondary hover:underline">Ver documento</a>
+										{:else}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Sin subir</span>
+										{/if}
+									</div>
+									{#if profileData.titulo?.estado === 'rechazado' && profileData.titulo?.motivo_rechazo}
+										<p class="mt-1 text-xs text-light-error dark:text-dark-error">Motivo: {profileData.titulo.motivo_rechazo}</p>
+									{/if}
+								</div>
+								{#if profileData.titulo?.estado !== 'verificado'}
+									<div class="shrink-0">
+										<button
+											type="button"
+											onclick={abrirModalTitulo}
+											class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-light-secondary dark:bg-dark-secondary hover:bg-light-secondary_d dark:hover:bg-dark-secondary_d rounded-lg transition-colors"
+										>
+											<DocumentAddIcon class="h-4 w-4" />
+											<span>{profileData.titulo?.titulo_url ? 'Reemplazar' : 'Subir'}</span>
+										</button>
+									</div>
+								{/if}
+							</div>
 						</div>
 					</Card>
 
@@ -666,6 +767,46 @@
 			</div>
 		{/if}
 	</div>
+
+	<!-- Modal de carga de Título Profesional -->
+	<Modal isOpen={showTituloModal} title="Subir Título Profesional" onClose={() => (showTituloModal = false)} maxWidth="sm:max-w-lg">
+		<div class="space-y-4">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
+				Completa los datos de tu título y adjunta el documento (PDF o imagen). Quedará
+				pendiente de verificación por CPD.
+			</p>
+
+			<Input label="Nombre del Título *" bind:value={tituloForm.titulo} error={tituloErrors.titulo} placeholder="Ej. Licenciatura en Contaduría Pública" />
+			<div class="grid gap-4 sm:grid-cols-2">
+				<Input label="Número de Título *" bind:value={tituloForm.numero_titulo} error={tituloErrors.numero_titulo} />
+				<Input label="Año de Expedición *" bind:value={tituloForm.año_expedicion} error={tituloErrors.año_expedicion} placeholder="Ej. 2020" />
+			</div>
+			<Input label="Universidad *" bind:value={tituloForm.universidad} error={tituloErrors.universidad} />
+
+			<div>
+				<p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Documento del Título *</p>
+				<FileUpload
+					accept="application/pdf,image/*"
+					onFileSelect={(f) => (tituloFile = f)}
+					label=""
+					preview={false}
+				/>
+				{#if tituloFile}
+					<p class="mt-1 text-xs text-light-success dark:text-dark-success">Archivo seleccionado: {tituloFile.name}</p>
+				{/if}
+				{#if tituloErrors.file}
+					<p class="mt-1 text-xs text-light-error dark:text-dark-error">{tituloErrors.file}</p>
+				{/if}
+			</div>
+
+			<div class="flex justify-end gap-3 pt-2">
+				<Button variant="secondary" onclick={() => (showTituloModal = false)} disabled={uploadingTitulo}>Cancelar</Button>
+				<Button onclick={submitTitulo} disabled={uploadingTitulo}>
+					{uploadingTitulo ? 'Subiendo...' : 'Subir Título'}
+				</Button>
+			</div>
+		</div>
+	</Modal>
 {:else}
 <div>
 	data de admin profile proceso
