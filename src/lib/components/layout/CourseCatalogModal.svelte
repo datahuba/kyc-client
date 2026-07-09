@@ -37,7 +37,7 @@
 	});
 </script>
 
-<Modal {isOpen} title="Catálogo de Cursos" {onClose} maxWidth="sm:max-w-3xl">
+<Modal {isOpen} title="Catálogo de Programas" {onClose} maxWidth="sm:max-w-3xl">
 	<div class="p-2 sm:p-4">
 		{#if loading}
 			<div class="flex justify-center py-10">

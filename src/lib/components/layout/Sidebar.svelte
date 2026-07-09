@@ -171,11 +171,11 @@
 						<button
 							type="button"
 							onclick={() => isCatalogOpen = true}
-							title={isCollapsed ? 'Catálogo de Cursos' : ''}
+							title={isCollapsed ? 'Catálogo de Programas' : ''}
 							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}
 						>
 							<BookIcon class="size-6 shrink-0 text-gray-400 group-hover:text-primary-600" />
-							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Catálogo de Cursos</span>{/if}
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Catálogo de Programas</span>{/if}
 						</button>
 						<button
 							type="button"
