@@ -110,13 +110,22 @@
 				// "desbloquear edición" nunca los incluye en el payload real;
 				// solo se muestran de forma editable en la UI como referencia
 				// visual de que existen, con la advertencia correspondiente.
+				// BUG (2026-07-09, reportado por el usuario): seleccionar un
+				// Descuento Personal (Beca) real del combo nunca disparaba el
+				// recálculo -- el backend ignoraba descuento_id. Ya corregido
+				// en el backend; aquí también se ajusta para que elegir
+				// "Ninguno" (descuento_id vacío) limpie explícitamente un
+				// descuento_id previamente asignado en vez de no enviar nada.
 				const updateData: any = {
 					estado: editData.estado,
-					descuento_personalizado: formData.descuento_personalizado
+					// Si no se seleccionó ningún Discount del combo, el porcentaje
+					// libre se limpia a 0 -- este formulario no tiene un input
+					// manual de porcentaje aparte del Select, así que "Ninguno"
+					// siempre significa "sin descuento", no "conservar el
+					// porcentaje anterior de la beca que se está quitando".
+					descuento_personalizado: formData.descuento_id ? formData.descuento_personalizado : 0,
+					descuento_id: formData.descuento_id || null
 				};
-				if (formData.descuento_id) {
-					updateData.descuento_id = formData.descuento_id;
-				}
 
 				await enrollmentService.update(enrollment._id, updateData);
 				alert('success', 'Inscripción actualizada correctamente');

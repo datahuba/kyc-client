@@ -10,6 +10,8 @@ class EnrollmentService {
 			estado?: string;
 			curso_id?: string;
 			estudiante_id?: string;
+			con_descuento?: boolean;
+			descuento_id?: string;
 		}
 	): Promise<import('$lib/interfaces/response.interface').PaginatedResponse<Enrollment>> {
 		const params = new URLSearchParams({
@@ -21,6 +23,8 @@ class EnrollmentService {
 		if (filters?.estado) params.append('estado', filters.estado);
 		if (filters?.curso_id) params.append('curso_id', filters.curso_id);
 		if (filters?.estudiante_id) params.append('estudiante_id', filters.estudiante_id);
+		if (filters?.con_descuento !== undefined) params.append('con_descuento', filters.con_descuento.toString());
+		if (filters?.descuento_id) params.append('descuento_id', filters.descuento_id);
 
 		return await apiKyC.get<import('$lib/interfaces/response.interface').PaginatedResponse<Enrollment>>(
 			`/enrollments/?${params.toString()}`

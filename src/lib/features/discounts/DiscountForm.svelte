@@ -3,6 +3,7 @@
 	import type { CreateDiscountRequest, Discount, Student } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
+	import FileUpload from '$lib/components/ui/fileUpload.svelte';
 	import { alert } from '$lib/utils';
 	import { CheckIcon } from '$lib/icons/outline';
 
@@ -17,6 +18,13 @@
 
 	let isEditMode = $derived(!!discount);
 	let saving = $state(false);
+
+	// ISSUE-P-DESCUENTO-RESOLUCION (fix 2026-07-09, reportado por el usuario):
+	// la opción de subir el documento de resolución solo existía DESPUÉS de
+	// crear el descuento (desde el dropdown de la lista). No es obligatorio
+	// (confirmado por el usuario, puede quedar pendiente), pero la opción
+	// debe estar visible desde el momento de crear/editar la beca.
+	let resolucionFile: File | null = $state(null);
 
 	let formData: CreateDiscountRequest = $state({
 		nombre: '',
@@ -56,6 +64,7 @@
 				nota_minima_requerida: null
 			};
 		}
+		resolucionFile = null;
 	});
 
 	async function handleSubmit() {
@@ -70,13 +79,24 @@
 
 		saving = true;
 		try {
+			let savedDiscount: Discount;
 			if (isEditMode && discount) {
-				await discountService.update(discount._id, formData);
-				alert('success', 'Descuento actualizado correctamente');
+				savedDiscount = await discountService.update(discount._id, formData);
 			} else {
-				await discountService.create(formData);
-				alert('success', 'Descuento creado correctamente');
+				savedDiscount = await discountService.create(formData);
 			}
+
+			// ISSUE-P-DESCUENTO-RESOLUCION: subir el respaldo si se seleccionó
+			// un archivo, en el mismo submit (no bloqueante -- no es obligatorio).
+			if (resolucionFile) {
+				try {
+					await discountService.uploadResolucion(savedDiscount._id, resolucionFile);
+				} catch (uploadErr: any) {
+					alert('warning', `El descuento se guardó, pero no se pudo subir el respaldo: ${uploadErr.message || 'error desconocido'}`);
+				}
+			}
+
+			alert('success', isEditMode ? 'Descuento actualizado correctamente' : 'Descuento creado correctamente');
 			onSuccess();
 		} catch (e: any) {
 			alert('error', e.message || 'Error al guardar descuento');
@@ -147,6 +167,23 @@
 			Si se define, el estudiante debe mantener esta nota en cada módulo. Si reprueba el
 			mínimo en un módulo específico, ese módulo (solo ese) pierde el descuento automáticamente.
 		</p>
+	</div>
+
+	<!-- ISSUE-P-DESCUENTO-RESOLUCION: documento de resolución (opcional, no bloqueante) -->
+	<div class="space-y-1">
+		<p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+			Documento de Resolución (opcional)
+		</p>
+		<p class="text-xs text-gray-500 dark:text-gray-400">
+			Respalda institucionalmente este descuento. No es obligatorio: puedes crear la beca sin
+			adjuntarlo ahora y subirlo/reemplazarlo después desde la lista de descuentos.
+		</p>
+		<FileUpload
+			accept="application/pdf,image/jpeg,image/png,image/webp"
+			file={resolucionFile}
+			onFileSelect={(f) => (resolucionFile = f)}
+			initialUrl={discount?.resolucion_url}
+		/>
 	</div>
 
 	<div class="flex items-center gap-2 pt-4">

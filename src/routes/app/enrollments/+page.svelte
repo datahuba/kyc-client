@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { enrollmentService, studentService, courseService } from '$lib/services';
+	import { enrollmentService, studentService, courseService, discountService } from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
-	import type { Enrollment, Student, Course } from '$lib/interfaces';
+	import type { Enrollment, Student, Course, Discount } from '$lib/interfaces';
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
@@ -31,11 +31,15 @@
 	let totalPages: number = $state(1);
 
 	// Filter state (reactivo para bind:value sin warnings)
+	// ISSUE-P-VISIBILIDAD-DESCUENTO (fix 2026-07-09, reportado por el usuario:
+	// "no pude seleccionar los que están con descuento y cuál descuento"):
+	// nuevo filtro con_descuento ('all' | 'con' | 'sin').
 	let filters = $state({
 		q: '',
 		estado: 'all',
 		curso_id: 'all',
-		estudiante_id: 'all'
+		estudiante_id: 'all',
+		con_descuento: 'all'
 	});
 	let debounceTimer: any;
 
@@ -62,6 +66,9 @@
 
 	let studentsList: Student[] = $state([]);
 	let coursesList: Course[] = $state([]);
+	// ISSUE-P-VISIBILIDAD-DESCUENTO (fix 2026-07-09): mapa id->Discount para
+	// mostrar el nombre real del descuento aplicado en cada inscripción.
+	let discountsMap: Record<string, Discount> = $state({});
 
 	// ISSUE N: Control de Permisos Visuales (RBAC Frontend)
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
@@ -132,6 +139,19 @@
 				coursesMap = cMap;
 			}
 
+			// ISSUE-P-VISIBILIDAD-DESCUENTO: cargar descuentos una sola vez para
+			// resolver el nombre real (no solo el porcentaje) en la tabla.
+			if (Object.keys(discountsMap).length === 0 && currentRole !== 'student') {
+				try {
+					const discountsRes = await discountService.getAll(1, 100);
+					const dMap: Record<string, Discount> = {};
+					for (const d of discountsRes.data) dMap[d._id] = d;
+					discountsMap = dMap;
+				} catch (e) {
+					console.error('Error cargando descuentos', e);
+				}
+			}
+
 			let enrollmentsPromise;
 			if (currentRole === 'student') {
 				enrollmentsPromise = enrollmentService.getByStudentId($userStore.user?._id || '');
@@ -141,6 +161,7 @@
 				if (filters.estado !== 'all') filterParams.estado = filters.estado;
 				if (filters.curso_id !== 'all') filterParams.curso_id = filters.curso_id;
 				if (filters.estudiante_id !== 'all') filterParams.estudiante_id = filters.estudiante_id;
+				if (filters.con_descuento !== 'all') filterParams.con_descuento = filters.con_descuento === 'con';
 
 				enrollmentsPromise = enrollmentService.getAll(page, limit, filterParams);
 			}
@@ -601,6 +622,19 @@
 					{/each}
 				</select>
 			</div>
+
+			<!-- ISSUE-P-VISIBILIDAD-DESCUENTO (fix 2026-07-09): filtro por si tiene descuento aplicado -->
+			<div>
+				<select
+					bind:value={filters.con_descuento}
+					onchange={handleFilterChange}
+					class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+				>
+					<option value="all">Con o sin descuento</option>
+					<option value="con">Solo con descuento</option>
+					<option value="sin">Solo sin descuento</option>
+				</select>
+			</div>
 		</div>
 	{/if}
 
@@ -644,6 +678,15 @@
 								<div class="flex justify-between gap-2"><span class="text-gray-400 dark:text-gray-500">Total</span><span class="font-medium text-gray-700 dark:text-gray-300">{formatCurrency(enrollment.total_a_pagar)}</span></div>
 								<div class="flex justify-between gap-2"><span class="text-gray-400 dark:text-gray-500">Pagado</span><span class="font-medium text-green-600 dark:text-green-400">{formatCurrency(enrollment.total_pagado)}</span></div>
 								<div class="flex justify-between gap-2"><span class="text-gray-400 dark:text-gray-500">Saldo</span><span class={`font-bold ${enrollment.saldo_pendiente > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(enrollment.saldo_pendiente)}</span></div>
+								<!-- ISSUE-P-VISIBILIDAD-DESCUENTO (fix 2026-07-09): mostrar nombre y % del descuento aplicado, si hay -->
+								{#if enrollment.descuento_estudiante_id || (enrollment.descuento_personalizado ?? 0) > 0}
+									<div class="flex justify-between gap-2 pt-0.5 border-t border-gray-100 dark:border-gray-700 mt-1">
+										<span class="text-gray-400 dark:text-gray-500">Beca</span>
+										<span class="font-semibold text-light-tertiary dark:text-dark-tertiary truncate max-w-[110px]" title={enrollment.descuento_estudiante_id ? discountsMap[enrollment.descuento_estudiante_id]?.nombre : 'Descuento libre'}>
+											{enrollment.descuento_estudiante_id ? (discountsMap[enrollment.descuento_estudiante_id]?.nombre ?? '—') : 'Libre'} ({enrollment.descuento_personalizado}%)
+										</span>
+									</div>
+								{/if}
 							</td>
 							<td class="px-4 py-4">
 								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(enrollment.estado)}`}>
@@ -748,6 +791,15 @@
 								{formatCurrency(enrollment.saldo_pendiente)}
 							</span>
 						</div>
+						<!-- ISSUE-P-VISIBILIDAD-DESCUENTO (fix 2026-07-09): mostrar nombre y % del descuento aplicado, si hay -->
+						{#if enrollment.descuento_estudiante_id || (enrollment.descuento_personalizado ?? 0) > 0}
+							<div class="flex justify-between">
+								<span class="text-gray-500 dark:text-gray-400">Beca:</span>
+								<span class="font-semibold text-light-tertiary dark:text-dark-tertiary">
+									{enrollment.descuento_estudiante_id ? (discountsMap[enrollment.descuento_estudiante_id]?.nombre ?? '—') : 'Libre'} ({enrollment.descuento_personalizado}%)
+								</span>
+							</div>
+						{/if}
 						<div class="flex justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Estado:</span>
 							<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(enrollment.estado)}`}>
