@@ -54,7 +54,14 @@ interface Props {
 	let requiereNombreFuncional = $derived(
 		!!formData.role && ROLES_CON_NOMBRE_FUNCIONAL.includes(formData.role)
 	);
+	// Obligatorio solo para Encargado de Curso (siempre segmentado).
 	let requiereCursosAsignados = $derived(formData.role === 'encargado_curso');
+	// Cobranza también puede asignarse a programas, pero es OPCIONAL: si no se
+	// marca ninguno, ve/gestiona todos los pagos (comportamiento general);
+	// si se marcan, queda segmentado a esos programas (ISSUE-P-SEGMENTACION).
+	let permiteCursosAsignados = $derived(
+		formData.role === 'encargado_curso' || formData.role === 'cobranza'
+	);
 
 	let cursosDisponibles: Course[] = $state([]);
 
@@ -181,7 +188,7 @@ interface Props {
 				password: formData.password?.trim() || undefined,
 				carnet: formData.carnet?.trim() || undefined,
 				nombre_funcional: requiereNombreFuncional ? formData.nombre_funcional : undefined,
-				cursos_asignados: requiereCursosAsignados ? formData.cursos_asignados : undefined
+				cursos_asignados: permiteCursosAsignados ? formData.cursos_asignados : undefined
 			};
 
 			if (isEditMode && user) {
@@ -314,10 +321,10 @@ interface Props {
 				</div>
 			{/if}
 
-			{#if requiereCursosAsignados}
+			{#if permiteCursosAsignados}
 				<div class="md:col-span-2">
 					<span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-						Cursos Asignados <span class="text-light-error">*</span>
+						Programas Asignados {#if requiereCursosAsignados}<span class="text-light-error">*</span>{:else}<span class="text-xs font-normal text-gray-400">(opcional)</span>{/if}
 					</span>
 					<div
 						class="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-light-four bg-white p-3 dark:border-dark-border dark:bg-dark-surface {errors.cursos_asignados
@@ -339,9 +346,14 @@ interface Props {
 					</div>
 					{#if errors.cursos_asignados}
 						<p class="mt-1 text-sm text-light-error">{errors.cursos_asignados}</p>
+					{:else if formData.role === 'cobranza'}
+						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+							Opcional. Si no marcas ningún programa, verá y gestionará los pagos de <strong>todos</strong>
+							los programas. Si marcas uno o varios, quedará segmentado solo a esos.
+						</p>
 					{:else}
 						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-							Este usuario solo verá e inscribirá estudiantes en los cursos marcados.
+							Este usuario solo verá e inscribirá estudiantes en los programas marcados.
 						</p>
 					{/if}
 				</div>
