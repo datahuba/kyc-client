@@ -90,3 +90,45 @@
 		}
 	}
 }
+
+/* ==================================================================
+   PWA & MOBILE OPTIMIZATIONS (NATIVE IOS/ANDROID APP FEEL)
+   ================================================================== */
+@supports (padding: env(safe-area-inset-top)) {
+	/* Prevenir recarga por arrastre y efectos de rebote en los extremos del scroll */
+	html, body {
+		overscroll-behavior-y: contain;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	/* Desactivar selección de texto global y callouts de enlaces de iOS */
+	body {
+		-webkit-user-select: none;
+		user-select: none;
+		-webkit-touch-callout: none;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	/* Restablecer selección de texto únicamente para inputs, textareas e información copiable */
+	input, textarea, [contenteditable="true"], select, .selectable, pre, code {
+		-webkit-user-select: text;
+		user-select: text;
+	}
+
+	/* PWA Header: Ajustar padding superior para el notch y redimensionar la barra sticky */
+	.sticky.top-0 {
+		padding-top: env(safe-area-inset-top, 0px) !important;
+		height: calc(4rem + env(safe-area-inset-top, 0px)) !important;
+	}
+
+	/* PWA Sidebar: Ajustar espaciado del panel lateral en móviles */
+	.fixed.inset-y-0.left-0 {
+		padding-top: env(safe-area-inset-top, 0px) !important;
+		padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+	}
+
+	/* Main Scroll: Espaciado inferior para evitar recortes del Home Indicator de iOS */
+	main {
+		padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
+	}
+}
