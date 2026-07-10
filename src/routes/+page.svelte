@@ -32,7 +32,11 @@
 	});
 
 	// ISSUE M: Enrutador de 3 puertas directas (Sin pasos intermedios)
+	// Forzar logout al cambiar de perfil para evitar contaminación de sesiones entre roles
 	function handleSelectRole(type: 'student' | 'teacher' | 'admin') {
+		// Si hay sesión activa de otro rol, limpiarla primero
+		userStore.logout();
+
 		if (type === 'student') {
 			userStore.setLoginType('academic');
 			userStore.setAcademicRole('student');

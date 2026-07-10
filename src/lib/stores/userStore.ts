@@ -206,15 +206,11 @@ function createUserStore() {
 				localStorage.removeItem(AUTH_TOKEN_KEY);
 				localStorage.removeItem(USER_DATA_KEY);
 				localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
+				// Limpiar también tipo de sesión para evitar contaminación entre roles
+				localStorage.removeItem(LOGIN_TYPE_KEY);
+				localStorage.removeItem(ACADEMIC_ROLE_KEY);
 			}
 			set(initialState);
-			if (browser) {
-				const loginType = localStorage.getItem(LOGIN_TYPE_KEY) as 'admin' | 'academic' | null;
-				const academicRole = localStorage.getItem(ACADEMIC_ROLE_KEY) as 'teacher' | 'student' | null;
-				if (loginType || academicRole) {
-					update(state => ({ ...state, loginType, academicRole }));
-				}
-			}
 		},
 
 		init: () => {
