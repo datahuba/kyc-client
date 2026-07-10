@@ -14,8 +14,7 @@
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
-	import StudentForm from '$lib/features/students/StudentForm.svelte';
-	import { PlusIcon, DotsVerticalIcon, UsersIcon } from '$lib/icons/outline';
+	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
 	import { alert, formatDate, formatCurrency } from '$lib/utils';
 	
@@ -46,7 +45,6 @@
 
 	// Modal state
 	let isFormOpen: boolean = $state(false);
-	let isStudentFormOpen: boolean = $state(false);
 	let selectedEnrollment: Enrollment | null = $state(null);
 	let showDeleteModal: boolean = $state(false);
 	let enrollmentToDelete: Enrollment | null = $state(null);
@@ -656,20 +654,12 @@
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<Heading level="h1">Inscripciones</Heading>
 		{#if canCreateEnrollment}
-			<div class="flex gap-2">
-				<Button onclick={() => isStudentFormOpen = true} variant="outline">
-					{#snippet leftIcon()}
-						<UsersIcon class="size-5" />
-					{/snippet}
-					Nuevo Estudiante
-				</Button>
-				<Button onclick={handleCreate}>
-					{#snippet leftIcon()}
-						<PlusIcon class="size-5" />
-					{/snippet}
-					Nueva Inscripción
-				</Button>
-			</div>
+			<Button onclick={handleCreate}>
+				{#snippet leftIcon()}
+					<PlusIcon class="size-5" />
+				{/snippet}
+				Nueva Inscripción
+			</Button>
 		{/if}
 	</div>
 
@@ -1353,15 +1343,4 @@
 			</div>
 		</div>
 	</Modal>
-
-	<!-- Nuevo Estudiante Modal -->
-	<StudentForm
-		isOpen={isStudentFormOpen}
-		student={null}
-		onClose={() => { isStudentFormOpen = false; }}
-		onSuccess={() => {
-			isStudentFormOpen = false;
-			loadData();
-		}}
-	/>
 </div>
