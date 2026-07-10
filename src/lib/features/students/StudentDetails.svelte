@@ -36,7 +36,7 @@
 
 	// Permisos granulares de escritura de archivos académicos y verificación KYC (Bug 4)
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
-	let canUploadAndVerify = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canUploadAndVerify = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 
 	// ISSUE-P-RECORDATORIO-PAGO (2026-07-08, reunión de postgrado contaduría):
 	// Cobranza necesita poder enviar un recordatorio de pago manual desde el

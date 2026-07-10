@@ -12,13 +12,14 @@
 
 	interface Props {
 		enrollment?: Enrollment | null;
+		defaultStudentId?: string;
 		students: Student[];
 		courses: Course[];
 		onSuccess: () => void;
 		onCancel: () => void;
 	}
 
-	let { enrollment = null, students = [], courses = [], onSuccess, onCancel }: Props = $props();
+	let { enrollment = null, defaultStudentId = '', students = [], courses = [], onSuccess, onCancel }: Props = $props();
 
 	let isEditMode = $derived(!!enrollment);
 	let saving = $state(false);
@@ -68,7 +69,7 @@
 			};
 		} else {
 			formData = {
-				estudiante_id: '',
+				estudiante_id: defaultStudentId,
 				curso_id: '',
 				descuento_personalizado: 0,
 				descuento_id: ''

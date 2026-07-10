@@ -79,7 +79,9 @@
 
 	// ISSUE N: Control de Permisos Visuales (RBAC Frontend)
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
-	let canCreateEnrollment = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	// ISSUE-R-ROLES (2026-07-10): encargado_curso/coordinador pueden crear inscripciones
+	// (el backend valida que el encargado solo inscriba en sus cursos asignados)
+	let canCreateEnrollment = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 	let canEditEnrollment = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canDeleteEnrollment = $derived(currentRole === 'superadmin');
 	// ISSUE-R-SOLICITUD-PASIVO: quién puede solicitar/aprobar el pasivo de una inscripción
@@ -98,7 +100,17 @@
 		['cpd', 'admin', 'superadmin', 'encargado_curso', 'coordinador'].includes(currentRole)
 	);
 
-	// ISSUE-R-NOTA-CONDICIONADA-PAGO (2026-07-08, reunión de postgrado
+	// ISSUE-R-ROLES (2026-07-10): filtrar cursos disponibles para el formulario
+	// de inscripción -- un Encargado de Curso solo ve sus cursos asignados.
+	let coursesListFiltrada = $derived(() => {
+		if (currentRole === 'encargado_curso' && $userStore.user?.cursos_asignados) {
+			const cursosIds = $userStore.user.cursos_asignados;
+			return coursesList.filter((c) => cursosIds.includes(c._id));
+		}
+		return coursesList;
+	});
+
+	// ISSUE-R-NOTA-CONDICIONADA-PAGO (2026-07-08, reunión de posgrado
 	// contaduría): el estudiante solo puede VER su nota oficial de un módulo
 	// si está al día con el pago de ese módulo (mod.estado === 'Pagado').
 	// Si debe, ve un aviso de "Falta pagar" en vez de la calificación -- esto

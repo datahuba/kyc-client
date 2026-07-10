@@ -20,6 +20,7 @@
 	import StudentTable from './StudentTable.svelte';
 	import ImportModal from './ImportModal.svelte';
 	import EnrollmentsModal from './EnrollmentsModal.svelte';
+	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
 
 	let students: Student[] = $state([]);
 	let loading = $state(true);
@@ -48,6 +49,7 @@
 
 	// Enrollments Modal State
 	let isEnrollmentsOpen :boolean= $state(false);
+	let isEnrollmentFormOpen :boolean= $state(false);
 	let studentEnrollments: Enrollment[] = $state([]);
 	let enrollmentsLoading :boolean= $state(false);
 
@@ -79,6 +81,7 @@
 	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canEditStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canVerifyTitle = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canEnrollStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 
 	let isAllSelected = $derived(
 		students.length > 0 && students.every(s => selectedStudentIds.includes(s._id))
@@ -321,6 +324,12 @@
 		}
 	}
 
+	function handleEnrollStudent(student: Student) {
+		selectedStudent = student;
+		isEnrollmentFormOpen = true;
+		openDropdownId = null;
+	}
+
 	function getDropdownOptions(student: Student) {
 		const options: any[] = [
 			{
@@ -336,6 +345,15 @@
 				action: () => handleViewEnrollments(student)
 			}
 		];
+
+		if (canEnrollStudent) {
+			options.push({
+				label: 'Inscribir a Curso',
+				id: 'enroll',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>`,
+				action: () => handleEnrollStudent(student)
+			});
+		}
 
 		if (canEditStudent) {
 			options.push({
@@ -596,6 +614,19 @@
 				<Button variant="destructive" onclick={confirmReject} loading={actionLoading}>Rechazar</Button>
 			</div>
 		</div>
+	</Modal>
+
+	<!-- Modal para Inscribir al Estudiante seleccionado -->
+	<Modal isOpen={isEnrollmentFormOpen} title="Inscribir a Curso" onClose={() => isEnrollmentFormOpen = false} maxWidth="sm:max-w-4xl">
+		{#if selectedStudent}
+			<EnrollmentForm 
+				defaultStudentId={selectedStudent._id}
+				students={[selectedStudent]} 
+				courses={allCourses} 
+				onSuccess={() => { isEnrollmentFormOpen = false; loadStudents(); }} 
+				onCancel={() => isEnrollmentFormOpen = false} 
+			/>
+		{/if}
 	</Modal>
 
 	<!-- Modal de Inscripciones Modularizado -->
