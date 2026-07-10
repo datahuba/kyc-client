@@ -316,7 +316,7 @@
 		const isMatricula = concept.includes('matricula');
 		
 		if (role === 'cpd') return isMatricula;
-		if (role === 'cobranza') return !isMatricula;
+		if (role === 'cobranza') return true; // Cobranza ahora puede validar tanto matrícula como colegiaturas
 		return false;
 	}
 

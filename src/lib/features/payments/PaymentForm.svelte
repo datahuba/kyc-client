@@ -324,7 +324,7 @@
 			// Determinamos si audita el CPD (para Matrícula) o Cobranzas (para Módulos de colegiatura)
 			const conceptoLower = (concepto || '').toLowerCase().trim();
 			const isMatricula = conceptoLower.includes('matricula') || conceptoLower.includes('matrícula');
-			const revisor = isMatricula ? 'El CPD' : 'Cobranzas';
+			const revisor = isMatricula ? 'El CPD / Cobranzas' : 'Cobranzas';
 
 			alert('success', `Pago reportado correctamente. ${revisor} lo revisará a la brevedad.`);
 			onSuccess();
