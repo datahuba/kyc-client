@@ -38,7 +38,8 @@
 		q: '',
 		estado: '',
 		curso_id: '',
-		estudiante_id: ''
+		estudiante_id: '',
+		tipo_concepto: ''
 	});
 	let debounceTimer: any;
 
@@ -100,6 +101,7 @@
 			if (filters.estado) filterParams.estado = filters.estado;
 			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
 			if (filters.estudiante_id) filterParams.estudiante_id = filters.estudiante_id;
+			if (filters.tipo_concepto) filterParams.tipo_concepto = filters.tipo_concepto;
 
 			const result = await paymentService.getAll(page, limit, filterParams); 
 			
@@ -409,6 +411,7 @@
 			if (filters.estado) filterParams.estado = filters.estado;
 			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
 			if (filters.estudiante_id) filterParams.estudiante_id = filters.estudiante_id;
+			if (filters.tipo_concepto) filterParams.tipo_concepto = filters.tipo_concepto;
 
 			const res = await paymentService.getAll(1, 500, filterParams) as any;
 			const allPayments: Payment[] = Array.isArray(res) ? res : (res?.data ?? []);
@@ -490,7 +493,7 @@
 	</div>
 
 	<!-- Filters -->
-	<div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+	<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
 		<div class="md:col-span-1">
 			<label for="search" class="sr-only">Buscar</label>
 			<div class="relative">
@@ -508,6 +511,18 @@
 					oninput={handleSearchInput}
 				/>
 			</div>
+		</div>
+
+		<div>
+			<select
+				bind:value={filters.tipo_concepto}
+				onchange={handleFilterChange}
+				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			>
+				<option value="">Todos los conceptos</option>
+				<option value="matricula">Matrícula</option>
+				<option value="colegiatura">Colegiatura / Módulos</option>
+			</select>
 		</div>
 		
 		<div>
@@ -578,10 +593,11 @@
 			<table class="w-full table-fixed divide-y divide-gray-200 dark:divide-dark-border">
 				<thead class="bg-gray-50 dark:bg-dark-background rounded-t-lg">
 					<tr>
-						<th scope="col" class="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transacción</th>
-						<th scope="col" class="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
-						<th scope="col" class="w-[16%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
-						<th scope="col" class="w-[18%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto / Fecha</th>
+						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transacción</th>
+						<th scope="col" class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
+						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
+						<th scope="col" class="w-[14%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
+						<th scope="col" class="w-[16%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto / Fecha</th>
 						<th scope="col" class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
 						<th scope="col" class="w-[6%] relative px-4 py-3"><span class="sr-only">Acciones</span></th>
 					</tr>
@@ -600,6 +616,12 @@
 									</span>
 									<span class="text-[10px] text-gray-400 dark:text-gray-500 truncate">{payment.banco || 'Caja UAGRM'}</span>
 								</div>
+							</td>
+							<!-- Concepto (Matrícula / Colegiatura / Módulos) -->
+							<td class="px-4 py-4 text-sm">
+								<span class={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${payment.concepto?.toLowerCase().includes('matrícula') || payment.concepto?.toLowerCase().includes('matricula') ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}`}>
+									{payment.concepto || 'Matrícula'}
+								</span>
 							</td>
 							<!-- Curso -->
 							<td class="px-4 py-4 text-sm">
@@ -681,6 +703,11 @@
 							<span class="block font-mono text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 truncate" title={payment.numero_transaccion}>
 								{payment.numero_transaccion?.startsWith('CAJA-') ? 'Físico / ' + payment.numero_transaccion : payment.numero_transaccion}
 							</span>
+							<div class="flex items-center gap-1.5 mt-1">
+								<span class={`px-1.5 py-0.5 inline-flex text-[10px] font-bold rounded ${payment.concepto?.toLowerCase().includes('matrícula') || payment.concepto?.toLowerCase().includes('matricula') ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}`}>
+									{payment.concepto || 'Matrícula'}
+								</span>
+							</div>
 						</div>
 						<div class="relative shrink-0">
 							<button onclick={() => toggleDropdown(payment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del pago">

@@ -10,6 +10,7 @@ class PaymentService {
 			estado?: string;
 			curso_id?: string;
 			estudiante_id?: string;
+			tipo_concepto?: string;
 		}
 	): Promise<import('$lib/interfaces/response.interface').PaginatedResponse<Payment>> {
 		const params = new URLSearchParams({
@@ -21,6 +22,7 @@ class PaymentService {
 		if (filters?.estado) params.append('estado', filters.estado);
 		if (filters?.curso_id) params.append('curso_id', filters.curso_id);
 		if (filters?.estudiante_id) params.append('estudiante_id', filters.estudiante_id);
+		if (filters?.tipo_concepto) params.append('tipo_concepto', filters.tipo_concepto);
 
 		return await apiKyC.get<import('$lib/interfaces/response.interface').PaginatedResponse<Payment>>(
 			`/payments/?${params.toString()}`

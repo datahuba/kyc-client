@@ -69,9 +69,9 @@
 				/>
 			</div>
 			<h1 class="text-3xl sm:text-4xl font-extrabold text-light-secondary dark:text-dark-tertiary mb-1 text-center leading-tight">
-				Escuela de Posgrado
+				Unidad de Postgrado
 			</h1>
-			<p class="text-lg font-semibold text-light-tertiary dark:text-dark-secondary mb-3">Contaduría Pública · UAGRM</p>
+			<p class="text-sm font-semibold text-light-tertiary dark:text-dark-secondary mb-3 max-w-lg text-center leading-normal">Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas</p>
 			<p class="text-light-black/70 dark:text-dark-white/70 text-base">Selecciona tu perfil de acceso a la plataforma</p>
 		</div>
 

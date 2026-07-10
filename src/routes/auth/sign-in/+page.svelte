@@ -105,10 +105,10 @@
 					/>
 				</div>
 				<span class="text-2xl font-extrabold text-light-secondary dark:text-dark-tertiary text-center leading-tight">
-					Facultad de Ciencias Contables
+					Unidad de Postgrado
 				</span>
-				<span class="text-sm font-semibold text-light-tertiary dark:text-dark-secondary text-center">
-					Contaduría Pública · UAGRM
+				<span class="text-xs font-semibold text-light-tertiary dark:text-dark-secondary text-center max-w-sm mt-1 px-4 leading-normal">
+					Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas
 				</span>
 				{#if loginType}
 					<span class="mt-2 text-lg font-medium text-light-black/60 dark:text-dark-white/60">
