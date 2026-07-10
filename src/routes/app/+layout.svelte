@@ -13,7 +13,7 @@
 	let sidebarOpen = $state(false);
 
 	// ISSUE-Q-PRE: bloquea la navegación del estudiante hasta que acepte
-	// el reglamento de Postgrado. Personal admin/docente siempre tiene
+	// el reglamento de Posgrado. Personal admin/docente siempre tiene
 	// terminos_aceptados=true desde el backend (no aplica a ellos).
 	const showTermsModal = $derived(
 		$userStore.isAuthenticated &&
@@ -93,7 +93,7 @@
   Añadida la directiva data-sveltekit-preload-data=\"hover\" a nivel del contenedor principal.
   SvelteKit descargará automáticamente el JavaScript de la página y pre-cargará los datos 
   en segundo plano en el mismo instante en que el usuario pase el puntero del mouse sobre 
-  cualquier enlace o pestaña de navegación de Postgrado, simulando transiciones de 0ms.
+  cualquier enlace o pestaña de navegación de Posgrado, simulando transiciones de 0ms.
 -->
 <div class="flex h-screen bg-light-primary dark:bg-dark-background transition-colors" data-sveltekit-preload-data="hover">
 	<Sidebar 

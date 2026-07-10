@@ -126,7 +126,7 @@
 				<!-- Info Estudiante -->
 				<div class="text-center sm:text-left flex-1 min-w-0">
 					<h2 class="text-base sm:text-lg font-bold mb-0.5 text-white truncate">¡Bienvenido, {$userStore.user?.nombre || 'Estudiante'}!</h2>
-					<p class="text-white/70 mb-3 text-xs font-medium">Portal académico de Postgrado · Contaduría Pública UAGRM.</p>
+					<p class="text-white/70 mb-3 text-xs font-medium">Portal académico de Posgrado · Contaduría Pública UAGRM.</p>
 					
 					<!-- Chips de contacto compactos -->
 					<div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-[11px] font-medium">

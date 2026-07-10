@@ -161,7 +161,7 @@ class StudentService {
 		return await apiKyC.put<Student>('/students/me', data);
 	}
 
-	// ISSUE-Q-PRE: aceptación del reglamento de Postgrado en el primer login
+	// ISSUE-Q-PRE: aceptación del reglamento de Posgrado en el primer login
 	async acceptTerms(): Promise<Student> {
 		return await apiKyC.post<Student>('/students/me/accept-terms', {});
 	}

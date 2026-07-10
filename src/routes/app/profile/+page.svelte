@@ -584,7 +584,7 @@
 
 						{#if editOficial}
 							<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-								Completa tus datos oficiales. Esta información será revisada por la unidad de postgrado.
+								Completa tus datos oficiales. Esta información será revisada por la unidad de posgrado.
 							</p>
 							<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 								<Select label="Sexo" bind:value={editData.sexo}>

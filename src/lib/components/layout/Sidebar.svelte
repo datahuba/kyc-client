@@ -122,7 +122,7 @@
 			<div class="flex items-center gap-2.5 min-w-0" in:fade>
 				<img src="/images/logo_uagrm_fondo_blanco.jpg" alt="UAGRM" class="h-9 w-9 shrink-0 rounded-md object-contain bg-white p-0.5 ring-1 ring-gray-200 dark:ring-gray-700" />
 				<div class="flex flex-col leading-tight min-w-0">
-					<span class="text-sm font-extrabold text-primary-700 dark:text-dark-tertiary truncate">Postgrado UAGRM</span>
+					<span class="text-sm font-extrabold text-primary-700 dark:text-dark-tertiary truncate">Posgrado UAGRM</span>
 					<span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 truncate">Contaduría Pública</span>
 				</div>
 			</div>
@@ -174,7 +174,7 @@
 						</ul>
 					</li>
 				{/if}
-				<!-- Accesos informativos: Catálogo de Cursos y Beneficios del Postgrado (SOLO ESTUDIANTES) -->
+				<!-- Accesos informativos: Catálogo de Cursos y Beneficios del Posgrado (SOLO ESTUDIANTES) -->
 				{#if isStudentUser}
 					<li class="mt-auto border-t border-gray-200 dark:border-gray-800 pt-3 space-y-1">
 						<button
@@ -189,13 +189,13 @@
 						<button
 							type="button"
 							onclick={() => isBenefitsOpen = true}
-							title={isCollapsed ? 'Beneficios del Postgrado' : ''}
+							title={isCollapsed ? 'Beneficios del Posgrado' : ''}
 							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}
 						>
 							<svg class="size-6 shrink-0 text-gray-400 group-hover:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
 							</svg>
-							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Beneficios del Postgrado</span>{/if}
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Beneficios del Posgrado</span>{/if}
 						</button>
 					</li>
 				{/if}

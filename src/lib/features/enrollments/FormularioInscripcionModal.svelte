@@ -96,7 +96,7 @@
 <body>
   <div class="head">
     <h1>Universidad Autónoma Gabriel René Moreno</h1>
-    <h2>"UNIDAD DE POSTGRADO"</h2>
+    <h2>"UNIDAD DE POSGRADO"</h2>
     <h3>Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas.</h3>
   </div>
   <div class="titulo">FORMULARIO DE INSCRIPCIÓN &nbsp;&nbsp; GESTIÓN: 2025</div>

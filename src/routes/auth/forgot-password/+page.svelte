@@ -36,7 +36,7 @@
 				<img src="/images/logo_contaduria_publica_fondo_blanco.jpg" alt="Contaduría Pública" class="h-16 w-16 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5" />
 			</div>
 			<h1 class="text-xl font-extrabold text-light-secondary dark:text-dark-tertiary text-center">Recuperar contraseña</h1>
-			<p class="text-sm text-light-tertiary dark:text-dark-secondary text-center">Escuela de Postgrado · Contaduría Pública UAGRM</p>
+			<p class="text-sm text-light-tertiary dark:text-dark-secondary text-center">Escuela de Posgrado · Contaduría Pública UAGRM</p>
 		</div>
 
 		<div class="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl shadow-sm p-6">

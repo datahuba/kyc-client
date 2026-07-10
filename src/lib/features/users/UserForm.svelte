@@ -258,7 +258,7 @@ interface Props {
 				</p>
 			</div>
 
-			<!-- ISSUE L/M/R: Selector de Roles alineado a la jerarquía de Postgrado UAGRM -->
+			<!-- ISSUE L/M/R: Selector de Roles alineado a la jerarquía de Posgrado UAGRM -->
 			<div>
 				<Select
 					label="Rol"
