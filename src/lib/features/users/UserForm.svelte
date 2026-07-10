@@ -37,7 +37,8 @@ interface Props {
 		activo: true,
 		nombre_funcional: '',
 		cursos_asignados: [],
-		carnet: ''
+		carnet: '',
+		subtipo_coordinador: ''
 	});
 
 	// GAP-1 (audio 2026-07-08): si se completa el CI y se deja la contraseña en
@@ -56,6 +57,8 @@ interface Props {
 	);
 	// Obligatorio solo para Encargado de Curso (siempre segmentado).
 	let requiereCursosAsignados = $derived(formData.role === 'encargado_curso');
+	// ISSUE-R-PERFIL-GENERICO: el Coordinador requiere subtipo (financiero/académico/investigación).
+	let requiereSubtipoCoordinador = $derived(formData.role === 'coordinador');
 	// Cobranza también puede asignarse a programas, pero es OPCIONAL: si no se
 	// marca ninguno, ve/gestiona todos los pagos (comportamiento general);
 	// si se marcan, queda segmentado a esos programas (ISSUE-P-SEGMENTACION).
@@ -97,7 +100,8 @@ interface Props {
 				activo: user.activo,
 				nombre_funcional: user.nombre_funcional ?? '',
 				cursos_asignados: user.cursos_asignados ?? [],
-				carnet: user.carnet ?? ''
+				carnet: user.carnet ?? '',
+				subtipo_coordinador: user.subtipo_coordinador ?? ''
 			};
 		} else {
 			formData = {
@@ -108,7 +112,8 @@ interface Props {
 				activo: true,
 				nombre_funcional: '',
 				cursos_asignados: [],
-				carnet: ''
+				carnet: '',
+				subtipo_coordinador: ''
 			};
 		}
 		errors = {};
@@ -157,6 +162,9 @@ interface Props {
 		if (requiereCursosAsignados && (formData.cursos_asignados ?? []).length === 0) {
 			nuevosErrores.cursos_asignados = 'Selecciona al menos un curso para este Encargado de Curso.';
 		}
+		if (requiereSubtipoCoordinador && !formData.subtipo_coordinador) {
+			nuevosErrores.subtipo_coordinador = 'Selecciona el subtipo del Coordinador (financiero, académico o investigación).';
+		}
 
 		errors = nuevosErrores;
 		return Object.keys(nuevosErrores).length === 0;
@@ -188,7 +196,8 @@ interface Props {
 				password: formData.password?.trim() || undefined,
 				carnet: formData.carnet?.trim() || undefined,
 				nombre_funcional: requiereNombreFuncional ? formData.nombre_funcional : undefined,
-				cursos_asignados: permiteCursosAsignados ? formData.cursos_asignados : undefined
+				cursos_asignados: permiteCursosAsignados ? formData.cursos_asignados : undefined,
+				subtipo_coordinador: requiereSubtipoCoordinador ? formData.subtipo_coordinador : undefined
 			};
 
 			if (isEditMode && user) {
@@ -318,6 +327,20 @@ interface Props {
 							perder el historial.
 						</p>
 					{/if}
+				</div>
+			{/if}
+
+			{#if requiereSubtipoCoordinador}
+				<div class="md:col-span-2">
+					<Select label="Subtipo de Coordinador" bind:value={formData.subtipo_coordinador} required error={errors.subtipo_coordinador}>
+						<option value="">— Seleccione —</option>
+						<option value="financiero">Financiero (ve lo económico)</option>
+						<option value="academico">Académico</option>
+						<option value="investigacion">Investigación</option>
+					</Select>
+					<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+						Solo el Coordinador <strong>Financiero</strong> tiene acceso a reportes de caja e ingresos.
+					</p>
 				</div>
 			{/if}
 

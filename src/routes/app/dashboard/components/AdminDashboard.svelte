@@ -17,14 +17,13 @@
 	// ingreso) solo aplica a los roles que ven finanzas, igual que los reportes.
 	// NOTA: este componente está en modo legacy (Svelte 4, sin runas); se
 	// mantiene ese estilo aquí para no romper la reactividad de `loading`/`stats`.
-	// 'coordinador' incluido para el coordinador financiero (ve todo lo económico).
-	// El rol genérico no distingue financiero/académico/investigación aún; cuando
-	// se modele el subtipo (ISSUE-R-PERFIL-GENERICO) restringir a financiero.
-	const ROLES_ECONOMICOS = ['superadmin', 'admin', 'cobranza', 'mae', 'coordinador'];
+	// ISSUE-R-PERFIL-GENERICO: roles económicos base + coordinador SOLO si es financiero.
+	const ROLES_ECONOMICOS_BASE = ['superadmin', 'admin', 'cobranza', 'mae'];
 	let resumenEconomico: ResumenEconomico | null = null;
 
 	$: currentRole = $userStore.role || $userStore.user?.rol || '';
-	$: verResumenEconomico = ROLES_ECONOMICOS.includes(currentRole);
+	$: esCoordinadorFinanciero = $userStore.user?.subtipo_coordinador === 'financiero';
+	$: verResumenEconomico = ROLES_ECONOMICOS_BASE.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero);
 
 	// Perfiles segmentados (cobranza/encargado con cursos_asignados) NO necesitan
 	// el "Desglose por Curso": su vista ya está acotada a sus cursos, así que sería
@@ -202,8 +201,10 @@
 			// ISSUE-P-DASHBOARD-COBRANZA: resumen económico agregado (incluye
 			// matrícula como ingreso). Solo para roles económicos; no bloquea el
 			// dashboard si el endpoint devuelve 403 o falla.
-			const roleNow = get(userStore).role || get(userStore).user?.rol || '';
-			if (ROLES_ECONOMICOS.includes(roleNow)) {
+			const snap = get(userStore);
+			const roleNow = snap.role || snap.user?.rol || '';
+			const esCoordFinNow = snap.user?.subtipo_coordinador === 'financiero';
+			if (ROLES_ECONOMICOS_BASE.includes(roleNow) || (roleNow === 'coordinador' && esCoordFinNow)) {
 				try {
 					resumenEconomico = await paymentService.getResumenEconomico();
 				} catch (e) {
