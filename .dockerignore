@@ -1,0 +1,8 @@
+node_modules
+.svelte-kit
+build
+.git
+.github
+.vscode
+npm-debug.log*
+.DS_Store
