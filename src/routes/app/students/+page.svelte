@@ -78,7 +78,7 @@
 	// Permisos Visuales Granulares
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
 	let isSuperAdmin = $derived(currentRole === 'superadmin');
-	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 	let canEditStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canVerifyTitle = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canEnrollStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
@@ -409,7 +409,7 @@
 			let allStudents: Student[] = [];
 			let currentPage = 1;
 			let hasMore = true;
-			const batchLimit = 100; 
+			const batchLimit = 1000; 
 
 			while (hasMore) {
 				const res = await studentService.getAll(currentPage, batchLimit, filterParams);

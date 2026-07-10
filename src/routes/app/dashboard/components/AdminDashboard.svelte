@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { studentService, courseService, enrollmentService, paymentService } from '$lib/services';
+	import { studentService, courseService, enrollmentService, paymentService, dashboardService } from '$lib/services';
 	import type { ResumenEconomico } from '$lib/services/payment.service';
 	import type { Enrollment, Payment } from '$lib/interfaces';
 	import { UsersIcon, ClipboardIcon, TagIcon } from '$lib/icons/outline';
@@ -110,12 +110,14 @@
 				studentsRes,
 				coursesRes,
 				enrollmentsRes,
-				paymentsRes
+				paymentsRes,
+				statsRes
 			] = await Promise.all([
-				studentService.getAll(),
-				courseService.getAll(),
+				studentService.getAll(1, 100),
+				courseService.getAll(1, 100),
 				enrollmentService.getAll(1, 100),
-				paymentService.getAll(1, 100)
+				paymentService.getAll(1, 100),
+				dashboardService.getStats()
 			]);
 
 			const students = studentsRes.data ?? [];
@@ -123,20 +125,7 @@
 			const enrollments = enrollmentsRes.data ?? [];
 			const payments = paymentsRes.data ?? [];
 
-			stats.students.total = studentsRes.meta?.totalItems ?? students.length;
-			stats.students.active = students.filter(s => s.activo).length;
-
-			stats.courses.total = coursesRes.meta?.totalItems ?? courses.length;
-			stats.courses.active = courses.filter(c => c.activo).length;
-
-			stats.enrollments.total = enrollmentsRes.meta?.totalItems ?? enrollments.length;
-			stats.enrollments.active = enrollments.filter(e => e.estado === 'activo').length;
-
-			stats.payments.total = paymentsRes.meta?.totalItems ?? payments.length;
-			stats.payments.pending = payments.filter(p => p.estado_pago === 'pendiente').length;
-			stats.payments.revenue = payments
-				.filter(p => p.estado_pago === 'aprobado' || p.estado_pago === 'pagado')
-				.reduce((sum, p) => sum + p.cantidad_pago, 0);
+			stats = statsRes;
 
 			const studentsMap = students.reduce(
 				(acc, s) => ({ ...acc, [s._id]: s.nombre }),
@@ -453,65 +442,6 @@
 														{course.activo ? 'Activo' : 'Inactivo'}
 													</span>
 												</div>
-											</div>
-
-											<!-- 4 cards del desglose -->
-											<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-												<!-- Inscritos -->
-												<a href={`/app/students?curso_id=${course.id}`} class="block">
-													<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
-														<div class="flex-1 min-w-0 mr-3">
-															<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Inscritos</p>
-															<p class="text-xl sm:text-2xl font-black text-gray-800 dark:text-white mt-0.5 truncate">{course.inscritos}</p>
-															<p class="text-[10px] text-green-600 font-semibold mt-1 truncate">{course.inscritosActivos} Activos</p>
-														</div>
-														<div class="p-2.5 sm:p-3 bg-primary-100 dark:bg-primary-900/30 rounded-xl text-primary-600 dark:text-primary-300 shrink-0">
-															<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-														</div>
-													</div>
-												</a>
-
-												<!-- Pagos Pendientes -->
-												<a href={`/app/payments?curso_id=${course.id}`} class="block">
-													<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
-														<div class="flex-1 min-w-0 mr-3">
-															<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Pagos Pend.</p>
-															<p class="text-xl sm:text-2xl font-black text-gray-800 dark:text-white mt-0.5 truncate">{course.pagosPendientes}</p>
-															<p class="text-[10px] text-yellow-600 font-semibold mt-1 truncate">{course.pagosPendientes} Por Revisar</p>
-														</div>
-														<div class="p-2.5 sm:p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl text-yellow-600 shrink-0">
-															<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-														</div>
-													</div>
-												</a>
-
-												<!-- Recaudado -->
-												<a href={`/app/payments?curso_id=${course.id}`} class="block">
-													<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
-														<div class="flex-1 min-w-0 mr-3">
-															<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Recaudado</p>
-															<p class="text-lg sm:text-xl font-black text-gray-800 dark:text-white mt-0.5 truncate" title={formatCurrency(course.ingresos)}>{formatCurrency(course.ingresos)}</p>
-															<p class="text-[10px] text-green-600 font-semibold mt-1 truncate">Aprobados</p>
-														</div>
-														<div class="p-2.5 sm:p-3 bg-green-100 dark:bg-green-900/30 rounded-xl text-green-600 shrink-0">
-															<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-														</div>
-													</div>
-												</a>
-
-												<!-- Por Cobrar -->
-												<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
-													<div class="flex-1 min-w-0 mr-3">
-														<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Por Cobrar</p>
-														<p class="text-lg sm:text-xl font-black text-gray-800 dark:text-white mt-0.5 truncate" title={formatCurrency(course.saldoPendiente)}>{formatCurrency(course.saldoPendiente)}</p>
-														<p class="text-[10px] text-orange-500 font-semibold mt-1 truncate">Saldo Pendiente</p>
-													</div>
-													<div class="p-2.5 sm:p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl text-orange-600 shrink-0">
-														<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-													</div>
-												</div>
-
 											</div>
 										</div>
 									{/each}

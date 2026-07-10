@@ -105,7 +105,7 @@
 					/>
 				</div>
 				<span class="text-2xl font-extrabold text-light-secondary dark:text-dark-tertiary text-center leading-tight">
-					Escuela de Posgrado
+					Facultad de Ciencias Contables
 				</span>
 				<span class="text-sm font-semibold text-light-tertiary dark:text-dark-secondary text-center">
 					Contaduría Pública · UAGRM

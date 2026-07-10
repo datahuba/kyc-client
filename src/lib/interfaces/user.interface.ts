@@ -33,6 +33,7 @@ export interface User {
 	// (UserResponse) trae también estos campos propios del Student.
 	registro?: string | null;
 	codigo_registro?: string | null;
+	perfil_completado?: boolean;
 }
 
 

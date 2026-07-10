@@ -385,7 +385,6 @@
                                         <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Módulo</th>
                                         <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Programa / Curso</th>
                                         <th scope="col" class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Código</th>
-                                        <th scope="col" class="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Costo Unitario</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -407,11 +406,6 @@
                                             <td class="px-4 py-4 align-top">
                                                 <span class="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600 whitespace-nowrap">
                                                     {module.curso_codigo}
-                                                </span>
-                                            </td>
-                                            <td class="px-4 py-4 align-top text-right whitespace-nowrap">
-                                                <span class="text-sm text-green-600 dark:text-green-400 font-bold">
-                                                    {safeFormatCurrency(module.modulo_costo)}
                                                 </span>
                                             </td>
                                         </tr>

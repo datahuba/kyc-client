@@ -122,7 +122,7 @@
 			<div class="flex items-center gap-2.5 min-w-0" in:fade>
 				<img src="/images/logo_uagrm_fondo_blanco.jpg" alt="UAGRM" class="h-9 w-9 shrink-0 rounded-md object-contain bg-white p-0.5 ring-1 ring-gray-200 dark:ring-gray-700" />
 				<div class="flex flex-col leading-tight min-w-0">
-					<span class="text-sm font-extrabold text-primary-700 dark:text-dark-tertiary truncate">Posgrado UAGRM</span>
+					<span class="text-sm font-extrabold text-primary-700 dark:text-dark-tertiary truncate">Fac. Ciencias Contables</span>
 					<span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 truncate">Contaduría Pública</span>
 				</div>
 			</div>
