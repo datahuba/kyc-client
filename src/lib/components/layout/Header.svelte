@@ -3,6 +3,7 @@
 	import { Menu2Icon, UserIcon } from '$lib/icons/outline';
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
+	import PWAInstallButton from '$lib/components/ui/PWAInstallButton.svelte';
 	import { goto } from '$app/navigation';
 	import { onMount, onDestroy, untrack } from 'svelte';
 	import { apiKyC } from '$lib/config/apiKyC.config'; // IMPORTACIÓN DEL CLIENTE ESTÁNDAR
@@ -258,6 +259,9 @@
 			</span>
 		</div>
 		<div class="flex items-center gap-x-4 lg:gap-x-6">
+
+			<!-- PWA INSTALL BUTTON -->
+			<PWAInstallButton />
 
 			<!-- TOGGLE DE TEMA CLARO/OSCURO -->
 			<ThemeToggle />
