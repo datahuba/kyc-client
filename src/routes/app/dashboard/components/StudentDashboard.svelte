@@ -24,6 +24,18 @@
 	let requestMensaje = $state('');
 	let requestLoading = $state(false);
 
+	// ISSUE-Q-INSCRIPCION-DOCS: Validar que el estudiante tenga sus documentos completos y verificados
+	let documentosCompletos = $derived.by(() => {
+		const u = $userStore.user as any;
+		if (!u) return false;
+		return (
+			u.cv_estado === 'verificado' &&
+			u.carnet_estado === 'verificado' &&
+			u.afiliacion_estado === 'verificado' &&
+			u.titulo?.estado === 'verificado'
+		);
+	});
+
 	function openRequestModal(course: Course) {
 		requestTargetCourse = course;
 		requestMensaje = '';
@@ -144,16 +156,6 @@
 		</div>
 
 		<!-- 2. Tarjetas de Estadísticas Globales -->
-		<!-- ISSUE-X-COMPACT (fix 2026-07-09, reportado por el usuario: las tarjetas
-		     quedaban demasiado grandes con mucho espacio vacío para lo poco que
-		     muestran). Reducido padding/ícono/tipografía, quitado el col-span-2 de
-		     la tercera tarjeta (ya no hace falta ocupar 2 columnas en tablet). -->
-		<!-- FIX (2026-07-09, reportado por el usuario: "los iconos no encajan bien"):
-		     Card envuelve el contenido en su propio <div class="card-content">, así
-		     que "flex items-center justify-between" puesto directamente en Card no
-		     actúa sobre estos 2 divs (quedan apilados verticalmente por defecto,
-		     descolocando el ícono debajo del texto en vez de al lado). Se mueve el
-		     flex a un wrapper propio DENTRO del Card. -->
 		<div class="grid grid-cols-3 gap-3 sm:gap-4">
 			<Card padding="none" class="p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
 				<div class="flex items-center justify-between gap-2">
@@ -197,11 +199,27 @@
 
 		<!-- 2.5 Slide horizontal dinámico: Programas Disponibles -->
 		{#if availableCourses.length > 0}
-			<div>
+			<div class="pt-2 border-t border-gray-100 dark:border-dark-border">
 				<div class="flex items-center justify-between mb-3">
 					<Heading level="h2" class="text-lg sm:text-xl">Programas Disponibles</Heading>
 					<span class="hidden sm:inline text-xs text-gray-400 dark:text-gray-500">Desliza para ver más →</span>
 				</div>
+
+				{#if !documentosCompletos}
+					<div class="mb-4 p-4 rounded-xl bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/30 dark:border-red-900 dark:text-red-300">
+						<div class="flex items-start gap-3">
+							<svg class="w-5 h-5 mt-0.5 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+							<div>
+								<h4 class="text-sm font-bold">Documentación Incompleta</h4>
+								<p class="text-xs mt-1">
+									No puedes solicitar inscripción a nuevos programas porque te faltan documentos obligatorios o aún no han sido validados por el CPD.
+									Por favor, ve a tu <a href="/app/profile" class="underline font-semibold hover:text-red-900 dark:hover:text-red-200">Perfil</a> y asegúrate de tener tu CV, Carnet, Formulario de Inscripción y Título Profesional en estado <strong>Verificado</strong>.
+								</p>
+							</div>
+						</div>
+					</div>
+				{/if}
+
 				<div class="flex gap-4 overflow-x-auto pb-3 snap-x -mx-1 px-1 scrollbar-hide">
 					{#each availableCourses as course (course._id)}
 						<div class="snap-start shrink-0 w-64 sm:w-72 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl shadow-sm overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
@@ -231,7 +249,9 @@
 										<button
 											type="button"
 											onclick={() => openRequestModal(course)}
-											class="text-xs font-semibold text-primary-600 hover:text-primary-800 dark:text-primary-400"
+											disabled={!documentosCompletos}
+											class="text-xs font-semibold {documentosCompletos ? 'text-primary-600 hover:text-primary-800 dark:text-primary-400' : 'text-gray-400 cursor-not-allowed dark:text-gray-600'}"
+											title={!documentosCompletos ? 'Debes validar tus documentos primero' : ''}
 										>
 											Solicitar Inscripción →
 										</button>
