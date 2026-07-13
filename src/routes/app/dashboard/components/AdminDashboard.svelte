@@ -19,11 +19,13 @@
 	// mantiene ese estilo aquí para no romper la reactividad de `loading`/`stats`.
 	// ISSUE-R-PERFIL-GENERICO: roles económicos base + coordinador SOLO si es financiero.
 	const ROLES_ECONOMICOS_BASE = ['superadmin', 'admin', 'cobranza', 'mae'];
+	const ROLES_QUE_VEN_PAGOS = ['superadmin', 'admin', 'mae', 'cobranza', 'cpd'];
 	let resumenEconomico: ResumenEconomico | null = null;
 
 	$: currentRole = $userStore.role || $userStore.user?.rol || '';
 	$: esCoordinadorFinanciero = $userStore.user?.subtipo_coordinador === 'financiero';
 	$: verResumenEconomico = ROLES_ECONOMICOS_BASE.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero);
+	$: puedeVerPagos = ROLES_QUE_VEN_PAGOS.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero);
 
 	// Perfiles segmentados (cobranza/encargado con cursos_asignados) NO necesitan
 	// el "Desglose por Curso": su vista ya está acotada a sus cursos, así que sería
@@ -106,24 +108,36 @@
 
 	onMount(async () => {
 		try {
+			const snap = get(userStore);
+			const roleNow = snap.role || snap.user?.rol || '';
+			const esCoordFinNow = snap.user?.subtipo_coordinador === 'financiero';
+			const puedeVerPagosNow = ROLES_QUE_VEN_PAGOS.includes(roleNow) || (roleNow === 'coordinador' && esCoordFinNow);
+
 			const [
 				studentsRes,
 				coursesRes,
 				enrollmentsRes,
-				paymentsRes,
 				statsRes
 			] = await Promise.all([
 				studentService.getAll(1, 100),
 				courseService.getAll(1, 100),
 				enrollmentService.getAll(1, 100),
-				paymentService.getAll(1, 100),
 				dashboardService.getStats()
 			]);
 
 			const students = studentsRes.data ?? [];
 			const courses = coursesRes.data ?? [];
 			const enrollments = enrollmentsRes.data ?? [];
-			const payments = paymentsRes.data ?? [];
+			
+			let payments: Payment[] = [];
+			if (puedeVerPagosNow) {
+				try {
+					const paymentsRes = await paymentService.getAll(1, 100);
+					payments = paymentsRes.data ?? [];
+				} catch (e) {
+					console.error("Error fetching payments for dashboard:", e);
+				}
+			}
 
 			stats = statsRes;
 
@@ -190,9 +204,6 @@
 			// ISSUE-P-DASHBOARD-COBRANZA: resumen económico agregado (incluye
 			// matrícula como ingreso). Solo para roles económicos; no bloquea el
 			// dashboard si el endpoint devuelve 403 o falla.
-			const snap = get(userStore);
-			const roleNow = snap.role || snap.user?.rol || '';
-			const esCoordFinNow = snap.user?.subtipo_coordinador === 'financiero';
 			if (ROLES_ECONOMICOS_BASE.includes(roleNow) || (roleNow === 'coordinador' && esCoordFinNow)) {
 				try {
 					resumenEconomico = await paymentService.getResumenEconomico();
@@ -362,16 +373,17 @@
 
 			<!-- La tarjeta "Ingresos" es redundante para roles económicos (ya ven
 			     "Total Ingresos" en el Resumen Económico, y esta muestra solo los
-			     pagos filtrados por rol, lo que confunde). Se oculta para ellos. -->
-			{#if !verResumenEconomico}
+			     pagos filtrados por rol, lo que confunde). Se oculta para ellos. 
+				 NOTA: Solo se muestra si el usuario TIENE PERMISOS para ver pagos (ej. CPD) -->
+			{#if !verResumenEconomico && puedeVerPagos}
 			<a href="/app/payments" class="block">
 				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg min-w-0">
 					<div class="flex-1 min-w-0 mr-3">
 						<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Ingresos</p>
-						<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(stats.payments.revenue)}>
-							{formatCurrency(stats.payments.revenue)}
+						<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(stats.payments?.revenue ?? 0)}>
+							{formatCurrency(stats.payments?.revenue ?? 0)}
 						</p>
-						<p class="text-[10px] sm:text-xs text-yellow-600 mt-1 truncate">{stats.payments.pending} Pendientes</p>
+						<p class="text-[10px] sm:text-xs text-yellow-600 mt-1 truncate">{stats.payments?.pending ?? 0} Pendientes</p>
 					</div>
 					<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
 						<CreditCardIcon class="size-6 sm:size-8" />
@@ -417,9 +429,11 @@
 									</span>
 									<span class="hidden lg:flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 ml-1 truncate">
 										<span>{totalInscritos} inscritos</span>
-										<span>·</span>
-										<span>{formatCurrency(totalIngresos)} recaudado</span>
-										{#if totalPendientes > 0}<span>· <span class="text-yellow-600 font-medium">{totalPendientes} pend.</span></span>{/if}
+										{#if puedeVerPagos}
+											<span>·</span>
+											<span>{formatCurrency(totalIngresos)} recaudado</span>
+											{#if totalPendientes > 0}<span>· <span class="text-yellow-600 font-medium">{totalPendientes} pend.</span></span>{/if}
+										{/if}
 									</span>
 								</div>
 								<svg class={`size-5 shrink-0 ${style.text} transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
