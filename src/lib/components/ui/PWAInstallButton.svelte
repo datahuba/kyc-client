@@ -13,7 +13,8 @@
 	onMount(() => {
 		// Detectamos si es iOS (iPhone/iPad) para mostrar las instrucciones manuales
 		const ua = window.navigator.userAgent.toLowerCase();
-		isIOS = /iphone|ipad|ipod/.test(ua);
+		// Detectamos iPhone, iPod, iPad antiguos, y iPad modernos (que reportan como Mac pero tienen touch)
+		isIOS = /iphone|ipad|ipod/.test(ua) || (ua.includes('mac') && navigator.maxTouchPoints > 1);
 		
 		// Verificamos si ya está instalada (standalone mode)
 		const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
