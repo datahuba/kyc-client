@@ -48,6 +48,12 @@ class UserService {
 	async delete(id: string): Promise<User> {
 		return apiKyC.delete<User>(`/users/${id}`);
 	}
+
+	async uploadCV(id: string, file: File): Promise<User> {
+		const formData = new FormData();
+		formData.append('file', file);
+		return apiKyC.post<User>(`/users/${id}/cv`, formData);
+	}
 }
 
 export const userService = new UserService();

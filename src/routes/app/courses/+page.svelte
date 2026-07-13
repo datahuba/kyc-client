@@ -53,7 +53,7 @@
 	let selectedCourseStudents: Course | null = $state(null);
 
 	// ISSUE N: Control de Permisos Visuales
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let currentRole = $derived(($userStore.role || $userStore.user?.rol || '').toLowerCase());
 	let canCreateCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canEditCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canDeleteCourse = $derived(currentRole === 'superadmin');

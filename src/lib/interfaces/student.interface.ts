@@ -33,8 +33,14 @@ export interface Student {
 	registro: string;
 	updated_at: string;
 	afiliacion_url?: string | null;
+	afiliacion_estado?: 'pendiente' | 'verificado' | 'rechazado';
+	afiliacion_motivo_rechazo?: string | null;
 	ci_url?: string | null;
+	carnet_estado?: 'pendiente' | 'verificado' | 'rechazado';
+	carnet_motivo_rechazo?: string | null;
 	cv_url?: string | null;
+	cv_estado?: 'pendiente' | 'verificado' | 'rechazado';
+	cv_motivo_rechazo?: string | null;
 	titulo?: Titulo | null;
 	// Datos oficiales UAGRM
 	sexo?: string | null;

@@ -111,6 +111,16 @@ class StudentService {
 		return await apiKyC.post<Student>(`/students/${id}/upload/titulo`, formData);
 	}
 
+	async verifyDocument(id: string, type: string): Promise<Student> {
+		return apiKyC.put<Student>(`/students/${id}/documentos/${type}/verificar`, undefined);
+	}
+
+	async rejectDocument(id: string, type: string, motivo: string): Promise<Student> {
+		const formData = new FormData();
+		formData.append('motivo', motivo);
+		return apiKyC.put<Student>(`/students/${id}/documentos/${type}/rechazar`, formData);
+	}
+
 	async verifyTitulo(id: string, data: VerifyTituloData): Promise<Student> {
 		// Convertir VerifyTituloData a URLSearchParams para x-www-form-urlencoded
 		const params = new URLSearchParams();

@@ -671,18 +671,27 @@
 						</p>
 
 						<div class="space-y-3">
-							{#each [{ tipo: 'cv', label: 'Curriculum Vitae (CV)', url: profileData.cv_url }, { tipo: 'ci', label: 'Carnet de Identidad', url: profileData.ci_url }, { tipo: 'afiliacion', label: 'Certificado de Afiliación (Colegio o convenios)', url: profileData.afiliacion_url }] as doc}
+							{#each [{ tipo: 'cv', label: 'Curriculum Vitae (CV)', url: profileData.cv_url, estado: profileData.cv_estado, motivo: profileData.cv_motivo_rechazo }, { tipo: 'ci', label: 'Carnet de Identidad', url: profileData.ci_url, estado: profileData.carnet_estado, motivo: profileData.carnet_motivo_rechazo }, { tipo: 'afiliacion', label: 'Certificado de Afiliación (Colegio o convenios)', url: profileData.afiliacion_url, estado: profileData.afiliacion_estado, motivo: profileData.afiliacion_motivo_rechazo }] as doc}
 								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-dark-border pb-3 last:border-b-0 last:pb-0">
 									<div class="min-w-0">
 										<p class="text-sm font-medium text-gray-900 dark:text-white">{doc.label}</p>
 										<div class="mt-1 flex items-center gap-2">
 											{#if doc.url}
-												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-success/15 text-light-success dark:bg-dark-success/20 dark:text-dark-success">Cargado</span>
+												{#if doc.estado === 'verificado'}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-success/15 text-light-success dark:bg-dark-success/20 dark:text-dark-success">Verificado</span>
+												{:else if doc.estado === 'rechazado'}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-red-100 text-red-800">Rechazado</span>
+												{:else}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-yellow-100 text-yellow-800">En revisión</span>
+												{/if}
 												<a href={doc.url} target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-light-secondary dark:text-dark-secondary hover:underline">Ver documento</a>
 											{:else}
 												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Sin subir</span>
 											{/if}
 										</div>
+										{#if doc.estado === 'rechazado' && doc.motivo}
+											<p class="mt-1 text-xs text-red-600 dark:text-red-400">Motivo de rechazo: {doc.motivo}</p>
+										{/if}
 									</div>
 									<div class="shrink-0">
 										<FileUpload
@@ -1007,8 +1016,103 @@
 		student={profileData}
 		onClose={() => (formularioModalOpen = false)}
 	/>
-{:else}
-<div>
-	data de admin profile proceso
-</div>
+{:else if profileData}
+	<div class="space-y-6 pb-8">
+		<div class="flex items-center justify-between">
+			<Heading level="h1">Mi Perfil ({profileData.role})</Heading>
+		</div>
+
+		<div class="grid gap-6 lg:grid-cols-3">
+			<div class="lg:col-span-2 space-y-6">
+				<Card>
+					{#snippet header()}
+						<div class="flex items-center gap-3">
+							<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-light-primary/10 dark:bg-dark-primary/10">
+								<IdentificationIcon class="h-5 w-5 text-light-primary dark:text-dark-primary" />
+							</div>
+							<div>
+								<h3 class="text-base font-semibold text-gray-900 dark:text-white">Datos Personales</h3>
+								<p class="text-sm text-gray-500 dark:text-gray-400">Información básica de tu cuenta</p>
+							</div>
+						</div>
+					{/snippet}
+
+					<div class="grid gap-6 sm:grid-cols-2">
+						<Input label="Usuario" value={profileData.username || ''} disabled />
+						<Input label="Correo Electrónico" value={profileData.email || ''} disabled />
+						<Input label="Carnet de Identidad" value={profileData.carnet || ''} disabled />
+						<Input label="Rol en el Sistema" value={profileData.role || ''} disabled />
+					</div>
+				</Card>
+			</div>
+
+			<div class="space-y-6">
+				{#if profileData.role === 'docente'}
+					<Card>
+						{#snippet header()}
+							<div class="flex items-center gap-3">
+								<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-light-secondary/10 dark:bg-dark-secondary/10">
+									<BriefcaseIcon class="h-5 w-5 text-light-secondary dark:text-dark-secondary" />
+								</div>
+								<div>
+									<h3 class="text-base font-semibold text-gray-900 dark:text-white">Curriculum Vitae</h3>
+									<p class="text-sm text-gray-500 dark:text-gray-400">Hoja de vida profesional</p>
+								</div>
+							</div>
+						{/snippet}
+
+						<div class="space-y-4">
+							{#if profileData.cv_url}
+								<div class="p-3 bg-light-success/10 dark:bg-dark-success/10 rounded-lg flex items-center justify-between">
+									<span class="text-sm font-medium text-light-success dark:text-dark-success">CV Cargado</span>
+									<a href={profileData.cv_url} target="_blank" rel="noopener noreferrer" class="text-sm text-light-secondary hover:underline dark:text-dark-secondary font-medium">Ver PDF</a>
+								</div>
+							{:else}
+								<div class="p-3 bg-light-warning/10 dark:bg-dark-warning/10 rounded-lg">
+									<span class="text-sm font-medium text-light-warning dark:text-dark-warning">No has subido tu CV</span>
+								</div>
+							{/if}
+
+							<FileUpload
+								accept="application/pdf"
+								onFileSelect={async (f) => {
+									if (!f || !profileData._id) return;
+									uploadingDoc = 'cv';
+									try {
+										const updated = await userService.uploadCV(profileData._id, f);
+										if (updated) {
+											profileData = { ...profileData, cv_url: updated.cv_url };
+											// update the store as well
+											userStore.updateCurrentUser({ cv_url: updated.cv_url });
+											alert('success', 'CV actualizado correctamente');
+										}
+									} catch (e: any) {
+										alert('error', e.message || 'Error al subir CV');
+									} finally {
+										uploadingDoc = null;
+									}
+								}}
+								label=""
+								preview={false}
+								disabled={uploadingDoc === 'cv'}
+							>
+								<button 
+									type="button"
+									class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-light-secondary dark:bg-dark-secondary hover:bg-light-secondary_d dark:hover:bg-dark-secondary_d rounded-lg transition-colors disabled:opacity-50"
+									disabled={uploadingDoc === 'cv'}
+								>
+									{#if uploadingDoc === 'cv'}
+										<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+									{:else}
+										<DocumentAddIcon class="h-4 w-4" />
+									{/if}
+									<span>{profileData.cv_url ? 'Reemplazar CV' : 'Subir CV (PDF)'}</span>
+								</button>
+							</FileUpload>
+						</div>
+					</Card>
+				{/if}
+			</div>
+		</div>
+	</div>
 {/if}

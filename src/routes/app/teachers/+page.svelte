@@ -4,6 +4,7 @@
 	import type { User } from '$lib/interfaces';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Button from '$lib/components/ui/button.svelte';
+	import FileUpload from '$lib/components/ui/fileUpload.svelte';
 	import { alert } from '$lib/utils';
 
 	const TEACHER_ROLE = 'docente';
@@ -38,6 +39,11 @@
     let selectedTeacherForModules: User | null = $state(null);
     let teacherModules: any[] = $state([]);
     let loadingModules = $state(false);
+
+	let showCVModal = $state(false);
+	let selectedTeacherForCV: User | null = $state(null);
+	let isUploadingCV = $state(false);
+	let fileToUpload: File | null = $state(null);
 
 	let isSubmitting = $state(false);
 
@@ -166,6 +172,36 @@
         }
     }
 
+	function handleManageCV(teacher: User) {
+		selectedTeacherForCV = teacher;
+		showCVModal = true;
+		fileToUpload = null;
+		error = '';
+	}
+
+	async function handleUploadCV() {
+		if (!selectedTeacherForCV || !fileToUpload) return;
+		isUploadingCV = true;
+		error = '';
+		try {
+			const updated = await userService.uploadCV(selectedTeacherForCV._id, fileToUpload);
+			alert('success', 'Hoja de Vida subida exitosamente');
+			
+			const idx = teachers.findIndex(t => t._id === updated._id);
+			if (idx !== -1) {
+				teachers[idx] = updated;
+			}
+			
+			selectedTeacherForCV = updated;
+			fileToUpload = null;
+		} catch (err: any) {
+			error = err.message || 'Error al subir la Hoja de Vida';
+			alert('error', error);
+		} finally {
+			isUploadingCV = false;
+		}
+	}
+
 	function safeFormatCurrency(value: any) {
 		if (value === null || value === undefined || isNaN(Number(value))) return 'Bs 0.00';
 		return `Bs ${Number(value).toFixed(2)}`;
@@ -236,6 +272,7 @@
 								{/if}
 							</td>
 							<td class="px-6 py-4 text-right text-sm font-medium space-x-2 whitespace-nowrap">
+								<button onclick={() => handleManageCV(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">CV</button>
 								<button onclick={() => handleViewModules(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
 								<button onclick={() => handleEditTeacher(teacher)} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
 								<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-light-error hover:opacity-80 dark:text-dark-error">Eliminar</button>
@@ -265,6 +302,7 @@
 						{/if}
 					</div>
 					<div class="mt-3 flex items-center gap-4 text-sm font-medium border-t border-gray-100 dark:border-dark-border pt-3">
+						<button onclick={() => handleManageCV(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">CV</button>
 						<button onclick={() => handleViewModules(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
 						<button onclick={() => handleEditTeacher(teacher)} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
 						<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-light-error hover:opacity-80 dark:text-dark-error ml-auto">Eliminar</button>
@@ -422,4 +460,49 @@
             </div>
         </div>
     {/if}
+
+	<!-- Modal Gestión CV -->
+	{#if showCVModal && selectedTeacherForCV}
+		<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+			<div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+				<div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+					<h2 class="text-xl font-bold text-gray-900 dark:text-white">Hoja de Vida (CV)</h2>
+					<button onclick={() => { showCVModal = false; selectedTeacherForCV = null; fileToUpload = null; }} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors p-2">
+						<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
+				</div>
+				
+				<div class="p-6 space-y-4">
+					<p class="text-sm text-gray-500 dark:text-gray-400">
+						Docente: <span class="font-semibold text-gray-900 dark:text-white">{selectedTeacherForCV.username}</span>
+					</p>
+					
+					<div class="pt-2">
+						<FileUpload 
+							accept="application/pdf"
+							loading={isUploadingCV}
+							onFileSelect={(f) => fileToUpload = f}
+							initialUrl={selectedTeacherForCV.cv_url}
+							file={fileToUpload}
+							label="Seleccionar o arrastrar PDF"
+						/>
+					</div>
+
+					{#if fileToUpload}
+						<div class="flex justify-end mt-4">
+							<Button onclick={handleUploadCV} loading={isUploadingCV} disabled={isUploadingCV}>
+								{isUploadingCV ? 'Subiendo...' : 'Subir Hoja de Vida'}
+							</Button>
+						</div>
+					{/if}
+				</div>
+				
+				<div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex justify-end rounded-b-lg">
+					<Button variant="secondary" onclick={() => { showCVModal = false; selectedTeacherForCV = null; fileToUpload = null; }}>Cerrar</Button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>
