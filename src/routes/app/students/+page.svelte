@@ -20,6 +20,7 @@
 	import StudentTable from './StudentTable.svelte';
 	import ImportModal from './ImportModal.svelte';
 	import EnrollmentsModal from './EnrollmentsModal.svelte';
+	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
 
 	let students: Student[] = $state([]);
 	let loading = $state(true);
@@ -48,6 +49,7 @@
 
 	// Enrollments Modal State
 	let isEnrollmentsOpen :boolean= $state(false);
+	let isEnrollmentFormOpen :boolean= $state(false);
 	let studentEnrollments: Enrollment[] = $state([]);
 	let enrollmentsLoading :boolean= $state(false);
 
@@ -56,16 +58,12 @@
 	let importFile: File | null = $state(null);
 	let importLoading = $state(false);
 	let importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color?: Record<string, string[]> } | null = $state(null);
-	let importTipoEstudiante: 'interno' | 'externo' = $state('externo'); 
 	let importCursoId: string = $state(''); // Curso opcional para auto-inscripción en carga masiva
 
 	// Selección Múltiple
 	let selectedStudentIds: string[] = $state([]);
 	let showBulkDeleteModal = $state(false);
 	let bulkDeleteLoading = $state(false);
-
-	// Toggling State
-	let togglingTypeIds: Set<string> = $state(new Set());
 
 	// Filters
 	let filters = $state({
@@ -80,9 +78,10 @@
 	// Permisos Visuales Granulares
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
 	let isSuperAdmin = $derived(currentRole === 'superadmin');
-	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 	let canEditStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canVerifyTitle = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canEnrollStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 
 	let isAllSelected = $derived(
 		students.length > 0 && students.every(s => selectedStudentIds.includes(s._id))
@@ -278,25 +277,6 @@
 		}
 	}
 
-	async function toggleStudentType(student: Student) {
-		if (!canEditStudent) return; 
-		const newType = student.es_estudiante_interno === 'interno' ? 'externo' : 'interno';
-		
-		togglingTypeIds.add(student._id);
-		togglingTypeIds = new Set(togglingTypeIds); 
-		
-		try {
-			const updatedStudent = await studentService.toggleTipoEstudiante(student._id, newType);
-			students = students.map(s => s._id === student._id ? { ...s, es_estudiante_interno: updatedStudent.es_estudiante_interno } : s);
-			alert('success', `El estudiante ahora es ${newType.toUpperCase()}`);
-		} catch (error: any) {
-			alert('error', error.message || 'Error al cambiar tipo de estudiante');
-		} finally {
-			togglingTypeIds.delete(student._id);
-			togglingTypeIds = new Set(togglingTypeIds);
-		}
-	}
-
 	function handleFormSuccess() {
 		isFormOpen = false;
 		loadStudents();
@@ -344,6 +324,12 @@
 		}
 	}
 
+	function handleEnrollStudent(student: Student) {
+		selectedStudent = student;
+		isEnrollmentFormOpen = true;
+		openDropdownId = null;
+	}
+
 	function getDropdownOptions(student: Student) {
 		const options: any[] = [
 			{
@@ -359,6 +345,15 @@
 				action: () => handleViewEnrollments(student)
 			}
 		];
+
+		if (canEnrollStudent) {
+			options.push({
+				label: 'Inscribir a Curso',
+				id: 'enroll',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>`,
+				action: () => handleEnrollStudent(student)
+			});
+		}
 
 		if (canEditStudent) {
 			options.push({
@@ -414,7 +409,7 @@
 			let allStudents: Student[] = [];
 			let currentPage = 1;
 			let hasMore = true;
-			const batchLimit = 100; 
+			const batchLimit = 1000; 
 
 			while (hasMore) {
 				const res = await studentService.getAll(currentPage, batchLimit, filterParams);
@@ -479,7 +474,7 @@
 		importLoading = true;
 		importReport = null;
 		try {
-			const response = await studentService.importFromExcel(importFile, importTipoEstudiante, importCursoId || undefined);
+			const response = await studentService.importFromExcel(importFile, importCursoId || undefined);
 			importReport = response;
 			if (response.success_count > 0) {
 				const inscritosMsg = response.enrolled_count > 0
@@ -538,7 +533,7 @@
 			</Button>
 
 			{#if canCreateStudent}
-				<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; importTipoEstudiante = 'externo'; importCursoId = ''; }} variant="secondary">
+				<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; importCursoId = ''; }} variant="secondary">
 					{#snippet leftIcon()}
 						<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
 					{/snippet}
@@ -574,11 +569,9 @@
 			{students}
 			{isSuperAdmin}
 			{canEditStudent}
-			{togglingTypeIds}
 			{getDropdownOptions}
 			{toggleSelectAll}
 			{toggleSelectStudent}
-			{toggleStudentType}
 			{toggleDropdown}
 			bind:selectedStudentIds={selectedStudentIds}
 			bind:openDropdownId={openDropdownId}
@@ -623,6 +616,19 @@
 		</div>
 	</Modal>
 
+	<!-- Modal para Inscribir al Estudiante seleccionado -->
+	<Modal isOpen={isEnrollmentFormOpen} title="Inscribir a Curso" onClose={() => isEnrollmentFormOpen = false} maxWidth="sm:max-w-4xl">
+		{#if selectedStudent}
+			<EnrollmentForm 
+				defaultStudentId={selectedStudent._id}
+				students={[selectedStudent]} 
+				courses={allCourses} 
+				onSuccess={() => { isEnrollmentFormOpen = false; loadStudents(); }} 
+				onCancel={() => isEnrollmentFormOpen = false} 
+			/>
+		{/if}
+	</Modal>
+
 	<!-- Modal de Inscripciones Modularizado -->
 	<EnrollmentsModal
 		isOpen={isEnrollmentsOpen}
@@ -636,7 +642,6 @@
 	<ImportModal
 		isOpen={isImportModalOpen}
 		{importLoading}
-		{downloadTemplateCSV}
 		onClose={() => isImportModalOpen = false}
 		onDownloadTemplate={downloadTemplateCSV}
 		onFileChange={(e) => {
@@ -646,7 +651,6 @@
 		onSubmit={handleImportExcelSubmit}
 		courses={allCourses}
 		bind:importFile={importFile}
-		bind:importTipoEstudiante={importTipoEstudiante}
 		bind:importCursoId={importCursoId}
 		bind:importReport={importReport}
 	/>

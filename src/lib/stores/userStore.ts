@@ -45,7 +45,7 @@ function createUserStore() {
 		const userRole = user.role || user.rol;
 		const isAdminOrStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(userRole as string);
 		const isStudentUser = user.user_type === 'student';
-		const isTeacherUser = userRole === 'docente' || userRole === 'teacher';
+		const isTeacherUser = userRole === 'docente' || (userRole as string) === 'teacher';
 
 		if (currentType === 'admin') {
 			return isAdminOrStaff
@@ -144,7 +144,7 @@ function createUserStore() {
 				if (user.user_type === 'student') {
 					syncedLoginType = 'academic';
 					syncedAcademicRole = 'student';
-				} else if (userRole === 'docente' || userRole === 'teacher') {
+				} else if (userRole === 'docente' || (userRole as string) === 'teacher') {
 					syncedLoginType = 'academic';
 					syncedAcademicRole = 'teacher';
 				} else if (['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(userRole as string)) {
@@ -168,7 +168,7 @@ function createUserStore() {
 					token,
 					isAuthenticated: true,
 					loading: false,
-					role: userRole,
+					role: userRole ?? null,
 					loginType: syncedLoginType,
 					academicRole: syncedAcademicRole
 				}));
@@ -206,15 +206,11 @@ function createUserStore() {
 				localStorage.removeItem(AUTH_TOKEN_KEY);
 				localStorage.removeItem(USER_DATA_KEY);
 				localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
+				// Limpiar también tipo de sesión para evitar contaminación entre roles
+				localStorage.removeItem(LOGIN_TYPE_KEY);
+				localStorage.removeItem(ACADEMIC_ROLE_KEY);
 			}
 			set(initialState);
-			if (browser) {
-				const loginType = localStorage.getItem(LOGIN_TYPE_KEY) as 'admin' | 'academic' | null;
-				const academicRole = localStorage.getItem(ACADEMIC_ROLE_KEY) as 'teacher' | 'student' | null;
-				if (loginType || academicRole) {
-					update(state => ({ ...state, loginType, academicRole }));
-				}
-			}
 		},
 
 		init: () => {

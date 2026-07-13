@@ -48,9 +48,9 @@
 				const currentAcademicRole = state.academicRole || '';
 
 				// ISSUE M: Enrutador Conmutador Inteligente Post-Auth de la UAGRM
-				if (userRole === 'student' || currentAcademicRole === 'student') {
+				if ((userRole as string) === 'student' || currentAcademicRole === 'student') {
 					goto('/app/dashboard'); // Estudiante va a su respectivo Dashboard académico
-				} else if (userRole === 'teacher' || userRole === 'docente' || currentAcademicRole === 'teacher') {
+				} else if ((userRole as string) === 'teacher' || userRole === 'docente' || currentAcademicRole === 'teacher') {
 					goto('/app/dashboard'); // Docente va a su respectivo Dashboard académico
 				} else if (userRole === 'cpd') {
 					goto('/app/students'); // CPD no tiene acceso financiero, inicia directo en gestión de estudiantes
@@ -105,10 +105,10 @@
 					/>
 				</div>
 				<span class="text-2xl font-extrabold text-light-secondary dark:text-dark-tertiary text-center leading-tight">
-					Escuela de Postgrado
+					Unidad de Postgrado
 				</span>
-				<span class="text-sm font-semibold text-light-tertiary dark:text-dark-secondary text-center">
-					Contaduría Pública · UAGRM
+				<span class="text-xs font-semibold text-light-tertiary dark:text-dark-secondary text-center max-w-sm mt-1 px-4 leading-normal">
+					Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas
 				</span>
 				{#if loginType}
 					<span class="mt-2 text-lg font-medium text-light-black/60 dark:text-dark-white/60">
@@ -136,7 +136,7 @@
 						for="username"
 						class="mb-2 block text-sm font-semibold text-light-black dark:text-dark-white"
 					>
-						Usuario o Email
+						Usuario, Correo, Registro o Carnet
 					</label>
 					<div class="relative">
 						<UserIcon
@@ -148,7 +148,7 @@
 							bind:value={username}
 							onkeypress={handleKeyPress}
 							class="w-full rounded-xl border-2 border-light-four bg-light-primary py-3.5 pr-4 pl-12 text-light-black transition-all outline-none placeholder:text-light-four/50 hover:border-light-four focus:border-light-tertiary dark:border-dark-four dark:bg-dark-primary dark:text-dark-white dark:placeholder:text-dark-four dark:hover:border-dark-four dark:focus:border-dark-tertiary dark:focus:ring-dark-tertiary"
-							placeholder="usuario@ejemplo.com"
+							placeholder="Correo, registro o carnet"
 							disabled={isLoading}
 						/>
 					</div>

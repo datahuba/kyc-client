@@ -52,8 +52,9 @@
 				<img src="/images/logo_uagrm_fondo_blanco.jpg" alt="UAGRM" class="h-16 w-16 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5" />
 				<img src="/images/logo_contaduria_publica_fondo_blanco.jpg" alt="Contaduría Pública" class="h-16 w-16 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5" />
 			</div>
-			<h1 class="text-xl font-extrabold text-light-secondary dark:text-dark-tertiary text-center">Nueva contraseña</h1>
-			<p class="text-sm text-light-tertiary dark:text-dark-secondary text-center">Escuela de Postgrado · Contaduría Pública UAGRM</p>
+			<span class="text-xl font-extrabold text-light-secondary dark:text-dark-tertiary text-center leading-tight">Unidad de Postgrado</span>
+			<span class="text-xs font-semibold text-light-tertiary dark:text-dark-secondary text-center mt-1 max-w-sm leading-normal">Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas</span>
+			<h1 class="text-base font-bold text-gray-700 dark:text-gray-300 text-center mt-4">Nueva contraseña</h1>
 		</div>
 
 		<div class="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl shadow-sm p-6">

@@ -42,16 +42,13 @@ class StudentService {
 		return await apiKyC.post<Student>('/students/', data);
 	}
 
-    // ISSUE G: Añadido selector de tipo de estudiante
-    // NUEVO: cursoId opcional para auto-inscribir a los estudiantes importados a un curso/diplomado
+    // cursoId opcional para auto-inscribir a los estudiantes importados a un curso/diplomado
     async importFromExcel(
         file: File,
-        tipoEstudiante: 'interno' | 'externo',
         cursoId?: string
     ): Promise<{ success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color: Record<string, string[]> }> {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('tipo_estudiante', tipoEstudiante);
         if (cursoId) {
             formData.append('curso_id', cursoId);
         }
@@ -66,11 +63,6 @@ class StudentService {
             formData, 
             { customTimeout: 180000 }
         );
-    }
-
-    // ISSUE H: Botón rápido de cambio de tipo
-    async toggleTipoEstudiante(id: string, tipo: 'interno' | 'externo'): Promise<Student> {
-        return await apiKyC.patch<Student>(`/students/${id}/toggle-tipo`, { tipo });
     }
 
     async bulkDelete(ids: string[]): Promise<{ message: string; deleted_count: number }> {
@@ -117,6 +109,16 @@ class StudentService {
 		formData.append('año_expedicion', data.año_expedicion);
 		formData.append('universidad', data.universidad);
 		return await apiKyC.post<Student>(`/students/${id}/upload/titulo`, formData);
+	}
+
+	async verifyDocument(id: string, type: string): Promise<Student> {
+		return apiKyC.put<Student>(`/students/${id}/documentos/${type}/verificar`, undefined);
+	}
+
+	async rejectDocument(id: string, type: string, motivo: string): Promise<Student> {
+		const formData = new FormData();
+		formData.append('motivo', motivo);
+		return apiKyC.put<Student>(`/students/${id}/documentos/${type}/rechazar`, formData);
 	}
 
 	async verifyTitulo(id: string, data: VerifyTituloData): Promise<Student> {
@@ -169,7 +171,7 @@ class StudentService {
 		return await apiKyC.put<Student>('/students/me', data);
 	}
 
-	// ISSUE-Q-PRE: aceptación del reglamento de Postgrado en el primer login
+	// ISSUE-Q-PRE: aceptación del reglamento de Posgrado en el primer login
 	async acceptTerms(): Promise<Student> {
 		return await apiKyC.post<Student>('/students/me/accept-terms', {});
 	}

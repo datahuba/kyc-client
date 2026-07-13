@@ -45,16 +45,16 @@
 		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		
 		// ACCESO DIRECTO A INSCRIPCIONES
-		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		
-		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza'], loginTypes: ['admin'] },
+		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ name: 'Solicitudes', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
 		{ name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
 		{ name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
-		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
-		{ name: 'Cursos', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
+		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		{ name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
 		{ name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
-		{ name: 'Reportes de Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
+		{ name: 'Reportes de Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'coordinador'], loginTypes: ['admin'] },
 		
 		{ name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
 		{ name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
@@ -65,7 +65,7 @@
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
 		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] }, 
 		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-		{ name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
+		{ name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
 		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	];
 
@@ -75,13 +75,22 @@
 
 	let isStudentUser = $derived(userRole === 'student' || academicRole === 'student');
 
+	// ISSUE-R-PERFIL-GENERICO: solo el coordinador FINANCIERO ve las vistas económicas.
+	let esCoordinadorFinanciero = $derived($userStore.user?.subtipo_coordinador === 'financiero');
+	const ECONOMIC_HREFS = ['/app/reports', '/app/payments', '/app/payment-config', '/app/bank-statements'];
+
 	let filteredNavigation = $derived(navigation.filter(item => {
 		// ISSUE-R-ROLES: encargado_curso y coordinador son staff administrativo también
 		const isStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(userRole);
 		const isTeacher = userRole === 'docente' || academicRole === 'teacher';
 		const isStudent = userRole === 'student' || academicRole === 'student';
 
-		if (isStaff) return item.loginTypes.includes('admin') && item.roles.includes(userRole);
+		if (isStaff) {
+			if (!(item.loginTypes.includes('admin') && item.roles.includes(userRole))) return false;
+			// Coordinador: solo el financiero ve vistas económicas
+			if (userRole === 'coordinador' && ECONOMIC_HREFS.includes(item.href) && !esCoordinadorFinanciero) return false;
+			return true;
+		}
 		if (loginType === 'academic' || isTeacher || isStudent) {
 			if (item.name === 'Aula Virtual UAGRM' || item.name === 'Perfil de Notas UAGRM') {
 				return isTeacher ? item.roles.includes('docente') : item.roles.includes('student');
@@ -113,7 +122,7 @@
 			<div class="flex items-center gap-2.5 min-w-0" in:fade>
 				<img src="/images/logo_uagrm_fondo_blanco.jpg" alt="UAGRM" class="h-9 w-9 shrink-0 rounded-md object-contain bg-white p-0.5 ring-1 ring-gray-200 dark:ring-gray-700" />
 				<div class="flex flex-col leading-tight min-w-0">
-					<span class="text-sm font-extrabold text-primary-700 dark:text-dark-tertiary truncate">Postgrado UAGRM</span>
+					<span class="text-sm font-extrabold text-primary-700 dark:text-dark-tertiary truncate">Fac. Ciencias Contables</span>
 					<span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 truncate">Contaduría Pública</span>
 				</div>
 			</div>
@@ -165,28 +174,28 @@
 						</ul>
 					</li>
 				{/if}
-				<!-- Accesos informativos: Catálogo de Cursos y Beneficios del Postgrado (SOLO ESTUDIANTES) -->
+				<!-- Accesos informativos: Catálogo de Cursos y Beneficios del Posgrado (SOLO ESTUDIANTES) -->
 				{#if isStudentUser}
 					<li class="mt-auto border-t border-gray-200 dark:border-gray-800 pt-3 space-y-1">
 						<button
 							type="button"
 							onclick={() => isCatalogOpen = true}
-							title={isCollapsed ? 'Catálogo de Cursos' : ''}
+							title={isCollapsed ? 'Catálogo de Programas' : ''}
 							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}
 						>
 							<BookIcon class="size-6 shrink-0 text-gray-400 group-hover:text-primary-600" />
-							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Catálogo de Cursos</span>{/if}
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Catálogo de Programas</span>{/if}
 						</button>
 						<button
 							type="button"
 							onclick={() => isBenefitsOpen = true}
-							title={isCollapsed ? 'Beneficios del Postgrado' : ''}
+							title={isCollapsed ? 'Beneficios del Posgrado' : ''}
 							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}
 						>
 							<svg class="size-6 shrink-0 text-gray-400 group-hover:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
 							</svg>
-							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Beneficios del Postgrado</span>{/if}
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Beneficios del Posgrado</span>{/if}
 						</button>
 					</li>
 				{/if}

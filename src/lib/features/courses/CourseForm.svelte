@@ -262,7 +262,9 @@
 			payload.modulos = payload.modulos!.map((m) => {
 				const mod = { ...m };
 				if (!mod.docente_id) {
-					delete mod.docente_id;
+					// `docente_id` no es opcional en el tipo; se castea para poder
+					// omitirlo del payload cuando está vacío (comportamiento previo).
+					delete (mod as { docente_id?: string }).docente_id;
 				}
 				return mod;
 			});

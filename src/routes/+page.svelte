@@ -32,7 +32,11 @@
 	});
 
 	// ISSUE M: Enrutador de 3 puertas directas (Sin pasos intermedios)
+	// Forzar logout al cambiar de perfil para evitar contaminación de sesiones entre roles
 	function handleSelectRole(type: 'student' | 'teacher' | 'admin') {
+		// Si hay sesión activa de otro rol, limpiarla primero
+		userStore.logout();
+
 		if (type === 'student') {
 			userStore.setLoginType('academic');
 			userStore.setAcademicRole('student');
@@ -69,9 +73,9 @@
 				/>
 			</div>
 			<h1 class="text-3xl sm:text-4xl font-extrabold text-light-secondary dark:text-dark-tertiary mb-1 text-center leading-tight">
-				Escuela de Postgrado
+				Unidad de Postgrado
 			</h1>
-			<p class="text-lg font-semibold text-light-tertiary dark:text-dark-secondary mb-3">Contaduría Pública · UAGRM</p>
+			<p class="text-sm font-semibold text-light-tertiary dark:text-dark-secondary mb-3 max-w-lg text-center leading-normal">Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas</p>
 			<p class="text-light-black/70 dark:text-dark-white/70 text-base">Selecciona tu perfil de acceso a la plataforma</p>
 		</div>
 

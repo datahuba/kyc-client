@@ -9,7 +9,6 @@
 	let carnet = $state('');
 	let celular = $state('');
 	let registro = $state('');
-	let tipo = $state<'interno' | 'externo'>('externo');
 	let mensaje = $state('');
 
 	let loading = $state(false);
@@ -39,7 +38,6 @@
 				carnet: carnet.trim(),
 				celular: celular.trim() || undefined,
 				registro: registro.trim() || undefined,
-				es_estudiante_interno: tipo,
 				mensaje: mensaje.trim() || undefined
 			});
 			success = true;
@@ -61,8 +59,9 @@
 				<img src="/images/logo_uagrm_fondo_blanco.jpg" alt="UAGRM" class="h-16 w-16 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5" />
 				<img src="/images/logo_contaduria_publica_fondo_blanco.jpg" alt="Contaduría Pública" class="h-16 w-16 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5" />
 			</div>
-			<h1 class="text-xl font-extrabold text-light-secondary dark:text-dark-tertiary text-center">Solicitud de Cuenta</h1>
-			<p class="text-sm text-light-tertiary dark:text-dark-secondary text-center">Escuela de Postgrado · Contaduría Pública UAGRM</p>
+			<span class="text-xl font-extrabold text-light-secondary dark:text-dark-tertiary text-center leading-tight">Unidad de Postgrado</span>
+			<span class="text-xs font-semibold text-light-tertiary dark:text-dark-secondary text-center mt-1 max-w-sm leading-normal">Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas</span>
+			<h1 class="text-base font-bold text-gray-700 dark:text-gray-300 text-center mt-4">Solicitud de Cuenta</h1>
 		</div>
 
 		<div class="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl shadow-sm p-6">
@@ -107,16 +106,6 @@
 						<div>
 							<label for="r-celular" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Celular <span class="text-gray-400 font-normal">(opcional)</span></label>
 							<input id="r-celular" bind:value={celular} type="tel" inputmode="numeric" class="block w-full rounded-lg border border-light-four dark:border-dark-border bg-white dark:bg-dark-background py-2 px-3 text-sm text-light-black dark:text-dark-white focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Solo números" />
-						</div>
-					</div>
-
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<div>
-							<label for="r-tipo" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Tipo de estudiante</label>
-							<select id="r-tipo" bind:value={tipo} class="block w-full rounded-lg border border-light-four dark:border-dark-border bg-white dark:bg-dark-background py-2 px-3 text-sm text-light-black dark:text-dark-white focus:outline-none focus:ring-2 focus:ring-primary-500">
-								<option value="externo">Externo (Público General)</option>
-								<option value="interno">Interno (UAGRM)</option>
-							</select>
 						</div>
 					</div>
 

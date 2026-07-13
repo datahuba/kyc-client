@@ -7,7 +7,6 @@
 		isOpen: boolean;
 		importLoading: boolean;
 		importFile: File | null;
-		importTipoEstudiante: 'interno' | 'externo';
 		importCursoId: string;
 		importReport: { success_count: number; enrolled_count: number; migrated_payments_count: number; matricula_vouchers_count: number; errors: string[]; marcados_por_color?: Record<string, string[]> } | null;
 		courses: Course[];
@@ -21,7 +20,6 @@
 		isOpen,
 		importLoading,
 		importFile = $bindable(),
-		importTipoEstudiante = $bindable(),
 		importCursoId = $bindable(),
 		importReport = $bindable(),
 		courses = [],
@@ -46,7 +44,6 @@
 				<li>Si un carnet trae un complemento con guion (ej. "2726683 - 1J"), se separa: el número se usa para el CI y el complemento se guarda aparte (visible en el detalle del estudiante).</li>
 				<li>Si el archivo no trae columna de Registro, se usa el Carnet (ya limpio) como usuario/registro.</li>
 				<li>La contraseña inicial siempre es <span class="font-mono">Uagrm.&lt;CI&gt;</span> (misma convención que docentes/staff).</li>
-				<li>El tipo Interno/Externo se infiere automáticamente si el archivo trae la Extensión del CI (Santa Cruz = Interno, cualquier otro lugar = Externo); si no la trae, se usa la opción seleccionada abajo.</li>
 				<li>Si el archivo marca filas con colores y trae una leyenda (ej. una celda amarilla junto al texto "Descuento Facultad"), el reporte final indicará qué estudiantes quedaron marcados con cada color — no se crea ni asigna ningún descuento automáticamente, eso lo decides tú después.</li>
 			</ul>
 		</div>
@@ -56,19 +53,7 @@
 			<Button onclick={onDownloadTemplate} variant="secondary" class="text-xs py-1 px-3">Descargar Plantilla</Button>
 		</div>
 
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-			<div class="space-y-1">
-				<label for="import-tipo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Estudiante a Registrar</label>
-				<select
-					id="import-tipo"
-					bind:value={importTipoEstudiante}
-					class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-				>
-					<option value="externo">Externos (Público General)</option>
-					<option value="interno">Internos (UAGRM)</option>
-				</select>
-			</div>
-			
+		<div class="grid grid-cols-1 gap-4">
 			<div class="space-y-1">
 				<label for="import-file" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Selecciona el archivo (.xlsx)</label>
 				<input
@@ -100,7 +85,6 @@
 				<p class="text-xs text-primary-600 dark:text-primary-400 pt-1">
 					Todos los estudiantes de esta importación se inscribirán automáticamente en
 					<span class="font-semibold">{selectedCourse.nombre_programa}</span>.
-					El costo aplicado será el de tipo <span class="font-semibold">{importTipoEstudiante}</span>.
 					Si el archivo incluye columnas de pago (Matrícula, M1, M2…), esos montos se registrarán como pagos aprobados. Si incluye un link de comprobante de matrícula, se registrará como pago pendiente de verificación con el enlace adjunto.
 				</p>
 			{/if}

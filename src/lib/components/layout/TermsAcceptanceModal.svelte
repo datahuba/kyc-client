@@ -1,7 +1,7 @@
 <script lang="ts">
 	// ISSUE-Q-PRE: Términos y Condiciones en el primer login del estudiante.
 	// Modal BLOQUEANTE (sin botón de cerrar ni click-outside): el estudiante
-	// no puede navegar el portal hasta aceptar el reglamento de Postgrado.
+	// no puede navegar el portal hasta aceptar el reglamento de Posgrado.
 	import BlurOverlay from '$lib/components/ui/blurOverlay.svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
@@ -45,14 +45,14 @@
 						class="border-b border-gray-200 bg-white px-4 py-3 sm:px-6 dark:border-dark-border dark:bg-dark-surface"
 					>
 						<Heading level="h5">
-							<span id="terms-modal-title">Reglamento de Postgrado — UAGRM</span>
+							<span id="terms-modal-title">Reglamento de Posgrado — UAGRM</span>
 						</Heading>
 					</div>
 
 					<!-- Body -->
 					<div class="w-full p-4 sm:p-6">
 						<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-							Antes de continuar, debes leer y aceptar el reglamento de la Escuela de Postgrado de
+							Antes de continuar, debes leer y aceptar el reglamento de la Escuela de Posgrado de
 							Contaduría Pública de la UAGRM. Esta aceptación es obligatoria para acceder al
 							portal.
 						</p>
@@ -63,7 +63,7 @@
 							<p>
 								<strong>1. Aceptación de condiciones académicas.</strong> El estudiante reconoce y
 								acepta las normas académicas, administrativas y financieras vigentes de la Escuela
-								de Postgrado de Contaduría Pública de la Universidad Autónoma Gabriel René Moreno
+								de Posgrado de Contaduría Pública de la Universidad Autónoma Gabriel René Moreno
 								(UAGRM).
 							</p>
 							<p>
@@ -75,7 +75,7 @@
 								<strong>3. Veracidad de la información.</strong> El estudiante declara que los
 								datos personales, académicos y documentos (CI, título, CV, afiliación) cargados en
 								la plataforma son verídicos y podrán ser verificados por el CPD (Coordinación de
-								Postgrado) en cualquier momento.
+								Posgrado) en cualquier momento.
 							</p>
 							<p>
 								<strong>4. Uso de la plataforma.</strong> El acceso al Aula Virtual, notificaciones
@@ -89,7 +89,7 @@
 							</p>
 							<p class="text-xs text-gray-400 dark:text-gray-500">
 								Documento resumido con fines de aceptación digital. El reglamento completo está
-								disponible en la Coordinación de Postgrado.
+								disponible en la Coordinación de Posgrado.
 							</p>
 						</div>
 
@@ -100,7 +100,7 @@
 								class="mt-0.5 h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-border dark:bg-dark-primary"
 							/>
 							<span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-								He leído y acepto el reglamento de la Escuela de Postgrado de Contaduría Pública -
+								He leído y acepto el reglamento de la Escuela de Posgrado de Contaduría Pública -
 								UAGRM.
 							</span>
 						</label>

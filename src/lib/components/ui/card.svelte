@@ -94,8 +94,10 @@
 		.filter(Boolean)
 		.join(' ');
 
-	// Handler para clicks
-	const handleClick = (event: MouseEvent) => {
+	// Handler para clicks. El tipo del evento coincide con el que Svelte pasa al
+	// onclick del <div> (incluye currentTarget tipado) para poder reenviarlo al
+	// prop `onclick` sin error de tipos.
+	const handleClick = (event: MouseEvent & { currentTarget: EventTarget & HTMLDivElement }) => {
 		if (disabled) return;
 		onclick?.(event);
 	};

@@ -37,7 +37,8 @@ interface Props {
 		activo: true,
 		nombre_funcional: '',
 		cursos_asignados: [],
-		carnet: ''
+		carnet: '',
+		subtipo_coordinador: ''
 	});
 
 	// GAP-1 (audio 2026-07-08): si se completa el CI y se deja la contraseña en
@@ -54,7 +55,16 @@ interface Props {
 	let requiereNombreFuncional = $derived(
 		!!formData.role && ROLES_CON_NOMBRE_FUNCIONAL.includes(formData.role)
 	);
+	// Obligatorio solo para Encargado de Curso (siempre segmentado).
 	let requiereCursosAsignados = $derived(formData.role === 'encargado_curso');
+	// ISSUE-R-PERFIL-GENERICO: el Coordinador requiere subtipo (financiero/académico/investigación).
+	let requiereSubtipoCoordinador = $derived(formData.role === 'coordinador');
+	// Cobranza también puede asignarse a programas, pero es OPCIONAL: si no se
+	// marca ninguno, ve/gestiona todos los pagos (comportamiento general);
+	// si se marcan, queda segmentado a esos programas (ISSUE-P-SEGMENTACION).
+	let permiteCursosAsignados = $derived(
+		formData.role === 'encargado_curso' || formData.role === 'cobranza'
+	);
 
 	let cursosDisponibles: Course[] = $state([]);
 
@@ -90,7 +100,8 @@ interface Props {
 				activo: user.activo,
 				nombre_funcional: user.nombre_funcional ?? '',
 				cursos_asignados: user.cursos_asignados ?? [],
-				carnet: user.carnet ?? ''
+				carnet: user.carnet ?? '',
+				subtipo_coordinador: user.subtipo_coordinador ?? ''
 			};
 		} else {
 			formData = {
@@ -101,7 +112,8 @@ interface Props {
 				activo: true,
 				nombre_funcional: '',
 				cursos_asignados: [],
-				carnet: ''
+				carnet: '',
+				subtipo_coordinador: ''
 			};
 		}
 		errors = {};
@@ -150,6 +162,9 @@ interface Props {
 		if (requiereCursosAsignados && (formData.cursos_asignados ?? []).length === 0) {
 			nuevosErrores.cursos_asignados = 'Selecciona al menos un curso para este Encargado de Curso.';
 		}
+		if (requiereSubtipoCoordinador && !formData.subtipo_coordinador) {
+			nuevosErrores.subtipo_coordinador = 'Selecciona el subtipo del Coordinador (financiero, académico o investigación).';
+		}
 
 		errors = nuevosErrores;
 		return Object.keys(nuevosErrores).length === 0;
@@ -181,7 +196,8 @@ interface Props {
 				password: formData.password?.trim() || undefined,
 				carnet: formData.carnet?.trim() || undefined,
 				nombre_funcional: requiereNombreFuncional ? formData.nombre_funcional : undefined,
-				cursos_asignados: requiereCursosAsignados ? formData.cursos_asignados : undefined
+				cursos_asignados: permiteCursosAsignados ? formData.cursos_asignados : undefined,
+				subtipo_coordinador: requiereSubtipoCoordinador ? formData.subtipo_coordinador : undefined
 			};
 
 			if (isEditMode && user) {
@@ -242,7 +258,7 @@ interface Props {
 				</p>
 			</div>
 
-			<!-- ISSUE L/M/R: Selector de Roles alineado a la jerarquía de Postgrado UAGRM -->
+			<!-- ISSUE L/M/R: Selector de Roles alineado a la jerarquía de Posgrado UAGRM -->
 			<div>
 				<Select
 					label="Rol"
@@ -314,10 +330,24 @@ interface Props {
 				</div>
 			{/if}
 
-			{#if requiereCursosAsignados}
+			{#if requiereSubtipoCoordinador}
+				<div class="md:col-span-2">
+					<Select label="Subtipo de Coordinador" bind:value={formData.subtipo_coordinador} required error={errors.subtipo_coordinador}>
+						<option value="">— Seleccione —</option>
+						<option value="financiero">Financiero (ve lo económico)</option>
+						<option value="academico">Académico</option>
+						<option value="investigacion">Investigación</option>
+					</Select>
+					<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+						Solo el Coordinador <strong>Financiero</strong> tiene acceso a reportes de caja e ingresos.
+					</p>
+				</div>
+			{/if}
+
+			{#if permiteCursosAsignados}
 				<div class="md:col-span-2">
 					<span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-						Cursos Asignados <span class="text-light-error">*</span>
+						Programas Asignados {#if requiereCursosAsignados}<span class="text-light-error">*</span>{:else}<span class="text-xs font-normal text-gray-400">(opcional)</span>{/if}
 					</span>
 					<div
 						class="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-light-four bg-white p-3 dark:border-dark-border dark:bg-dark-surface {errors.cursos_asignados
@@ -339,9 +369,14 @@ interface Props {
 					</div>
 					{#if errors.cursos_asignados}
 						<p class="mt-1 text-sm text-light-error">{errors.cursos_asignados}</p>
+					{:else if formData.role === 'cobranza'}
+						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+							Opcional. Si no marcas ningún programa, verá y gestionará los pagos de <strong>todos</strong>
+							los programas. Si marcas uno o varios, quedará segmentado solo a esos.
+						</p>
 					{:else}
 						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-							Este usuario solo verá e inscribirá estudiantes en los cursos marcados.
+							Este usuario solo verá e inscribirá estudiantes en los programas marcados.
 						</p>
 					{/if}
 				</div>

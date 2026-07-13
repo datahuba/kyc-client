@@ -42,7 +42,6 @@
 		email: '',
 		domicilio: '',
 		carrera: '',
-		es_estudiante_interno: 'interno',
 		password: '',
 		course_id: '',
 		lista_cursos_ids: [],
@@ -105,7 +104,6 @@
 				celular: student.celular,
 				email: student.email,
 				domicilio: student.domicilio,
-				es_estudiante_interno: student.es_estudiante_interno,
 				// Datos oficiales UAGRM
 				sexo: student.sexo || '',
 				estado_civil: student.estado_civil || '',
@@ -147,7 +145,6 @@
 				celular: '',
 				email: '',
 				domicilio: '',
-				es_estudiante_interno: 'interno',
 				password: '',
 				sexo: '',
 				estado_civil: '',
@@ -375,12 +372,8 @@
 			</div>
 		</div>
 
-		<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+		<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
 			<Input label="Registro" id="registro" bind:value={formData.registro} required placeholder="EST-2024-001" error={errors.registro} />
-			<Select label="Tipo de Estudiante" bind:value={formData.es_estudiante_interno} required>
-				<option value="interno">Interno</option>
-				<option value="externo">Externo</option>
-			</Select>
 
 			{#if !isEditMode}
 				<Select

@@ -13,7 +13,7 @@
 	let sidebarOpen = $state(false);
 
 	// ISSUE-Q-PRE: bloquea la navegación del estudiante hasta que acepte
-	// el reglamento de Postgrado. Personal admin/docente siempre tiene
+	// el reglamento de Posgrado. Personal admin/docente siempre tiene
 	// terminos_aceptados=true desde el backend (no aplica a ellos).
 	const showTermsModal = $derived(
 		$userStore.isAuthenticated &&
@@ -93,7 +93,7 @@
   Añadida la directiva data-sveltekit-preload-data=\"hover\" a nivel del contenedor principal.
   SvelteKit descargará automáticamente el JavaScript de la página y pre-cargará los datos 
   en segundo plano en el mismo instante en que el usuario pase el puntero del mouse sobre 
-  cualquier enlace o pestaña de navegación de Postgrado, simulando transiciones de 0ms.
+  cualquier enlace o pestaña de navegación de Posgrado, simulando transiciones de 0ms.
 -->
 <div class="flex h-screen bg-light-primary dark:bg-dark-background transition-colors" data-sveltekit-preload-data="hover">
 	<Sidebar 
@@ -103,6 +103,25 @@
 	<div class="relative flex flex-1 flex-col overflow-hidden transition-all duration-300">
 		<Watermark />
 		<Header onOpenSidebar={() => sidebarOpen = true} />
+
+		{#if $userStore.isAuthenticated && $userStore.user?.user_type === 'student' && $userStore.user?.perfil_completado === false}
+			<div class="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-900/30 px-6 py-3 flex items-center justify-between shadow-sm">
+				<div class="flex items-center gap-3 text-amber-800 dark:text-amber-200">
+					<svg class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+					</svg>
+					<span class="text-sm font-medium">
+						Por favor, complete sus datos personales (celular, domicilio, fecha de nacimiento y carnet) para finalizar su registro.
+					</span>
+				</div>
+				<button 
+					class="text-sm font-bold text-amber-900 dark:text-amber-100 bg-amber-200 dark:bg-amber-800/50 hover:bg-amber-300 dark:hover:bg-amber-700/50 px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ml-4"
+					onclick={() => goto('/app/profile')}
+				>
+					Actualizar Datos
+				</button>
+			</div>
+		{/if}
 
 		<main class="relative flex-1 overflow-y-auto p-6">
 			{@render children?.()}

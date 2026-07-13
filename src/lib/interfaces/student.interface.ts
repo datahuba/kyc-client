@@ -12,6 +12,8 @@ export interface Titulo {
 
 export interface Student {
 	_id: string;
+	// Algunas respuestas/patrones defensivos usan `.id` como fallback de `._id`.
+	id?: string;
 	activo: boolean;
 	carnet?: string;
 	// ISSUE-Q-COMPLEMENTO-CI (2026-07-08): complemento del CI (ej. '1D', '1J'),
@@ -21,7 +23,6 @@ export interface Student {
 	created_at: string;
 	domicilio: string;
 	email: string;
-	es_estudiante_interno: string;
 	extension: string;
 	fecha_nacimiento: string;
 	fecha_registro: string;
@@ -32,8 +33,14 @@ export interface Student {
 	registro: string;
 	updated_at: string;
 	afiliacion_url?: string | null;
+	afiliacion_estado?: 'pendiente' | 'verificado' | 'rechazado';
+	afiliacion_motivo_rechazo?: string | null;
 	ci_url?: string | null;
+	carnet_estado?: 'pendiente' | 'verificado' | 'rechazado';
+	carnet_motivo_rechazo?: string | null;
 	cv_url?: string | null;
+	cv_estado?: 'pendiente' | 'verificado' | 'rechazado';
+	cv_motivo_rechazo?: string | null;
 	titulo?: Titulo | null;
 	// Datos oficiales UAGRM
 	sexo?: string | null;
@@ -70,7 +77,6 @@ export interface CreateStudentRequest {
 	celular: string;
 	email: string;
 	domicilio: string;
-	es_estudiante_interno: string;
 	// Datos oficiales UAGRM (opcionales)
 	sexo?: string;
 	estado_civil?: string;
@@ -116,4 +122,17 @@ export interface VerifyTituloData {
 export interface UpdateStudentSelfRequest {
 	celular?: string;
 	domicilio?: string;
+	// Datos oficiales UAGRM que el estudiante puede completar/editar por sí mismo
+	// (reunión postgrado 2026-07-09), para aliviar la carga de CPD.
+	telefono?: string;
+	sexo?: string;
+	estado_civil?: string;
+	tipo_sangre?: string;
+	pais?: string;
+	departamento?: string;
+	provincia?: string;
+	nacionalidad?: string;
+	modalidad_ingreso?: string;
+	periodo?: string;
+	titulo_bachiller?: string;
 }

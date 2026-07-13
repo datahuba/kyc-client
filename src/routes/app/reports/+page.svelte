@@ -233,7 +233,7 @@
 								{payment.fecha_comprobante ? formatDate(payment.fecha_comprobante) : 'Sin registrar'}
 							</td>
 							<td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{(payment as any).nombre_estudiante || '—'}</td>
-							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 line-clamp-1" title={getCursoNombre(payment.curso_id)}>{getCursoNombre(payment.curso_id)}</td>
+							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs break-words" title={getCursoNombre(payment.curso_id)}>{getCursoNombre(payment.curso_id)}</td>
 							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{payment.concepto}</td>
 							<td class="px-4 py-3 text-sm text-right font-bold text-gray-900 dark:text-white">{formatCurrency(payment.cantidad_pago)}</td>
 							<td class="px-4 py-3 text-center">

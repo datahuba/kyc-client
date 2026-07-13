@@ -36,7 +36,7 @@
 
 	// Permisos granulares de escritura de archivos académicos y verificación KYC (Bug 4)
 	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
-	let canUploadAndVerify = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canUploadAndVerify = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 
 	// ISSUE-P-RECORDATORIO-PAGO (2026-07-08, reunión de postgrado contaduría):
 	// Cobranza necesita poder enviar un recordatorio de pago manual desde el
@@ -147,6 +147,51 @@
 
 	// Granular loading state
 	let uploadingDoc: string | null = $state(null);
+	let verifyingDoc: string | null = $state(null);
+	let rejectingDoc: string | null = $state(null);
+	
+	let isRejectDocModalOpen = $state(false);
+	let docToReject = $state<string | null>(null);
+	let docRejectReason = $state('');
+
+	async function handleVerifyDocument(type: string) {
+		verifyingDoc = type;
+		try {
+			const updated = await studentService.verifyDocument(student._id, type);
+			student = updated;
+			alert('success', 'Documento verificado correctamente');
+			onUpdate();
+		} catch (e: any) {
+			alert('error', e.message || 'Error al verificar documento');
+		} finally {
+			verifyingDoc = null;
+		}
+	}
+
+	function openRejectDocModal(type: string) {
+		docToReject = type;
+		docRejectReason = '';
+		isRejectDocModalOpen = true;
+	}
+
+	async function confirmRejectDoc() {
+		if (!docToReject || !docRejectReason.trim()) {
+			alert('error', 'Debe ingresar un motivo');
+			return;
+		}
+		rejectingDoc = docToReject;
+		try {
+			const updated = await studentService.rejectDocument(student._id, docToReject, docRejectReason);
+			student = updated;
+			alert('success', 'Documento rechazado correctamente');
+			onUpdate();
+			isRejectDocModalOpen = false;
+		} catch (e: any) {
+			alert('error', e.message || 'Error al rechazar documento');
+		} finally {
+			rejectingDoc = null;
+		}
+	}
 
 	async function handleUpload(file: File | null, type: 'photo' | 'cv' | 'carnet' | 'afiliacion' | 'titulo') {
 		if (!file) return;
@@ -275,10 +320,6 @@
 				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">{student.registro}</p>
 			</div>
 			
-			<div>
-				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</label>
-				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white capitalize">{student.es_estudiante_interno}</p>
-			</div>
 
 			<div class="md:col-span-2">
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Curso / Programa</label>
@@ -311,13 +352,23 @@
 			
 			<div class="grid grid-cols-2 gap-4">
 				{#each [
-					{ label: 'Foto Perfil', url: student.foto_url, type: 'photo', accept: 'image/*' },
-					{ label: 'Carnet', url: student.ci_url, type: 'carnet', accept: '.pdf' },
-					{ label: 'Curriculum', url: student.cv_url, type: 'cv', accept: '.pdf' },
-					{ label: 'Afiliación', url: student.afiliacion_url, type: 'afiliacion', accept: '.pdf' }
+					{ label: 'Foto Perfil', url: student.foto_url, type: 'photo', accept: 'image/*', estado: undefined, motivo: undefined },
+					{ label: 'Carnet', url: student.ci_url, type: 'carnet', accept: '.pdf', estado: student.carnet_estado, motivo: student.carnet_motivo_rechazo },
+					{ label: 'Curriculum', url: student.cv_url, type: 'cv', accept: '.pdf', estado: student.cv_estado, motivo: student.cv_motivo_rechazo },
+					{ label: 'Afiliación', url: student.afiliacion_url, type: 'afiliacion', accept: '.pdf', estado: student.afiliacion_estado, motivo: student.afiliacion_motivo_rechazo }
 				] as doc}
 					<div class="flex flex-col gap-2">
-						<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{doc.label}</span>
+						<div class="flex items-center justify-between">
+							<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{doc.label}</span>
+							{#if doc.estado}
+								<span class="px-2 py-0.5 text-[10px] font-semibold rounded-full {doc.estado === 'verificado' ? 'bg-green-100 text-green-800' : doc.estado === 'rechazado' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}">
+									{doc.estado.toUpperCase()}
+								</span>
+							{/if}
+						</div>
+						{#if doc.estado === 'rechazado' && doc.motivo}
+							<p class="text-xs text-red-600 dark:text-red-400">Motivo: {doc.motivo}</p>
+						{/if}
 						{#if doc.url}
 							<div class="relative group h-48 w-full rounded-lg border border-gray-200 bg-gray-50 overflow-hidden dark:border-gray-700 dark:bg-gray-800">
 								{#if uploadingDoc === doc.type}
@@ -349,7 +400,7 @@
 							</div>
 							
 							{#if canUploadAndVerify}
-								<div class="text-xs text-center mt-1">
+								<div class="text-xs text-center mt-1 flex flex-wrap items-center justify-center gap-2">
 									<button 
 										type="button"
 										class="text-primary-600 hover:underline disabled:opacity-50" 
@@ -358,6 +409,28 @@
 									>
 										{uploadingDoc === doc.type ? 'Actualizando...' : 'Reemplazar'}
 									</button>
+									
+									{#if doc.estado && doc.estado !== 'verificado'}
+										<span class="text-gray-300">|</span>
+										<button 
+											type="button"
+											onclick={() => handleVerifyDocument(doc.type)}
+											disabled={verifyingDoc === doc.type || rejectingDoc === doc.type}
+											class="text-green-600 hover:underline disabled:opacity-50">
+											{verifyingDoc === doc.type ? '...' : 'Verificar'}
+										</button>
+									{/if}
+									
+									{#if doc.estado && doc.estado !== 'rechazado'}
+										<span class="text-gray-300">|</span>
+										<button 
+											type="button"
+											onclick={() => openRejectDocModal(doc.type)}
+											disabled={verifyingDoc === doc.type || rejectingDoc === doc.type}
+											class="text-red-600 hover:underline disabled:opacity-50">
+											{rejectingDoc === doc.type ? '...' : 'Rechazar'}
+										</button>
+									{/if}
 								</div>
 							{/if}
 						{:else}
@@ -536,6 +609,20 @@
 				<Button onclick={handleSendReminder} loading={sendingReminder} disabled={!reminderMessage.trim()}>
 					Enviar
 				</Button>
+			</div>
+		</div>
+	</Modal>
+	
+	<!-- Modal Rechazar Documento Genérico -->
+	<Modal isOpen={isRejectDocModalOpen} title="Rechazar Documento" onClose={() => isRejectDocModalOpen = false} maxWidth="sm:max-w-lg">
+		<div class="space-y-4 p-4">
+			<p class="text-sm text-gray-500">Por favor ingrese el motivo por el cual se rechaza el documento.</p>
+			<div>
+				<textarea bind:value={docRejectReason} rows="3" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm" placeholder="Ej: Documento ilegible..."></textarea>
+			</div>
+			<div class="flex justify-end gap-3 mt-4">
+				<Button variant="secondary" onclick={() => isRejectDocModalOpen = false} disabled={!!rejectingDoc}>Cancelar</Button>
+				<Button variant="destructive" onclick={confirmRejectDoc} loading={!!rejectingDoc}>Rechazar</Button>
 			</div>
 		</div>
 	</Modal>

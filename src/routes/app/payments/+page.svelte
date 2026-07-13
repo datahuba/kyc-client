@@ -38,7 +38,8 @@
 		q: '',
 		estado: '',
 		curso_id: '',
-		estudiante_id: ''
+		estudiante_id: '',
+		tipo_concepto: ''
 	});
 	let debounceTimer: any;
 
@@ -62,6 +63,7 @@
 	let isApproveModalOpen = $state(false);
 	let isRejectModalOpen = $state(false);
 	let isRevertModalOpen = $state(false); // ISSUE-P-CANALES: Modal de anulación
+	let isDeleteModalOpen = $state(false); // Borrado definitivo (solo superadmin)
 	
 	let paymentToAction: Payment | null = $state(null);
 	let actionLoading = $state(false);
@@ -74,7 +76,7 @@
 
 	// Computed
 	let isAdmin = $derived($userStore.role === 'admin' || $userStore.role === 'superadmin');
-	let isStudent = $derived($userStore.role === 'student');
+	let isStudent = $derived(($userStore.role as string) === 'student');
 	let isCPD = $derived($userStore.role === 'cpd');
 	let isCobranza = $derived($userStore.role === 'cobranza');
 	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae'].includes($userStore.role || ''));
@@ -99,6 +101,7 @@
 			if (filters.estado) filterParams.estado = filters.estado;
 			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
 			if (filters.estudiante_id) filterParams.estudiante_id = filters.estudiante_id;
+			if (filters.tipo_concepto) filterParams.tipo_concepto = filters.tipo_concepto;
 
 			const result = await paymentService.getAll(page, limit, filterParams); 
 			
@@ -267,9 +270,40 @@
 		}
 	}
 
+	function handleDeleteClick(payment: Payment) {
+		paymentToAction = payment;
+		isDeleteModalOpen = true;
+		openDropdownId = null;
+	}
+
+	async function confirmDelete() {
+		if (!paymentToAction) return;
+		actionLoading = true;
+
+		const idToDelete = paymentToAction._id;
+
+		try {
+			await paymentService.delete(idToDelete);
+			alert('success', 'Pago eliminado definitivamente. El saldo de la inscripción fue recalculado.');
+			isDeleteModalOpen = false;
+			payments = payments.filter(p => p._id !== idToDelete);
+		} catch (error: any) {
+			alert('error', error.message || 'Error al eliminar el pago');
+		} finally {
+			actionLoading = false;
+			paymentToAction = null;
+		}
+	}
+
 	function handleViewDetails(payment: Payment) {
 		selectedPayment = payment;
 		openDropdownId = null;
+	}
+
+	function canDelete(): boolean {
+		// Borrado destructivo/financiero: exclusivo de superadmin (mismo criterio
+		// que eliminar usuarios o cursos). Sirve para limpiar pagos de prueba/erróneos.
+		return $userStore.role === 'superadmin';
 	}
 
 	function canApproveReject(payment: Payment): boolean {
@@ -282,7 +316,7 @@
 		const isMatricula = concept.includes('matricula');
 		
 		if (role === 'cpd') return isMatricula;
-		if (role === 'cobranza') return !isMatricula;
+		if (role === 'cobranza') return true; // Cobranza ahora puede validar tanto matrícula como colegiaturas
 		return false;
 	}
 
@@ -331,6 +365,17 @@
 			)
 		}
 
+		if (canDelete()) {
+			options.push(
+				{
+					label: 'Eliminar Pago',
+					id: 'delete',
+					icon: `<svg class="size-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`,
+					action: () => handleDeleteClick(payment)
+				}
+			)
+		}
+
 		return options;
 	}
 
@@ -366,6 +411,7 @@
 			if (filters.estado) filterParams.estado = filters.estado;
 			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
 			if (filters.estudiante_id) filterParams.estudiante_id = filters.estudiante_id;
+			if (filters.tipo_concepto) filterParams.tipo_concepto = filters.tipo_concepto;
 
 			const res = await paymentService.getAll(1, 500, filterParams) as any;
 			const allPayments: Payment[] = Array.isArray(res) ? res : (res?.data ?? []);
@@ -447,7 +493,7 @@
 	</div>
 
 	<!-- Filters -->
-	<div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+	<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
 		<div class="md:col-span-1">
 			<label for="search" class="sr-only">Buscar</label>
 			<div class="relative">
@@ -465,6 +511,18 @@
 					oninput={handleSearchInput}
 				/>
 			</div>
+		</div>
+
+		<div>
+			<select
+				bind:value={filters.tipo_concepto}
+				onchange={handleFilterChange}
+				class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			>
+				<option value="">Todos los conceptos</option>
+				<option value="matricula">Matrícula</option>
+				<option value="colegiatura">Colegiatura / Módulos</option>
+			</select>
 		</div>
 		
 		<div>
@@ -535,10 +593,11 @@
 			<table class="w-full table-fixed divide-y divide-gray-200 dark:divide-dark-border">
 				<thead class="bg-gray-50 dark:bg-dark-background rounded-t-lg">
 					<tr>
-						<th scope="col" class="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transacción</th>
-						<th scope="col" class="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
-						<th scope="col" class="w-[16%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
-						<th scope="col" class="w-[18%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto / Fecha</th>
+						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transacción</th>
+						<th scope="col" class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
+						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
+						<th scope="col" class="w-[14%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
+						<th scope="col" class="w-[16%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto / Fecha</th>
 						<th scope="col" class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
 						<th scope="col" class="w-[6%] relative px-4 py-3"><span class="sr-only">Acciones</span></th>
 					</tr>
@@ -557,6 +616,12 @@
 									</span>
 									<span class="text-[10px] text-gray-400 dark:text-gray-500 truncate">{payment.banco || 'Caja UAGRM'}</span>
 								</div>
+							</td>
+							<!-- Concepto (Matrícula / Colegiatura / Módulos) -->
+							<td class="px-4 py-4 text-sm">
+								<span class={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${payment.concepto?.toLowerCase().includes('matrícula') || payment.concepto?.toLowerCase().includes('matricula') ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}`}>
+									{payment.concepto || 'Matrícula'}
+								</span>
 							</td>
 							<!-- Curso -->
 							<td class="px-4 py-4 text-sm">
@@ -585,18 +650,20 @@
 							</td>
 							<!-- Estado -->
 							<td class="px-4 py-4 text-sm">
-								<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(payment.estado_pago)}`}>
-									{payment.estado_pago}
-								</span>
-								<!-- ISSUE-P-REVERSION -->
-								{#if payment.en_ventana_reversion}
-									<span
-										class="ml-1 px-2 inline-flex text-[10px] leading-5 font-bold uppercase tracking-wide rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-										title="Este pago por transferencia puede ser revertido por el banco hasta 48h después de su aprobación. Verifícalo contra el extracto bancario antes de darlo por definitivo."
-									>
-										En observación 48h
+								<div class="flex flex-col items-start gap-1">
+									<span class={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${getStatusColor(payment.estado_pago)}`}>
+										{payment.estado_pago}
 									</span>
-								{/if}
+									<!-- ISSUE-P-REVERSION -->
+									{#if payment.en_ventana_reversion}
+										<span
+											class="px-2 py-0.5 inline-flex text-[10px] leading-4 font-bold uppercase tracking-wide rounded-full whitespace-nowrap bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+											title="Este pago por transferencia puede ser revertido por el banco hasta 48h después de su aprobación. Verifícalo contra el extracto bancario antes de darlo por definitivo."
+										>
+											En observación 48h
+										</span>
+									{/if}
+								</div>
 							</td>
 							<!-- Acciones -->
 							<td class="px-4 py-4 text-right text-sm font-medium relative">
@@ -636,6 +703,11 @@
 							<span class="block font-mono text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 truncate" title={payment.numero_transaccion}>
 								{payment.numero_transaccion?.startsWith('CAJA-') ? 'Físico / ' + payment.numero_transaccion : payment.numero_transaccion}
 							</span>
+							<div class="flex items-center gap-1.5 mt-1">
+								<span class={`px-1.5 py-0.5 inline-flex text-[10px] font-bold rounded ${payment.concepto?.toLowerCase().includes('matrícula') || payment.concepto?.toLowerCase().includes('matricula') ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}`}>
+									{payment.concepto || 'Matrícula'}
+								</span>
+							</div>
 						</div>
 						<div class="relative shrink-0">
 							<button onclick={() => toggleDropdown(payment._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del pago">
@@ -651,12 +723,12 @@
 
 					<div class="mt-3 flex items-center justify-between">
 						<span class="text-base font-bold text-green-600 dark:text-green-400">{payment.monto_comprobante ? formatCurrency(payment.monto_comprobante) : '0.00'}</span>
-						<div class="flex items-center gap-1">
-							<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(payment.estado_pago)}`}>{payment.estado_pago}</span>
+						<div class="flex items-center gap-1 shrink-0">
+							<span class={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${getStatusColor(payment.estado_pago)}`}>{payment.estado_pago}</span>
 							<!-- ISSUE-P-REVERSION -->
 							{#if payment.en_ventana_reversion}
 								<span
-									class="px-2 inline-flex text-[10px] leading-5 font-bold uppercase tracking-wide rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+									class="px-2 py-0.5 inline-flex text-[10px] leading-4 font-bold uppercase tracking-wide rounded-full whitespace-nowrap bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
 									title="Este pago por transferencia puede ser revertido por el banco hasta 48h después de su aprobación."
 								>
 									48h
@@ -775,6 +847,15 @@
 			</div>
 		</div>
 	</Modal>
+
+	<!-- Delete Payment Modal (Borrado definitivo, solo superadmin) -->
+	<ModalConfirm
+		isOpen={isDeleteModalOpen}
+		message={`¿ELIMINAR DEFINITIVAMENTE este pago de ${formatCurrency(paymentToAction?.cantidad_pago || 0)} por "${paymentToAction?.concepto || 'sin concepto'}"? Esta acción NO se puede deshacer: el registro se borra por completo de la base de datos y el saldo de la inscripción se recalcula automáticamente. Úsalo solo para pagos de prueba o erróneos.`}
+		loading={actionLoading}
+		onConfirm={confirmDelete}
+		onCancel={() => { isDeleteModalOpen = false; paymentToAction = null; }}
+	/>
 
 	<!-- View Payment Details Modal -->
 	<Modal

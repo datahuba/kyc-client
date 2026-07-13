@@ -9,6 +9,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
+	import ComunicadoModal from '$lib/features/courses/ComunicadoModal.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
 	import { alert } from '$lib/utils';
@@ -52,10 +53,24 @@
 	let selectedCourseStudents: Course | null = $state(null);
 
 	// ISSUE N: Control de Permisos Visuales
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let currentRole = $derived(($userStore.role || $userStore.user?.rol || '').toLowerCase());
 	let canCreateCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canEditCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canDeleteCourse = $derived(currentRole === 'superadmin');
+	// Comunicados: Encargado de Programa / Coordinador / CPD / Admin / Superadmin.
+	// (El Encargado solo a sus programas: lo valida el backend con 403.)
+	let canSendComunicado = $derived(
+		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole)
+	);
+	let comunicadoOpen = $state(false);
+	let comunicadoCourseId = $state('');
+	let comunicadoPrograma = $state('');
+	function openComunicado(course: Course) {
+		comunicadoCourseId = course._id;
+		comunicadoPrograma = course.nombre_programa;
+		comunicadoOpen = true;
+		openDropdownId = null;
+	}
 
 	onMount(() => {
 		loadCourses();
@@ -151,7 +166,7 @@
 		
 		try {
 			await courseService.delete(idToDelete);
-			alert('success', 'Curso eliminado correctamente');
+			alert('success', 'Programa eliminado correctamente');
 			courses = courses.filter(c => c._id !== idToDelete);
 			showDeleteModal = false;
 		} catch (e: any) {
@@ -196,6 +211,15 @@
 			});
 		}
 
+		if (canSendComunicado) {
+			options.push({
+				label: 'Enviar Comunicado',
+				id: 'comunicado',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>`,
+				action: () => openComunicado(course)
+			});
+		}
+
 		if (canDeleteCourse) {
 			options.push({
 				label: 'Eliminar',
@@ -216,7 +240,7 @@
             return;
         }
 
-        const headers = ["Estudiante", "CI", "Email", "Celular", "Estado", "Tipo", "Fecha Inscripcion", "Total", "Pagado", "Saldo"];
+        const headers = ["Estudiante", "CI", "Email", "Celular", "Estado", "Fecha Inscripcion", "Total", "Pagado", "Saldo"];
         
         try {
             const rows = courseStudents.map(s => [
@@ -225,7 +249,6 @@
                 s.contacto.email,
                 s.contacto.celular,
                 s.inscripcion.estado,
-                s.inscripcion.tipo_estudiante,
                 formatDate(s.inscripcion.fecha_inscripcion),
                 s.financiero.total_a_pagar,
                 s.financiero.total_pagado,
@@ -258,15 +281,15 @@
 
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-		<Heading level="h1">Cursos</Heading>
+		<Heading level="h1">Programas</Heading>
 		
-		<!-- ISSUE N: Ocultar botón Nuevo Curso si no tiene permisos -->
+		<!-- ISSUE N: Ocultar botón Nuevo Programa si no tiene permisos -->
 		{#if canCreateCourse}
 			<Button onclick={handleCreate}>
 				{#snippet leftIcon()}
 					<PlusIcon class="size-5" />
 				{/snippet}
-				Nuevo Curso
+				Nuevo Programa
 			</Button>
 		{/if}
 	</div>
@@ -342,7 +365,7 @@
 		<TableSkeleton columns={6} rows={10} />
 	{:else if courses.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-			<p class="text-gray-500 dark:text-gray-400">No hay cursos registrados.</p>
+			<p class="text-gray-500 dark:text-gray-400">No hay programas registrados.</p>
 		</div>
 	{:else}
 		<!-- Desktop Table -->
@@ -472,7 +495,7 @@
 	<!-- Create/Edit Modal -->
 	<Modal
 		isOpen={isFormOpen}
-		title={selectedCourse ? 'Editar Curso' : 'Nuevo Curso'}
+		title={selectedCourse ? 'Editar Programa' : 'Nuevo Programa'}
 		onClose={() => isFormOpen = false}
 		maxWidth="sm:max-w-4xl"
 	>
@@ -485,13 +508,21 @@
 
 	<ModalConfirm
 		isOpen={showDeleteModal}
-		message={`¿Estás seguro de que deseas eliminar el curso ${courseToDelete?.nombre_programa || ''}? Esta acción no se puede deshacer.`}
+		message={`¿Estás seguro de que deseas eliminar el programa ${courseToDelete?.nombre_programa || ''}? Esta acción no se puede deshacer.`}
 		onConfirm={handleDelete}
 		onCancel={() => {
 			showDeleteModal = false;
 			courseToDelete = null;
 		}}
 		loading={deleteLoading}
+	/>
+
+	<!-- Comunicado por programa (Encargado/Coordinador/CPD/Admin/Superadmin) -->
+	<ComunicadoModal
+		isOpen={comunicadoOpen}
+		courseId={comunicadoCourseId}
+		programa={comunicadoPrograma}
+		onClose={() => (comunicadoOpen = false)}
 	/>
 
 	<!-- Course Students Modal -->
@@ -555,7 +586,6 @@
 										  student.inscripcion.estado === 'pagado' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
 										{student.inscripcion.estado}
 									</span>
-									<div class="text-xs text-gray-500 dark:text-gray-400 mt-1 capitalize">{student.inscripcion.tipo_estudiante}</div>
 									<div class="text-xs text-gray-400 mt-0.5">{formatDate(student.inscripcion.fecha_inscripcion)}</div>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">

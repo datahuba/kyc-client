@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { studentService, courseService, enrollmentService, paymentService } from '$lib/services';
+	import { studentService, courseService, enrollmentService, paymentService, dashboardService } from '$lib/services';
+	import type { ResumenEconomico } from '$lib/services/payment.service';
 	import type { Enrollment, Payment } from '$lib/interfaces';
 	import { UsersIcon, ClipboardIcon, TagIcon } from '$lib/icons/outline';
 	import { CreditCardIcon } from '$lib/icons/solid';
@@ -9,6 +10,28 @@
 	import { goto } from '$app/navigation';
 	import DashboardSkeleton from '$lib/components/skeletons/DashboardSkeleton.svelte';
 	import { formatDate } from '$lib/utils';
+	import { userStore } from '$lib/stores/userStore';
+	import { get } from 'svelte/store';
+
+	// ISSUE-P-DASHBOARD-COBRANZA: el resumen económico (con matrícula como
+	// ingreso) solo aplica a los roles que ven finanzas, igual que los reportes.
+	// NOTA: este componente está en modo legacy (Svelte 4, sin runas); se
+	// mantiene ese estilo aquí para no romper la reactividad de `loading`/`stats`.
+	// ISSUE-R-PERFIL-GENERICO: roles económicos base + coordinador SOLO si es financiero.
+	const ROLES_ECONOMICOS_BASE = ['superadmin', 'admin', 'cobranza', 'mae'];
+	const ROLES_QUE_VEN_PAGOS = ['superadmin', 'admin', 'mae', 'cobranza', 'cpd'];
+	let resumenEconomico: ResumenEconomico | null = null;
+
+	$: currentRole = $userStore.role || $userStore.user?.rol || '';
+	$: esCoordinadorFinanciero = $userStore.user?.subtipo_coordinador === 'financiero';
+	$: verResumenEconomico = ROLES_ECONOMICOS_BASE.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero);
+	$: puedeVerPagos = ROLES_QUE_VEN_PAGOS.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero);
+
+	// Perfiles segmentados (cobranza/encargado con cursos_asignados) NO necesitan
+	// el "Desglose por Curso": su vista ya está acotada a sus cursos, así que sería
+	// redundante. Solo los perfiles globales (superadmin/admin/mae sin cursos) lo ven.
+	$: cursosAsignados = $userStore.user?.cursos_asignados ?? [];
+	$: esSegmentado = cursosAsignados.length > 0;
 
 	let loading = true;
 	let stats = {
@@ -85,37 +108,38 @@
 
 	onMount(async () => {
 		try {
+			const snap = get(userStore);
+			const roleNow = snap.role || snap.user?.rol || '';
+			const esCoordFinNow = snap.user?.subtipo_coordinador === 'financiero';
+			const puedeVerPagosNow = ROLES_QUE_VEN_PAGOS.includes(roleNow) || (roleNow === 'coordinador' && esCoordFinNow);
+
 			const [
 				studentsRes,
 				coursesRes,
 				enrollmentsRes,
-				paymentsRes
+				statsRes
 			] = await Promise.all([
-				studentService.getAll(),
-				courseService.getAll(),
+				studentService.getAll(1, 100),
+				courseService.getAll(1, 100),
 				enrollmentService.getAll(1, 100),
-				paymentService.getAll(1, 100)
+				dashboardService.getStats()
 			]);
 
 			const students = studentsRes.data ?? [];
 			const courses = coursesRes.data ?? [];
 			const enrollments = enrollmentsRes.data ?? [];
-			const payments = paymentsRes.data ?? [];
+			
+			let payments: Payment[] = [];
+			if (puedeVerPagosNow) {
+				try {
+					const paymentsRes = await paymentService.getAll(1, 100);
+					payments = paymentsRes.data ?? [];
+				} catch (e) {
+					console.error("Error fetching payments for dashboard:", e);
+				}
+			}
 
-			stats.students.total = studentsRes.meta?.totalItems ?? students.length;
-			stats.students.active = students.filter(s => s.activo).length;
-
-			stats.courses.total = coursesRes.meta?.totalItems ?? courses.length;
-			stats.courses.active = courses.filter(c => c.activo).length;
-
-			stats.enrollments.total = enrollmentsRes.meta?.totalItems ?? enrollments.length;
-			stats.enrollments.active = enrollments.filter(e => e.estado === 'activo').length;
-
-			stats.payments.total = paymentsRes.meta?.totalItems ?? payments.length;
-			stats.payments.pending = payments.filter(p => p.estado_pago === 'pendiente').length;
-			stats.payments.revenue = payments
-				.filter(p => p.estado_pago === 'aprobado' || p.estado_pago === 'pagado')
-				.reduce((sum, p) => sum + p.cantidad_pago, 0);
+			stats = statsRes;
 
 			const studentsMap = students.reduce(
 				(acc, s) => ({ ...acc, [s._id]: s.nombre }),
@@ -177,6 +201,17 @@
 			groupedByType = buildGrouped(courseBreakdown);
 			expandedGroups = new Set(Object.keys(groupedByType));
 
+			// ISSUE-P-DASHBOARD-COBRANZA: resumen económico agregado (incluye
+			// matrícula como ingreso). Solo para roles económicos; no bloquea el
+			// dashboard si el endpoint devuelve 403 o falla.
+			if (ROLES_ECONOMICOS_BASE.includes(roleNow) || (roleNow === 'coordinador' && esCoordFinNow)) {
+				try {
+					resumenEconomico = await paymentService.getResumenEconomico();
+				} catch (e) {
+					console.error('Error cargando resumen económico:', e);
+				}
+			}
+
 		} catch (error) {
 			console.error('Error loading dashboard data:', error);
 		} finally {
@@ -195,6 +230,103 @@
 		<DashboardSkeleton />
 	{:else}
   	<Heading level="h1">Dashboard</Heading>
+
+		<!-- ISSUE-P-DASHBOARD-COBRANZA: Resumen Económico (Cobranza / Coordinador Financiero / MAE / Admin).
+		     Incluye la matrícula como ingreso contable aunque Cobranza no la apruebe. -->
+		{#if verResumenEconomico && resumenEconomico}
+			<div>
+				<div class="flex items-center justify-between mb-4">
+					<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Resumen Económico</h2>
+					<a href="/app/reports" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">Ver reportes</a>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+					<!-- Ingreso por Matrícula -->
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
+						<div class="flex-1 min-w-0 mr-3">
+							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Ingreso por Matrícula</p>
+							<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(resumenEconomico.ingreso_matricula)}>
+								{formatCurrency(resumenEconomico.ingreso_matricula)}
+							</p>
+							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Pagos aprobados</p>
+						</div>
+						<div class="p-3 bg-uagrm-blue rounded-full text-white shrink-0">
+							<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
+						</div>
+					</div>
+
+					<!-- Ingreso por Colegiatura -->
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
+						<div class="flex-1 min-w-0 mr-3">
+							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Ingreso por Colegiatura</p>
+							<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(resumenEconomico.ingreso_colegiatura)}>
+								{formatCurrency(resumenEconomico.ingreso_colegiatura)}
+							</p>
+							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Módulos / cuotas</p>
+						</div>
+						<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
+							<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+						</div>
+					</div>
+
+					<!-- Total Ingresos -->
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
+						<div class="flex-1 min-w-0 mr-3">
+							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Ingresos</p>
+							<p class="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400 mt-1 truncate" title={formatCurrency(resumenEconomico.total_ingresos)}>
+								{formatCurrency(resumenEconomico.total_ingresos)}
+							</p>
+							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Matrícula + Colegiatura</p>
+						</div>
+						<div class="p-3 bg-green-600 rounded-full text-white shrink-0">
+							<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+						</div>
+					</div>
+
+					<!-- Por Cobrar -->
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
+						<div class="flex-1 min-w-0 mr-3">
+							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Por Cobrar</p>
+							<p class="text-xl sm:text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1 truncate" title={formatCurrency(resumenEconomico.por_cobrar)}>
+								{formatCurrency(resumenEconomico.por_cobrar)}
+							</p>
+							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Saldo pendiente total</p>
+						</div>
+						<div class="p-3 bg-orange-500 rounded-full text-white shrink-0">
+							<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+						</div>
+					</div>
+
+					<!-- Cobros Pendientes (por persona) -->
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
+						<div class="flex-1 min-w-0 mr-3">
+							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Cobros Pendientes</p>
+							<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate">
+								{resumenEconomico.cobros_pendientes}
+							</p>
+							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Inscritos con saldo por cobrar</p>
+						</div>
+						<div class="p-3 bg-yellow-500 rounded-full text-white shrink-0">
+							<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+						</div>
+					</div>
+
+					<!-- Total Inscritos -->
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
+						<div class="flex-1 min-w-0 mr-3">
+							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Inscritos</p>
+							<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate">
+								{resumenEconomico.total_inscritos}
+							</p>
+							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">En tu alcance</p>
+						</div>
+						<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
+							<ClipboardIcon class="size-6 sm:size-8" />
+						</div>
+					</div>
+				</div>
+			</div>
+		{/if}
 
 		<!-- Stats Grid -->
 		<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
@@ -239,23 +371,30 @@
 				</div>
 			</a>
 
+			<!-- La tarjeta "Ingresos" es redundante para roles económicos (ya ven
+			     "Total Ingresos" en el Resumen Económico, y esta muestra solo los
+			     pagos filtrados por rol, lo que confunde). Se oculta para ellos. 
+				 NOTA: Solo se muestra si el usuario TIENE PERMISOS para ver pagos (ej. CPD) -->
+			{#if !verResumenEconomico && puedeVerPagos}
 			<a href="/app/payments" class="block">
 				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg min-w-0">
 					<div class="flex-1 min-w-0 mr-3">
 						<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Ingresos</p>
-						<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(stats.payments.revenue)}>
-							{formatCurrency(stats.payments.revenue)}
+						<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(stats.payments?.revenue ?? 0)}>
+							{formatCurrency(stats.payments?.revenue ?? 0)}
 						</p>
-						<p class="text-[10px] sm:text-xs text-yellow-600 mt-1 truncate">{stats.payments.pending} Pendientes</p>
+						<p class="text-[10px] sm:text-xs text-yellow-600 mt-1 truncate">{stats.payments?.pending ?? 0} Pendientes</p>
 					</div>
 					<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
 						<CreditCardIcon class="size-6 sm:size-8" />
 					</div>
 				</div>
 			</a>
+			{/if}
 		</div>
 
-		<!-- Course Breakdown Section -->
+		<!-- Course Breakdown Section (oculto para perfiles segmentados por curso) -->
+		{#if !esSegmentado}
 		<div>
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Desglose por Curso</h2>
@@ -290,9 +429,11 @@
 									</span>
 									<span class="hidden lg:flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 ml-1 truncate">
 										<span>{totalInscritos} inscritos</span>
-										<span>·</span>
-										<span>{formatCurrency(totalIngresos)} recaudado</span>
-										{#if totalPendientes > 0}<span>· <span class="text-yellow-600 font-medium">{totalPendientes} pend.</span></span>{/if}
+										{#if puedeVerPagos}
+											<span>·</span>
+											<span>{formatCurrency(totalIngresos)} recaudado</span>
+											{#if totalPendientes > 0}<span>· <span class="text-yellow-600 font-medium">{totalPendientes} pend.</span></span>{/if}
+										{/if}
 									</span>
 								</div>
 								<svg class={`size-5 shrink-0 ${style.text} transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -316,65 +457,6 @@
 													</span>
 												</div>
 											</div>
-
-											<!-- 4 cards del desglose -->
-											<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-												<!-- Inscritos -->
-												<a href={`/app/students?curso_id=${course.id}`} class="block">
-													<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
-														<div class="flex-1 min-w-0 mr-3">
-															<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Inscritos</p>
-															<p class="text-xl sm:text-2xl font-black text-gray-800 dark:text-white mt-0.5 truncate">{course.inscritos}</p>
-															<p class="text-[10px] text-green-600 font-semibold mt-1 truncate">{course.inscritosActivos} Activos</p>
-														</div>
-														<div class="p-2.5 sm:p-3 bg-primary-100 dark:bg-primary-900/30 rounded-xl text-primary-600 dark:text-primary-300 shrink-0">
-															<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-														</div>
-													</div>
-												</a>
-
-												<!-- Pagos Pendientes -->
-												<a href={`/app/payments?curso_id=${course.id}`} class="block">
-													<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
-														<div class="flex-1 min-w-0 mr-3">
-															<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Pagos Pend.</p>
-															<p class="text-xl sm:text-2xl font-black text-gray-800 dark:text-white mt-0.5 truncate">{course.pagosPendientes}</p>
-															<p class="text-[10px] text-yellow-600 font-semibold mt-1 truncate">{course.pagosPendientes} Por Revisar</p>
-														</div>
-														<div class="p-2.5 sm:p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl text-yellow-600 shrink-0">
-															<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-														</div>
-													</div>
-												</a>
-
-												<!-- Recaudado -->
-												<a href={`/app/payments?curso_id=${course.id}`} class="block">
-													<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
-														<div class="flex-1 min-w-0 mr-3">
-															<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Recaudado</p>
-															<p class="text-lg sm:text-xl font-black text-gray-800 dark:text-white mt-0.5 truncate" title={formatCurrency(course.ingresos)}>{formatCurrency(course.ingresos)}</p>
-															<p class="text-[10px] text-green-600 font-semibold mt-1 truncate">Aprobados</p>
-														</div>
-														<div class="p-2.5 sm:p-3 bg-green-100 dark:bg-green-900/30 rounded-xl text-green-600 shrink-0">
-															<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-														</div>
-													</div>
-												</a>
-
-												<!-- Por Cobrar -->
-												<div class="bg-gray-50 dark:bg-gray-800/80 rounded-lg border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all min-w-0">
-													<div class="flex-1 min-w-0 mr-3">
-														<p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Por Cobrar</p>
-														<p class="text-lg sm:text-xl font-black text-gray-800 dark:text-white mt-0.5 truncate" title={formatCurrency(course.saldoPendiente)}>{formatCurrency(course.saldoPendiente)}</p>
-														<p class="text-[10px] text-orange-500 font-semibold mt-1 truncate">Saldo Pendiente</p>
-													</div>
-													<div class="p-2.5 sm:p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl text-orange-600 shrink-0">
-														<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-													</div>
-												</div>
-
-											</div>
 										</div>
 									{/each}
 								</div>
@@ -384,6 +466,7 @@
 				</div>
 			{/if}
 		</div>
+		{/if}
 
 	{/if}
 </div>

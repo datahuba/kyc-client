@@ -88,6 +88,13 @@ class EnrollmentService {
 		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/beca-respaldo`, formData);
 	}
 
+	// === Formulario de inscripción lleno: subir/reemplazar (PDF o imagen) ===
+	async uploadFormularioInscripcion(enrollmentId: string, file: File): Promise<Enrollment> {
+		const formData = new FormData();
+		formData.append('file', file);
+		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/formulario-inscripcion`, formData);
+	}
+
 	// === ISSUE-M-EXENCION: bypass de matrícula otorgado por MAE ===
 	async otorgarMatriculaExenta(enrollmentId: string): Promise<Enrollment> {
 		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/matricula-exenta`, {});
