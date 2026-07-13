@@ -132,3 +132,13 @@
 		padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
 	}
 }
+
+/* Ocultar barras de scroll en móviles para sensación nativa */
+@media (max-width: 1024px) {
+	::-webkit-scrollbar {
+		display: none;
+	}
+	* {
+		scrollbar-width: none;
+	}
+}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Sidebar from '$lib/components/layout/Sidebar.svelte';
 	import Header from '$lib/components/layout/Header.svelte';
+	import BottomNav from '$lib/components/layout/BottomNav.svelte';
 	import TermsAcceptanceModal from '$lib/components/layout/TermsAcceptanceModal.svelte';
 	import Watermark from '$lib/components/layout/Watermark.svelte';
 	import { onMount } from 'svelte';
@@ -123,9 +124,10 @@
 			</div>
 		{/if}
 
-		<main class="relative flex-1 overflow-y-auto p-6">
+		<main class="relative flex-1 overflow-y-auto p-4 sm:p-6 pb-24 lg:pb-6">
 			{@render children?.()}
 		</main>
+		<BottomNav />
 	</div>
 </div>
 
