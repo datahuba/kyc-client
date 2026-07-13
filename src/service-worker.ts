@@ -23,6 +23,8 @@ self.addEventListener('install', (event) => {
 	}
 
 	event.waitUntil(addFilesToCache());
+	// Tomar control inmediatamente sin esperar a que se cierre la pestaña
+	self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -34,6 +36,8 @@ self.addEventListener('activate', (event) => {
 	}
 
 	event.waitUntil(deleteOldCaches());
+	// Tomar control de todos los clientes abiertos inmediatamente
+	self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
