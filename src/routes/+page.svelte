@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
+	import PWAInstallButton from '$lib/components/ui/PWAInstallButton.svelte';
 
 	// Subscribe to user store
 	let isAuthenticated = false;
@@ -54,7 +55,8 @@
 {#if !isAuthenticated}
 <!-- Role Selection UI - 3 Puertas -->
 <div class="relative min-h-screen flex flex-col items-center justify-center bg-light-primary dark:bg-dark-primary p-4">
-	<div class="absolute top-4 right-4">
+	<div class="absolute top-4 right-4 flex items-center gap-4 z-50">
+		<PWAInstallButton />
 		<ThemeToggle />
 	</div>
 	<div class="w-full max-w-5xl text-center">
