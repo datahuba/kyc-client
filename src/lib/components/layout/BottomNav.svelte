@@ -70,8 +70,11 @@
 </script>
 
 <!-- Bottom Nav Bar for Mobile -->
-<div class="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] select-none">
-	<nav class="flex justify-around items-center h-16 px-2">
+<div 
+	class="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] select-none"
+	style="padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));"
+>
+	<nav class="flex justify-around items-center h-14 px-2">
 		{#each bottomNavItems as item}
 			<a 
 				href={item.href} 
@@ -109,7 +112,8 @@
 		aria-hidden="true"
 	></div>
 	<div 
-		class="lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 bg-white dark:bg-gray-900 rounded-t-2xl shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col max-h-[80vh]"
+		class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 rounded-t-2xl shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col max-h-[80vh]"
+		style="padding-bottom: env(safe-area-inset-bottom, 0px);"
 		in:slide={{ duration: 250, axis: 'y' }}
 		out:slide={{ duration: 200, axis: 'y' }}
 	>

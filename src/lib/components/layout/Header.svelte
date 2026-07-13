@@ -242,7 +242,10 @@
 	});
 </script>
 
-<div class="sticky top-[env(safe-area-inset-top,0px)] z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md px-4 sm:gap-x-6 sm:px-6 lg:px-8 pt-[env(safe-area-inset-top,0px)] transition-colors">
+<div 
+	class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md px-4 sm:gap-x-6 sm:px-6 lg:px-8 transition-colors"
+	style="padding-top: env(safe-area-inset-top, 0px); margin-top: max(0px, env(safe-area-inset-top, 0px));"
+>
 
 	<div class="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
 		<div class="flex flex-1 items-center">
