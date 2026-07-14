@@ -9,9 +9,10 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import { goto } from '$app/navigation';
 	import DashboardSkeleton from '$lib/components/skeletons/DashboardSkeleton.svelte';
-	import { formatDate } from '$lib/utils';
 	import { userStore } from '$lib/stores/userStore';
 	import { get } from 'svelte/store';
+	import DocumentValidationModal from '$lib/components/ui/DocumentValidationModal.svelte';
+	import { FileTextIcon } from '$lib/icons/outline';
 
 	// ISSUE-P-DASHBOARD-COBRANZA: el resumen económico (con matrícula como
 	// ingreso) solo aplica a los roles que ven finanzas, igual que los reportes.
@@ -60,6 +61,9 @@
 	let courseBreakdown: CourseBreakdown[] = [];
 	let groupedByType: Record<string, CourseBreakdown[]> = {};
 	let expandedGroups: Set<string> = new Set();
+	
+	let pendingDocumentsCount = 0;
+	let showDocumentModal = false;
 
 	const TYPE_ORDER = ['maestría', 'doctorado', 'diplomado', 'curso', 'taller', 'seminario', 'otro'];
 
@@ -168,6 +172,14 @@
 					studentName: studentsMap[p.estudiante_id] || 'Desconocido',
 					courseName: coursesMap[p.curso_id] || '—'
 				}));
+				
+			// Cargar conteo de documentos pendientes (solo primer fetch)
+			try {
+				const pendingDocsRes = await enrollmentService.getAll(1, 1, { requiere_accion_documentos: true });
+				pendingDocumentsCount = pendingDocsRes.meta.totalItems;
+			} catch (e) {
+				console.error("Error al obtener conteo de documentos pendientes", e);
+			}
 
 			courseBreakdown = courses.map(course => {
 				const courseEnrollments = enrollments.filter(e => e.curso_id === course._id);
@@ -229,7 +241,29 @@
 	{#if loading}
 		<DashboardSkeleton />
 	{:else}
-  	<Heading level="h1">Dashboard</Heading>
+		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  			<Heading level="h1">Dashboard</Heading>
+			
+			{#if ['encargado_curso', 'cpd', 'admin', 'superadmin', 'coordinador'].includes(currentRole)}
+				<button 
+					onclick={() => showDocumentModal = true}
+					class="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all active:scale-95 text-gray-700 dark:text-gray-200 font-medium text-sm w-full sm:w-auto justify-center"
+				>
+					<FileTextIcon class="size-5 text-amber-500" />
+					Validación de Documentos
+					{#if pendingDocumentsCount > 0}
+						<span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded-full ml-1">
+							{pendingDocumentsCount}
+						</span>
+					{/if}
+				</button>
+			{/if}
+		</div>
+
+		<DocumentValidationModal 
+			isOpen={showDocumentModal} 
+			onClose={() => showDocumentModal = false} 
+		/>
 
 		<!-- ISSUE-P-DASHBOARD-COBRANZA: Resumen Económico (Cobranza / Coordinador Financiero / MAE / Admin).
 		     Incluye la matrícula como ingreso contable aunque Cobranza no la apruebe. -->

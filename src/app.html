@@ -4,7 +4,7 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
 		<link rel="icon" href="/images/logo_datahub.png" />
-		<link rel="manifest" href="%sveltekit.assets%/manifest.json" />
+		<link rel="manifest" href="/manifest.json" />
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 		<meta name="apple-mobile-web-app-title" content="Posgrado Contaduría" />
@@ -17,7 +17,7 @@
 					var m = localStorage.getItem('kyc_theme');
 					var dark =
 						m === 'dark' ||
-						((!m || m === 'system') &&
+						(m === 'system' &&
 							window.matchMedia('(prefers-color-scheme: dark)').matches);
 					if (dark) document.documentElement.classList.add('dark');
 				} catch (e) {}

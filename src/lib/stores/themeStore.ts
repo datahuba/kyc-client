@@ -17,7 +17,7 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 const STORAGE_KEY = 'kyc_theme';
 
 /** Modo elegido por el usuario (light | dark | system) */
-export const themeMode = writable<ThemeMode>('system');
+export const themeMode = writable<ThemeMode>('light');
 
 /** Booleano resuelto: ¿está el tema oscuro activo ahora mismo? */
 export const isDark = writable<boolean>(false);
@@ -63,11 +63,11 @@ let systemListenerAttached = false;
 export function initTheme() {
 	if (!browser) return;
 
-	let stored: ThemeMode = 'system';
+	let stored: ThemeMode = 'light';
 	try {
-		stored = (localStorage.getItem(STORAGE_KEY) as ThemeMode | null) ?? 'system';
+		stored = (localStorage.getItem(STORAGE_KEY) as ThemeMode | null) ?? 'light';
 	} catch (e) {
-		stored = 'system';
+		stored = 'light';
 	}
 
 	themeMode.set(stored);

@@ -10,6 +10,7 @@
 	import { get } from 'svelte/store';
 	import { LOGIN_TYPE_KEY } from '$lib/constants';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
+	import PWAInstallButton from '$lib/components/ui/PWAInstallButton.svelte';
 
 	let showPassword = false;
 	let username = '';
@@ -83,7 +84,8 @@
 </script>
 
 <div class="relative flex min-h-dvh">
-	<div class="absolute top-4 right-4 z-30">
+	<div class="absolute top-4 right-4 z-50 flex items-center gap-4">
+		<PWAInstallButton />
 		<ThemeToggle />
 	</div>
 	<div

@@ -159,8 +159,13 @@ interface Props {
 		if (requiereNombreFuncional && !formData.nombre_funcional?.trim()) {
 			nuevosErrores.nombre_funcional = 'El nombre funcional es obligatorio para Encargado de Curso, Coordinador y Cobranza.';
 		}
-		if (requiereCursosAsignados && (formData.cursos_asignados ?? []).length === 0) {
-			nuevosErrores.cursos_asignados = 'Selecciona al menos un curso para este Encargado de Curso.';
+		if (requiereCursosAsignados) {
+			const numCursos = (formData.cursos_asignados ?? []).length;
+			if (numCursos === 0) {
+				nuevosErrores.cursos_asignados = 'Selecciona al menos un curso para este Encargado de Curso.';
+			} else if (numCursos > 5) {
+				nuevosErrores.cursos_asignados = 'Un Encargado de Curso puede tener máximo 5 programas asignados.';
+			}
 		}
 		if (requiereSubtipoCoordinador && !formData.subtipo_coordinador) {
 			nuevosErrores.subtipo_coordinador = 'Selecciona el subtipo del Coordinador (financiero, académico o investigación).';
