@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { slide, fade } from 'svelte/transition';
-	import { XIcon, CheckCircleIcon, StopwatchIcon } from '$lib/icons/outline';
+	import { XIcon, CircleCheckIcon, StopwatchIcon } from '$lib/icons/outline';
 	import Button from '$lib/components/ui/button.svelte';
 	import { enrollmentService, studentService, courseService } from '$lib/services';
 	import type { Enrollment } from '$lib/interfaces';
@@ -83,7 +83,7 @@
 				{:else if enrollments.length === 0}
 					<div class="flex flex-col items-center justify-center py-16 text-center">
 						<div class="size-16 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mb-4">
-							<CheckCircleIcon class="size-8" />
+							<CircleCheckIcon class="size-8" />
 						</div>
 						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">¡Todo al día!</h3>
 						<p class="text-gray-500 dark:text-gray-400 max-w-sm mt-2">No hay documentos pendientes de revisión o subida.</p>
