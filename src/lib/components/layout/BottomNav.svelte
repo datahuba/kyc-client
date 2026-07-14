@@ -71,7 +71,7 @@
 
 <!-- Bottom Nav Bar for Mobile -->
 <div 
-	class="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] select-none"
+	class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md dark:bg-gray-900/95 border-t border-gray-200/80 dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] select-none"
 	style="padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));"
 >
 	<nav class="flex justify-around items-center h-14 px-2">
@@ -107,15 +107,15 @@
 <!-- "Más" Full Screen Modal -->
 {#if isMoreMenuOpen}
 	<div 
-		class="lg:hidden fixed inset-0 z-40 bg-gray-900/40 backdrop-blur-sm transition-opacity"
+		class="lg:hidden fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm transition-opacity"
 		onclick={() => isMoreMenuOpen = false}
 		aria-hidden="true"
 	></div>
 	<div 
-		class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 rounded-t-2xl shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col max-h-[80vh]"
-		style="padding-bottom: env(safe-area-inset-bottom, 0px);"
-		in:slide={{ duration: 250, axis: 'y' }}
-		out:slide={{ duration: 200, axis: 'y' }}
+		class="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 rounded-t-3xl shadow-[0_-10px_25px_-5px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col max-h-[85vh]"
+		style="padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));"
+		in:slide={{ duration: 300, axis: 'y' }}
+		out:slide={{ duration: 250, axis: 'y' }}
 	>
 		<div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
 			<h2 class="text-lg font-bold text-gray-800 dark:text-gray-200">Menú Principal</h2>

@@ -124,7 +124,7 @@
 			</div>
 		{/if}
 
-		<main class="relative flex-1 overflow-y-auto p-4 sm:p-6 pb-24 lg:pb-6">
+		<main class="relative flex-1 overflow-y-auto p-4 sm:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-6">
 			{@render children?.()}
 		</main>
 		<BottomNav />
