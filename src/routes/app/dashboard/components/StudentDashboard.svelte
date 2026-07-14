@@ -124,12 +124,12 @@
 		<DashboardSkeleton />
 	{:else}
 		<!-- 1. Tarjeta de Bienvenida y Perfil Rápido (compacta) -->
-		<div class="bg-gradient-to-br from-primary-600 via-primary-800 to-primary-950 rounded-3xl shadow-xl shadow-primary-900/20 p-5 sm:p-6 text-white overflow-hidden relative hover-lift border border-white/10">
-			<!-- Decoración de fondo dinámica -->
-			<div class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white/10 rounded-full blur-2xl animate-pulse-slow"></div>
-			<div class="absolute bottom-0 right-32 -mb-10 w-32 h-32 bg-uagrm-sky/20 rounded-full blur-2xl animate-float" style="animation-delay: 1s;"></div>
+		<div class="bg-gradient-to-br from-primary-700 to-primary-950 rounded-2xl shadow-lg p-4 sm:p-5 text-white overflow-hidden relative">
+			<!-- Decoración de fondo -->
+			<div class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white opacity-5 rounded-full blur-2xl pointer-events-none"></div>
+			<div class="absolute bottom-0 right-32 -mb-10 w-28 h-28 bg-white opacity-5 rounded-full blur-xl pointer-events-none"></div>
 			
-			<div class="relative z-10 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-5">
+			<div class="relative z-10 flex flex-col sm:flex-row items-center sm:items-center gap-3 sm:gap-4">
 				<!-- Avatar Letra -->
 				<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/10 border-2 border-white/25 flex items-center justify-center text-lg sm:text-xl font-extrabold shadow-inner shrink-0 text-white">
 					{$userStore.user?.nombre?.charAt(0).toUpperCase() || 'E'}
@@ -156,42 +156,45 @@
 		</div>
 
 		<!-- 2. Tarjetas de Estadísticas Globales -->
-		<div class="grid grid-cols-3 gap-3 sm:gap-5">
-			<div class="glass-panel hover-lift p-4 sm:p-5 rounded-3xl flex items-center justify-between gap-3 min-w-0 group relative overflow-hidden">
-				<div class="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-				<div class="min-w-0 relative z-10">
-					<p class="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate mb-1">Total Programas</p>
-					<p class="text-xl sm:text-3xl font-black text-gray-900 dark:text-white leading-none">{enrollments.length}</p>
+		<div class="grid grid-cols-3 gap-3 sm:gap-4">
+			<Card padding="none" class="p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
+				<div class="flex items-center justify-between gap-2">
+					<div class="min-w-0">
+						<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Total Programas</p>
+						<p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{enrollments.length}</p>
+					</div>
+					<div class="p-2 sm:p-2.5 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-primary-600 dark:text-primary-300 shrink-0">
+						<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+					</div>
 				</div>
-				<div class="p-3 sm:p-3.5 bg-primary-50/80 dark:bg-primary-900/40 rounded-2xl text-primary-600 dark:text-primary-400 shrink-0 shadow-sm relative z-10 group-hover:scale-110 transition-transform duration-300">
-					<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-				</div>
-			</div>
+			</Card>
 			
-			<div class="glass-panel hover-lift p-4 sm:p-5 rounded-3xl flex items-center justify-between gap-3 min-w-0 group relative overflow-hidden">
-				<div class="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-				<div class="min-w-0 relative z-10">
-					<p class="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate mb-1">Activos</p>
-					<p class="text-xl sm:text-3xl font-black text-gray-900 dark:text-white leading-none">{cursosActivos}</p>
+			<Card padding="none" class="p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
+				<div class="flex items-center justify-between gap-2">
+					<div class="min-w-0">
+						<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Activos</p>
+						<p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{cursosActivos}</p>
+					</div>
+					<div class="p-2 sm:p-2.5 bg-green-50 dark:bg-green-900/20 rounded-lg text-green-600 dark:text-green-400 shrink-0">
+						<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+					</div>
 				</div>
-				<div class="p-3 sm:p-3.5 bg-green-50/80 dark:bg-green-900/40 rounded-2xl text-green-600 dark:text-green-400 shrink-0 shadow-sm relative z-10 group-hover:scale-110 transition-transform duration-300">
-					<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-				</div>
-			</div>
+			</Card>
 			
-			<div class="glass-panel hover-lift p-4 sm:p-5 rounded-3xl flex items-center justify-between gap-3 min-w-0 group relative overflow-hidden">
-				<div class="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-				<div class="min-w-0 relative z-10">
-					<p class="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate mb-1">Deuda Global</p>
-					<!-- BUG 5 FIX: Truncamiento inteligente si la cifra es muy larga -->
-					<p class="text-lg sm:text-2xl font-black text-red-600 dark:text-red-400 leading-none truncate" title={formatCurrency(totalDeuda)}>
-						{formatCurrency(totalDeuda)}
-					</p>
+			<Card padding="none" class="p-3 sm:p-4 hover:shadow-md transition-shadow min-w-0">
+				<div class="flex items-center justify-between gap-2">
+					<div class="min-w-0">
+						<p class="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">Deuda Global</p>
+						<!-- BUG 5 FIX: Truncamiento inteligente si la cifra es muy larga -->
+						<p class="text-sm sm:text-lg font-bold text-red-600 dark:text-red-400 mt-0.5 truncate" title={formatCurrency(totalDeuda)}>
+							{formatCurrency(totalDeuda)}
+						</p>
+					</div>
+					<div class="p-2 sm:p-2.5 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400 shrink-0">
+						<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+					</div>
 				</div>
-				<div class="p-3 sm:p-3.5 bg-red-50/80 dark:bg-red-900/40 rounded-2xl text-red-600 dark:text-red-400 shrink-0 shadow-sm relative z-10 group-hover:scale-110 transition-transform duration-300">
-					<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-				</div>
-			</div>
+			</Card>
 		</div>
 
 		<!-- 2.5 Slide horizontal dinámico: Programas Disponibles -->
@@ -217,13 +220,13 @@
 					</div>
 				{/if}
 
-				<div class="flex gap-5 overflow-x-auto pb-6 pt-2 snap-x -mx-1 px-1 scrollbar-hide">
+				<div class="flex gap-4 overflow-x-auto pb-3 snap-x -mx-1 px-1 scrollbar-hide">
 					{#each availableCourses as course (course._id)}
-						<div class="snap-start shrink-0 w-64 sm:w-[300px] glass-panel hover-lift rounded-3xl overflow-hidden group">
-							<div class="h-2 bg-gradient-to-r from-primary-500 via-primary-600 to-primary-800"></div>
-							<div class="p-5">
-								<span class="inline-block px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-widest rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300 capitalize">{course.tipo_curso}</span>
-								<h3 class="mt-3 text-base font-bold text-gray-900 dark:text-white line-clamp-2 leading-tight min-h-[3rem] group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors" title={course.nombre_programa}>{course.nombre_programa}</h3>
+						<div class="snap-start shrink-0 w-64 sm:w-72 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl shadow-sm overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
+							<div class="h-1.5 bg-gradient-to-r from-primary-600 to-primary-800"></div>
+							<div class="p-4">
+								<span class="inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 capitalize">{course.tipo_curso}</span>
+								<h3 class="mt-2 text-sm font-bold text-gray-900 dark:text-white line-clamp-2 leading-snug min-h-[2.5rem]" title={course.nombre_programa}>{course.nombre_programa}</h3>
 								<div class="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
 									<span class="capitalize">{course.modalidad}</span>
 									<span>·</span>
@@ -281,12 +284,12 @@
 					</div>
 				</Card>
 			{:else}
-				<!-- ISSUE-X-COMPACT: tarjetas compactas y desplegables con estilo premium -->
-				<div class="space-y-4">
+				<!-- ISSUE-X-COMPACT: tarjetas compactas y desplegables -->
+				<div class="space-y-3">
 					{#each latestEnrollments.slice(0, 3) as enr (enr._id)}
 						{@const isOpen = expandedEnrollments.has(enr._id)}
 						{@const nombre = coursesMap[enr.curso_id]?.nombre_programa || 'Curso Desconocido'}
-						<div class="glass-panel rounded-2xl hover-lift border-l-4 border-l-primary-600 overflow-hidden">
+						<div class="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border border-l-4 border-l-primary-600 rounded-xl shadow-sm overflow-hidden">
 							<!-- Cabecera colapsable -->
 							<button
 								type="button"
