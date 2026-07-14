@@ -89,6 +89,43 @@
 			transform: rotate(3deg);
 		}
 	}
+
+	--animate-float: float 6s ease-in-out infinite;
+	@keyframes float {
+		0%,
+		100% {
+			transform: translateY(0);
+		}
+		50% {
+			transform: translateY(-10px);
+		}
+	}
+
+	--animate-pulse-slow: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	@keyframes pulse-slow {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: .5;
+		}
+	}
+}
+
+/* ==================================================================
+   UTILITIES (GLASSMORPHISM & PREMIUM UI)
+   ================================================================== */
+@utility glass {
+	@apply bg-white/70 backdrop-blur-md border border-white/20 dark:bg-dark-surface/70 dark:border-white/10;
+}
+
+@utility glass-panel {
+	@apply bg-white/60 backdrop-blur-xl border border-white/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-dark-surface/60 dark:border-white/10 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)];
+}
+
+@utility hover-lift {
+	@apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary-600/10 dark:hover:shadow-primary-500/10;
 }
 
 /* ==================================================================

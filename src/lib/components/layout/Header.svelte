@@ -243,7 +243,7 @@
 </script>
 
 <div 
-	class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md px-4 sm:gap-x-6 sm:px-6 lg:px-8 transition-colors"
+	class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200/40 dark:border-white/5 bg-white/60 dark:bg-dark-surface/60 backdrop-blur-xl shadow-sm shadow-gray-200/20 dark:shadow-black/20 px-4 sm:gap-x-6 sm:px-6 lg:px-8 transition-all duration-300"
 	style="padding-top: env(safe-area-inset-top, 0px); margin-top: max(0px, env(safe-area-inset-top, 0px));"
 >
 

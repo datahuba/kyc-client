@@ -96,12 +96,17 @@
   en segundo plano en el mismo instante en que el usuario pase el puntero del mouse sobre 
   cualquier enlace o pestaña de navegación de Posgrado, simulando transiciones de 0ms.
 -->
-<div class="flex h-screen bg-light-primary dark:bg-dark-background transition-colors" data-sveltekit-preload-data="hover">
+<div class="flex h-screen bg-light-primary dark:bg-dark-background transition-colors overflow-hidden relative" data-sveltekit-preload-data="hover">
+	
+	<!-- Ambient Background Blobs (Dynamic effect) -->
+	<div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-300/20 dark:bg-primary-900/20 rounded-full blur-[100px] pointer-events-none animate-pulse-slow"></div>
+	<div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-300/20 dark:bg-blue-900/20 rounded-full blur-[100px] pointer-events-none animate-pulse-slow" style="animation-delay: 2s;"></div>
+
 	<Sidebar 
 		isOpen={sidebarOpen} 
 		onClose={() => sidebarOpen = false} 
 	/>
-	<div class="relative flex flex-1 flex-col overflow-hidden transition-all duration-300">
+	<div class="relative flex flex-1 flex-col overflow-hidden transition-all duration-300 z-10">
 		<Watermark />
 		<Header onOpenSidebar={() => sidebarOpen = true} />
 

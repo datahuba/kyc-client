@@ -116,7 +116,7 @@
 	<button class="fixed inset-0 z-40 bg-gray-900/80 backdrop-blur-sm lg:hidden" onclick={onClose} onkeydown={(e) => { if (e.key === 'Enter') onClose(); }} aria-label="Close sidebar" type="button" transition:slide={{ duration: 200, axis: 'y' }}></button>
 {/if}
 
-<div class={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} ${isCollapsed ? 'lg:w-20' : 'w-72'}`}>
+<div class={`fixed inset-y-0 left-0 z-50 w-72 bg-white/70 dark:bg-dark-surface/70 backdrop-blur-xl border-r border-gray-200/40 dark:border-white/5 shadow-[4px_0_24px_rgba(0,0,0,0.02)] transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} ${isCollapsed ? 'lg:w-20' : 'w-72'}`}>
 	<div class="flex h-16 items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
 		{#if !isCollapsed}
 			<div class="flex items-center gap-2.5 min-w-0" in:fade>
