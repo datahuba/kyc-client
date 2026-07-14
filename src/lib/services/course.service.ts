@@ -59,6 +59,10 @@ class CourseService {
 	): Promise<{ success: boolean; total_estudiantes: number; correos_enviados: number; detail: string }> {
 		return await apiKyC.post(`/courses/${courseId}/comunicado`, data);
 	}
+
+	async assignEncargados(courseId: string, encargadosIds: string[]): Promise<{ success: boolean; detail: string }> {
+		return await apiKyC.put(`/courses/${courseId}/encargados`, { encargados_ids: encargadosIds });
+	}
 }
 
 export const courseService = new CourseService();
