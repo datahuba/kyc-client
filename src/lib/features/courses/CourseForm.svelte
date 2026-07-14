@@ -81,7 +81,7 @@
 			]);
 			discounts = resDiscounts.data;
 			teachers = resTeachers;
-			availableEncargados = resUsers.data.filter(u => u.role === 'encargado_curso' || u.role === 'coordinador');
+			availableEncargados = resUsers.data.filter(u => u.rol === 'encargado_curso' || u.rol === 'coordinador' || u.role === 'encargado_curso' || u.role === 'coordinador');
 		} catch (e) {
 			console.error('Error fetching data for course form', e);
 		}
@@ -441,7 +441,7 @@
 								{encargado.nombre || encargado.username}
 							</span>
 							<span class="text-xs text-gray-500 dark:text-gray-400">
-								{encargado.role === 'coordinador' ? 'Coordinador' : 'Encargado de Curso'}
+								{(encargado.rol || encargado.role) === 'coordinador' ? 'Coordinador' : 'Encargado de Curso'}
 							</span>
 						</div>
 					</label>
