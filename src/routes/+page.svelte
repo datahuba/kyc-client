@@ -4,14 +4,13 @@
 	import { onMount } from 'svelte';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 	import PWAInstallButton from '$lib/components/ui/PWAInstallButton.svelte';
-	import { BriefcaseIcon, ShieldIcon, BookIcon } from '$lib/icons/solid';
-	import { ChevronRightIcon } from '$lib/icons/outline';
 
-	let isAuthenticated = $state(false);
-	let loginType: 'admin' | 'academic' | null = $state(null);
-	let user: any = $state(null);
+	// Subscribe to user store
+	let isAuthenticated = false;
+	let loginType: 'admin' | 'academic' | null = null;
+	let user: any = null;
 
-	userStore.subscribe((state) => {
+	userStore.subscribe(state => {
 		isAuthenticated = state.isAuthenticated;
 		loginType = state.loginType;
 		user = state.user;
@@ -19,9 +18,10 @@
 
 	onMount(() => {
 		userStore.init();
-
+		
 		if (isAuthenticated && user) {
 			const userRole = user.rol || user.role || '';
+			// Redirección inteligente si ya está logueado
 			if (userRole === 'cpd') {
 				goto('/app/students');
 			} else {
@@ -33,7 +33,9 @@
 	});
 
 	// ISSUE M: Enrutador de 3 puertas directas (Sin pasos intermedios)
+	// Forzar logout al cambiar de perfil para evitar contaminación de sesiones entre roles
 	function handleSelectRole(type: 'student' | 'teacher' | 'admin') {
+		// Si hay sesión activa de otro rol, limpiarla primero
 		userStore.logout();
 
 		if (type === 'student') {
@@ -48,191 +50,112 @@
 		}
 		goto('/auth/sign-in');
 	}
-
-	const roles = [
-		{
-			id: 'student' as const,
-			label: 'Estudiantes',
-			description: 'Aula virtual, notas y pagos.',
-			href: '#estudiantes',
-			gradient: 'from-uagrm-blue to-uagrm-sky',
-			glow: 'shadow-uagrm-blue/20 hover:shadow-uagrm-blue/40',
-			ring: 'hover:border-uagrm-blue',
-			iconBg: 'bg-uagrm-blue/10 dark:bg-uagrm-blue/20',
-			iconColor: 'text-uagrm-blue dark:text-uagrm-sky',
-			overlay: 'bg-gradient-to-br from-uagrm-blue to-uagrm-sky',
-			overlayText: 'group-hover:text-white',
-			overlaySubtext: 'group-hover:text-blue-100',
-			overlayIcon: 'group-hover:bg-white/20',
-			icon: BookIcon
-		},
-		{
-			id: 'teacher' as const,
-			label: 'Docentes',
-			description: 'Calificaciones y material.',
-			href: '#docentes',
-			gradient: 'from-uagrm-green to-emerald-600',
-			glow: 'shadow-uagrm-green/20 hover:shadow-uagrm-green/40',
-			ring: 'hover:border-uagrm-green',
-			iconBg: 'bg-uagrm-green/10 dark:bg-uagrm-green/20',
-			iconColor: 'text-uagrm-green dark:text-emerald-400',
-			overlay: 'bg-gradient-to-br from-uagrm-green to-emerald-600',
-			overlayText: 'group-hover:text-white',
-			overlaySubtext: 'group-hover:text-emerald-100',
-			overlayIcon: 'group-hover:bg-white/20',
-			icon: BriefcaseIcon
-		},
-		{
-			id: 'admin' as const,
-			label: 'Administrativos',
-			description: 'Gestión UAGRM y cobranzas.',
-			href: '#administrativos',
-			gradient: 'from-primary-700 to-primary-900',
-			glow: 'shadow-primary-700/20 hover:shadow-primary-700/40',
-			ring: 'hover:border-primary-600',
-			iconBg: 'bg-primary-50 dark:bg-primary-900/30',
-			iconColor: 'text-primary-700 dark:text-primary-300',
-			overlay: 'bg-gradient-to-br from-primary-700 to-primary-900',
-			overlayText: 'group-hover:text-white',
-			overlaySubtext: 'group-hover:text-rose-100',
-			overlayIcon: 'group-hover:bg-white/20',
-			icon: BriefcaseIcon
-		}
-	];
 </script>
 
 {#if !isAuthenticated}
-<!--
-  Role Selection v2 (2026-07-17) — Rediseño mobile-first con patrones NameThatUI:
-  - Card (Patrón 66) con hover/gradient overlay + micro-interaction (translate-y, scale)
-  - Sticky/Positioned (Patrón 48): site header con safe-area-top
-  - Empty State-style hero con gradient institucional
-  - Touch targets mínimo 44x44 (h-14/16)
--->
-<div
-	class="relative min-h-dvh overflow-hidden bg-gradient-to-br from-primary-50 via-white to-uagrm-blue/5 dark:from-dark-background dark:via-dark-primary dark:to-dark-background"
->
-	<!-- Patrón decorativo de fondo (solo sm+) -->
-	<div class="pointer-events-none absolute inset-0 hidden sm:block" aria-hidden="true">
-		<div
-			class="absolute -top-40 -right-40 size-[28rem] rounded-full bg-primary-200/30 blur-3xl dark:bg-primary-900/20"
-		></div>
-		<div
-			class="absolute -bottom-40 -left-40 size-[28rem] rounded-full bg-uagrm-sky/20 blur-3xl dark:bg-uagrm-sky/10"
-		></div>
-		<div
-			class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-[40rem] rounded-full bg-uagrm-gold/5 blur-3xl"
-		></div>
-	</div>
-
-	<!-- Theme toggle y PWA install -->
-	<div class="absolute top-4 right-4 z-50 flex items-center gap-2">
+<!-- Role Selection UI - 3 Puertas -->
+<div class="relative min-h-dvh flex flex-col items-center justify-center bg-light-primary dark:bg-dark-primary p-4 sm:p-6">
+	<div class="absolute top-4 right-4 flex items-center gap-2 sm:gap-4 z-50">
 		<PWAInstallButton />
 		<ThemeToggle />
 	</div>
+	<div class="w-full max-w-5xl text-center">
+		<!-- Encabezado institucional UAGRM -->
+		<div class="mb-8 sm:mb-12 flex flex-col items-center justify-center">
+			<div class="mb-4 sm:mb-5 flex items-center gap-3 sm:gap-4">
+				<img
+					src="/images/logo_uagrm_fondo_blanco.jpg"
+					alt="UAGRM"
+					class="h-16 w-16 sm:h-24 sm:w-24 rounded-2xl object-contain bg-white p-1.5 sm:p-2 shadow-md ring-1 ring-black/5"
+				/>
+				<img
+					src="/images/logo_contaduria_publica_fondo_blanco.jpg"
+					alt="Facultad de Contaduría Pública"
+					class="h-16 w-16 sm:h-24 sm:w-24 rounded-2xl object-contain bg-white p-1.5 sm:p-2 shadow-md ring-1 ring-black/5"
+				/>
+			</div>
+			<h1 class="text-2xl sm:text-3xl md:text-4xl font-extrabold text-light-secondary dark:text-dark-tertiary mb-1 text-center leading-tight px-2">
+				Unidad de Postgrado
+			</h1>
+			<p class="text-xs sm:text-sm font-semibold text-light-tertiary dark:text-dark-secondary mb-3 max-w-lg mx-auto text-center leading-normal px-4">
+				Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas
+			</p>
+			<p class="text-sm sm:text-base text-light-black/70 dark:text-dark-white/70 px-4">
+				Selecciona tu perfil de acceso a la plataforma
+			</p>
+		</div>
 
-	<!-- Contenido principal -->
-	<div class="relative z-10 flex min-h-dvh flex-col items-center justify-center px-4 py-12 sm:px-6">
-		<div class="w-full max-w-5xl">
-			<!-- Hero / Encabezado institucional -->
-			<header class="mb-10 flex flex-col items-center text-center sm:mb-14">
-				<div class="mb-5 flex items-center gap-3 sm:mb-6 sm:gap-4">
-					<img
-						src="/images/logo_uagrm_fondo_blanco.jpg"
-						alt="UAGRM"
-						class="h-16 w-16 rounded-2xl object-contain bg-white p-1.5 shadow-xl ring-1 ring-primary-100 sm:h-24 sm:w-24 sm:p-2 dark:ring-primary-900/40"
-					/>
-					<img
-						src="/images/logo_contaduria_publica_fondo_blanco.jpg"
-						alt="Facultad de Contaduría Pública"
-						class="h-16 w-16 rounded-2xl object-contain bg-white p-1.5 shadow-xl ring-1 ring-primary-100 sm:h-24 sm:w-24 sm:p-2 dark:ring-primary-900/40"
-					/>
-				</div>
-				<h1
-					class="text-2xl font-extrabold tracking-tight text-primary-700 sm:text-4xl md:text-5xl dark:text-dark-tertiary"
-				>
-					Unidad de Postgrado
-				</h1>
-				<p
-					class="mt-2 max-w-md text-xs font-semibold text-uagrm-blue/80 sm:mt-3 sm:text-sm md:text-base dark:text-uagrm-sky/80"
-				>
-					Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y
-					Finanzas
-				</p>
-				<div class="mt-5 inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-1.5 text-xs font-semibold text-primary-700 shadow-sm backdrop-blur-sm sm:text-sm dark:bg-dark-surface/80 dark:text-dark-tertiary">
-					<span class="size-2 rounded-full bg-primary-500"></span>
-					Selecciona tu perfil de acceso
-				</div>
-			</header>
+		<!-- Contenedor de Botones (3 Columnas) -->
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full max-w-3xl sm:max-w-4xl mx-auto px-2 sm:px-4">
 
-			<!-- Bento Grid de 3 puertas (mobile-first) -->
-			<nav
-				class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3"
-				aria-label="Perfiles de acceso"
+			<!-- PUERTA 1: ESTUDIANTES -->
+			<button
+				onclick={() => handleSelectRole('student')}
+				class="group relative overflow-hidden w-full py-6 sm:py-8 px-4 sm:px-6 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:-translate-y-1 active:scale-[0.98]"
 			>
-				{#each roles as role (role.id)}
-					<button
-						type="button"
-						onclick={() => handleSelectRole(role.id)}
-						class="group relative w-full overflow-hidden rounded-2xl border-2 border-gray-200/80 bg-white/95 p-6 text-left shadow-md backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl active:scale-[0.98] sm:p-8 dark:border-dark-border/80 dark:bg-dark-surface/95 {role.ring} {role.glow}"
-						aria-label={`Acceder como ${role.label}: ${role.description}`}
-					>
-						<!-- Gradient overlay (aparece en hover) -->
-						<div
-							class="pointer-events-none absolute inset-0 translate-y-full bg-gradient-to-br transition-transform duration-500 ease-out group-hover:translate-y-0 {role.overlay}"
-							aria-hidden="true"
-						></div>
+				<div class="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
 
-						<!-- Contenido -->
-						<div class="relative z-10 flex flex-col items-start gap-4">
-							<!-- Icono -->
-							<div
-								class="flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-300 {role.iconBg} {role.overlayIcon} sm:h-16 sm:w-16"
-							>
-								<role.icon
-									class="size-7 transition-all duration-300 {role.iconColor} group-hover:text-white group-hover:scale-110 sm:size-8"
-								/>
-							</div>
+				<div class="relative z-10 flex flex-col items-center gap-3 sm:gap-4">
+					<div class="p-3 sm:p-4 rounded-full bg-blue-50 dark:bg-blue-900/30 group-hover:bg-white/20 transition-colors duration-300">
+						<svg class="w-7 h-7 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400 group-hover:text-white transition-all duration-300 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+						</svg>
+					</div>
+					<span class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-200 group-hover:text-white transition-colors duration-300">
+						Estudiantes
+					</span>
+					<p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 group-hover:text-blue-100 transition-colors duration-300">
+						Aula virtual, notas y pagos.
+					</p>
+				</div>
+			</button>
 
-							<!-- Textos -->
-							<div>
-								<h2
-									class="text-xl font-extrabold text-gray-900 transition-colors duration-300 sm:text-2xl dark:text-white {role.overlayText}"
-								>
-									{role.label}
-								</h2>
-								<p
-									class="mt-1.5 text-sm text-gray-500 transition-colors duration-300 dark:text-gray-400 sm:text-base {role.overlaySubtext}"
-								>
-									{role.description}
-								</p>
-							</div>
+			<!-- PUERTA 2: DOCENTES -->
+			<button
+				onclick={() => handleSelectRole('teacher')}
+				class="group relative overflow-hidden w-full py-6 sm:py-8 px-4 sm:px-6 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-emerald-500 dark:hover:border-emerald-500 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/20 hover:-translate-y-1 active:scale-[0.98]"
+			>
+				<div class="absolute inset-0 bg-gradient-to-br from-emerald-500 to-emerald-600 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
 
-							<!-- CTA inline -->
-							<div
-								class="mt-2 flex items-center gap-1.5 text-sm font-semibold {role.iconColor} transition-colors duration-300 {role.overlayText}"
-							>
-								<span>Ingresar</span>
-								<ChevronRightIcon
-									class="size-4 transition-transform duration-300 group-hover:translate-x-1"
-								/>
-							</div>
-						</div>
-					</button>
-				{/each}
-			</nav>
+				<div class="relative z-10 flex flex-col items-center gap-3 sm:gap-4">
+					<div class="p-3 sm:p-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 group-hover:bg-white/20 transition-colors duration-300">
+						<svg class="w-7 h-7 sm:w-8 sm:h-8 text-emerald-600 dark:text-emerald-400 group-hover:text-white transition-all duration-300 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+						</svg>
+					</div>
+					<span class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-200 group-hover:text-white transition-colors duration-300">
+						Docentes
+					</span>
+					<p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 group-hover:text-emerald-100 transition-colors duration-300">
+						Calificaciones y material.
+					</p>
+				</div>
+			</button>
 
-			<!-- Trust signals / Footer -->
-			<footer class="mt-12 text-center sm:mt-16">
-				<p
-					class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 sm:text-xs dark:text-gray-500"
-				>
-					Sistema de Gestión Académica y Financiera
-				</p>
-				<p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500 sm:text-sm">
-					© {new Date().getFullYear()} Unidad de Postgrado · UAGRM
-				</p>
-			</footer>
+			<!-- PUERTA 3: ADMINISTRATIVOS -->
+			<button
+				onclick={() => handleSelectRole('admin')}
+				class="group relative overflow-hidden w-full py-6 sm:py-8 px-4 sm:px-6 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-primary-700 dark:hover:border-primary-500 transition-all duration-300 hover:shadow-xl hover:shadow-primary-700/20 hover:-translate-y-1 active:scale-[0.98]"
+			>
+				<div class="absolute inset-0 bg-gradient-to-br from-primary-700 to-primary-900 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+
+				<div class="relative z-10 flex flex-col items-center gap-3 sm:gap-4">
+					<div class="p-3 sm:p-4 rounded-full bg-primary-50 dark:bg-primary-900/30 group-hover:bg-white/20 transition-colors duration-300">
+						<svg class="w-7 h-7 sm:w-8 sm:h-8 text-primary-700 dark:text-primary-300 group-hover:text-white transition-all duration-300 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+							<path stroke-linecap="round" stroke-linejoin="round" d="m9 12 2 2 4-4" />
+						</svg>
+					</div>
+					<span class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-200 group-hover:text-white transition-colors duration-300">
+						Administrativos
+					</span>
+					<p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 group-hover:text-slate-200 transition-colors duration-300">
+						Gestión UAGRM y cobranzas.
+					</p>
+				</div>
+			</button>
+
 		</div>
 	</div>
 </div>
