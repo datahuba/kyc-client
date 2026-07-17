@@ -14,6 +14,7 @@
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
+	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
 	import { alert, formatDate, formatCurrency } from '$lib/utils';
@@ -240,6 +241,16 @@
 		page = 1;
 		loadData();
 	}
+
+	function clearEnrollmentFilters() {
+		filters = { q: '', estado: 'all', curso_id: 'all', estudiante_id: 'all', con_descuento: 'all' };
+		page = 1;
+		loadData();
+	}
+
+	let hasActiveEnrollmentFilters = $derived(
+		!!(filters.q || filters.estado !== 'all' || filters.curso_id !== 'all' || filters.estudiante_id !== 'all' || filters.con_descuento !== 'all')
+	);
 
 	function handleCreate() {
 		selectedEnrollment = null;
@@ -748,9 +759,21 @@
 	{#if loading}
 		<TableSkeleton columns={9} rows={10} />
 	{:else if enrollments.length === 0}
-		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-			<p class="text-gray-500 dark:text-gray-400">No hay inscripciones registradas.</p>
-		</div>
+		<EmptyState
+			icon="enrollment"
+			title={currentRole === 'student' ? 'Aún no tienes inscripciones' : 'No hay inscripciones registradas'}
+			description={hasActiveEnrollmentFilters
+				? 'No hay resultados con los filtros aplicados. Probá limpiarlos para ver todas las inscripciones.'
+				: currentRole === 'student'
+					? 'Cuando un administrador te inscriba a un programa o apruebe una de tus solicitudes, aparecerá aquí.'
+					: 'Cuando un estudiante sea inscrito a un programa, o cuando se apruebe una solicitud de inscripción, aparecerá aquí.'}
+			ctaLabel={hasActiveEnrollmentFilters
+				? 'Limpiar filtros'
+				: (canCreateEnrollment && currentRole !== 'student') ? 'Crear primera inscripción' : undefined}
+			onCta={hasActiveEnrollmentFilters
+				? clearEnrollmentFilters
+				: (canCreateEnrollment && currentRole !== 'student') ? handleCreate : undefined}
+		/>
 	{:else}
 		<!-- ISSUE-X-COMPACT: Desktop Table consolidada SIN scroll horizontal -->
 		<div class="hidden md:block bg-white dark:bg-dark-surface rounded-lg shadow border border-gray-200 dark:border-dark-border">

@@ -12,6 +12,7 @@
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import DiscountForm from '$lib/features/discounts/DiscountForm.svelte';
 	import FileUpload from '$lib/components/ui/fileUpload.svelte';
+	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
@@ -231,9 +232,13 @@
 	{#if loading}
 		<TableSkeleton columns={5} rows={10} />
 	{:else if discounts.length === 0}
-		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-			<p class="text-gray-500 dark:text-gray-400">No hay descuentos registrados.</p>
-		</div>
+		<EmptyState
+			icon="discount"
+			title="No hay descuentos registrados"
+			description="CPD puede crear descuentos para Becas, Empleados UAGRM, Convenios o Promociones, y asignarlos a uno o varios estudiantes."
+			ctaLabel={canManageDiscounts ? 'Crear primer descuento' : undefined}
+			onCta={canManageDiscounts ? handleCreate : undefined}
+		/>
 	{:else}
 		<!-- Desktop Table -->
 		<div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -278,7 +283,7 @@
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
 								{#if getDropdownOptions(discount).length > 0}
-									<button onclick={() => toggleDropdown(discount._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+									<button onclick={() => toggleDropdown(discount._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del descuento {discount.nombre}">
 										<DotsVerticalIcon class="size-5" />
 									</button>
 									{#if openDropdownId === discount._id}
@@ -322,7 +327,7 @@
 						</div>
 						<div class="relative">
 							{#if getDropdownOptions(discount).length > 0}
-								<button onclick={() => toggleDropdown(discount._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+								<button onclick={() => toggleDropdown(discount._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del descuento {discount.nombre}">
 									<DotsVerticalIcon class="size-5" />
 								</button>
 								{#if openDropdownId === discount._id}

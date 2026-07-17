@@ -11,6 +11,7 @@
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import StudentDetails from '$lib/features/students/StudentDetails.svelte';
 	import StudentForm from '$lib/features/students/StudentForm.svelte';
+	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import { PlusIcon, DownloadIcon } from '$lib/icons/outline';
 	import { alert } from '$lib/utils';
 	import { Pagination } from '$lib/components/ui';
@@ -149,6 +150,22 @@
 
 	function handleFilterChange() {
 		loadStudents();
+	}
+
+	// ISS-004: empty state contextual con limpieza de filtros
+	let hasActiveStudentFilters = $derived(
+		!!(filters.q || filters.activo !== 'all' || filters.estado_titulo !== 'all' || filters.curso_id)
+	);
+
+	function clearStudentFilters() {
+		filters = { q: '', activo: 'all', estado_titulo: 'all', curso_id: '' };
+		page = 1;
+		loadStudents();
+	}
+
+	function handleCreateStudent() {
+		selectedStudent = null;
+		isFormOpen = true;
 	}
 
 	function handleSearchInput() {
@@ -525,7 +542,7 @@
 	<div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
 		<Heading level="h1">Estudiantes</Heading>
 		<div class="flex flex-wrap gap-3 ml-auto w-full sm:w-auto justify-end">
-			<Button onclick={downloadStudentsCSV} variant="secondary" loading={csvLoading}>
+			<Button onclick={downloadStudentsCSV} variant="secondary" loading={csvLoading} aria-label="Descargar listado de estudiantes en CSV">
 				{#snippet leftIcon()}
 					<DownloadIcon class="size-5" />
 				{/snippet}
@@ -563,6 +580,20 @@
 
 	{#if loading}
 		<TableSkeleton columns={6} rows={10} />
+	{:else if students.length === 0}
+		<EmptyState
+			icon="student"
+			title={hasActiveStudentFilters ? 'No hay estudiantes con esos filtros' : 'No hay estudiantes registrados'}
+			description={hasActiveStudentFilters
+				? 'Probá limpiar los filtros para ver todos los estudiantes del sistema.'
+				: 'CPD o SuperAdmin pueden registrar estudiantes manualmente o cargarlos en lote desde Excel.'}
+			ctaLabel={hasActiveStudentFilters
+				? 'Limpiar filtros'
+				: canCreateStudent ? 'Crear primer estudiante' : undefined}
+			onCta={hasActiveStudentFilters
+				? clearStudentFilters
+				: canCreateStudent ? handleCreateStudent : undefined}
+		/>
 	{:else}
 		<!-- Componente de Tabla Modularizado -->
 		<StudentTable
@@ -576,7 +607,7 @@
 			bind:selectedStudentIds={selectedStudentIds}
 			bind:openDropdownId={openDropdownId}
 		/>
-		
+
 		<Pagination
 			currentPage={page}
 			{totalPages}

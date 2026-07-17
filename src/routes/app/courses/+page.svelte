@@ -12,6 +12,7 @@
 	import ComunicadoModal from '$lib/features/courses/ComunicadoModal.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
+	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon, DownloadIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
@@ -141,6 +142,16 @@
 			studentsLoading = false;
 		}
 	}
+
+	function clearCourseFilters() {
+		filters = { q: '', activo: 'all', tipo_curso: 'all', modalidad: 'all' };
+		page = 1;
+		loadCourses();
+	}
+
+	let hasActiveCourseFilters = $derived(
+		!!(filters.q || filters.activo !== 'all' || filters.tipo_curso !== 'all' || filters.modalidad !== 'all')
+	);
 
 	function handleCreate() {
 		selectedCourse = null;
@@ -364,9 +375,19 @@
 	{#if loading}
 		<TableSkeleton columns={6} rows={10} />
 	{:else if courses.length === 0}
-		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-			<p class="text-gray-500 dark:text-gray-400">No hay programas registrados.</p>
-		</div>
+		<EmptyState
+			icon="course"
+			title={hasActiveCourseFilters ? 'No hay programas con esos filtros' : 'No hay programas registrados'}
+			description={hasActiveCourseFilters
+				? 'Probá limpiar los filtros para ver todos los programas disponibles.'
+				: 'Cuando CPD o Admin cree un nuevo programa de Diplomado, Maestría, Curso o Taller, aparecerá aquí.'}
+			ctaLabel={hasActiveCourseFilters
+				? 'Limpiar filtros'
+				: canCreateCourse ? 'Crear primer programa' : undefined}
+			onCta={hasActiveCourseFilters
+				? clearCourseFilters
+				: canCreateCourse ? handleCreate : undefined}
+		/>
 	{:else}
 		<!-- Desktop Table -->
 		<div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -417,7 +438,7 @@
 							</td>
 							
 							<td class="px-3 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-								<button onclick={() => toggleDropdown(course._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+								<button onclick={() => toggleDropdown(course._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del programa {course.nombre_programa}">
 									<DotsVerticalIcon class="size-5" />
 								</button>
 								{#if openDropdownId === course._id}
@@ -456,7 +477,7 @@
 							<p class="text-xs text-gray-500 dark:text-gray-400">{course.codigo}</p>
 						</div>
 						<div class="relative">
-							<button onclick={() => toggleDropdown(course._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+							<button onclick={() => toggleDropdown(course._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del programa {course.nombre_programa}">
 								<DotsVerticalIcon class="size-5" />
 							</button>
 							{#if openDropdownId === course._id}

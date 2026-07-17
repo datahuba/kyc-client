@@ -11,6 +11,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import PaymentForm from '$lib/features/payments/PaymentForm.svelte';
+	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import { Pagination } from '$lib/components/ui';
 	import { 
 		PlusIcon, 
@@ -306,6 +307,18 @@
 		return $userStore.role === 'superadmin';
 	}
 
+	// ISS-004: detección de filtros activos y limpieza para el empty state.
+	// Reactividad pura: si cambia cualquier filtro, esto se recalcula solo.
+	let hasActiveFilters = $derived(
+		!!(filters.q || filters.estado || filters.curso_id || filters.estudiante_id || filters.tipo_concepto)
+	);
+
+	function clearFilters() {
+		filters = { q: '', estado: '', curso_id: '', estudiante_id: '', tipo_concepto: '' };
+		page = 1;
+		loadPayments();
+	}
+
 	function canApproveReject(payment: Payment): boolean {
 		if (payment.estado_pago !== 'pendiente') return false;
 		
@@ -476,10 +489,10 @@
 		</div>
 		
 		<div class="flex gap-3 w-full md:w-auto">
-			<Button variant="secondary" onclick={loadPayments} loading={loading}>
+			<Button variant="secondary" onclick={loadPayments} loading={loading} aria-label="Recargar lista de pagos">
 				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
 			</Button>
-			<Button variant="secondary" onclick={downloadCSV} loading={csvLoading}>
+			<Button variant="secondary" onclick={downloadCSV} loading={csvLoading} aria-label="Descargar listado de pagos en CSV">
 				{#snippet leftIcon()} <DownloadIcon class="size-5" /> {/snippet}
 				Descargar CSV
 			</Button>
@@ -680,8 +693,20 @@
 					{/each}
 					{#if payments.length === 0}
 						<tr>
-							<td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-								No se encontraron pagos.
+							<td colspan="6" class="px-6 py-0">
+								<EmptyState
+									icon="payment"
+									variant="simple"
+									size="md"
+									title="No se encontraron pagos"
+									description={hasActiveFilters
+										? 'No hay resultados con los filtros aplicados. Probá limpiarlos para ver todos los pagos.'
+										: isStudent
+											? 'Cuando registres un pago desde esta misma vista, aparecerá aquí para que puedas hacer seguimiento.'
+											: 'Aún no se registraron pagos en el sistema.'}
+									ctaLabel={hasActiveFilters ? 'Limpiar filtros' : undefined}
+									onCta={hasActiveFilters ? clearFilters : undefined}
+								/>
 							</td>
 						</tr>
 					{/if}
@@ -746,9 +771,19 @@
 				</div>
 			{/each}
 			{#if payments.length === 0}
-				<div class="text-center py-8 text-sm text-gray-500 dark:text-gray-400 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl">
-					No se encontraron pagos.
-				</div>
+				<EmptyState
+					icon="payment"
+					variant="bordered"
+					size="md"
+					title="No se encontraron pagos"
+					description={hasActiveFilters
+						? 'No hay resultados con los filtros aplicados. Probá limpiarlos para ver todos los pagos.'
+						: isStudent
+							? 'Cuando registres un pago desde esta misma vista, aparecerá aquí para que puedas hacer seguimiento.'
+							: 'Aún no se registraron pagos en el sistema.'}
+					ctaLabel={hasActiveFilters ? 'Limpiar filtros' : undefined}
+					onCta={hasActiveFilters ? clearFilters : undefined}
+				/>
 			{/if}
 		</div>
 
