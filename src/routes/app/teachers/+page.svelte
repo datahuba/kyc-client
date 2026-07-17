@@ -5,6 +5,7 @@
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import FileUpload from '$lib/components/ui/fileUpload.svelte';
+	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import { alert } from '$lib/utils';
 
 	const TEACHER_ROLE = 'docente';
@@ -44,6 +45,12 @@
 	let selectedTeacherForCV: User | null = $state(null);
 	let isUploadingCV = $state(false);
 	let fileToUpload: File | null = $state(null);
+
+	// ISS-001 (2026-07-17): reemplazo de window.confirm() nativo por ModalConfirm
+	// para mantener consistencia con design system y soportar dark mode.
+	let showDeleteModal = $state(false);
+	let teacherToDelete: User | null = $state(null);
+	let deleteLoading = $state(false);
 
 	let isSubmitting = $state(false);
 
@@ -146,14 +153,24 @@
 	}
 
 	async function handleDeleteTeacher(id: string) {
-		if (confirm('¿Está seguro de que desea eliminar a este docente?')) {
-			try {
-				await userService.delete(id);
-				alert('success', 'Docente eliminado correctamente');
-				teachers = teachers.filter((t) => t._id !== id);
-			} catch (err: any) {
-				alert('error', err.message || 'Error al eliminar docente');
-			}
+		// ISS-001: abrir modal de confirmacion en vez de window.confirm() nativo
+		teacherToDelete = teachers.find((t) => t._id === id) ?? null;
+		showDeleteModal = true;
+	}
+
+	async function confirmDeleteTeacher() {
+		if (!teacherToDelete) return;
+		deleteLoading = true;
+		try {
+			await userService.delete(teacherToDelete._id);
+			alert('success', 'Docente eliminado correctamente');
+			teachers = teachers.filter((t) => t._id !== teacherToDelete!._id);
+			showDeleteModal = false;
+			teacherToDelete = null;
+		} catch (err: any) {
+			alert('error', err.message || 'Error al eliminar docente');
+		} finally {
+			deleteLoading = false;
 		}
 	}
 
@@ -505,4 +522,15 @@
 			</div>
 		</div>
 	{/if}
+
+	<!-- ISS-001: Modal de confirmacion para eliminar docente (reemplaza window.confirm) -->
+	<ModalConfirm
+		isOpen={showDeleteModal}
+		message={teacherToDelete
+			? `¿Estás seguro de que querés eliminar a "${teacherToDelete.username}"? Esta acción es permanente.`
+			: '¿Estás seguro de que querés eliminar este docente?'}
+		loading={deleteLoading}
+		onConfirm={confirmDeleteTeacher}
+		onCancel={() => { showDeleteModal = false; teacherToDelete = null; }}
+	/>
 </div>
