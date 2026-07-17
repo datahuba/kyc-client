@@ -96,7 +96,7 @@
   en segundo plano en el mismo instante en que el usuario pase el puntero del mouse sobre 
   cualquier enlace o pestaña de navegación de Posgrado, simulando transiciones de 0ms.
 -->
-<div class="flex h-screen bg-light-primary dark:bg-dark-background transition-colors" data-sveltekit-preload-data="hover">
+<div class="flex h-dvh bg-light-primary dark:bg-dark-background transition-colors" data-sveltekit-preload-data="hover">
 	<Sidebar 
 		isOpen={sidebarOpen} 
 		onClose={() => sidebarOpen = false} 
@@ -124,7 +124,7 @@
 			</div>
 		{/if}
 
-		<main class="relative flex-1 overflow-y-auto p-4 sm:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-6">
+		<main class="relative flex-1 overflow-y-auto p-4 sm:p-6">
 			{@render children?.()}
 		</main>
 		<BottomNav />
