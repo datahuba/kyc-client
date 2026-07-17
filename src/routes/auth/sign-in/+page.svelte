@@ -98,12 +98,12 @@
 					<img
 						src="/images/logo_uagrm_fondo_blanco.jpg"
 						alt="UAGRM"
-						class="h-20 w-20 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5"
+						class="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5"
 					/>
 					<img
 						src="/images/logo_contaduria_publica_fondo_blanco.jpg"
 						alt="Facultad de Contaduría Pública"
-						class="h-20 w-20 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5"
+						class="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5"
 					/>
 				</div>
 				<span class="text-2xl font-extrabold text-light-secondary dark:text-dark-tertiary text-center leading-tight">

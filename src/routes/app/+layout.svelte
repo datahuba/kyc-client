@@ -106,17 +106,17 @@
 		<Header onOpenSidebar={() => sidebarOpen = true} />
 
 		{#if $userStore.isAuthenticated && $userStore.user?.user_type === 'student' && $userStore.user?.perfil_completado === false}
-			<div class="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-900/30 px-6 py-3 flex items-center justify-between shadow-sm">
-				<div class="flex items-center gap-3 text-amber-800 dark:text-amber-200">
-					<svg class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<div class="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-900/30 px-4 py-3 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 shadow-sm">
+				<div class="flex items-start sm:items-center gap-3 text-amber-800 dark:text-amber-200 min-w-0">
+					<svg class="size-5 shrink-0 mt-0.5 sm:mt-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
 					</svg>
-					<span class="text-sm font-medium">
+					<span class="text-sm font-medium leading-snug">
 						Por favor, complete sus datos personales (celular, domicilio, fecha de nacimiento y carnet) para finalizar su registro.
 					</span>
 				</div>
 				<button 
-					class="text-sm font-bold text-amber-900 dark:text-amber-100 bg-amber-200 dark:bg-amber-800/50 hover:bg-amber-300 dark:hover:bg-amber-700/50 px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ml-4"
+					class="self-end sm:self-auto text-sm font-bold text-amber-900 dark:text-amber-100 bg-amber-200 dark:bg-amber-800/50 hover:bg-amber-300 dark:hover:bg-amber-700/50 px-3 py-1.5 rounded-md transition-colors whitespace-nowrap shrink-0"
 					onclick={() => goto('/app/profile')}
 				>
 					Actualizar Datos

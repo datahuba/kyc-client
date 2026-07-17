@@ -4,7 +4,7 @@
 	import type { Classroom } from '$lib/interfaces';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Button from '$lib/components/ui/button.svelte';
-	import { AcademicCapIcon } from '$lib/icons/outline';
+	import { AcademicCapIcon, PlusIcon } from '$lib/icons/outline';
 
 	let classrooms: (Classroom & { teacherName?: string })[] = [];
 	let teachers: any[] = [];
@@ -137,9 +137,12 @@
 </script>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 		<Heading level="h1">Gestión de Classroom</Heading>
-		<Button onclick={() => (showNewClassModal = true)}>+ Nueva Clase</Button>
+		<Button onclick={() => (showNewClassModal = true)}>
+			{#snippet leftIcon()}<PlusIcon class="size-5" />{/snippet}
+			Nueva Clase
+		</Button>
 	</div>
 
 	{#if error}

@@ -152,8 +152,8 @@
 		</Button>
 	</div>
 
-	<div class="flex flex-wrap items-end gap-3 bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-dark-border">
-		<div class="w-48">
+	<div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-dark-border">
+		<div class="w-full sm:w-48">
 			<Input label="Banco" id="filtro-banco" bind:value={filters.banco} oninput={handleFilterChange} placeholder="Ej: Banco Unión" />
 		</div>
 		<label class="flex items-center gap-2 pb-2 text-sm text-gray-700 dark:text-gray-300">

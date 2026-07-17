@@ -7,6 +7,7 @@
 	import FileUpload from '$lib/components/ui/fileUpload.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import { alert } from '$lib/utils';
+	import { PlusIcon } from '$lib/icons/outline';
 
 	const TEACHER_ROLE = 'docente';
 
@@ -226,9 +227,12 @@
 </script>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 		<Heading level="h1">Gestión de Docentes</Heading>
-		<Button onclick={() => (showNewTeacherModal = true)}>+ Nuevo Docente</Button>
+		<Button onclick={() => (showNewTeacherModal = true)}>
+			{#snippet leftIcon()}<PlusIcon class="size-5" />{/snippet}
+			Nuevo Docente
+		</Button>
 	</div>
 
 	{#if error}
