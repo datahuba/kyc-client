@@ -104,7 +104,7 @@
 					/>
 					<button
 						type="button"
-						class="absolute right-3 bottom-0 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-md"
+						class="absolute right-2 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-md"
 						onclick={() => showCurrent = !showCurrent}
 						tabindex="-1"
 						aria-label={showCurrent ? "Ocultar contraseña actual" : "Mostrar contraseña actual"}
@@ -134,7 +134,7 @@
 						/>
 						<button
 							type="button"
-							class="absolute right-3 bottom-0 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-md"
+							class="absolute right-2 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-md"
 							onclick={() => showNew = !showNew}
 							tabindex="-1"
 							aria-label={showNew ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
@@ -169,7 +169,7 @@
 						/>
 						<button
 							type="button"
-							class="absolute right-3 bottom-0 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-md"
+							class="absolute right-2 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-md"
 							onclick={() => showConfirm = !showConfirm}
 							tabindex="-1"
 							aria-label={showConfirm ? "Ocultar confirmación de contraseña" : "Mostrar confirmación de contraseña"}

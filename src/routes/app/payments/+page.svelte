@@ -488,18 +488,19 @@
 			{/if}
 		</div>
 		
-		<div class="flex gap-3 w-full md:w-auto">
-			<Button variant="secondary" onclick={loadPayments} loading={loading} aria-label="Recargar lista de pagos">
+		<div class="flex flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
+			<Button variant="secondary" onclick={loadPayments} loading={loading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
 				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
+				<span class="sm:hidden">Recargar</span>
 			</Button>
-			<Button variant="secondary" onclick={downloadCSV} loading={csvLoading} aria-label="Descargar listado de pagos en CSV">
+			<Button variant="secondary" onclick={downloadCSV} loading={csvLoading} aria-label="Descargar listado de pagos en CSV" class="flex-1 sm:flex-none justify-center">
 				{#snippet leftIcon()} <DownloadIcon class="size-5" /> {/snippet}
-				Descargar CSV
+				<span class="whitespace-nowrap">CSV</span>
 			</Button>
 			{#if isStudent}
-				<Button onclick={() => isCreateModalOpen = true} loading={loading}>
+				<Button onclick={() => isCreateModalOpen = true} loading={loading} class="flex-1 sm:flex-none justify-center">
 					{#snippet leftIcon()} <PlusIcon class="size-5" /> {/snippet}
-					Registrar Pago
+					<span class="whitespace-nowrap">Registrar Pago</span>
 				</Button>
 			{/if}
 		</div>

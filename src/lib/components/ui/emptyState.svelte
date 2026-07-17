@@ -79,47 +79,51 @@
 		subtle: 'bg-gray-50/50 dark:bg-gray-800/30 rounded-lg'
 	};
 
+	// Mobile-first responsive: cada size se adapta al breakpoint.
+	// En sm (mobile) reduce padding y tamaño del ícono; en sm: vuelve al normal.
 	const sizeClasses = {
-		sm: 'py-6 px-4',
-		md: 'py-10 px-6',
-		lg: 'py-16 px-8'
+		sm: 'py-5 px-3 sm:py-6 sm:px-4',
+		md: 'py-8 px-4 sm:py-10 sm:px-6',
+		lg: 'py-10 px-5 sm:py-16 sm:px-8'
 	};
 </script>
 
 <div
 	role="status"
-	class={`flex flex-col items-center justify-center text-center ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+	class={`flex flex-col items-center justify-center text-center w-full max-w-full overflow-hidden ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
 >
 	<div
-		class="mb-4 flex items-center justify-center rounded-full bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 size-16"
+		class="mb-3 sm:mb-4 flex items-center justify-center rounded-full bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 size-12 sm:size-16"
 		aria-hidden="true"
 	>
 		{#if typeof icon === 'string' && iconSnippets[icon]}
-			{@html iconSnippets[icon]}
+			<div class="scale-[0.75] sm:scale-100 [&_svg]:size-10 sm:[&_svg]:size-12">
+				{@html iconSnippets[icon]}
+			</div>
 		{:else}
-			<svg class="size-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+			<svg class="size-10 sm:size-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661z" />
 			</svg>
 		{/if}
 	</div>
 
-	<h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+	<h3 class="text-sm sm:text-lg font-semibold text-gray-900 dark:text-white px-2">
 		{title}
 	</h3>
 
 	{#if description}
-		<p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400 max-w-md">
+		<p class="mt-1 sm:mt-1.5 text-xs sm:text-sm text-gray-500 dark:text-gray-400 max-w-md px-2">
 			{description}
 		</p>
 	{/if}
 
 	{#if ctaLabel || secondaryLabel}
-		<div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+		<div class="mt-4 sm:mt-5 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center gap-2 sm:gap-3 w-full px-2 sm:px-0">
 			{#if ctaLabel && onCta}
 				<button
 					type="button"
 					onclick={onCta}
-					class="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+					class="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 w-full sm:w-auto"
 				>
 					{ctaLabel}
 				</button>
@@ -128,7 +132,7 @@
 				<button
 					type="button"
 					onclick={onSecondary}
-					class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+					class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 w-full sm:w-auto"
 				>
 					{secondaryLabel}
 				</button>
