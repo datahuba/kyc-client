@@ -550,14 +550,14 @@
 			</Button>
 
 			{#if canCreateStudent}
-				<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; importCursoId = ''; }} variant="secondary">
+				<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; importCursoId = ''; }} variant="secondary" aria-label="Importar estudiantes desde archivo Excel">
 					{#snippet leftIcon()}
 						<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
 					{/snippet}
 					Importar Excel
 				</Button>
 
-				<Button onclick={handleCreate}>
+				<Button onclick={handleCreate} aria-label="Crear nuevo estudiante">
 					{#snippet leftIcon()}
 						<PlusIcon class="size-5" />
 					{/snippet}

@@ -84,7 +84,7 @@
 						<div class="text-sm text-gray-900 dark:text-white truncate" title={student.domicilio}>{student.domicilio || '—'}</div>
 					</td>
 					<td class="px-4 py-4 text-right text-sm font-medium relative">
-						<button onclick={() => toggleDropdown(student._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del estudiante">
+						<button onclick={() => toggleDropdown(student._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label={`Acciones de ${student.nombre_funcional || student.username || 'estudiante'}`}>
 							<DotsVerticalIcon class="size-5" />
 						</button>
 						{#if openDropdownId === student._id}
@@ -126,7 +126,7 @@
 					</div>
 				</div>
 				<div class="relative shrink-0">
-					<button onclick={() => toggleDropdown(student._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del estudiante">
+					<button onclick={() => toggleDropdown(student._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label={`Acciones de ${student.nombre_funcional || student.username || 'estudiante'}`}>
 						<DotsVerticalIcon class="size-5" />
 					</button>
 					{#if openDropdownId === student._id}

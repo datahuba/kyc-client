@@ -293,10 +293,10 @@
 								{/if}
 							</td>
 							<td class="px-6 py-4 text-right text-sm font-medium space-x-2 whitespace-nowrap">
-								<button onclick={() => handleManageCV(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">CV</button>
-								<button onclick={() => handleViewModules(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
-								<button onclick={() => handleEditTeacher(teacher)} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
-								<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-light-error hover:opacity-80 dark:text-dark-error">Eliminar</button>
+								<button onclick={() => handleManageCV(teacher)} aria-label={`Ver CV de ${teacher.nombre_funcional || teacher.username}`} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">CV</button>
+								<button onclick={() => handleViewModules(teacher)} aria-label={`Ver módulos de ${teacher.nombre_funcional || teacher.username}`} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
+								<button onclick={() => handleEditTeacher(teacher)} aria-label={`Editar ${teacher.nombre_funcional || teacher.username}`} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
+								<button onclick={() => handleDeleteTeacher(teacher._id)} aria-label={`Eliminar ${teacher.nombre_funcional || teacher.username}`} class="text-light-error hover:opacity-80 dark:text-dark-error">Eliminar</button>
 							</td>
 						</tr>
 					{/each}
@@ -323,10 +323,10 @@
 						{/if}
 					</div>
 					<div class="mt-3 flex items-center gap-4 text-sm font-medium border-t border-gray-100 dark:border-dark-border pt-3">
-						<button onclick={() => handleManageCV(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">CV</button>
-						<button onclick={() => handleViewModules(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
-						<button onclick={() => handleEditTeacher(teacher)} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
-						<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-light-error hover:opacity-80 dark:text-dark-error ml-auto">Eliminar</button>
+						<button onclick={() => handleManageCV(teacher)} aria-label={`Ver CV de ${teacher.nombre_funcional || teacher.username}`} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">CV</button>
+						<button onclick={() => handleViewModules(teacher)} aria-label={`Ver módulos de ${teacher.nombre_funcional || teacher.username}`} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
+						<button onclick={() => handleEditTeacher(teacher)} aria-label={`Editar ${teacher.nombre_funcional || teacher.username}`} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
+						<button onclick={() => handleDeleteTeacher(teacher._id)} aria-label={`Eliminar ${teacher.nombre_funcional || teacher.username}`} class="text-light-error hover:opacity-80 dark:text-dark-error ml-auto">Eliminar</button>
 					</div>
 				</div>
 			{/each}
