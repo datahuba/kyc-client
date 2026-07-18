@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { Student } from '$lib/interfaces';
-	import { UserIcon, DotsVerticalIcon } from '$lib/icons/outline';
+	import { UserIcon, DotsVerticalIcon, PencilIcon, TrashIcon } from '$lib/icons/outline';
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
+	import SwipeableCard from '$lib/components/ui/swipeableCard.svelte';
+	import LongPress from '$lib/components/ui/longPress.svelte';
 
 	interface Props {
 		students: Student[];
@@ -13,6 +15,8 @@
 		toggleSelectAll: () => void;
 		toggleSelectStudent: (id: string) => void;
 		toggleDropdown: (id: string) => void;
+		onEdit?: (student: Student) => void;
+		onDelete?: (student: Student) => void;
 	}
 
 	let {
@@ -24,7 +28,9 @@
 		getDropdownOptions,
 		toggleSelectAll,
 		toggleSelectStudent,
-		toggleDropdown
+		toggleDropdown,
+		onEdit,
+		onDelete
 	}: Props = $props();
 
 	let isAllSelected = $derived(
@@ -107,6 +113,12 @@
 <!-- ISSUE-X-COMPACT: Tarjetas para móvil -->
 <div class="md:hidden space-y-3 animate-fade-in">
 	{#each students as student (student._id)}
+		<!-- MOBILE-004: Swipe horizontal revela acciones. MOBILE-006: Long-press abre menú contextual. -->
+		<SwipeableCard
+			leftActions={onEdit ? [{ label: 'Editar', color: 'blue', onClick: () => onEdit?.(student) }] : []}
+			rightActions={onDelete ? [{ label: 'Eliminar', color: 'red', onClick: () => onDelete?.(student) }] : []}
+		>
+		<LongPress onLongPress={() => toggleDropdown(student._id)}>
 		<div class={`bg-white dark:bg-dark-surface border rounded-xl p-4 shadow-sm ${selectedStudentIds.includes(student._id) ? 'border-primary-400 dark:border-primary-700' : 'border-gray-200 dark:border-dark-border'}`}>
 			<div class="flex items-start justify-between gap-3">
 				<div class="flex items-center min-w-0">
@@ -156,5 +168,7 @@
 				</div>
 			</div>
 		</div>
+		</LongPress>
+		</SwipeableCard>
 	{/each}
 </div>

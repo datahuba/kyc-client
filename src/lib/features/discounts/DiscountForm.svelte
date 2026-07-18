@@ -5,6 +5,7 @@
 	import Input from '$lib/components/ui/input.svelte';
 	import FileUpload from '$lib/components/ui/fileUpload.svelte';
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
+	import NumberStepper from '$lib/components/ui/numberStepper.svelte';
 	import { alert } from '$lib/utils';
 	import { CheckIcon } from '$lib/icons/outline';
 
@@ -164,23 +165,30 @@
 		</div>
 
 		<div class="space-y-1">
-			<Input
-				label="Porcentaje (%)"
-				id="porcentaje"
-				type="number"
-				min="0.01"
-				max="100"
-				step="0.01"
+			<label
+				for="porcentaje"
+				class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:text-base"
+			>
+				Porcentaje (%) <span class="text-red-500">*</span>
+			</label>
+			<!-- MOBILE-010: NumberStepper con botones +/- para ajuste táctil rápido -->
+			<NumberStepper
 				bind:value={formData.porcentaje}
-				required
-				error={!isPercentageValid && formData.porcentaje !== 0
-					? (Number(formData.porcentaje) <= 0
+				min={0.01}
+				max={100}
+				step={1}
+				suffix="%"
+				ariaLabel="Porcentaje de descuento"
+			/>
+			{#if !isPercentageValid && formData.porcentaje !== 0}
+				<p class="text-sm text-red-600 dark:text-red-400" role="alert">
+					{Number(formData.porcentaje) <= 0
 						? 'No se permiten descuentos del 0% o negativos.'
 						: Number(formData.porcentaje) > 100
 							? 'El descuento no puede superar el 100%.'
-							: 'Ingresa un porcentaje entre 0.01 y 100.')
-					: undefined}
-			/>
+							: 'Ingresa un porcentaje entre 0.01 y 100.'}
+				</p>
+			{/if}
 		</div>
 	</div>
 

@@ -604,6 +604,8 @@
 			{toggleSelectAll}
 			{toggleSelectStudent}
 			{toggleDropdown}
+			onEdit={handleEdit}
+			onDelete={handleDeleteClick}
 			bind:selectedStudentIds={selectedStudentIds}
 			bind:openDropdownId={openDropdownId}
 		/>
