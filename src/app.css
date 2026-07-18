@@ -183,3 +183,27 @@
 		scrollbar-width: none;
 	}
 }
+
+/* MOBILE-007: Toasts bottom-center en mobile.
+   Los toasts noyf se posicionan bottom-center en mobile.
+   Hay que empujarlos arriba del bottom-nav (h-16) y respetar safe-area.
+   En desktop el toast está top-right con offset normal. */
+@media (max-width: 768px) {
+	.notyf {
+		left: 0 !important;
+		right: 0 !important;
+		width: 100% !important;
+		padding: 0 1rem !important;
+	}
+	.notyf__container {
+		bottom: calc(env(safe-area-inset-bottom, 0px) + 5rem) !important; /* 5rem = 80px ≈ bottom-nav (64px) + gap */
+		top: auto !important;
+	}
+	.notyf__wrapper {
+		max-width: 100% !important;
+	}
+	.notyf__toast {
+		max-width: 100% !important;
+		width: 100% !important;
+	}
+}
