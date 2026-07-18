@@ -25,6 +25,6 @@
 	<meta name="format-detection" content="telephone=no" />
 </svelte:head>
 
-<Splash minDuration={1500} />
+<Splash minDuration={800} />
 
 {@render children()}
