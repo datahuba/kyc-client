@@ -104,6 +104,8 @@
 			{#each ['pendiente', 'aprobado', 'rechazado', 'todas'] as f}
 				<button
 					type="button"
+					aria-label={`Filtrar solicitudes ${f === 'todas' ? 'sin filtro' : f + 's'}`}
+					aria-pressed={filtro === f}
 					onclick={() => { filtro = f as any; loadRequests(); }}
 					class={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${filtro === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-dark-surface dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-dark-border'}`}
 				>

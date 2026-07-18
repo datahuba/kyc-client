@@ -157,7 +157,12 @@
 			{/if}
 		</div>
 		<div class="flex gap-3">
-			<Button variant="secondary" onclick={loadReporte} loading={loading}>
+			<Button
+				variant="secondary"
+				onclick={loadReporte}
+				loading={loading}
+				aria-label="Recargar reporte"
+			>
 				{#snippet leftIcon()}<RefreshIcon class="size-5" />{/snippet}
 			</Button>
 			<Button onclick={handleExportExcel} loading={exporting}>

@@ -130,8 +130,22 @@
 				</div>
 			</div>
 		{/if}
-		<button type="button" class="hidden md:block -m-2.5 p-2.5 text-gray-500 hover:text-primary-700 transition-colors" onclick={() => isCollapsed = !isCollapsed}><Menu2Icon class="size-6" /></button>
-		<button type="button" class="-m-2.5 p-2.5 text-gray-700 dark:text-gray-200 md:hidden" onclick={onClose}><XIcon class="size-6" /></button>
+		<button
+			type="button"
+			class="hidden md:block -m-2.5 p-2.5 text-gray-500 hover:text-primary-700 transition-colors"
+			onclick={() => isCollapsed = !isCollapsed}
+			aria-label={isCollapsed ? 'Expandir menú lateral' : 'Colapsar menú lateral'}
+		>
+			<Menu2Icon class="size-6" />
+		</button>
+		<button
+			type="button"
+			class="-m-2.5 p-2.5 text-gray-700 dark:text-gray-200 md:hidden"
+			onclick={onClose}
+			aria-label="Cerrar menú lateral"
+		>
+			<XIcon class="size-6" />
+		</button>
 	</div>
 	<div class="flex flex-col gap-y-5 overflow-y-auto px-4 pb-4 pt-8 h-[calc(100vh-4rem)] scrollbar-hide">
 		<nav class="flex flex-1 flex-col">

@@ -333,7 +333,12 @@
 				</span>
 			</td>
 			<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-				<button onclick={() => toggleDropdown(user._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+				<button
+					onclick={() => toggleDropdown(user._id)}
+					aria-label={`Acciones del usuario ${user.username}`}
+					aria-haspopup="menu"
+					class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+				>
 					<DotsVerticalIcon class="size-5" />
 				</button>
 				{#if openDropdownId === user._id}
@@ -361,7 +366,12 @@
 					{/if}
 				</div>
 				<div class="relative">
-					<button onclick={() => toggleDropdown(user._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+					<button
+					onclick={() => toggleDropdown(user._id)}
+					aria-label={`Acciones del usuario ${user.username}`}
+					aria-haspopup="menu"
+					class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+				>
 						<DotsVerticalIcon class="size-5" />
 					</button>
 					{#if openDropdownId === user._id}
