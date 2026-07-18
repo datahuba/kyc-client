@@ -13,6 +13,7 @@
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
+	import SearchInput from '$lib/components/ui/searchInput.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon, DownloadIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
@@ -310,21 +311,11 @@
 		<!-- Search -->
 		<div class="md:col-span-1">
 			<label for="search" class="sr-only">Buscar</label>
-			<div class="relative">
-				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-					<svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-					</svg>
-				</div>
-				<input
-					type="text"
-					id="search"
-					bind:value={filters.q}
-					class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-					placeholder="Buscar código o nombre..."
-					oninput={handleSearchInput}
-				/>
-			</div>
+			<SearchInput
+				bind:value={filters.q}
+				placeholder="Buscar código o nombre..."
+				onInput={() => handleSearchInput()}
+			/>
 		</div>
 		
 		<!-- Estado -->

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SearchIcon, XIcon } from '$lib/icons/outline';
+	import { XMarkIcon } from '$lib/icons/outline';
 
 	interface Props {
 		value: string;
@@ -44,7 +44,19 @@
 
 <div class={`relative w-full ${className}`}>
 	<div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none">
-		<SearchIcon class="size-4" />
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			viewBox="0 0 20 20"
+			fill="currentColor"
+			class="size-4"
+			aria-hidden="true"
+		>
+			<path
+				fill-rule="evenodd"
+				d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
+				clip-rule="evenodd"
+			/>
+		</svg>
 	</div>
 	<input
 		bind:this={inputRef}
@@ -64,7 +76,7 @@
 			class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 dark:text-gray-500 active:scale-90 transition-transform rounded-full active:bg-gray-100 dark:active:bg-gray-800"
 			aria-label="Limpiar búsqueda"
 		>
-			<XIcon class="size-4" />
+			<XMarkIcon class="size-4" />
 		</button>
 	{/if}
 </div>
