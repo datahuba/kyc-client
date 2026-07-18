@@ -125,10 +125,11 @@
 
 <!-- Bottom Nav nativo iOS/Material -->
 <div
-	class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/85 dark:bg-gray-900/85 backdrop-blur-xl border-t border-gray-200/60 dark:border-gray-800/60 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgba(0,0,0,0.3)] select-none"
+	class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/85 dark:bg-gray-900/85 backdrop-blur-xl border-t border-gray-200/60 dark:border-gray-800/60 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgba(0,0,0,0.3)] select-none"
 	style="padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));"
 >
 	<nav class="flex justify-around items-center h-16 px-1.5">
+		<!-- (mantenido por compatibilidad) -->
 		{#each bottomNavItems as item, idx (item.href)}
 			{@const active = activeBottomHrefs.has(item.href)}
 			<a
@@ -181,14 +182,14 @@
 	<!-- Backdrop con blur -->
 	<button
 		type="button"
-		class="lg:hidden fixed inset-0 z-50 bg-gray-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity cursor-default"
+		class="md:hidden fixed inset-0 z-50 bg-gray-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity cursor-default"
 		onclick={closeMore}
 		aria-label="Cerrar menú"
 	></button>
 
 	<!-- Bottom Sheet con drag handle -->
 	<div
-		class="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-t-3xl shadow-[0_-8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_-8px_32px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[88vh] border-t border-gray-200/40 dark:border-gray-800/40"
+		class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-t-3xl shadow-[0_-8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_-8px_32px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[88vh] border-t border-gray-200/40 dark:border-gray-800/40"
 		style="padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));"
 		in:slide={{ duration: 300, axis: 'y' }}
 		out:slide={{ duration: 250, axis: 'y' }}

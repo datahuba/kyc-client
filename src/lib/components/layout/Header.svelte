@@ -258,18 +258,18 @@
 	class="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-x-3 border-b border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl px-3 sm:gap-x-4 sm:px-6 lg:px-8 transition-colors"
 	style="padding-top: env(safe-area-inset-top, 0px); margin-top: max(0px, env(safe-area-inset-top, 0px));"
 >
-	<!-- Mobile: hamburger button (lg:hidden) -->
+	<!-- Mobile: hamburger button (md:hidden) -->
 	<button
 		type="button"
-		class="lg:hidden -ml-1 p-2 text-gray-700 dark:text-gray-200 active:scale-90 transition-transform rounded-lg active:bg-gray-100 dark:active:bg-gray-800"
+		class="md:hidden -ml-1 p-2 text-gray-700 dark:text-gray-200 active:scale-90 transition-transform rounded-lg active:bg-gray-100 dark:active:bg-gray-800"
 		onclick={onOpenSidebar}
 		aria-label="Abrir menú lateral"
 	>
 		<Menu2Icon class="size-6" />
 	</button>
 
-	<!-- Mobile: logo UAGRM mini + título contextual (lg:hidden) -->
-	<div class="lg:hidden flex items-center gap-2 min-w-0 flex-1">
+	<!-- Mobile: logo UAGRM mini + título contextual (md:hidden) -->
+	<div class="md:hidden flex items-center gap-2 min-w-0 flex-1">
 		<img src="/images/logo_uagrm_fondo_blanco.jpg" alt="UAGRM" class="h-7 w-7 shrink-0 rounded-md object-contain bg-white ring-1 ring-gray-200 dark:ring-gray-700" />
 		<div class="flex flex-col leading-tight min-w-0">
 			<span class="text-sm font-bold text-gray-900 dark:text-white truncate">{contextualTitle}</span>
@@ -277,14 +277,14 @@
 		</div>
 	</div>
 
-	<!-- Desktop: breadcrumb original (hidden lg:flex) -->
-	<div class="hidden lg:flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
+	<!-- Desktop: breadcrumb original (hidden md:flex) -->
+	<div class="hidden md:flex flex-1 gap-x-4 self-stretch md:gap-x-6">
 		<div class="flex flex-1 items-center">
 			<span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
 				{getUserTypeLabel()}
 			</span>
 		</div>
-		<div class="flex items-center gap-x-4 lg:gap-x-6">
+		<div class="flex items-center gap-x-4 md:gap-x-6">
 
 			<!-- PWA INSTALL BUTTON -->
 			<PWAInstallButton />
@@ -438,7 +438,7 @@
 							<UserIcon class="h-5 w-5 text-gray-500 dark:text-gray-400" />
 						</div>
 					{/if}
-					<span class="hidden lg:flex lg:items-center">
+					<span class="hidden md:flex md:items-center">
 						<span class="ml-4 text-sm font-semibold leading-6 text-gray-900 dark:text-white" aria-hidden="true">
 							{user?.nombre_funcional || user?.username || 'Usuario'}
 						</span>
@@ -459,8 +459,8 @@
 		</div>
 	</div>
 
-	<!-- Mobile: iconos compactos a la derecha (lg:hidden) -->
-	<div class="lg:hidden flex items-center gap-0.5 shrink-0">
+	<!-- Mobile: iconos compactos a la derecha (md:hidden) -->
+	<div class="md:hidden flex items-center gap-0.5 shrink-0">
 		<!-- PWA Install -->
 		<PWAInstallButton />
 

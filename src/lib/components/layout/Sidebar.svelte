@@ -116,10 +116,10 @@
 </script>
 
 {#if isOpen}
-	<button class="fixed inset-0 z-40 bg-gray-900/80 backdrop-blur-sm lg:hidden" onclick={onClose} onkeydown={(e) => { if (e.key === 'Enter') onClose(); }} aria-label="Close sidebar" type="button" transition:slide={{ duration: 200, axis: 'y' }}></button>
+	<button class="fixed inset-0 z-40 bg-gray-900/80 backdrop-blur-sm md:hidden" onclick={onClose} onkeydown={(e) => { if (e.key === 'Enter') onClose(); }} aria-label="Close sidebar" type="button" transition:slide={{ duration: 200, axis: 'y' }}></button>
 {/if}
 
-<div class={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} ${isCollapsed ? 'lg:w-20' : 'w-72'}`}>
+<div class={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:inset-0 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} ${isCollapsed ? 'md:w-20' : 'w-72'}`}>
 	<div class="flex h-16 items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
 		{#if !isCollapsed}
 			<div class="flex items-center gap-2.5 min-w-0" in:fade>
@@ -130,8 +130,8 @@
 				</div>
 			</div>
 		{/if}
-		<button type="button" class="hidden lg:block -m-2.5 p-2.5 text-gray-500 hover:text-primary-700 transition-colors" onclick={() => isCollapsed = !isCollapsed}><Menu2Icon class="size-6" /></button>
-		<button type="button" class="-m-2.5 p-2.5 text-gray-700 dark:text-gray-200 lg:hidden" onclick={onClose}><XIcon class="size-6" /></button>
+		<button type="button" class="hidden md:block -m-2.5 p-2.5 text-gray-500 hover:text-primary-700 transition-colors" onclick={() => isCollapsed = !isCollapsed}><Menu2Icon class="size-6" /></button>
+		<button type="button" class="-m-2.5 p-2.5 text-gray-700 dark:text-gray-200 md:hidden" onclick={onClose}><XIcon class="size-6" /></button>
 	</div>
 	<div class="flex flex-col gap-y-5 overflow-y-auto px-4 pb-4 pt-8 h-[calc(100vh-4rem)] scrollbar-hide">
 		<nav class="flex flex-1 flex-col">
