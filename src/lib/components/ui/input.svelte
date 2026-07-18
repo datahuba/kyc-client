@@ -13,12 +13,16 @@
 	}
 
 	let { class: className, icon, label, error, value = $bindable(), files = $bindable(), ...restProps }: Props = $props();
+
+	// ISS-005: generar id estable para aria-describedby si no se proveyó
+	const inputId = $derived(restProps.id ?? `input-${label?.toString().toLowerCase().replace(/\s+/g, '-') ?? 'field'}`);
+	const errorId = `${inputId}-error`;
 </script>
 
 <div class={className}>
 	{#if label}
 		<label
-			for={restProps.id}
+			for={inputId}
 			class="grid grid-cols-[auto,_1fr] items-center gap-0.5 text-sm leading-6 font-medium text-gray-700 dark:text-gray-300 sm:text-base"
 		>
 			<span class="truncate"
@@ -30,6 +34,9 @@
 		{#if restProps.type === 'file'}
 			<input
 				type="file"
+				id={inputId}
+				aria-invalid={!!error}
+				aria-describedby={error ? errorId : undefined}
 				{...restProps}
 				bind:files
 				class="block w-full rounded-lg border border-light-four bg-white dark:border-dark-border dark:bg-dark-surface py-2 px-3 text-sm text-light-black dark:text-dark-white transition-all placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-base sm:leading-6 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-dark-four dark:file:text-dark-tertiary {icon &&
@@ -37,6 +44,9 @@
 			/>
 		{:else}
 			<input
+				id={inputId}
+				aria-invalid={!!error}
+				aria-describedby={error ? errorId : undefined}
 				{...restProps}
 				bind:value
 				class="block w-full rounded-lg border border-light-four bg-white dark:border-dark-border dark:bg-dark-surface py-2 px-3 text-sm text-light-black dark:text-dark-white transition-all placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-base sm:leading-6 {icon &&
@@ -51,7 +61,12 @@
 			</p>
 		{/if}
 		{#if error}
-			<p transition:slide={{ duration: 300, easing: cubicOut }} class="mt-1 text-sm text-light-error">
+			<p
+				id={errorId}
+				role="alert"
+				transition:slide={{ duration: 300, easing: cubicOut }}
+				class="mt-1 text-sm text-light-error"
+			>
 				{error}
 			</p>
 		{/if}
