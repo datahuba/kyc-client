@@ -96,15 +96,32 @@
 	let formToDelete: PreRegistrationForm | null = $state(null);
 	let deleteSaving = $state(false);
 
+	// ISSUE-AUDIT-PRE-REGISTROS: fix race condition. El +page.svelte se monta
+	// ANTES de que el +layout.svelte termine de llamar a userStore.init(),
+	// entonces `isAdmin` es false (initial state del store) y redirigimos
+	// incorrectamente. Usamos un flag `storeReady` para esperar a que init
+	// haya terminado antes de evaluar el rol.
+	let storeReady = $state(false);
+
 	onMount(async () => {
-		if (!isAdmin) {
+		// Asegurar que el store esté hidratado antes de evaluar isAdmin
+		if (!$userStore.isAuthenticated) {
+			userStore.init();
+		}
+		storeReady = true;
+	});
+
+	$effect(() => {
+		if (storeReady && !isAdmin) {
 			goto('/app/dashboard');
 			return;
 		}
-		await loadCourses();
-		await Promise.all([loadForms(), loadCounters()]);
-		if (activeTab === 'submissions') {
-			await loadSubmissions();
+		if (storeReady && isAdmin) {
+			loadCourses();
+			Promise.all([loadForms(), loadCounters()]);
+			if (activeTab === 'submissions') {
+				loadSubmissions();
+			}
 		}
 	});
 
