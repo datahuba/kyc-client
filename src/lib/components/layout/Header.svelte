@@ -59,6 +59,9 @@
 	let isNotificationsOpen = $state(false);
 	let notificationsLoading = $state(false);
 	let pollInterval: any;
+	// TECH-003: EventSource (SSE) reemplaza el polling cada 45s. Reconexión
+	// automática si el server se desconecta (EventSource nativo ya lo hace).
+	let notificationEventSource: EventSource | null = null;
 
 	// Referencias de elementos para el cierre click-outside
 	let notificationContainerEl = $state<HTMLDivElement | null>(null);
@@ -232,15 +235,65 @@
 	onMount(() => {
 		if (user) {
 			loadNotificationsSummary();
-			pollInterval = setInterval(() => loadNotificationsSummary(true), 45000);
+			setupNotificationStream();
 		}
 		if (typeof window !== 'undefined') {
 			window.addEventListener('click', handleWindowClick);
 		}
 	});
 
+	function setupNotificationStream() {
+		// TECH-003: conectar al endpoint SSE del backend. El server mantiene
+		// la conexión abierta y emite eventos 'notification' cada vez que
+		// llega una nueva notificación para este usuario. Reemplaza el
+		// polling cada 45s (50+ requests/hora por sesión).
+		try {
+			// Construir URL absoluta. En dev, apiKyC.baseURL ya tiene /api/api/v1
+			const baseURL = (apiKyC as any).baseURL || (apiKyC as any).defaults?.baseURL || '';
+			const streamURL = `${baseURL}/notifications/stream`.replace(/^http/, 'http'); // SSE funciona con HTTP
+			// Para SSE, no podemos usar el cliente HTTP normal (no soporta streaming).
+			// El browser añadirá el header Authorization automáticamente si la cookie
+			// está configurada. Si usamos Bearer token, hay que pasarlo via query.
+			const token = localStorage.getItem('kyc-auth_token');
+			const url = token ? `${streamURL}?token=${encodeURIComponent(token)}` : streamURL;
+
+			notificationEventSource = new EventSource(url, { withCredentials: true });
+
+			notificationEventSource.addEventListener('connected', (e: MessageEvent) => {
+				try {
+					const data = JSON.parse(e.data);
+					if (typeof data.unread_count === 'number') {
+						unreadCount = data.unread_count;
+					}
+				} catch (_) { /* ignore */ }
+			});
+
+			notificationEventSource.addEventListener('notification', (e: MessageEvent) => {
+				try {
+					const notif = JSON.parse(e.data);
+					// Agregar al inicio de la lista (si está abierta)
+					notifications = [notif, ...notifications].slice(0, 15);
+					unreadCount = (unreadCount || 0) + 1;
+				} catch (_) { /* ignore */ }
+			});
+
+			// El browser reconecta automáticamente. Solo loggeamos errores.
+			notificationEventSource.onerror = () => {
+				// EventSource reintenta solo. No hacer nada aquí para evitar loops.
+			};
+		} catch (err) {
+			// Fallback silencioso a polling si SSE no se puede establecer
+			console.warn('[notifications] SSE no disponible, fallback a polling:', err);
+			pollInterval = setInterval(() => loadNotificationsSummary(true), 45000);
+		}
+	}
+
 	onDestroy(() => {
 		if (pollInterval) clearInterval(pollInterval);
+		if (notificationEventSource) {
+			notificationEventSource.close();
+			notificationEventSource = null;
+		}
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('click', handleWindowClick);
 		}
