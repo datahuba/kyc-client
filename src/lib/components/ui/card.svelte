@@ -44,7 +44,7 @@
 	}: CardProps = $props();
 
 	// Clases base del card
-	const baseClasses = 'rounded-lg transition-all duration-200 ease-in-out';
+	const baseClasses = 'rounded-xl transition-all duration-200 ease-in-out';
 
 	// Variantes de estilo
 	const variantClasses = {
@@ -72,10 +72,10 @@
 		lg: 'p-6 sm:p-8'
 	};
 
-	// Estados interactivos
+	// Estados interactivos (mobile-first: active para tap, hover solo desktop)
 	const interactiveClasses =
 		interactive && !disabled
-			? 'hover:shadow-md hover:scale-[1.02] cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-dark-background'
+			? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-background active:scale-[0.98] active:shadow-sm sm:hover:shadow-md sm:hover:-translate-y-0.5 motion-reduce:active:scale-100 motion-reduce:sm:hover:translate-y-0 transition-transform duration-150'
 			: '';
 
 	// Estado deshabilitado

@@ -83,13 +83,13 @@
 	}
 </script>
 
-<div class="relative flex min-h-dvh">
+<div class="relative flex min-h-dvh" style="padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);">
 	<div class="absolute top-4 right-4 z-50 flex items-center gap-4">
 		<PWAInstallButton />
 		<ThemeToggle />
 	</div>
 	<div
-		class="relative z-20 flex flex-1 items-center justify-center bg-light-primary p-8 dark:bg-dark-primary"
+		class="relative z-20 flex flex-1 items-center justify-center bg-light-primary p-5 sm:p-8 dark:bg-dark-primary"
 	>
 		<div class="w-full max-w-md">
 			<!-- Logo institucional UAGRM -->

@@ -54,7 +54,7 @@
 
 {#if !isAuthenticated}
 <!-- Role Selection UI - 3 Puertas -->
-<div class="relative min-h-dvh flex flex-col items-center justify-center bg-light-primary dark:bg-dark-primary p-4 sm:p-6">
+<div class="relative min-h-dvh flex flex-col items-center justify-center bg-light-primary dark:bg-dark-primary p-4 sm:p-6" style="padding-top: calc(env(safe-area-inset-top, 0px) + 1rem); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);">
 	<div class="absolute top-4 right-4 flex items-center gap-2 sm:gap-4 z-50">
 		<PWAInstallButton />
 		<ThemeToggle />
@@ -66,12 +66,12 @@
 				<img
 					src="/images/logo_uagrm_fondo_blanco.jpg"
 					alt="UAGRM"
-					class="h-16 w-16 sm:h-24 sm:w-24 rounded-2xl object-contain bg-white p-1.5 sm:p-2 shadow-md ring-1 ring-black/5"
+					class="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl object-contain bg-white p-1.5 sm:p-2 shadow-md ring-1 ring-black/5 dark:ring-white/10"
 				/>
 				<img
 					src="/images/logo_contaduria_publica_fondo_blanco.jpg"
 					alt="Facultad de Contaduría Pública"
-					class="h-16 w-16 sm:h-24 sm:w-24 rounded-2xl object-contain bg-white p-1.5 sm:p-2 shadow-md ring-1 ring-black/5"
+					class="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl object-contain bg-white p-1.5 sm:p-2 shadow-md ring-1 ring-black/5 dark:ring-white/10"
 				/>
 			</div>
 			<h1 class="text-2xl sm:text-3xl md:text-4xl font-extrabold text-light-secondary dark:text-dark-tertiary mb-1 text-center leading-tight px-2">
@@ -80,20 +80,20 @@
 			<p class="text-xs sm:text-sm font-semibold text-light-tertiary dark:text-dark-secondary mb-3 max-w-lg mx-auto text-center leading-normal px-4">
 				Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas
 			</p>
-			<p class="text-sm sm:text-base text-light-black/70 dark:text-dark-white/70 px-4">
+			<p class="text-sm sm:text-base text-light-black/70 dark:text-dark-white/70 px-4 font-medium">
 				Selecciona tu perfil de acceso a la plataforma
 			</p>
 		</div>
 
 		<!-- Contenedor de Botones (3 Columnas) -->
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full max-w-3xl sm:max-w-4xl mx-auto px-2 sm:px-4">
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 w-full max-w-3xl sm:max-w-4xl mx-auto px-2 sm:px-4">
 
 			<!-- PUERTA 1: ESTUDIANTES -->
 			<button
 				onclick={() => handleSelectRole('student')}
-				class="group relative overflow-hidden w-full py-6 sm:py-8 px-4 sm:px-6 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:-translate-y-1 active:scale-[0.98]"
+				class="group relative overflow-hidden w-full py-7 sm:py-8 px-4 sm:px-6 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 sm:hover:-translate-y-1 active:scale-[0.98] motion-reduce:sm:hover:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-primary min-h-[140px] sm:min-h-0"
 			>
-				<div class="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+				<div class="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out motion-reduce:transition-none"></div>
 
 				<div class="relative z-10 flex flex-col items-center gap-3 sm:gap-4">
 					<div class="p-3 sm:p-4 rounded-full bg-blue-50 dark:bg-blue-900/30 group-hover:bg-white/20 transition-colors duration-300">
@@ -114,9 +114,9 @@
 			<!-- PUERTA 2: DOCENTES -->
 			<button
 				onclick={() => handleSelectRole('teacher')}
-				class="group relative overflow-hidden w-full py-6 sm:py-8 px-4 sm:px-6 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-emerald-500 dark:hover:border-emerald-500 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/20 hover:-translate-y-1 active:scale-[0.98]"
+				class="group relative overflow-hidden w-full py-7 sm:py-8 px-4 sm:px-6 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-emerald-500 dark:hover:border-emerald-500 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/20 sm:hover:-translate-y-1 active:scale-[0.98] motion-reduce:sm:hover:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-primary min-h-[140px] sm:min-h-0"
 			>
-				<div class="absolute inset-0 bg-gradient-to-br from-emerald-500 to-emerald-600 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+				<div class="absolute inset-0 bg-gradient-to-br from-emerald-500 to-emerald-600 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out motion-reduce:transition-none"></div>
 
 				<div class="relative z-10 flex flex-col items-center gap-3 sm:gap-4">
 					<div class="p-3 sm:p-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 group-hover:bg-white/20 transition-colors duration-300">
@@ -136,9 +136,9 @@
 			<!-- PUERTA 3: ADMINISTRATIVOS -->
 			<button
 				onclick={() => handleSelectRole('admin')}
-				class="group relative overflow-hidden w-full py-6 sm:py-8 px-4 sm:px-6 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-primary-700 dark:hover:border-primary-500 transition-all duration-300 hover:shadow-xl hover:shadow-primary-700/20 hover:-translate-y-1 active:scale-[0.98]"
+				class="group relative overflow-hidden w-full py-7 sm:py-8 px-4 sm:px-6 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-primary-700 dark:hover:border-primary-500 transition-all duration-300 hover:shadow-xl hover:shadow-primary-700/20 sm:hover:-translate-y-1 active:scale-[0.98] motion-reduce:sm:hover:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-primary min-h-[140px] sm:min-h-0"
 			>
-				<div class="absolute inset-0 bg-gradient-to-br from-primary-700 to-primary-900 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+				<div class="absolute inset-0 bg-gradient-to-br from-primary-700 to-primary-900 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out motion-reduce:transition-none"></div>
 
 				<div class="relative z-10 flex flex-col items-center gap-3 sm:gap-4">
 					<div class="p-3 sm:p-4 rounded-full bg-primary-50 dark:bg-primary-900/30 group-hover:bg-white/20 transition-colors duration-300">
