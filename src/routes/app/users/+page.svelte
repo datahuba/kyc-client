@@ -8,7 +8,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
-	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
+	import Skeleton from '$lib/components/ui/skeleton.svelte';
 	import UserForm from '$lib/features/users/UserForm.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon, AcademicCapIcon, UsersIcon } from '$lib/icons/outline';
@@ -416,7 +416,7 @@
 	{/snippet}
 
 	{#if loading}
-		<TableSkeleton columns={6} rows={10} />
+		<Skeleton variant="table" columns={6} rows={10} />
 	{:else if filteredUsers.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
 			<p class="text-gray-500 dark:text-gray-400">No hay usuarios registrados que coincidan con el filtro.</p>

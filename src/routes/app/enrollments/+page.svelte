@@ -12,7 +12,7 @@
 	import Modal from '$lib/components/ui/modal.svelte';
 	import Select from '$lib/components/ui/select.svelte';
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
-	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
+	import Skeleton from '$lib/components/ui/skeleton.svelte';
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import SearchInput from '$lib/components/ui/searchInput.svelte';
@@ -748,7 +748,7 @@
 	{/if}
 
 	{#if loading}
-		<TableSkeleton columns={9} rows={10} />
+		<Skeleton variant="table" columns={9} rows={10} />
 	{:else if enrollments.length === 0}
 		<EmptyState
 			icon="enrollment"

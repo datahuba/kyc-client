@@ -8,7 +8,7 @@
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
-	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
+	import Skeleton from '$lib/components/ui/skeleton.svelte';
 	import StudentDetails from '$lib/features/students/StudentDetails.svelte';
 	import StudentForm from '$lib/features/students/StudentForm.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
@@ -579,7 +579,7 @@
 	/>
 
 	{#if loading}
-		<TableSkeleton columns={6} rows={10} />
+		<Skeleton variant="table" columns={6} rows={10} />
 	{:else if students.length === 0}
 		<EmptyState
 			icon="student"

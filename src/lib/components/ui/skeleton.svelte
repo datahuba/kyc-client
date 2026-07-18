@@ -7,13 +7,16 @@
 	 *   <Skeleton variant="circle" size="48" />  // Avatar
 	 *   <Skeleton variant="rect" height="120" />  // Card
 	 *   <Skeleton variant="block" lines={3} />  // Bloque con varias líneas
+	 *   <Skeleton variant="table" columns={5} rows={10} />  // Skeleton de tabla
 	 */
 	interface Props {
-		variant?: 'text' | 'circle' | 'rect' | 'block';
+		variant?: 'text' | 'circle' | 'rect' | 'block' | 'table';
 		width?: string;
 		height?: string;
 		size?: string; // para circle
 		lines?: number; // para block
+		columns?: number; // para table
+		rows?: number; // para table
 		class?: string;
 	}
 
@@ -23,6 +26,8 @@
 		height,
 		size = '1rem',
 		lines = 1,
+		columns = 5,
+		rows = 10,
 		class: className = '',
 	}: Props = $props();
 
@@ -31,21 +36,38 @@
 		circle: 'rounded-full',
 		rect: 'rounded-lg',
 		block: 'space-y-2',
+		table: 'space-y-3',
 	};
+
+	const shimmerBase =
+		'bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 bg-[length:200%_100%] animate-shimmer';
 </script>
 
 {#if variant === 'block'}
 	<div class={`${variantClasses.block} ${className}`} role="status" aria-label="Cargando...">
 		{#each Array(lines) as _, i (i)}
 			<div
-				class="h-3 rounded bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 bg-[length:200%_100%] animate-shimmer"
+				class={`h-3 rounded ${shimmerBase}`}
 				style="width: {i === lines - 1 && lines > 1 ? '75%' : '100%'};"
 			></div>
 		{/each}
 	</div>
+{:else if variant === 'table'}
+	<div class={`${variantClasses.table} ${className}`} role="status" aria-label="Cargando tabla...">
+		{#each Array(rows) as _, r (r)}
+			<div class="flex gap-3">
+				{#each Array(columns) as _, c (c)}
+					<div
+						class={`h-4 flex-1 rounded ${shimmerBase}`}
+						style="opacity: {0.5 + (r + c) * 0.05};"
+					></div>
+				{/each}
+			</div>
+		{/each}
+	</div>
 {:else}
 	<div
-		class={`${variantClasses[variant]} bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 bg-[length:200%_100%] animate-shimmer ${className}`}
+		class={`${variantClasses[variant]} ${shimmerBase} ${className}`}
 		style="
 			width: {variant === 'circle' ? size : width};
 			height: {variant === 'circle' ? size : (height ?? '0.75rem')};

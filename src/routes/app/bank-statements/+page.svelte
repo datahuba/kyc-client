@@ -7,7 +7,7 @@
 	import Input from '$lib/components/ui/input.svelte';
 	import Select from '$lib/components/ui/select.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
-	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
+	import Skeleton from '$lib/components/ui/skeleton.svelte';
 	import { alert, formatCurrency, formatDate } from '$lib/utils';
 	import { PlusIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
@@ -168,7 +168,7 @@
 	</div>
 
 	{#if loading}
-		<TableSkeleton columns={6} rows={8} />
+		<Skeleton variant="table" columns={6} rows={8} />
 	{:else if entries.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl">
 			<p class="text-gray-500 dark:text-gray-400">No hay movimientos registrados.</p>

@@ -9,7 +9,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
-	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
+	import Skeleton from '$lib/components/ui/skeleton.svelte';
 	import DiscountForm from '$lib/features/discounts/DiscountForm.svelte';
 	import FileUpload from '$lib/components/ui/fileUpload.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
@@ -230,7 +230,7 @@
 	</div>
 
 	{#if loading}
-		<TableSkeleton columns={5} rows={10} />
+		<Skeleton variant="table" columns={5} rows={10} />
 	{:else if discounts.length === 0}
 		<EmptyState
 			icon="discount"
