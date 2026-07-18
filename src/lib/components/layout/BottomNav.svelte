@@ -18,8 +18,11 @@
 	}
 
 	const navigation: NavigationItem[] = [
+		// MOBILE-005: orden optimizado por rol. El bottom nav muestra los primeros 4 + "Más".
+		// Estudiantes primero ven lo que usan; admin ve Estudiantes/Pagos; docente ve Classroom.
 		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente', 'admin', 'superadmin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['academic', 'admin'] },
 		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'student'], loginTypes: ['admin', 'academic'] },
+		{ name: 'Aula', href: '/app/classroom', icon: BookIcon, roles: ['student', 'docente', 'admin', 'superadmin', 'cpd', 'mae', 'encargado_curso'], loginTypes: ['academic', 'admin'] },
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
