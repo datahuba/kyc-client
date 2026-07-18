@@ -28,6 +28,45 @@
 		showCloseButton = true,
 	}: Props = $props();
 
+	// MOBILE-001: Drag-to-dismiss en mobile
+	let sheetRef = $state<HTMLDivElement | null>(null);
+	let dragStartY = 0;
+	let dragOffset = $state(0);
+	let isDragging = $state(false);
+	const DRAG_THRESHOLD = 100; // px para activar dismiss
+
+	function handleTouchStart(e: TouchEvent) {
+		// Solo en mobile (sm:hidden en el handle)
+		if (window.innerWidth >= 640) return;
+		// Solo si el target es el handle o el header (no el body scrolleable)
+		const target = e.target as HTMLElement;
+		if (!target.closest('[data-drag-handle]')) return;
+		dragStartY = e.touches[0].clientY;
+		isDragging = true;
+		dragOffset = 0;
+	}
+
+	function handleTouchMove(e: TouchEvent) {
+		if (!isDragging) return;
+		const currentY = e.touches[0].clientY;
+		dragOffset = Math.max(0, currentY - dragStartY);
+	}
+
+	function handleTouchEnd() {
+		if (!isDragging) return;
+		isDragging = false;
+		if (dragOffset > DRAG_THRESHOLD) {
+			onClose();
+		}
+		dragOffset = 0;
+	}
+
+	const sheetStyle = $derived(
+		isDragging && dragOffset > 0
+			? `transform: translateY(${dragOffset}px); transition: none; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);`
+			: `padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);`
+	);
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') onClose();
 	}
@@ -47,25 +86,36 @@
 
 	<!-- Bottom Sheet (mobile) / Modal (desktop) -->
 	<div
+		bind:this={sheetRef}
 		class="fixed z-50 bg-white dark:bg-dark-surface shadow-2xl flex flex-col
 			inset-x-0 bottom-0 max-h-[92dvh] rounded-t-3xl
 			sm:inset-auto sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:max-h-[85vh] sm:w-full
 			{maxWidth}"
-		style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);"
+		style={sheetStyle}
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby="modal-title"
+		ontouchstart={handleTouchStart}
+		ontouchmove={handleTouchMove}
+		ontouchend={handleTouchEnd}
 		transition:fly={{ y: 50, duration: 300, easing: cubicOut }}
 	>
 		<!-- Drag handle (solo mobile) -->
 		{#if showHandle}
-			<div class="sm:hidden flex justify-center pt-2.5 pb-1.5" aria-hidden="true">
+			<div
+				class="sm:hidden flex justify-center pt-2.5 pb-1.5 cursor-grab active:cursor-grabbing"
+				aria-hidden="true"
+				data-drag-handle
+			>
 				<div class="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600"></div>
 			</div>
 		{/if}
 
 		<!-- Header -->
-		<div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-dark-border flex justify-between items-center gap-3">
+		<div
+			class="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-dark-border flex justify-between items-center gap-3"
+			data-drag-handle
+		>
 			<Heading level="h5" id="modal-title">{title}</Heading>
 			{#if showCloseButton}
 				<button
