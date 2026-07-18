@@ -160,6 +160,18 @@
 	textarea {
 		font-size: max(16px, inherit);
 	}
+
+	/* SCROLL-001: Cuando el keyboard sube en mobile, el input focused queda tapado.
+	   scroll-margin-top permite que scrollIntoView deje espacio arriba para que
+	   el input quede visible sobre el keyboard. */
+	@supports (-webkit-touch-callout: none) {
+		input:focus-visible,
+		select:focus-visible,
+		textarea:focus-visible {
+			scroll-margin-top: 1.5rem;
+			scroll-margin-bottom: 50vh; /* deja espacio para el keyboard virtual */
+		}
+	}
 }
 
 /* Ocultar barras de scroll en móviles para sensación nativa */

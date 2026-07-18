@@ -40,6 +40,16 @@
 		} else {
 			window.addEventListener('load', () => checkReady());
 		}
+
+		// SPLASH-001: si la página vuelve de background después de 3s,
+		// forzar hide del splash (puede haber quedado colgado en background).
+		const onVisibility = () => {
+			if (!document.hidden && Date.now() - startTime > 3000) {
+				visible = false;
+			}
+		};
+		document.addEventListener('visibilitychange', onVisibility);
+		return () => document.removeEventListener('visibilitychange', onVisibility);
 	});
 </script>
 

@@ -4,11 +4,13 @@
 	import { onMount } from 'svelte';
 	import { initTheme } from '$lib/stores/themeStore';
 	import Splash from '$lib/components/ui/splash.svelte';
+	import { setupPageTransitions } from '$lib/utils/pageTransitions';
 
 	let { children } = $props();
 
 	onMount(() => {
 		initTheme();
+		setupPageTransitions();
 	});
 </script>
 

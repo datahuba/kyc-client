@@ -91,7 +91,7 @@
 	<div
 		class="relative z-20 flex flex-1 items-center justify-center bg-light-primary p-5 sm:p-8 dark:bg-dark-primary"
 	>
-		<div class="w-full max-w-md">
+		<div class="w-full max-w-md pt-4 sm:pt-0">
 			<!-- Logo institucional UAGRM -->
 			<div class="mb-10 flex flex-col items-center justify-center">
 				<div class="mb-4 flex items-center gap-3">

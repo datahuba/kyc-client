@@ -72,7 +72,7 @@
 		if (loginType === 'academic') {
 			return academicRole === 'teacher' ? 'Docente' : 'Estudiante';
 		}
-		return 'Administrativo';
+		return 'Admin';
 	}
 
 	function getProfileOptions() {
@@ -361,11 +361,11 @@
 														<span class="size-2 rounded-full bg-blue-500 inline-block"></span>
 													{/if}
 												</div>
-												<div class="flex-1">
-													<p class="text-gray-900 dark:text-white font-bold">
+												<div class="flex-1 min-w-0">
+													<p class="text-gray-900 dark:text-white font-bold truncate">
 														{item.titulo}
 													</p>
-													<p class="text-gray-500 dark:text-gray-400 mt-0.5 break-words">
+													<p class="text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 break-words">
 														{item.mensaje}
 													</p>
 													<span class="text-[9px] text-gray-400 mt-1 block">
@@ -397,11 +397,11 @@
 														<span class="size-2 rounded-full bg-blue-500 inline-block"></span>
 													{/if}
 												</div>
-												<div class="flex-1">
-													<p class="text-gray-900 dark:text-white font-medium">
+												<div class="flex-1 min-w-0">
+													<p class="text-gray-900 dark:text-white font-medium truncate">
 														{item.titulo}
 													</p>
-													<p class="text-gray-500 dark:text-gray-400 mt-0.5 break-words">
+													<p class="text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 break-words">
 														{item.mensaje}
 													</p>
 													<span class="text-[9px] text-gray-400 mt-1 block">

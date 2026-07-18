@@ -57,10 +57,17 @@
 	let moreNavItems = $derived(filteredNavigation.slice(4));
 
 	let isMoreMenuOpen = $state(false);
+	// Path actual reactivo (en Svelte 5 los stores como $page NO son auto-reactivos en runes,
+	// hay que wrappear en $derived para que se re-evalúe en navegaciones)
+	let currentPath = $derived($page.url.pathname);
 	// Estado reactivo: el item "Más" está activo si el sheet está abierto o algún item de more está activo
-	let moreActive = $derived(
-		isMoreMenuOpen || moreNavItems.some(i => isCurrent(i.href))
-	);
+	let moreActive = $derived.by(() => {
+		if (isMoreMenuOpen) return true;
+		const path = currentPath;
+		return moreNavItems.some(i =>
+			i.href === path || (path.startsWith(i.href) && i.href !== '/app/dashboard')
+		);
+	});
 	// Haptic feedback (Vibration API) en tap — funciona en Android, no en iOS
 	function hapticTap() {
 		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -70,8 +77,31 @@
 
 	function isCurrent(href: string) {
 		if (href.startsWith('http')) return false;
-		return $page.url.pathname === href || ($page.url.pathname.startsWith(href) && href !== '/app/dashboard');
+		const path = currentPath;
+		return path === href || (path.startsWith(href) && href !== '/app/dashboard');
 	}
+
+	// Set reactivo de hrefs activos (necesario porque isCurrent no es reactivo por sí solo)
+	let activeBottomHrefs = $derived.by(() => {
+		const path = currentPath;
+		const set = new Set<string>();
+		for (const item of bottomNavItems) {
+			if (item.href === path || (path.startsWith(item.href) && item.href !== '/app/dashboard')) {
+				set.add(item.href);
+			}
+		}
+		return set;
+	});
+	let activeMoreHrefs = $derived.by(() => {
+		const path = currentPath;
+		const set = new Set<string>();
+		for (const item of moreNavItems) {
+			if (item.href === path || (path.startsWith(item.href) && item.href !== '/app/dashboard')) {
+				set.add(item.href);
+			}
+		}
+		return set;
+	});
 
 	function logout() {
 		hapticTap();
@@ -100,7 +130,7 @@
 >
 	<nav class="flex justify-around items-center h-16 px-1.5">
 		{#each bottomNavItems as item, idx (item.href)}
-			{@const active = isCurrent(item.href)}
+			{@const active = activeBottomHrefs.has(item.href)}
 			<a
 				href={item.href}
 				onclick={handleNavClick}
@@ -189,7 +219,7 @@
 		<div class="overflow-y-auto flex-1 px-3 pb-4 scrollbar-hide">
 			<div class="grid grid-cols-4 gap-1.5">
 				{#each moreNavItems as item (item.href)}
-					{@const active = isCurrent(item.href)}
+					{@const active = activeMoreHrefs.has(item.href)}
 					<a
 						href={item.href}
 						onclick={() => { hapticTap(); closeMore(); }}
