@@ -57,6 +57,10 @@
 	let moreNavItems = $derived(filteredNavigation.slice(4));
 
 	let isMoreMenuOpen = $state(false);
+	// Estado reactivo: el item "Más" está activo si el sheet está abierto o algún item de more está activo
+	let moreActive = $derived(
+		isMoreMenuOpen || moreNavItems.some(i => isCurrent(i.href))
+	);
 	// Haptic feedback (Vibration API) en tap — funciona en Android, no en iOS
 	function hapticTap() {
 		if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -121,7 +125,6 @@
 		{/each}
 
 		<!-- "Más" Button -->
-		{@const moreActive = isMoreMenuOpen || moreNavItems.some(i => isCurrent(i.href))}
 		<button
 			type="button"
 			onclick={openMore}
