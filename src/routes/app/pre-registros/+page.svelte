@@ -29,7 +29,10 @@
 		UsersIcon,
 		PencilIcon,
 		CheckIcon,
-		CopyIcon
+		CopyIcon,
+		DownloadIcon,
+		ExclamationIcon,
+		CircleCheckIcon
 	} from '$lib/icons/outline';
 	import { ShieldIcon, BriefcaseIcon } from '$lib/icons/solid';
 
@@ -328,6 +331,48 @@
 		}
 	}
 
+	function exportSubmissionsCSV() {
+		if (submissions.length === 0) {
+			alert('warning', 'No hay pre-inscripciones para exportar.');
+			return;
+		}
+		const headers = ['Formulario', 'Nombre', 'Email', 'CI', 'Celular', 'Fecha Nacimiento', 'Sexo', 'Estado', 'Fecha de envío', 'Mensaje'];
+		const formNameById = new Map(forms.map(f => [f._id, f.nombre]));
+		const escapeCSV = (v: any) => {
+			if (v == null) return '';
+			const s = String(v);
+			if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+				return '"' + s.replace(/"/g, '""') + '"';
+			}
+			return s;
+		};
+		const rows = submissions.map(s => {
+			const d = s.data || {};
+			return [
+				escapeCSV(s.form_nombre || formNameById.get(s.form_id) || s.form_id || ''),
+				escapeCSV(d.nombre),
+				escapeCSV(d.email),
+				escapeCSV(d.carnet + (d.extension ? ' ' + d.extension : '')),
+				escapeCSV(d.celular),
+				escapeCSV(d.fecha_nacimiento || ''),
+				escapeCSV(d.sexo || ''),
+				escapeCSV(s.estado),
+				escapeCSV(s.created_at ? new Date(s.created_at).toLocaleString('es-BO') : ''),
+				escapeCSV(d.mensaje || '')
+			].join(',');
+		});
+		const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		const filename = `pre-inscripciones-${new Date().toISOString().split('T')[0]}.csv`;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
+		alert('success', `${submissions.length} pre-inscripciones exportadas.`);
+	}
+
 	// ============== Submissions ==============
 
 	async function handleApproveSubmission(sub: PreRegistration) {
@@ -396,12 +441,76 @@
 				Formularios públicos para que visitantes llenen sus datos. Al aprobar, se crea el estudiante y se le envía un email con sus credenciales.
 			</p>
 		</div>
-		{#if canCreate}
-			<Button onclick={openCreateFormModal}>
-				{#snippet leftIcon()}<PlusIcon class="size-5" />{/snippet}
-				Nuevo Formulario
-			</Button>
-		{/if}
+		<div class="flex items-center gap-2">
+			<button
+				type="button"
+				onclick={exportSubmissionsCSV}
+				disabled={submissions.length === 0}
+				class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50 active:scale-95 disabled:opacity-50 dark:border-dark-border dark:bg-dark-surface dark:text-gray-300 dark:hover:bg-dark-border/50"
+				title="Exportar pre-inscripciones a CSV"
+			>
+				<DownloadIcon class="size-4" />
+				Exportar CSV
+			</button>
+			{#if canCreate}
+				<Button onclick={openCreateFormModal}>
+					{#snippet leftIcon()}<PlusIcon class="size-5" />{/snippet}
+					Nuevo Formulario
+				</Button>
+			{/if}
+		</div>
+	</div>
+
+	<!-- Stats dashboard -->
+	<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+		<div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-border dark:bg-dark-surface">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Formularios totales</p>
+					<p class="mt-1 text-3xl font-extrabold text-gray-900 dark:text-white">{counters.forms_total}</p>
+				</div>
+				<div class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">
+					<ClipboardIcon class="size-6" />
+				</div>
+			</div>
+			<p class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+				{counters.forms_activos} activos · {counters.forms_total - counters.forms_activos} cerrados
+			</p>
+		</div>
+
+		<div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-border dark:bg-dark-surface">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Pendientes de revisión</p>
+					<p class="mt-1 text-3xl font-extrabold {counters.submissions_pendientes > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-white'}">
+						{counters.submissions_pendientes}
+					</p>
+				</div>
+				<div class="flex h-12 w-12 items-center justify-center rounded-xl {counters.submissions_pendientes > 0 ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-gray-50 text-gray-400 dark:bg-dark-border dark:text-gray-500'}">
+					<ExclamationIcon class="size-6" />
+				</div>
+			</div>
+			<p class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+				{counters.submissions_pendientes === 0 ? '¡Todo al día!' : 'Requieren tu atención'}
+			</p>
+		</div>
+
+		<div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-border dark:bg-dark-surface">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Tasa de aprobación</p>
+					<p class="mt-1 text-3xl font-extrabold text-gray-900 dark:text-white">
+						{counters.forms_total > 0 ? Math.round(((counters.forms_total - counters.submissions_pendientes) / counters.forms_total) * 100) : 0}<span class="text-lg">%</span>
+					</p>
+				</div>
+				<div class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400">
+					<CircleCheckIcon class="size-6" />
+				</div>
+			</div>
+			<p class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+				Aprobados vs total
+			</p>
+		</div>
 	</div>
 
 	<!-- Tabs: Formularios | Pre-inscripciones -->
