@@ -34,7 +34,7 @@
 		ExclamationIcon,
 		CircleCheckIcon
 	} from '$lib/icons/outline';
-	import { ShieldIcon, BriefcaseIcon } from '$lib/icons/solid';
+	import { ShieldIcon } from '$lib/icons/solid';
 
 	// SVG inline para reloj (no hay ClockIcon exportado)
 	const ClockSvg = `<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
