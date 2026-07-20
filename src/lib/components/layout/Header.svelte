@@ -65,7 +65,11 @@
 
 	// Referencias de elementos para el cierre click-outside
 	let notificationContainerEl = $state<HTMLDivElement | null>(null);
-	let profileContainerEl = $state<HTMLDivElement | null>(null);
+	// BUG-HEADER-001 FIX: refs separadas para desktop y mobile del profile
+	// (antes se compartía la misma var y solo el último bind:this ganaba,
+	// dejando el click-outside del header sin poder detectar el contenedor)
+	let profileContainerElDesktop = $state<HTMLDivElement | null>(null);
+	let profileContainerElMobile = $state<HTMLDivElement | null>(null);
 
 	// Derivados reactivos para separar Nuevas de Anteriores (Historial)
 	const unreadAlerts = $derived(notifications.filter(n => !n.leido));
@@ -221,7 +225,12 @@
 			isNotificationsOpen = false;
 		}
 
-		if (isProfileOpen && profileContainerEl && !profileContainerEl.contains(target)) {
+		// BUG-HEADER-001 FIX: chequea ambas refs (desktop + mobile)
+		if (
+			isProfileOpen &&
+			!profileContainerElDesktop?.contains(target) &&
+			!profileContainerElMobile?.contains(target)
+		) {
 			isProfileOpen = false;
 		}
 	}
@@ -474,14 +483,18 @@
 			{/if}
 
 			<!-- Profile dropdown -->
-			<div class="relative" bind:this={profileContainerEl}>
+			<div class="relative" bind:this={profileContainerElDesktop}>
 				<button
 					type="button"
 					class="-m-1.5 flex items-center p-1.5"
 					id="user-menu-button"
-					aria-expanded="false"
+					aria-expanded={isProfileOpen}
 					aria-haspopup="true"
-					onclick={() => { isProfileOpen = !isProfileOpen; isNotificationsOpen = false; }}
+					onclick={(e) => {
+						e.stopPropagation();
+						isProfileOpen = !isProfileOpen;
+						isNotificationsOpen = false;
+					}}
 				>
 					<span class="sr-only">Abrir menú de usuario</span>
 					{#if user?.foto_url}
@@ -595,13 +608,18 @@
 		{/if}
 
 		<!-- Profile avatar (mobile) -->
-		<div class="relative" bind:this={profileContainerEl}>
+		<div class="relative" bind:this={profileContainerElMobile}>
 			<button
 				type="button"
 				class="p-1 active:scale-90 transition-transform"
 				id="user-menu-button-mobile"
+				aria-expanded={isProfileOpen}
 				aria-label="Menú de usuario"
-				onclick={() => { isProfileOpen = !isProfileOpen; isNotificationsOpen = false; }}
+				onclick={(e) => {
+					e.stopPropagation();
+					isProfileOpen = !isProfileOpen;
+					isNotificationsOpen = false;
+				}}
 			>
 				{#if user?.foto_url}
 					<img class="h-7 w-7 rounded-full bg-gray-50 ring-1 ring-gray-200 dark:ring-gray-700" src={user.foto_url} alt="" />
