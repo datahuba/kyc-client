@@ -257,9 +257,12 @@
 		// llega una nueva notificación para este usuario. Reemplaza el
 		// polling cada 45s (50+ requests/hora por sesión).
 		try {
-			// Construir URL absoluta. En dev, apiKyC.baseURL ya tiene /api/api/v1
-			const baseURL = (apiKyC as any).baseURL || (apiKyC as any).defaults?.baseURL || '';
-			const streamURL = `${baseURL}/notifications/stream`.replace(/^http/, 'http'); // SSE funciona con HTTP
+			// BUG-SSE-001 FIX: usar URL relativa con el prefijo correcto /api/api/v1
+			// (antes se usaba (apiKyC as any).baseURL que no existe, daba '',
+			// y la URL quedaba como /notifications/stream → 404 en nginx)
+			// nginx: location /api/ → proxy_pass http://127.0.0.1:8000/;
+			// por eso el cliente manda doble /api/api/v1/
+			const streamURL = `/api/api/v1/notifications/stream`;
 			// Para SSE, no podemos usar el cliente HTTP normal (no soporta streaming).
 			// El browser añadirá el header Authorization automáticamente si la cookie
 			// está configurada. Si usamos Bearer token, hay que pasarlo via query.
