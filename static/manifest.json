@@ -33,5 +33,43 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Inicio",
+      "description": "Ir al panel principal",
+      "url": "/app/dashboard",
+      "icons": [
+        { "src": "/images/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "Estudiantes",
+      "short_name": "Estudiantes",
+      "description": "Ver lista de estudiantes",
+      "url": "/app/students",
+      "icons": [
+        { "src": "/images/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "Docentes",
+      "short_name": "Docentes",
+      "description": "Ver lista de docentes",
+      "url": "/app/teachers",
+      "icons": [
+        { "src": "/images/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "Gestión de Pagos",
+      "short_name": "Pagos",
+      "description": "Ver y registrar pagos",
+      "url": "/app/payments",
+      "icons": [
+        { "src": "/images/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    }
   ]
 }

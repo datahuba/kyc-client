@@ -12,8 +12,10 @@
 	import Modal from '$lib/components/ui/modal.svelte';
 	import Select from '$lib/components/ui/select.svelte';
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
-	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
+	import Skeleton from '$lib/components/ui/skeleton.svelte';
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
+	import EmptyState from '$lib/components/ui/emptyState.svelte';
+	import SearchInput from '$lib/components/ui/searchInput.svelte';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
 	import { alert, formatDate, formatCurrency } from '$lib/utils';
@@ -240,6 +242,16 @@
 		page = 1;
 		loadData();
 	}
+
+	function clearEnrollmentFilters() {
+		filters = { q: '', estado: 'all', curso_id: 'all', estudiante_id: 'all', con_descuento: 'all' };
+		page = 1;
+		loadData();
+	}
+
+	let hasActiveEnrollmentFilters = $derived(
+		!!(filters.q || filters.estado !== 'all' || filters.curso_id !== 'all' || filters.estudiante_id !== 'all' || filters.con_descuento !== 'all')
+	);
 
 	function handleCreate() {
 		selectedEnrollment = null;
@@ -669,21 +681,11 @@
 			<!-- Start Search -->
 			<div class="md:col-span-1">
 				<label for="search" class="sr-only">Buscar</label>
-				<div class="relative">
-					<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-						<svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-							<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-						</svg>
-					</div>
-					<input
-						type="text"
-						id="search"
-						bind:value={filters.q}
-						class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-						placeholder="Buscar..."
-						oninput={handleSearchInput}
-					/>
-				</div>
+				<SearchInput
+					bind:value={filters.q}
+					placeholder="Buscar..."
+					onInput={() => handleSearchInput()}
+				/>
 			</div>
 			
 			<!-- Estado -->
@@ -746,11 +748,23 @@
 	{/if}
 
 	{#if loading}
-		<TableSkeleton columns={9} rows={10} />
+		<Skeleton variant="table" columns={9} rows={10} />
 	{:else if enrollments.length === 0}
-		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-			<p class="text-gray-500 dark:text-gray-400">No hay inscripciones registradas.</p>
-		</div>
+		<EmptyState
+			icon="enrollment"
+			title={currentRole === 'student' ? 'Aún no tienes inscripciones' : 'No hay inscripciones registradas'}
+			description={hasActiveEnrollmentFilters
+				? 'No hay resultados con los filtros aplicados. Probá limpiarlos para ver todas las inscripciones.'
+				: currentRole === 'student'
+					? 'Cuando un administrador te inscriba a un programa o apruebe una de tus solicitudes, aparecerá aquí.'
+					: 'Cuando un estudiante sea inscrito a un programa, o cuando se apruebe una solicitud de inscripción, aparecerá aquí.'}
+			ctaLabel={hasActiveEnrollmentFilters
+				? 'Limpiar filtros'
+				: (canCreateEnrollment && currentRole !== 'student') ? 'Crear primera inscripción' : undefined}
+			onCta={hasActiveEnrollmentFilters
+				? clearEnrollmentFilters
+				: (canCreateEnrollment && currentRole !== 'student') ? handleCreate : undefined}
+		/>
 	{:else}
 		<!-- ISSUE-X-COMPACT: Desktop Table consolidada SIN scroll horizontal -->
 		<div class="hidden md:block bg-white dark:bg-dark-surface rounded-lg shadow border border-gray-200 dark:border-dark-border">

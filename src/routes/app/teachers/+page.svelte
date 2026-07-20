@@ -5,7 +5,9 @@
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import FileUpload from '$lib/components/ui/fileUpload.svelte';
+	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import { alert } from '$lib/utils';
+	import { PlusIcon } from '$lib/icons/outline';
 
 	const TEACHER_ROLE = 'docente';
 
@@ -44,6 +46,12 @@
 	let selectedTeacherForCV: User | null = $state(null);
 	let isUploadingCV = $state(false);
 	let fileToUpload: File | null = $state(null);
+
+	// ISS-001 (2026-07-17): reemplazo de window.confirm() nativo por ModalConfirm
+	// para mantener consistencia con design system y soportar dark mode.
+	let showDeleteModal = $state(false);
+	let teacherToDelete: User | null = $state(null);
+	let deleteLoading = $state(false);
 
 	let isSubmitting = $state(false);
 
@@ -146,14 +154,24 @@
 	}
 
 	async function handleDeleteTeacher(id: string) {
-		if (confirm('¿Está seguro de que desea eliminar a este docente?')) {
-			try {
-				await userService.delete(id);
-				alert('success', 'Docente eliminado correctamente');
-				teachers = teachers.filter((t) => t._id !== id);
-			} catch (err: any) {
-				alert('error', err.message || 'Error al eliminar docente');
-			}
+		// ISS-001: abrir modal de confirmacion en vez de window.confirm() nativo
+		teacherToDelete = teachers.find((t) => t._id === id) ?? null;
+		showDeleteModal = true;
+	}
+
+	async function confirmDeleteTeacher() {
+		if (!teacherToDelete) return;
+		deleteLoading = true;
+		try {
+			await userService.delete(teacherToDelete._id);
+			alert('success', 'Docente eliminado correctamente');
+			teachers = teachers.filter((t) => t._id !== teacherToDelete!._id);
+			showDeleteModal = false;
+			teacherToDelete = null;
+		} catch (err: any) {
+			alert('error', err.message || 'Error al eliminar docente');
+		} finally {
+			deleteLoading = false;
 		}
 	}
 
@@ -209,9 +227,12 @@
 </script>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 		<Heading level="h1">Gestión de Docentes</Heading>
-		<Button onclick={() => (showNewTeacherModal = true)}>+ Nuevo Docente</Button>
+		<Button onclick={() => (showNewTeacherModal = true)}>
+			{#snippet leftIcon()}<PlusIcon class="size-5" />{/snippet}
+			Nuevo Docente
+		</Button>
 	</div>
 
 	{#if error}
@@ -272,10 +293,10 @@
 								{/if}
 							</td>
 							<td class="px-6 py-4 text-right text-sm font-medium space-x-2 whitespace-nowrap">
-								<button onclick={() => handleManageCV(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">CV</button>
-								<button onclick={() => handleViewModules(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
-								<button onclick={() => handleEditTeacher(teacher)} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
-								<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-light-error hover:opacity-80 dark:text-dark-error">Eliminar</button>
+								<button onclick={() => handleManageCV(teacher)} aria-label={`Ver CV de ${teacher.nombre_funcional || teacher.username}`} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">CV</button>
+								<button onclick={() => handleViewModules(teacher)} aria-label={`Ver módulos de ${teacher.nombre_funcional || teacher.username}`} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
+								<button onclick={() => handleEditTeacher(teacher)} aria-label={`Editar ${teacher.nombre_funcional || teacher.username}`} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
+								<button onclick={() => handleDeleteTeacher(teacher._id)} aria-label={`Eliminar ${teacher.nombre_funcional || teacher.username}`} class="text-light-error hover:opacity-80 dark:text-dark-error">Eliminar</button>
 							</td>
 						</tr>
 					{/each}
@@ -302,10 +323,10 @@
 						{/if}
 					</div>
 					<div class="mt-3 flex items-center gap-4 text-sm font-medium border-t border-gray-100 dark:border-dark-border pt-3">
-						<button onclick={() => handleManageCV(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">CV</button>
-						<button onclick={() => handleViewModules(teacher)} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
-						<button onclick={() => handleEditTeacher(teacher)} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
-						<button onclick={() => handleDeleteTeacher(teacher._id)} class="text-light-error hover:opacity-80 dark:text-dark-error ml-auto">Eliminar</button>
+						<button onclick={() => handleManageCV(teacher)} aria-label={`Ver CV de ${teacher.nombre_funcional || teacher.username}`} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">CV</button>
+						<button onclick={() => handleViewModules(teacher)} aria-label={`Ver módulos de ${teacher.nombre_funcional || teacher.username}`} class="text-primary-600 hover:text-primary-800 dark:text-primary-400">Módulos</button>
+						<button onclick={() => handleEditTeacher(teacher)} aria-label={`Editar ${teacher.nombre_funcional || teacher.username}`} class="text-light-warning hover:opacity-80 dark:text-dark-warning">Editar</button>
+						<button onclick={() => handleDeleteTeacher(teacher._id)} aria-label={`Eliminar ${teacher.nombre_funcional || teacher.username}`} class="text-light-error hover:opacity-80 dark:text-dark-error ml-auto">Eliminar</button>
 					</div>
 				</div>
 			{/each}
@@ -505,4 +526,15 @@
 			</div>
 		</div>
 	{/if}
+
+	<!-- ISS-001: Modal de confirmacion para eliminar docente (reemplaza window.confirm) -->
+	<ModalConfirm
+		isOpen={showDeleteModal}
+		message={teacherToDelete
+			? `¿Estás seguro de que querés eliminar a "${teacherToDelete.username}"? Esta acción es permanente.`
+			: '¿Estás seguro de que querés eliminar este docente?'}
+		loading={deleteLoading}
+		onConfirm={confirmDeleteTeacher}
+		onCancel={() => { showDeleteModal = false; teacherToDelete = null; }}
+	/>
 </div>

@@ -7,7 +7,7 @@
 	import Input from '$lib/components/ui/input.svelte';
 	import Select from '$lib/components/ui/select.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
-	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
+	import Skeleton from '$lib/components/ui/skeleton.svelte';
 	import { alert, formatCurrency, formatDate } from '$lib/utils';
 	import { PlusIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
@@ -152,8 +152,8 @@
 		</Button>
 	</div>
 
-	<div class="flex flex-wrap items-end gap-3 bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-dark-border">
-		<div class="w-48">
+	<div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-dark-border">
+		<div class="w-full sm:w-48">
 			<Input label="Banco" id="filtro-banco" bind:value={filters.banco} oninput={handleFilterChange} placeholder="Ej: Banco Unión" />
 		</div>
 		<label class="flex items-center gap-2 pb-2 text-sm text-gray-700 dark:text-gray-300">
@@ -168,7 +168,7 @@
 	</div>
 
 	{#if loading}
-		<TableSkeleton columns={6} rows={8} />
+		<Skeleton variant="table" columns={6} rows={8} />
 	{:else if entries.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl">
 			<p class="text-gray-500 dark:text-gray-400">No hay movimientos registrados.</p>

@@ -5,6 +5,7 @@
 	import Input from '$lib/components/ui/input.svelte';
 	import FileUpload from '$lib/components/ui/fileUpload.svelte';
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
+	import NumberStepper from '$lib/components/ui/numberStepper.svelte';
 	import { alert } from '$lib/utils';
 	import { CheckIcon } from '$lib/icons/outline';
 
@@ -159,38 +160,34 @@
 				bind:value={formData.nombre}
 				required
 				placeholder="Ej: Beca Excelencia"
-				class={!isNameValid && formData.nombre.length > 0 ? "border-red-500 ring-red-500" : ""}
+				error={!isNameValid && formData.nombre.length > 0 ? 'El nombre debe tener al menos 2 caracteres útiles.' : undefined}
 			/>
-			{#if !isNameValid && formData.nombre.length > 0}
-				<p class="text-xs text-red-500 font-medium">El nombre debe tener al menos 2 caracteres útiles.</p>
-			{/if}
 		</div>
 
 		<div class="space-y-1">
-			<Input
-				label="Porcentaje (%)"
-				id="porcentaje"
-				type="number"
-				min="0.01"
-				max="100"
-				step="0.01"
+			<label
+				for="porcentaje"
+				class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:text-base"
+			>
+				Porcentaje (%) <span class="text-red-500">*</span>
+			</label>
+			<!-- MOBILE-010: NumberStepper con botones +/- para ajuste táctil rápido -->
+			<NumberStepper
 				bind:value={formData.porcentaje}
-				required
-				class={!isPercentageValid && formData.porcentaje !== 0 ? "border-red-500 ring-red-500" : ""}
+				min={0.01}
+				max={100}
+				step={1}
+				suffix="%"
+				ariaLabel="Porcentaje de descuento"
 			/>
-			<!-- BUG 9 FIX: Feedback visual instantáneo para el operador de Cobranzas -->
-			{#if formData.porcentaje !== null && formData.porcentaje !== undefined}
-				{#if Number(formData.porcentaje) <= 0}
-					<p class="text-xs text-red-500 font-medium flex items-center gap-1">
-						<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-						No se permiten descuentos del 0% o negativos.
-					</p>
-				{:else if Number(formData.porcentaje) > 100}
-					<p class="text-xs text-red-500 font-medium flex items-center gap-1">
-						<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-						El descuento no puede superar el 100%.
-					</p>
-				{/if}
+			{#if !isPercentageValid && formData.porcentaje !== 0}
+				<p class="text-sm text-red-600 dark:text-red-400" role="alert">
+					{Number(formData.porcentaje) <= 0
+						? 'No se permiten descuentos del 0% o negativos.'
+						: Number(formData.porcentaje) > 100
+							? 'El descuento no puede superar el 100%.'
+							: 'Ingresa un porcentaje entre 0.01 y 100.'}
+				</p>
 			{/if}
 		</div>
 	</div>

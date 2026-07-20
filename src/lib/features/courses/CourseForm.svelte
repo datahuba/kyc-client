@@ -26,6 +26,8 @@
 	let saving = $state(false);
 	let discounts: Discount[] = $state([]);
 	let teachers: User[] = $state([]);
+	let availableEncargados: User[] = $state([]);
+	let selectedEncargadosIds: string[] = $state([]);
 
 	// ISSUE-REFACTOR (UI): validación inline por campo (estilo DiscountForm)
 	// en vez de depender solo de alert() al fallar el submit.
@@ -72,12 +74,14 @@
 
 	onMount(async () => {
 		try {
-			const [resDiscounts, resTeachers] = await Promise.all([
+			const [resDiscounts, resTeachers, resUsers] = await Promise.all([
 				discountService.getAll(1, 100),
-				userService.getTeachers()
+				userService.getTeachers(),
+				userService.getAll(1, 100)
 			]);
 			discounts = resDiscounts.data;
 			teachers = resTeachers;
+			availableEncargados = resUsers.data.filter(u => u.rol === 'encargado_curso' || u.rol === 'coordinador' || u.role === 'encargado_curso' || u.role === 'coordinador');
 		} catch (e) {
 			console.error('Error fetching data for course form', e);
 		}
@@ -142,6 +146,16 @@
 
 				autoCalculateModules = true;
 			}
+			
+			// Inicializar los checkboxes de encargados seleccionados si es edición
+			if (course) {
+				selectedEncargadosIds = availableEncargados
+					.filter(u => (u.cursos_asignados || []).includes(course._id))
+					.map(u => u._id);
+			} else {
+				selectedEncargadosIds = [];
+			}
+			
 			trackedCourseId = currentId;
 			errors = {};
 		}
@@ -226,6 +240,11 @@
 		if (formData.cargo_adicional_items?.some((it) => !it.nombre?.trim())) {
 			nuevosErrores.cargo_adicional_items = 'Todos los ítems de cargo adicional deben tener un nombre.';
 		}
+		if (selectedEncargadosIds.length > 0) {
+			// Validar localmente (aunque el backend también lo validará)
+			// No podemos validar estrictamente si un usuario ya tiene otros 4 y seleccionamos 2,
+			// pero sí podemos mostrar error del backend si falla.
+		}
 
 		errors = nuevosErrores;
 		return Object.keys(nuevosErrores).length === 0;
@@ -289,17 +308,28 @@
 	async function guardarCurso(payload: any) {
 		saving = true;
 		try {
+			let savedCourse: Course;
 			if (isEditMode && course) {
 				const updatePayload = {
 					...payload,
 					inscritos: course.inscritos
 				};
-				await courseService.update(course._id, updatePayload);
+				savedCourse = await courseService.update(course._id, updatePayload);
 				alert('success', 'Programa y módulos actualizados correctamente');
 			} else {
-				await courseService.create(payload);
+				savedCourse = await courseService.create(payload);
 				alert('success', 'Programa creado correctamente');
 			}
+			
+			// Asignar los encargados de curso seleccionados
+			if (savedCourse && savedCourse._id) {
+				try {
+					await courseService.assignEncargados(savedCourse._id, selectedEncargadosIds);
+				} catch (err: any) {
+					alert('warning', err.message || 'El curso se guardó, pero hubo un error al asignar los encargados. Revisa el límite de 5 programas por usuario.');
+				}
+			}
+			
 			onSuccess();
 		} catch (e: any) {
 			alert('error', e.message || 'Error al guardar el curso');
@@ -387,6 +417,41 @@
 				error={errors.fecha_fin}
 			/>
 		</div>
+	</Card>
+
+	<!-- SECCIÓN: Encargados de Curso -->
+	<Card variant="bordered" padding="md">
+		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">Gestión Académica</Heading>
+		<p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+			Selecciona a los Encargados de Curso o Coordinadores que administrarán este programa. Recuerda que cada usuario puede administrar un máximo de 5 programas a la vez.
+		</p>
+		
+		{#if availableEncargados.length > 0}
+			<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+				{#each availableEncargados as encargado}
+					<label class="flex items-start gap-2 p-3 rounded-md border border-gray-100 bg-gray-50/50 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-750 cursor-pointer transition-colors">
+						<input 
+							type="checkbox" 
+							class="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-900"
+							value={encargado._id}
+							bind:group={selectedEncargadosIds}
+						/>
+						<div class="flex flex-col">
+							<span class="text-sm font-medium text-gray-900 dark:text-white leading-tight">
+								{encargado.nombre || encargado.username}
+							</span>
+							<span class="text-xs text-gray-500 dark:text-gray-400">
+								{(encargado.rol || encargado.role) === 'coordinador' ? 'Coordinador' : 'Encargado de Curso'}
+							</span>
+						</div>
+					</label>
+				{/each}
+			</div>
+		{:else}
+			<p class="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md border border-amber-100 dark:border-amber-800">
+				No hay Encargados de Curso o Coordinadores registrados en el sistema.
+			</p>
+		{/if}
 	</Card>
 
 	<!-- SECCIÓN: Costo del Programa (precio único para todos los estudiantes) -->

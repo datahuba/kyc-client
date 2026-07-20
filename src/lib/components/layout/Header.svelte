@@ -5,8 +5,10 @@
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 	import PWAInstallButton from '$lib/components/ui/PWAInstallButton.svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { onMount, onDestroy, untrack } from 'svelte';
-	import { apiKyC } from '$lib/config/apiKyC.config'; // IMPORTACIÓN DEL CLIENTE ESTÁNDAR
+	import { apiKyC } from '$lib/config/apiKyC.config';
+	import { fly } from 'svelte/transition';
 
 	interface Props {
 		onOpenSidebar: () => void;
@@ -18,16 +20,56 @@
 	let loginType = $derived($userStore.loginType);
 	let academicRole = $derived($userStore.academicRole);
 
+	// Título contextual basado en la ruta (mobile-friendly)
+	const routeTitleMap: Record<string, string> = {
+		'/app/dashboard': 'Inicio',
+		'/app/students': 'Estudiantes',
+		'/app/teachers': 'Docentes',
+		'/app/payments': 'Pagos',
+		'/app/enrollments': 'Inscripciones',
+		'/app/courses': 'Programas',
+		'/app/discounts': 'Descuentos',
+		'/app/reports': 'Caja',
+		'/app/users': 'Usuarios',
+		'/app/profile': 'Perfil',
+		'/app/change-password': 'Contraseña',
+		'/app/pre-registros': 'Pre-inscripciones',
+		'/app/account-requests': 'Solicitudes',
+		'/app/passive-requests': 'Pasivo',
+		'/app/enrollment-requests': 'Inscripciones',
+		'/app/payment-config': 'Info. Pagos',
+		'/app/bank-statements': 'Extracto',
+		'/app/classroom': 'Aula Virtual',
+	};
+	let contextualTitle = $derived.by(() => {
+		const path = $page.url.pathname;
+		if (path.startsWith('/app/classroom/clase/')) return 'Aula Virtual';
+		// Exact match primero
+		if (routeTitleMap[path]) return routeTitleMap[path];
+		// Prefix match
+		for (const [prefix, title] of Object.entries(routeTitleMap)) {
+			if (path.startsWith(prefix) && prefix !== '/app/dashboard') return title;
+		}
+		return 'Inicio';
+	});
+
 	// Estados reactivos del buzón de notificaciones (Svelte 5 - Runas)
 	let notifications = $state<any[]>([]);
 	let unreadCount = $state<number>(0);
 	let isNotificationsOpen = $state(false);
 	let notificationsLoading = $state(false);
 	let pollInterval: any;
+	// TECH-003: EventSource (SSE) reemplaza el polling cada 45s. Reconexión
+	// automática si el server se desconecta (EventSource nativo ya lo hace).
+	let notificationEventSource: EventSource | null = null;
 
 	// Referencias de elementos para el cierre click-outside
 	let notificationContainerEl = $state<HTMLDivElement | null>(null);
-	let profileContainerEl = $state<HTMLDivElement | null>(null);
+	// BUG-HEADER-001 FIX: refs separadas para desktop y mobile del profile
+	// (antes se compartía la misma var y solo el último bind:this ganaba,
+	// dejando el click-outside del header sin poder detectar el contenedor)
+	let profileContainerElDesktop = $state<HTMLDivElement | null>(null);
+	let profileContainerElMobile = $state<HTMLDivElement | null>(null);
 
 	// Derivados reactivos para separar Nuevas de Anteriores (Historial)
 	const unreadAlerts = $derived(notifications.filter(n => !n.leido));
@@ -37,9 +79,9 @@
 		if (loginType === 'academic') {
 			return academicRole === 'teacher' ? 'Docente' : 'Estudiante';
 		}
-		return 'Administrativo';
+		return 'Admin';
 	}
-	
+
 	function getProfileOptions() {
 		return [
 			{
@@ -51,7 +93,7 @@
 			{
 				label: 'Cerrar Sesión',
 				id: 'logout',
-				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>`,
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>`,
 				action: () => logout(),
 				divider: true
 			}
@@ -65,15 +107,12 @@
 		goto('/auth/sign-in');
 	}
 
-	// Lógica asíncrona de notificaciones (Con bandera 'silent' para evitar loaders molestos)
 	async function loadNotificationsSummary(silent = false) {
 		if (!user) return;
 		try {
-			// Consultar conteo de alertas no leídas
 			const countRes = await apiKyC.get<{ unread_count: number }>('/notifications/unread-count');
 			unreadCount = countRes.unread_count;
 
-			// Si el dropdown está abierto, refrescar la lista en segundo plano
 			if (isNotificationsOpen) {
 				await fetchNotificationsList(silent);
 			}
@@ -83,15 +122,12 @@
 	}
 
 	async function fetchNotificationsList(silent = false) {
-		// [ESTRATEGIA CACHE-FIRST]: Solo activamos el spinner de carga si la lista local está vacía.
-		// Si ya tenemos notificaciones en memoria, las renderizamos al instante y refrescamos de forma silenciosa.
 		const isFirstLoad = notifications.length === 0;
 		if (isFirstLoad) {
 			notificationsLoading = true;
 		}
-		
+
 		try {
-			// Agregada la barra diagonal final "/" para evitar el 307 Redirect en el VPS
 			const list = await apiKyC.get<any[]>('/notifications/?limit=15');
 			notifications = list;
 		} catch (err) {
@@ -103,37 +139,28 @@
 		}
 	}
 
-	// Marcar como leído con actualización optimista de 0ms para el usuario
 	async function markAsRead(id: string) {
-		// 1. Cambio optimista inmediato en la UI local sin mostrar spinner de carga
 		notifications = notifications.map(n => (n._id === id || n.id === id) ? { ...n, leido: true } : n);
 		if (unreadCount > 0) unreadCount--;
 
 		try {
-			// 2. Enviar petición en segundo plano silencioso
 			await apiKyC.patch(`/notifications/${id}/read`, {});
-			
-			// 3. Sincronizar conteo de manera silenciosa
+
 			const countRes = await apiKyC.get<{ unread_count: number }>('/notifications/unread-count');
 			unreadCount = countRes.unread_count;
 		} catch (err) {
 			console.error('Error marking notification as read:', err);
-			// Rollback en caso de falla
 			loadNotificationsSummary();
 		}
 	}
 
-	// Marcar todas como leídas optimista e instantáneo
 	async function markAllAsRead() {
-		// 1. Cambio optimista inmediato
 		notifications = notifications.map(n => ({ ...n, leido: true }));
 		unreadCount = 0;
 
 		try {
-			// 2. Enviar petición en segundo plano silencioso
 			await apiKyC.post('/notifications/read-all', {});
-			
-			// 3. Sincronizar conteo de manera silenciosa
+
 			const countRes = await apiKyC.get<{ unread_count: number }>('/notifications/unread-count');
 			unreadCount = countRes.unread_count;
 		} catch (err) {
@@ -142,10 +169,6 @@
 		}
 	}
 
-	// Resolver la ruta destino de una notificación.
-	// 1) usa la `ruta` explícita del backend (notificaciones nuevas);
-	// 2) si no, la deduce por `referencia_tipo`;
-	// 3) fallback por contenido para notificaciones antiguas (sin ruta).
 	function resolveNotificationRoute(item: any): string | null {
 		if (item?.ruta) return item.ruta;
 		if (item?.referencia_tipo === 'payment') return '/app/payments';
@@ -165,7 +188,6 @@
 		return null;
 	}
 
-	// Click en una notificación: marcar leída (si aplica), cerrar el buzón y navegar a su flujo.
 	function handleNotificationClick(item: any) {
 		isNotificationsOpen = false;
 		if (!item.leido) {
@@ -177,47 +199,42 @@
 		}
 	}
 
-	// Sanitizado estricto e interpretación ISO de Bolivia (UTC-4) sin importar reloj local del cliente
 	function formatTime(dateStr: string): string {
 		if (!dateStr) return '';
-		
-		// 1. Reemplazar espacio por 'T' para asegurar formato estándar ISO
+
 		let cleanStr = dateStr.trim().replace(' ', 'T');
-		
-		// 2. Recortar microsegundos que confunden a algunos motores JS
+
 		if (cleanStr.includes('.')) {
 			cleanStr = cleanStr.split('.')[0];
 		}
-		
-		// 3. Forzar sufijo 'Z' para indicar que es UTC nativo de MongoDB
+
 		if (!cleanStr.endsWith('Z') && !cleanStr.includes('+') && !cleanStr.includes('-')) {
 			cleanStr += 'Z';
 		}
-		
+
 		const date = new Date(cleanStr);
 		if (isNaN(date.getTime())) return dateStr;
-		
-		// 4. Formatear la fecha local (El navegador la convertirá automáticamente a Bolivia UTC-4)
+
 		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString();
 	}
 
-	// Cerrar dropdowns al hacer clic fuera de ellos (Click-Outside nativo)
 	function handleWindowClick(event: MouseEvent) {
 		const target = event.target as Node;
-		
+
 		if (isNotificationsOpen && notificationContainerEl && !notificationContainerEl.contains(target)) {
 			isNotificationsOpen = false;
 		}
-		
-		if (isProfileOpen && profileContainerEl && !profileContainerEl.contains(target)) {
+
+		// BUG-HEADER-001 FIX: chequea ambas refs (desktop + mobile)
+		if (
+			isProfileOpen &&
+			!profileContainerElDesktop?.contains(target) &&
+			!profileContainerElMobile?.contains(target)
+		) {
 			isProfileOpen = false;
 		}
 	}
 
-	// Svelte 5: Observar apertura de notificaciones para cargar la lista.
-	// `untrack` evita que la lectura de `notifications` dentro de fetchNotificationsList
-	// convierta a `notifications` en dependencia del efecto (lo que provocaba un loop
-	// infinito de fetch y el spinner que nunca terminaba).
 	$effect(() => {
 		if (isNotificationsOpen && user) {
 			untrack(() => fetchNotificationsList());
@@ -227,33 +244,112 @@
 	onMount(() => {
 		if (user) {
 			loadNotificationsSummary();
-			pollInterval = setInterval(() => loadNotificationsSummary(true), 45000); // Refrescos de fondo silenciosos
+			setupNotificationStream();
 		}
 		if (typeof window !== 'undefined') {
 			window.addEventListener('click', handleWindowClick);
 		}
 	});
 
+	function setupNotificationStream() {
+		// TECH-003: conectar al endpoint SSE del backend. El server mantiene
+		// la conexión abierta y emite eventos 'notification' cada vez que
+		// llega una nueva notificación para este usuario. Reemplaza el
+		// polling cada 45s (50+ requests/hora por sesión).
+		try {
+			// BUG-SSE-001 FIX: usar URL relativa con el prefijo correcto /api/api/v1
+			// (antes se usaba (apiKyC as any).baseURL que no existe, daba '',
+			// y la URL quedaba como /notifications/stream → 404 en nginx)
+			// nginx: location /api/ → proxy_pass http://127.0.0.1:8000/;
+			// por eso el cliente manda doble /api/api/v1/
+			const streamURL = `/api/api/v1/notifications/stream`;
+			// Para SSE, no podemos usar el cliente HTTP normal (no soporta streaming).
+			// El browser añadirá el header Authorization automáticamente si la cookie
+			// está configurada. Si usamos Bearer token, hay que pasarlo via query.
+			const token = localStorage.getItem('kyc-auth_token');
+			const url = token ? `${streamURL}?token=${encodeURIComponent(token)}` : streamURL;
+
+			notificationEventSource = new EventSource(url, { withCredentials: true });
+
+			notificationEventSource.addEventListener('connected', (e: MessageEvent) => {
+				try {
+					const data = JSON.parse(e.data);
+					if (typeof data.unread_count === 'number') {
+						unreadCount = data.unread_count;
+					}
+				} catch (_) { /* ignore */ }
+			});
+
+			notificationEventSource.addEventListener('notification', (e: MessageEvent) => {
+				try {
+					const notif = JSON.parse(e.data);
+					// Agregar al inicio de la lista (si está abierta)
+					notifications = [notif, ...notifications].slice(0, 15);
+					unreadCount = (unreadCount || 0) + 1;
+				} catch (_) { /* ignore */ }
+			});
+
+			// El browser reconecta automáticamente. Solo loggeamos errores.
+			notificationEventSource.onerror = () => {
+				// EventSource reintenta solo. No hacer nada aquí para evitar loops.
+			};
+		} catch (err) {
+			// Fallback silencioso a polling si SSE no se puede establecer
+			console.warn('[notifications] SSE no disponible, fallback a polling:', err);
+			pollInterval = setInterval(() => loadNotificationsSummary(true), 45000);
+		}
+	}
+
 	onDestroy(() => {
 		if (pollInterval) clearInterval(pollInterval);
+		if (notificationEventSource) {
+			notificationEventSource.close();
+			notificationEventSource = null;
+		}
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('click', handleWindowClick);
 		}
 	});
 </script>
 
-<div 
-	class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md px-4 sm:gap-x-6 sm:px-6 lg:px-8 transition-colors"
+<!--
+  Header mobile-friendly con:
+  - Hamburger button (solo mobile) que abre el sidebar como drawer
+  - Logo UAGRM mini + título contextual (solo mobile, < md)
+  - Backdrop blur y safe-area-inset-top
+  - Versión desktop intacta (todos los iconos + breadcrumb)
+-->
+<header
+	class="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-x-3 border-b border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl px-3 sm:gap-x-4 sm:px-6 lg:px-8 transition-colors"
 	style="padding-top: env(safe-area-inset-top, 0px); margin-top: max(0px, env(safe-area-inset-top, 0px));"
 >
+	<!-- Mobile: hamburger button (md:hidden) -->
+	<button
+		type="button"
+		class="md:hidden -ml-1 p-2 text-gray-700 dark:text-gray-200 active:scale-90 transition-transform rounded-lg active:bg-gray-100 dark:active:bg-gray-800"
+		onclick={onOpenSidebar}
+		aria-label="Abrir menú lateral"
+	>
+		<Menu2Icon class="size-6" />
+	</button>
 
-	<div class="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
+	<!-- Mobile: logo UAGRM mini + título contextual (md:hidden) -->
+	<div class="md:hidden flex items-center gap-2 min-w-0 flex-1">
+		<img src="/images/logo_uagrm_fondo_blanco.jpg" alt="UAGRM" class="h-7 w-7 shrink-0 rounded-md object-contain bg-white ring-1 ring-gray-200 dark:ring-gray-700" />
+		<div class="flex flex-col leading-tight min-w-0">
+			<span class="text-sm font-bold text-gray-900 dark:text-white truncate">{contextualTitle}</span>
+			<span class="text-[10px] font-medium text-gray-500 dark:text-gray-400 truncate">{getUserTypeLabel()}</span>
+		</div>
+	</div>
+
+	<!-- Desktop: breadcrumb original (hidden md:flex) -->
+	<div class="hidden md:flex flex-1 gap-x-4 self-stretch md:gap-x-6">
 		<div class="flex flex-1 items-center">
 			<span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
 				{getUserTypeLabel()}
 			</span>
 		</div>
-		<div class="flex items-center gap-x-4 lg:gap-x-6">
+		<div class="flex items-center gap-x-4 md:gap-x-6">
 
 			<!-- PWA INSTALL BUTTON -->
 			<PWAInstallButton />
@@ -264,13 +360,12 @@
 			<!-- BUZÓN DE NOTIFICACIONES (ISSUE-U-BUZON) -->
 			{#if user}
 				<div class="relative" bind:this={notificationContainerEl}>
-					<button 
-						type="button" 
+					<button
+						type="button"
 						class="relative -m-2.5 p-2.5 text-gray-400 hover:text-gray-500 dark:text-gray-300 dark:hover:text-gray-200 transition-colors"
 						onclick={(e) => { e.stopPropagation(); isNotificationsOpen = !isNotificationsOpen; isProfileOpen = false; }}
 					>
 						<span class="sr-only">Ver notificaciones</span>
-						<!-- Campana SVG de Tailwind CSS -->
 						<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
 						</svg>
@@ -283,15 +378,15 @@
 					</button>
 
 					{#if isNotificationsOpen}
-						<div 
-							onclick={(e) => e.stopPropagation()} 
+						<div
+							onclick={(e) => e.stopPropagation()}
 							class="absolute right-0 z-50 mt-2.5 w-80 origin-top-right rounded-lg bg-white dark:bg-gray-900 py-2 shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-800 focus:outline-none border border-gray-100 dark:border-gray-800"
 						>
 							<div class="px-4 py-2 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
 								<span class="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Notificaciones</span>
 								{#if unreadCount > 0}
-									<button 
-										type="button" 
+									<button
+										type="button"
 										onclick={(e) => { e.stopPropagation(); markAllAsRead(); }}
 										class="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
 									>
@@ -310,7 +405,6 @@
 										No tienes notificaciones
 									</div>
 								{:else}
-									<!-- SECCIÓN 1: NUEVAS (ALERTAS SIN LEER) -->
 									{#if unreadAlerts.length > 0}
 										<div class="px-4 py-1.5 bg-blue-50/20 dark:bg-blue-950/20 text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
 											Nuevas
@@ -332,11 +426,11 @@
 														<span class="size-2 rounded-full bg-blue-500 inline-block"></span>
 													{/if}
 												</div>
-												<div class="flex-1">
-													<p class="text-gray-900 dark:text-white font-bold">
+												<div class="flex-1 min-w-0">
+													<p class="text-gray-900 dark:text-white font-bold truncate">
 														{item.titulo}
 													</p>
-													<p class="text-gray-500 dark:text-gray-400 mt-0.5 break-words">
+													<p class="text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 break-words">
 														{item.mensaje}
 													</p>
 													<span class="text-[9px] text-gray-400 mt-1 block">
@@ -347,7 +441,6 @@
 										{/each}
 									{/if}
 
-									<!-- SECCIÓN 2: HISTORIAL (NOTIFICACIONES LEÍDAS) -->
 									{#if readAlerts.length > 0}
 										<div class="px-4 py-1.5 bg-gray-50 dark:bg-gray-800/40 text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
 											Anteriores (Historial)
@@ -369,11 +462,11 @@
 														<span class="size-2 rounded-full bg-blue-500 inline-block"></span>
 													{/if}
 												</div>
-												<div class="flex-1">
-													<p class="text-gray-900 dark:text-white font-medium">
+												<div class="flex-1 min-w-0">
+													<p class="text-gray-900 dark:text-white font-medium truncate">
 														{item.titulo}
 													</p>
-													<p class="text-gray-500 dark:text-gray-400 mt-0.5 break-words">
+													<p class="text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 break-words">
 														{item.mensaje}
 													</p>
 													<span class="text-[9px] text-gray-400 mt-1 block">
@@ -388,19 +481,23 @@
 						</div>
 					{/if}
 				</div>
-				
+
 				<div class="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-200 dark:lg:bg-gray-800" aria-hidden="true"></div>
 			{/if}
 
 			<!-- Profile dropdown -->
-			<div class="relative" bind:this={profileContainerEl}>
-				<button 
-					type="button" 
-					class="-m-1.5 flex items-center p-1.5" 
-					id="user-menu-button" 
-					aria-expanded="false" 
+			<div class="relative" bind:this={profileContainerElDesktop}>
+				<button
+					type="button"
+					class="-m-1.5 flex items-center p-1.5"
+					id="user-menu-button"
+					aria-expanded={isProfileOpen}
 					aria-haspopup="true"
-					onclick={() => { isProfileOpen = !isProfileOpen; isNotificationsOpen = false; }}
+					onclick={(e) => {
+						e.stopPropagation();
+						isProfileOpen = !isProfileOpen;
+						isNotificationsOpen = false;
+					}}
 				>
 					<span class="sr-only">Abrir menú de usuario</span>
 					{#if user?.foto_url}
@@ -410,7 +507,7 @@
 							<UserIcon class="h-5 w-5 text-gray-500 dark:text-gray-400" />
 						</div>
 					{/if}
-					<span class="hidden lg:flex lg:items-center">
+					<span class="hidden md:flex md:items-center">
 						<span class="ml-4 text-sm font-semibold leading-6 text-gray-900 dark:text-white" aria-hidden="true">
 							{user?.nombre_funcional || user?.username || 'Usuario'}
 						</span>
@@ -419,9 +516,9 @@
 
 				{#if isProfileOpen}
 					<div class="absolute right-0 z-10 mt-2.5 origin-top-right">
-						<DropdownMenu 
-							options={getProfileOptions()} 
-							isOpen={true} 
+						<DropdownMenu
+							options={getProfileOptions()}
+							isOpen={true}
 							width="w-full"
 							class="w-full"
 						/>
@@ -430,4 +527,121 @@
 			</div>
 		</div>
 	</div>
-</div>
+
+	<!-- Mobile: iconos compactos a la derecha (md:hidden) -->
+	<div class="md:hidden flex items-center gap-0.5 shrink-0">
+		<!-- PWA Install -->
+		<PWAInstallButton />
+
+		<!-- Theme toggle (compact) -->
+		<ThemeToggle />
+
+		<!-- Notifications bell -->
+		{#if user}
+			<div class="relative" bind:this={notificationContainerEl}>
+				<button
+					type="button"
+					class="relative p-2 text-gray-500 dark:text-gray-400 active:scale-90 transition-transform rounded-lg active:bg-gray-100 dark:active:bg-gray-800"
+					onclick={(e) => { e.stopPropagation(); isNotificationsOpen = !isNotificationsOpen; isProfileOpen = false; }}
+					aria-label="Ver notificaciones"
+				>
+					<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+					</svg>
+					{#if unreadCount > 0}
+						<span class="absolute top-1.5 right-1.5 flex h-2 w-2">
+							<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+							<span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+						</span>
+					{/if}
+				</button>
+
+				{#if isNotificationsOpen}
+					<div
+						onclick={(e) => e.stopPropagation()}
+						class="absolute right-0 z-50 mt-2 w-72 origin-top-right rounded-lg bg-white dark:bg-gray-900 py-2 shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-800 focus:outline-none border border-gray-100 dark:border-gray-800"
+					>
+						<div class="px-4 py-2 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+							<span class="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Notificaciones</span>
+							{#if unreadCount > 0}
+								<button
+									type="button"
+									onclick={(e) => { e.stopPropagation(); markAllAsRead(); }}
+									class="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+								>
+									Marcar todo
+								</button>
+							{/if}
+						</div>
+
+						<div class="max-h-72 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 scrollbar-hide">
+							{#if notificationsLoading}
+								<div class="flex justify-center items-center py-6">
+									<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
+								</div>
+							{:else if notifications.length === 0}
+								<div class="px-4 py-6 text-center text-xs text-gray-500 dark:text-gray-400">
+									No tienes notificaciones
+								</div>
+							{:else}
+								{#each [...unreadAlerts, ...readAlerts].slice(0, 8) as item (item._id || item.id)}
+									<button
+										type="button"
+										onclick={(e) => { e.stopPropagation(); handleNotificationClick(item); }}
+										class="w-full text-left px-3 py-2.5 text-xs flex gap-x-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40 {item.leido ? '' : 'bg-blue-50/40 dark:bg-blue-900/10'}"
+									>
+										<div class="mt-1 shrink-0">
+											<span class="size-2 rounded-full inline-block {item.tipo_alerta === 'success' ? 'bg-green-500' : item.tipo_alerta === 'warning' ? 'bg-amber-500' : item.tipo_alerta === 'error' ? 'bg-red-500' : 'bg-blue-500'}"></span>
+										</div>
+										<div class="flex-1 min-w-0">
+											<p class="text-gray-900 dark:text-white font-semibold truncate">
+												{item.titulo}
+											</p>
+											<p class="text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 break-words">
+												{item.mensaje}
+											</p>
+										</div>
+									</button>
+								{/each}
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
+
+		<!-- Profile avatar (mobile) -->
+		<div class="relative" bind:this={profileContainerElMobile}>
+			<button
+				type="button"
+				class="p-1 active:scale-90 transition-transform"
+				id="user-menu-button-mobile"
+				aria-expanded={isProfileOpen}
+				aria-label="Menú de usuario"
+				onclick={(e) => {
+					e.stopPropagation();
+					isProfileOpen = !isProfileOpen;
+					isNotificationsOpen = false;
+				}}
+			>
+				{#if user?.foto_url}
+					<img class="h-7 w-7 rounded-full bg-gray-50 ring-1 ring-gray-200 dark:ring-gray-700" src={user.foto_url} alt="" />
+				{:else}
+					<div class="h-7 w-7 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white text-xs font-bold">
+						{(user?.username || 'U').charAt(0).toUpperCase()}
+					</div>
+				{/if}
+			</button>
+
+			{#if isProfileOpen}
+				<div class="absolute right-0 z-10 mt-2 origin-top-right">
+					<DropdownMenu
+						options={getProfileOptions()}
+						isOpen={true}
+						width="w-48"
+					/>
+				</div>
+			{/if}
+		</div>
+	</div>
+</header>

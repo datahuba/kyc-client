@@ -127,9 +127,50 @@
 		padding-bottom: env(safe-area-inset-bottom, 0px) !important;
 	}
 
-	/* Main Scroll: Espaciado inferior para evitar recortes del Home Indicator de iOS */
-	main {
-		padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
+	/* Main Scroll: espaciado inferior para evitar recortes del Home Indicator de iOS.
+	   NOTA: se usa `:where()` para que la specificity sea 0, y las utility classes
+	   del <main> (pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-6) ganen
+	   en el orden de cascada. Esto es CRÍTICO para que el BottomNav (h-14 = 3.5rem)
+	   no tape el contenido en mobile. */
+	:where(main) {
+		padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+	}
+
+	@media (min-width: 1024px) {
+		:where(main) {
+			padding-bottom: 1.5rem;
+		}
+	}
+
+	/* iOS: inputs con font-size < 16px hacen zoom automático al enfocar y
+	   descuadran la página. Aplicamos 16px globalmente para evitar el zoom
+	   en iOS Safari (incluye páginas /auth/* que están fuera de <main>). */
+	@supports (-webkit-touch-callout: none) {
+		/* Selector específico para iOS (Safari iOS se anuncia con -webkit-touch-callout) */
+		input,
+		select,
+		textarea {
+			font-size: max(16px, 1em);
+		}
+	}
+
+	/* Fallback: si no detecta iOS explícitamente, igual aplicar 16px mínimo */
+	input,
+	select,
+	textarea {
+		font-size: max(16px, inherit);
+	}
+
+	/* SCROLL-001: Cuando el keyboard sube en mobile, el input focused queda tapado.
+	   scroll-margin-top permite que scrollIntoView deje espacio arriba para que
+	   el input quede visible sobre el keyboard. */
+	@supports (-webkit-touch-callout: none) {
+		input:focus-visible,
+		select:focus-visible,
+		textarea:focus-visible {
+			scroll-margin-top: 1.5rem;
+			scroll-margin-bottom: 50vh; /* deja espacio para el keyboard virtual */
+		}
 	}
 }
 
@@ -140,5 +181,29 @@
 	}
 	* {
 		scrollbar-width: none;
+	}
+}
+
+/* MOBILE-007: Toasts bottom-center en mobile.
+   Los toasts noyf se posicionan bottom-center en mobile.
+   Hay que empujarlos arriba del bottom-nav (h-16) y respetar safe-area.
+   En desktop el toast está top-right con offset normal. */
+@media (max-width: 768px) {
+	.notyf {
+		left: 0 !important;
+		right: 0 !important;
+		width: 100% !important;
+		padding: 0 1rem !important;
+	}
+	.notyf__container {
+		bottom: calc(env(safe-area-inset-bottom, 0px) + 5rem) !important; /* 5rem = 80px ≈ bottom-nav (64px) + gap */
+		top: auto !important;
+	}
+	.notyf__wrapper {
+		max-width: 100% !important;
+	}
+	.notyf__toast {
+		max-width: 100% !important;
+		width: 100% !important;
 	}
 }

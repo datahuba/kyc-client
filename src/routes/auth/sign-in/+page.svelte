@@ -83,27 +83,27 @@
 	}
 </script>
 
-<div class="relative flex min-h-dvh">
+<div class="relative flex min-h-dvh" style="padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);">
 	<div class="absolute top-4 right-4 z-50 flex items-center gap-4">
 		<PWAInstallButton />
 		<ThemeToggle />
 	</div>
 	<div
-		class="relative z-20 flex flex-1 items-center justify-center bg-light-primary p-8 dark:bg-dark-primary"
+		class="relative z-20 flex flex-1 items-center justify-center bg-light-primary p-5 sm:p-8 dark:bg-dark-primary"
 	>
-		<div class="w-full max-w-md">
+		<div class="w-full max-w-md pt-4 sm:pt-0">
 			<!-- Logo institucional UAGRM -->
 			<div class="mb-10 flex flex-col items-center justify-center">
 				<div class="mb-4 flex items-center gap-3">
 					<img
 						src="/images/logo_uagrm_fondo_blanco.jpg"
 						alt="UAGRM"
-						class="h-20 w-20 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5"
+						class="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5"
 					/>
 					<img
 						src="/images/logo_contaduria_publica_fondo_blanco.jpg"
 						alt="Facultad de Contaduría Pública"
-						class="h-20 w-20 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5"
+						class="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-contain bg-white p-1.5 shadow-sm ring-1 ring-black/5"
 					/>
 				</div>
 				<span class="text-2xl font-extrabold text-light-secondary dark:text-dark-tertiary text-center leading-tight">

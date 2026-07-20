@@ -11,6 +11,8 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import PaymentForm from '$lib/features/payments/PaymentForm.svelte';
+	import EmptyState from '$lib/components/ui/emptyState.svelte';
+	import SearchInput from '$lib/components/ui/searchInput.svelte';
 	import { Pagination } from '$lib/components/ui';
 	import { 
 		PlusIcon, 
@@ -306,6 +308,18 @@
 		return $userStore.role === 'superadmin';
 	}
 
+	// ISS-004: detección de filtros activos y limpieza para el empty state.
+	// Reactividad pura: si cambia cualquier filtro, esto se recalcula solo.
+	let hasActiveFilters = $derived(
+		!!(filters.q || filters.estado || filters.curso_id || filters.estudiante_id || filters.tipo_concepto)
+	);
+
+	function clearFilters() {
+		filters = { q: '', estado: '', curso_id: '', estudiante_id: '', tipo_concepto: '' };
+		page = 1;
+		loadPayments();
+	}
+
 	function canApproveReject(payment: Payment): boolean {
 		if (payment.estado_pago !== 'pendiente') return false;
 		
@@ -475,18 +489,19 @@
 			{/if}
 		</div>
 		
-		<div class="flex gap-3 w-full md:w-auto">
-			<Button variant="secondary" onclick={loadPayments} loading={loading}>
+		<div class="flex flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
+			<Button variant="secondary" onclick={loadPayments} loading={loading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
 				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
+				<span class="sm:hidden">Recargar</span>
 			</Button>
-			<Button variant="secondary" onclick={downloadCSV} loading={csvLoading}>
+			<Button variant="secondary" onclick={downloadCSV} loading={csvLoading} aria-label="Descargar listado de pagos en CSV" class="flex-1 sm:flex-none justify-center">
 				{#snippet leftIcon()} <DownloadIcon class="size-5" /> {/snippet}
-				Descargar CSV
+				<span class="whitespace-nowrap">CSV</span>
 			</Button>
 			{#if isStudent}
-				<Button onclick={() => isCreateModalOpen = true} loading={loading}>
+				<Button onclick={() => isCreateModalOpen = true} loading={loading} class="flex-1 sm:flex-none justify-center">
 					{#snippet leftIcon()} <PlusIcon class="size-5" /> {/snippet}
-					Registrar Pago
+					<span class="whitespace-nowrap">Registrar Pago</span>
 				</Button>
 			{/if}
 		</div>
@@ -496,21 +511,11 @@
 	<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
 		<div class="md:col-span-1">
 			<label for="search" class="sr-only">Buscar</label>
-			<div class="relative">
-				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-					<svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-					</svg>
-				</div>
-				<input
-					type="text"
-					id="search"
-					bind:value={filters.q}
-					class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-					placeholder="Buscar recibo o nombre..."
-					oninput={handleSearchInput}
-				/>
-			</div>
+			<SearchInput
+				bind:value={filters.q}
+				placeholder="Buscar recibo o nombre..."
+				onInput={() => handleSearchInput()}
+			/>
 		</div>
 
 		<div>
@@ -680,8 +685,20 @@
 					{/each}
 					{#if payments.length === 0}
 						<tr>
-							<td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-								No se encontraron pagos.
+							<td colspan="6" class="px-6 py-0">
+								<EmptyState
+									icon="payment"
+									variant="simple"
+									size="md"
+									title="No se encontraron pagos"
+									description={hasActiveFilters
+										? 'No hay resultados con los filtros aplicados. Probá limpiarlos para ver todos los pagos.'
+										: isStudent
+											? 'Cuando registres un pago desde esta misma vista, aparecerá aquí para que puedas hacer seguimiento.'
+											: 'Aún no se registraron pagos en el sistema.'}
+									ctaLabel={hasActiveFilters ? 'Limpiar filtros' : undefined}
+									onCta={hasActiveFilters ? clearFilters : undefined}
+								/>
 							</td>
 						</tr>
 					{/if}
@@ -746,9 +763,19 @@
 				</div>
 			{/each}
 			{#if payments.length === 0}
-				<div class="text-center py-8 text-sm text-gray-500 dark:text-gray-400 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl">
-					No se encontraron pagos.
-				</div>
+				<EmptyState
+					icon="payment"
+					variant="bordered"
+					size="md"
+					title="No se encontraron pagos"
+					description={hasActiveFilters
+						? 'No hay resultados con los filtros aplicados. Probá limpiarlos para ver todos los pagos.'
+						: isStudent
+							? 'Cuando registres un pago desde esta misma vista, aparecerá aquí para que puedas hacer seguimiento.'
+							: 'Aún no se registraron pagos en el sistema.'}
+					ctaLabel={hasActiveFilters ? 'Limpiar filtros' : undefined}
+					onCta={hasActiveFilters ? clearFilters : undefined}
+				/>
 			{/if}
 		</div>
 

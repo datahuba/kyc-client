@@ -104,9 +104,11 @@
 					/>
 					<button
 						type="button"
-						class="absolute right-3 bottom-0 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none"
+						class="absolute right-2 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-md"
 						onclick={() => showCurrent = !showCurrent}
 						tabindex="-1"
+						aria-label={showCurrent ? "Ocultar contraseña actual" : "Mostrar contraseña actual"}
+						aria-pressed={showCurrent}
 						title={showCurrent ? "Ocultar contraseña" : "Mostrar contraseña"}
 					>
 						{#if showCurrent}
@@ -132,9 +134,12 @@
 						/>
 						<button
 							type="button"
-							class="absolute right-3 bottom-0 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none"
+							class="absolute right-2 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-md"
 							onclick={() => showNew = !showNew}
 							tabindex="-1"
+							aria-label={showNew ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
+							aria-pressed={showNew}
+							title={showNew ? "Ocultar contraseña" : "Mostrar contraseña"}
 						>
 							{#if showNew}
 								<svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.568 1 1 0 0 1 0 .712 11.334 11.334 0 0 1-4.225 4.887M15.344 15.344A4.89 4.89 0 0 1 12 17a5 5 0 0 1-5-5 4.89 4.89 0 0 1 1.656-3.344M2 2l20 20"/><path d="M14.5 14.5a3 3 0 0 1-2.5-2.5"/><path d="M8.544 3.01A10.6 10.6 0 0 0 2 12a1 1 0 0 0 0 .712 10.73 10.73 0 0 0 4.225 4.887"/></svg>
@@ -164,9 +169,12 @@
 						/>
 						<button
 							type="button"
-							class="absolute right-3 bottom-0 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none"
+							class="absolute right-2 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-md"
 							onclick={() => showConfirm = !showConfirm}
 							tabindex="-1"
+							aria-label={showConfirm ? "Ocultar confirmación de contraseña" : "Mostrar confirmación de contraseña"}
+							aria-pressed={showConfirm}
+							title={showConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
 						>
 							{#if showConfirm}
 								<svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.568 1 1 0 0 1 0 .712 11.334 11.334 0 0 1-4.225 4.887M15.344 15.344A4.89 4.89 0 0 1 12 17a5 5 0 0 1-5-5 4.89 4.89 0 0 1 1.656-3.344M2 2l20 20"/><path d="M14.5 14.5a3 3 0 0 1-2.5-2.5"/><path d="M8.544 3.01A10.6 10.6 0 0 0 2 12a1 1 0 0 0 0 .712 10.73 10.73 0 0 0 4.225 4.887"/></svg>

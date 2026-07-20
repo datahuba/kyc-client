@@ -461,8 +461,8 @@
 </script>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between gap-3">
-		<div class="flex items-center gap-3">
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+		<div class="flex items-center gap-3 min-w-0">
 			<button
 				onclick={goBack}
 				class="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -475,12 +475,12 @@
 			{#if loadingMain}
 				<div class="h-7 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
 			{:else}
-				<Heading level="h1">{classroom?.nombre ?? 'Clase'}</Heading>
+				<Heading level="h1" class="truncate">{classroom?.nombre ?? 'Clase'}</Heading>
 			{/if}
 		</div>
 
 		{#if isTeacher}
-			<Button onclick={() => (showEnrollStudentForm = true)}>
+			<Button onclick={() => (showEnrollStudentForm = true)} class="self-start sm:self-auto">
 				Inscribir Estudiante
 			</Button>
 		{/if}

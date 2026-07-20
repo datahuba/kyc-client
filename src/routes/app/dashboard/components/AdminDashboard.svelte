@@ -4,6 +4,8 @@
 	import type { ResumenEconomico } from '$lib/services/payment.service';
 	import type { Enrollment, Payment } from '$lib/interfaces';
 	import { UsersIcon, ClipboardIcon, TagIcon } from '$lib/icons/outline';
+	// FIX-DASH-001: UsersIcon, TagIcon, ClipboardIcon se mantienen en import
+	// por si se usan en el Resumen Económico (línea ~358 usa ClipboardIcon).
 	import { CreditCardIcon } from '$lib/icons/solid';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -363,51 +365,12 @@
 		{/if}
 
 		<!-- Stats Grid -->
-		<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
-			<a href="/app/students" class="block">
-				<!-- BUG 6 FIX: Aplicación de min-w-0 al padre y flex-1 min-w-0 al contenedor de texto -->
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg min-w-0">
-					<div class="flex-1 min-w-0 mr-3">
-						<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Estudiantes</p>
-						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 truncate">{stats.students.total}</p>
-						<p class="text-[10px] sm:text-xs text-green-600 mt-1 truncate">{stats.students.active} Activos</p>
-					</div>
-					<!-- BUG 6 FIX: shrink-0 para proteger el icono del aplastamiento -->
-					<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
-						<UsersIcon class="size-6 sm:size-8" />
-					</div>
-				</div>
-			</a>
-
-			<a href="/app/courses" class="block">
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg min-w-0">
-					<div class="flex-1 min-w-0 mr-3">
-						<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Cursos</p>
-						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 truncate">{stats.courses.total}</p>
-						<p class="text-[10px] sm:text-xs text-green-600 mt-1 truncate">{stats.courses.active} Activos</p>
-					</div>
-					<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
-						<TagIcon class="size-6 sm:size-8" />
-					</div>
-				</div>
-			</a>
-
-			<a href="/app/enrollments" class="block">
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg min-w-0">
-					<div class="flex-1 min-w-0 mr-3">
-						<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Inscripciones</p>
-						<p class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 truncate">{stats.enrollments.total}</p>
-						<p class="text-[10px] sm:text-xs text-green-600 mt-1 truncate">{stats.enrollments.active} Activas</p>
-					</div>
-					<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
-						<ClipboardIcon class="size-6 sm:size-8" />
-					</div>
-				</div>
-			</a>
-
+		<!-- FIX-DASH-001: Eliminadas las 3 tarjetas (Estudiantes, Cursos, Inscripciones) que eran redundantes
+		     con el Resumen Económico. Ahora solo queda la tarjeta de Ingresos (condicional) -->
+		<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 gap-4 sm:gap-6">
 			<!-- La tarjeta "Ingresos" es redundante para roles económicos (ya ven
 			     "Total Ingresos" en el Resumen Económico, y esta muestra solo los
-			     pagos filtrados por rol, lo que confunde). Se oculta para ellos. 
+			     pagos filtrados por rol, lo que confunde). Se oculta para ellos.
 				 NOTA: Solo se muestra si el usuario TIENE PERMISOS para ver pagos (ej. CPD) -->
 			{#if !verResumenEconomico && puedeVerPagos}
 			<a href="/app/payments" class="block">
@@ -427,12 +390,12 @@
 			{/if}
 		</div>
 
-		<!-- Course Breakdown Section (oculto para perfiles segmentados por curso) -->
+		<!-- Program Breakdown Section (oculto para perfiles segmentados por programa) -->
 		{#if !esSegmentado}
 		<div>
 			<div class="flex items-center justify-between mb-4">
-				<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Desglose por Curso</h2>
-				<a href="/app/courses" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">Ver cursos</a>
+				<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Desglose por Programa</h2>
+				<a href="/app/courses" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">Ver programas</a>
 			</div>
 
 			{#if courseBreakdown.length === 0}

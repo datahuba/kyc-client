@@ -8,9 +8,10 @@
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
-	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
+	import Skeleton from '$lib/components/ui/skeleton.svelte';
 	import StudentDetails from '$lib/features/students/StudentDetails.svelte';
 	import StudentForm from '$lib/features/students/StudentForm.svelte';
+	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import { PlusIcon, DownloadIcon } from '$lib/icons/outline';
 	import { alert } from '$lib/utils';
 	import { Pagination } from '$lib/components/ui';
@@ -149,6 +150,22 @@
 
 	function handleFilterChange() {
 		loadStudents();
+	}
+
+	// ISS-004: empty state contextual con limpieza de filtros
+	let hasActiveStudentFilters = $derived(
+		!!(filters.q || filters.activo !== 'all' || filters.estado_titulo !== 'all' || filters.curso_id)
+	);
+
+	function clearStudentFilters() {
+		filters = { q: '', activo: 'all', estado_titulo: 'all', curso_id: '' };
+		page = 1;
+		loadStudents();
+	}
+
+	function handleCreateStudent() {
+		selectedStudent = null;
+		isFormOpen = true;
 	}
 
 	function handleSearchInput() {
@@ -525,7 +542,7 @@
 	<div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
 		<Heading level="h1">Estudiantes</Heading>
 		<div class="flex flex-wrap gap-3 ml-auto w-full sm:w-auto justify-end">
-			<Button onclick={downloadStudentsCSV} variant="secondary" loading={csvLoading}>
+			<Button onclick={downloadStudentsCSV} variant="secondary" loading={csvLoading} aria-label="Descargar listado de estudiantes en CSV">
 				{#snippet leftIcon()}
 					<DownloadIcon class="size-5" />
 				{/snippet}
@@ -533,14 +550,14 @@
 			</Button>
 
 			{#if canCreateStudent}
-				<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; importCursoId = ''; }} variant="secondary">
+				<Button onclick={() => { isImportModalOpen = true; importReport = null; importFile = null; importCursoId = ''; }} variant="secondary" aria-label="Importar estudiantes desde archivo Excel">
 					{#snippet leftIcon()}
 						<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
 					{/snippet}
 					Importar Excel
 				</Button>
 
-				<Button onclick={handleCreate}>
+				<Button onclick={handleCreate} aria-label="Crear nuevo estudiante">
 					{#snippet leftIcon()}
 						<PlusIcon class="size-5" />
 					{/snippet}
@@ -562,7 +579,21 @@
 	/>
 
 	{#if loading}
-		<TableSkeleton columns={6} rows={10} />
+		<Skeleton variant="table" columns={6} rows={10} />
+	{:else if students.length === 0}
+		<EmptyState
+			icon="student"
+			title={hasActiveStudentFilters ? 'No hay estudiantes con esos filtros' : 'No hay estudiantes registrados'}
+			description={hasActiveStudentFilters
+				? 'Probá limpiar los filtros para ver todos los estudiantes del sistema.'
+				: 'CPD o SuperAdmin pueden registrar estudiantes manualmente o cargarlos en lote desde Excel.'}
+			ctaLabel={hasActiveStudentFilters
+				? 'Limpiar filtros'
+				: canCreateStudent ? 'Crear primer estudiante' : undefined}
+			onCta={hasActiveStudentFilters
+				? clearStudentFilters
+				: canCreateStudent ? handleCreateStudent : undefined}
+		/>
 	{:else}
 		<!-- Componente de Tabla Modularizado -->
 		<StudentTable
@@ -573,10 +604,12 @@
 			{toggleSelectAll}
 			{toggleSelectStudent}
 			{toggleDropdown}
+			onEdit={handleEdit}
+			onDelete={handleDeleteClick}
 			bind:selectedStudentIds={selectedStudentIds}
 			bind:openDropdownId={openDropdownId}
 		/>
-		
+
 		<Pagination
 			currentPage={page}
 			{totalPages}

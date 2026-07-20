@@ -12,6 +12,8 @@
 	import ComunicadoModal from '$lib/features/courses/ComunicadoModal.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
+	import EmptyState from '$lib/components/ui/emptyState.svelte';
+	import SearchInput from '$lib/components/ui/searchInput.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon, DownloadIcon } from '$lib/icons/outline';
 	import { Pagination } from '$lib/components/ui';
@@ -141,6 +143,16 @@
 			studentsLoading = false;
 		}
 	}
+
+	function clearCourseFilters() {
+		filters = { q: '', activo: 'all', tipo_curso: 'all', modalidad: 'all' };
+		page = 1;
+		loadCourses();
+	}
+
+	let hasActiveCourseFilters = $derived(
+		!!(filters.q || filters.activo !== 'all' || filters.tipo_curso !== 'all' || filters.modalidad !== 'all')
+	);
 
 	function handleCreate() {
 		selectedCourse = null;
@@ -299,21 +311,11 @@
 		<!-- Search -->
 		<div class="md:col-span-1">
 			<label for="search" class="sr-only">Buscar</label>
-			<div class="relative">
-				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-					<svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-					</svg>
-				</div>
-				<input
-					type="text"
-					id="search"
-					bind:value={filters.q}
-					class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-					placeholder="Buscar código o nombre..."
-					oninput={handleSearchInput}
-				/>
-			</div>
+			<SearchInput
+				bind:value={filters.q}
+				placeholder="Buscar código o nombre..."
+				onInput={() => handleSearchInput()}
+			/>
 		</div>
 		
 		<!-- Estado -->
@@ -364,9 +366,19 @@
 	{#if loading}
 		<TableSkeleton columns={6} rows={10} />
 	{:else if courses.length === 0}
-		<div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-			<p class="text-gray-500 dark:text-gray-400">No hay programas registrados.</p>
-		</div>
+		<EmptyState
+			icon="course"
+			title={hasActiveCourseFilters ? 'No hay programas con esos filtros' : 'No hay programas registrados'}
+			description={hasActiveCourseFilters
+				? 'Probá limpiar los filtros para ver todos los programas disponibles.'
+				: 'Cuando CPD o Admin cree un nuevo programa de Diplomado, Maestría, Curso o Taller, aparecerá aquí.'}
+			ctaLabel={hasActiveCourseFilters
+				? 'Limpiar filtros'
+				: canCreateCourse ? 'Crear primer programa' : undefined}
+			onCta={hasActiveCourseFilters
+				? clearCourseFilters
+				: canCreateCourse ? handleCreate : undefined}
+		/>
 	{:else}
 		<!-- Desktop Table -->
 		<div class="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -417,7 +429,7 @@
 							</td>
 							
 							<td class="px-3 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-								<button onclick={() => toggleDropdown(course._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+								<button onclick={() => toggleDropdown(course._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del programa {course.nombre_programa}">
 									<DotsVerticalIcon class="size-5" />
 								</button>
 								{#if openDropdownId === course._id}
@@ -456,7 +468,7 @@
 							<p class="text-xs text-gray-500 dark:text-gray-400">{course.codigo}</p>
 						</div>
 						<div class="relative">
-							<button onclick={() => toggleDropdown(course._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+							<button onclick={() => toggleDropdown(course._id)} class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Acciones del programa {course.nombre_programa}">
 								<DotsVerticalIcon class="size-5" />
 							</button>
 							{#if openDropdownId === course._id}

@@ -12,7 +12,7 @@
 	import Input from '$lib/components/ui/input.svelte';
 	import Select from '$lib/components/ui/select.svelte';
 	import Card from '$lib/components/ui/card.svelte';
-	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
+	import Skeleton from '$lib/components/ui/skeleton.svelte';
 	import { Pagination } from '$lib/components/ui';
 	import { DownloadIcon, RefreshIcon } from '$lib/icons/outline';
 	import { alert, formatDate, formatCurrency } from '$lib/utils';
@@ -157,7 +157,12 @@
 			{/if}
 		</div>
 		<div class="flex gap-3">
-			<Button variant="secondary" onclick={loadReporte} loading={loading}>
+			<Button
+				variant="secondary"
+				onclick={loadReporte}
+				loading={loading}
+				aria-label="Recargar reporte"
+			>
 				{#snippet leftIcon()}<RefreshIcon class="size-5" />{/snippet}
 			</Button>
 			<Button onclick={handleExportExcel} loading={exporting}>
@@ -207,7 +212,7 @@
 	</div>
 
 	{#if loading}
-		<TableSkeleton columns={7} rows={10} />
+		<Skeleton variant="table" columns={7} rows={10} />
 	{:else if payments.length === 0}
 		<div class="text-center py-12 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl">
 			<p class="text-gray-500 dark:text-gray-400">No hay pagos en el rango y filtros seleccionados.</p>

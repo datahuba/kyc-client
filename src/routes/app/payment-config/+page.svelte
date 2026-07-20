@@ -57,16 +57,16 @@
 </script>
 
 <div class="space-y-6">
-	<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<div>
 			<Heading level="h1">Información de Pagos</Heading>
 			<p class="text-gray-500 dark:text-gray-400 text-sm mt-1">
 				Datos necesarios para realizar depósitos o transferencias.
 			</p>
 		</div>
-		
+
 		{#if isAdmin}
-			<div class="flex gap-3">
+			<div class="flex flex-wrap gap-2 sm:gap-3">
                 {#if config}
 				    <Button variant="destructive" onclick={() => isDeleteModalOpen = true}>
                         {#snippet leftIcon()} <TrashIcon class="size-5" /> {/snippet}

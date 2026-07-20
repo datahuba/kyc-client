@@ -374,7 +374,7 @@
 				</p>
 			{:else if selectedEnrollmentId && isMatriculaPagada}
 				<p class="mt-1 flex items-center gap-1 text-xs font-bold text-light-success dark:text-dark-success">
-					<CircleCheckIcon className="size-3.5 shrink-0" />
+					<CircleCheckIcon class="size-3.5 shrink-0" />
 					Matrícula al día. Puedes registrar pagos de colegiatura.
 				</p>
 			{/if}
