@@ -42,6 +42,7 @@
 		fecha_desde: hoyISO(),
 		fecha_hasta: hoyISO(),
 		curso_id: '',
+		estudiante_id: '',  // F-COBRANZA-003
 		estado: ''
 	});
 
@@ -83,6 +84,7 @@
 				fecha_desde: filters.fecha_desde,
 				fecha_hasta: filters.fecha_hasta,
 				curso_id: filters.curso_id || undefined,
+				estudiante_id: filters.estudiante_id || undefined,  // F-COBRANZA-003
 				estado: filters.estado || undefined
 			});
 			payments = res.data;
@@ -119,6 +121,7 @@
 				fecha_desde: filters.fecha_desde,
 				fecha_hasta: filters.fecha_hasta,
 				curso_id: filters.curso_id || undefined,
+				estudiante_id: filters.estudiante_id || undefined,  // F-COBRANZA-003
 				estado: filters.estado || undefined
 			});
 		} catch (e: any) {
@@ -173,7 +176,7 @@
 	</div>
 
 	<!-- Filtros -->
-	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-dark-border">
+	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-gray-700">
 		<Input label="Desde" id="fecha_desde" type="date" bind:value={filters.fecha_desde} onchange={handleFilterChange} />
 		<Input label="Hasta" id="fecha_hasta" type="date" bind:value={filters.fecha_hasta} onchange={handleFilterChange} />
 		<Select label="Curso" bind:value={filters.curso_id} onchange={handleFilterChange}>
@@ -189,6 +192,14 @@
 			<option value="rechazado">Rechazado</option>
 			<option value="anulado">Anulado</option>
 		</Select>
+		<!-- F-COBRANZA-003: filtro por estudiante. Se pega el ID. -->
+		<Input
+			label="ID Estudiante"
+			id="estudiante_id"
+			placeholder="Pega el ID del estudiante"
+			bind:value={filters.estudiante_id}
+			onchange={handleFilterChange}
+		/>
 	</div>
 
 	<!-- Resumen agregado -->
