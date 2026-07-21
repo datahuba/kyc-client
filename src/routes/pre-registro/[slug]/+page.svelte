@@ -452,7 +452,7 @@
 										type="button"
 										onclick={() => goToStep(step.id)}
 										disabled={!isReachable}
-										class="group flex min-w-0 flex-1 items-center gap-2 sm:gap-3 rounded-xl px-2 py-2 text-left transition-all
+										class="group flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3 rounded-xl px-1.5 py-2 sm:px-2 text-left transition-all
 											{isActive ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
 											{!isReachable ? 'cursor-not-allowed opacity-60' : 'hover:bg-gray-50 dark:hover:bg-dark-surface/60'}
 											{isComplete ? 'cursor-pointer' : ''}"
@@ -469,7 +469,7 @@
 											{/if}
 										</span>
 										<span class="min-w-0">
-											<span class="block truncate text-xs font-semibold
+											<span class="block truncate text-[10px] font-semibold sm:text-xs
 												{isActive ? 'text-primary-700 dark:text-dark-tertiary' : isComplete ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'}">
 												{step.title}
 											</span>
@@ -479,7 +479,7 @@
 										</span>
 									</button>
 									{#if !isLast}
-										<div class="h-0.5 w-3 shrink-0 rounded-full transition-all
+										<div class="h-0.5 w-2 shrink-0 rounded-full transition-all sm:w-3
 											{isComplete ? 'bg-primary-500' : 'bg-gray-200 dark:bg-dark-border'}"></div>
 									{/if}
 								</li>
