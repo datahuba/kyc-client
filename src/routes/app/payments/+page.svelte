@@ -959,12 +959,29 @@
 				<div class="border-t border-gray-200 dark:border-gray-700 pt-4">
 					<label for="comprobante" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Comprobante</label>
 					{#if selectedPayment.comprobante_url}
+						<!-- F-COBRANZA-012 (2026-07-21): botón de descarga prominentemente.
+						     Funciona para cualquier tipo de comprobante (imagen o PDF).
+						     El atributo `download` fuerza la descarga en vez de abrir nueva pestaña. -->
+						<div class="flex justify-end mb-2">
+							<a
+								href={selectedPayment.comprobante_url}
+								download
+								target="_blank"
+								rel="noopener noreferrer"
+								class="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 active:scale-95 text-white text-sm font-medium rounded-lg transition-all"
+							>
+								<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+								</svg>
+								Descargar comprobante
+							</a>
+						</div>
 						<div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900 flex justify-center items-center min-h-[200px]">
-							{#if selectedPayment.comprobante_url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) || selectedPayment.comprobante_url.includes('cloudinary')} 
-								<img 
-									src={selectedPayment.comprobante_url} 
-									alt="Comprobante" 
-									class="max-w-full max-h-[500px] object-contain" 
+							{#if selectedPayment.comprobante_url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) || selectedPayment.comprobante_url.includes('cloudinary')}
+								<img
+									src={selectedPayment.comprobante_url}
+									alt="Comprobante"
+									class="max-w-full max-h-[500px] object-contain"
 								/>
 							{:else}
 								<div class="text-center p-6">
