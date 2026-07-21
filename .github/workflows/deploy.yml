@@ -13,37 +13,54 @@ jobs:
       - name: Sincronización y Reconstrucción Absoluta
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
+          # F-ACTIONS-FIX (2026-07-21): migrado a SSH key (mismo patrón que backend).
+          # VPS endurecido: no acepta password, puerto 22 cerrado, user root bloqueado.
+          host: ${{ secrets.VPS_SSH_HOST }}
+          port: 2222
+          username: ${{ secrets.VPS_SSH_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 15m
           script: |
+            # F-ACTIONS-FIX: todo el script con sudo -n bash (deploy user
+            # no puede acceder a /root directamente).
+            sudo -n bash << 'REMOTE_EOF'
+            set -e
             echo "🧹 1. LIMPIANDO ESTADO LOCAL DEL VPS..."
             # ISSUE-MIGRACION (2026-07-17): movido de /var/www/frontend a /root/postgrado/frontend
-            # (al lado de /root/oys-deploy/ para convivencia multi-proyecto en el VPS)
             cd /root/postgrado/frontend
-            git reset --hard
+
+            # F-ACTIONS-FIX: refspec explícito (descubrimos que git pull no
+            # actualizaba la ref local de develop_kevin).
+            git fetch origin +refs/heads/develop_kevin:refs/remotes/origin/develop_kevin
+            echo "🔖 SHA remoto descargado:"
+            git rev-parse origin/develop_kevin
+
+            git checkout develop_kevin
+            git reset --hard origin/develop_kevin
             git clean -fd
-
-            echo "📥 2. DESCARGANDO CÓDIGO NUEVO..."
-            git pull origin develop_kevin
-
-            echo "🔎 3. VERIFICANDO QUE EL CÓDIGO LLEGÓ (Último commit):"
+            echo "🆕 HEAD actual:"
             git log -1 --oneline
 
-            echo "🔥 4. DESTRUYENDO CACHÉ FÍSICO DE SVELTE..."
-            rm -rf build/ .svelte-kit/ node_modules/
+            echo "🔥 2. DESTRUYENDO CACHÉ FÍSICO DE SVELTE..."
+            rm -rf build/ .svelte-kit/ node_modules/ || true
 
-            echo "🧨 5. DESTRUYENDO IMAGEN VIEJA DE DOCKER..."
+            echo "🧨 3. DESTRUYENDO IMAGEN VIEJA DE DOCKER..."
             cd /root/postgrado
             docker compose stop frontend || true
             docker compose rm -f frontend || true
             # Borra la imagen física para evitar que Docker use capas viejas
-            docker rmi -f $(docker images -q postgrado-frontend) || true
-            docker rmi -f $(docker images -q *frontend*) || true
+            docker rmi -f $(docker images -q postgrado-frontend) 2>/dev/null || true
+            docker rmi -f $(docker images -q "*frontend*") 2>/dev/null || true
 
-            echo "🚀 6. CONSTRUYENDO Y LEVANTANDO DESDE CERO..."
+            echo "🚀 4. CONSTRUYENDO Y LEVANTANDO DESDE CERO..."
             docker compose build --no-cache frontend
             docker compose up -d --no-deps --force-recreate frontend
 
+            sleep 3
+            docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}' | grep -E 'kyc-frontend|postgrado-frontend' || echo "WARN: kyc-frontend no encontrado en docker ps"
+
+            echo "🧹 5. LIMPIEZA DE IMÁGENES HUÉRFANAS..."
+            docker image prune -f
+
             echo "✅ DESPLIEGUE FINALIZADO"
-            
+            REMOTE_EOF
