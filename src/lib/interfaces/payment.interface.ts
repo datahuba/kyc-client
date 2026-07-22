@@ -29,6 +29,10 @@ export interface Payment {
     // (enrich_payments_with_details_bulk). Útil para mostrar "Estudiante:
     // Juan Pérez" cuando verificado_por es "SISTEMA (auto-aprobación)".
     nombre_estudiante?: string;
+    // F-COBRANZA-036 (2026-07-22): C.I. (carnet_identidad) del estudiante.
+    // Si no tiene CI, cae al registro universitario. Pedido Lic. Sandra
+    // Zabala para mostrar en la columna del reporte de caja.
+    estudiante_ci?: string;
 }
 
 export interface CreatePaymentFormData {

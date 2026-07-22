@@ -252,6 +252,8 @@
 					<tr>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha Comprobante</th>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
+						<!-- F-COBRANZA-036 (2026-07-22): columna C.I. pedido por Sandra -->
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">C.I.</th>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Curso</th>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Concepto</th>
 						<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Monto</th>
@@ -265,6 +267,8 @@
 								{payment.fecha_comprobante ? formatDate(payment.fecha_comprobante) : 'Sin registrar'}
 							</td>
 							<td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{(payment as any).nombre_estudiante || '—'}</td>
+							<!-- F-COBRANZA-036: C.I. (carnet_identidad) o registro -->
+							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 font-mono">{(payment as any).estudiante_ci || '—'}</td>
 							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs break-words" title={getCursoNombre(payment.curso_id)}>{getCursoNombre(payment.curso_id)}</td>
 							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{payment.concepto}</td>
 							<td class="px-4 py-3 text-sm text-right font-bold text-gray-900 dark:text-white">{formatCurrency(payment.cantidad_pago)}</td>
@@ -286,6 +290,10 @@
 					<div class="flex items-start justify-between gap-3">
 						<div>
 							<p class="text-sm font-bold text-gray-900 dark:text-white">{(payment as any).nombre_estudiante || '—'}</p>
+							<!-- F-COBRANZA-036: CI/registro del estudiante -->
+							{#if (payment as any).estudiante_ci}
+								<p class="text-xs text-gray-500 dark:text-gray-400 font-mono">C.I. {(payment as any).estudiante_ci}</p>
+							{/if}
 							<p class="text-xs text-gray-500 dark:text-gray-400">{getCursoNombre(payment.curso_id)}</p>
 						</div>
 						<span class="text-base font-bold text-gray-900 dark:text-white">{formatCurrency(payment.cantidad_pago)}</span>
