@@ -77,6 +77,23 @@ class PaymentService {
 		return await apiKyC.put<Payment>(`/payments/${id}/anular`, { motivo });
 	}
 
+	// F-COBRANZA-011 (2026-07-21): Cobranza sube el comprobante de pago en
+	// nombre del estudiante cuando este no puede hacerlo por sí mismo.
+	// Restringido por backend a superadmin/admin/cobranza. La UI solo expone
+	// este método desde el menú de 3 puntos en /app/payments.
+	async uploadByEncargado(
+		paymentId: string,
+		file: File,
+		opts?: { numero_transaccion?: string; remitente?: string; fecha_comprobante?: string }
+	): Promise<Payment> {
+		const formData = new FormData();
+		formData.append('file', file);
+		if (opts?.numero_transaccion) formData.append('numero_transaccion', opts.numero_transaccion);
+		if (opts?.remitente) formData.append('remitente', opts.remitente);
+		if (opts?.fecha_comprobante) formData.append('fecha_comprobante', opts.fecha_comprobante);
+		return await apiKyC.post<Payment>(`/payments/${paymentId}/upload-by-encargado`, formData);
+	}
+
 	// ISSUE-P-DASHBOARD-COBRANZA: resumen económico agregado (incluye matrícula
 	// como ingreso, respeta segmentación por curso). Solo roles económicos.
 	async getResumenEconomico(): Promise<ResumenEconomico> {

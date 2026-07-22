@@ -14,13 +14,15 @@
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import SearchInput from '$lib/components/ui/searchInput.svelte';
 	import { Pagination } from '$lib/components/ui';
+	import UploadComprobanteModal from '$lib/features/payments/UploadComprobanteModal.svelte';
 	import { 
 		PlusIcon, 
 		DotsVerticalIcon, 
 		CheckIcon, 
 		XIcon, 
 		RefreshIcon,
-		DownloadIcon
+		DownloadIcon,
+		UploadIcon
 	} from '$lib/icons/outline';
 	import { alert, formatDate, formatCurrency } from '$lib/utils';
 	import Select from '$lib/components/ui/select.svelte';
@@ -66,6 +68,7 @@
 	let isRejectModalOpen = $state(false);
 	let isRevertModalOpen = $state(false); // ISSUE-P-CANALES: Modal de anulación
 	let isDeleteModalOpen = $state(false); // Borrado definitivo (solo superadmin)
+	let isUploadComprobanteOpen = $state(false); // F-COBRANZA-011: cobranza sube comprobante del estudiante
 	
 	let paymentToAction: Payment | null = $state(null);
 	let actionLoading = $state(false);
@@ -341,6 +344,27 @@
 		return role === 'admin' || role === 'superadmin' || role === 'cobranza';
 	}
 
+	// F-COBRANZA-011 (2026-07-21): cobranza puede subir el comprobante del
+	// estudiante en nombre de él, cuando el estudiante no pudo hacerlo.
+	// - Roles: superadmin, admin, cobranza (el backend rechaza otros roles).
+	// - Estado: solo si NO tiene comprobante todavía (si ya tiene, mostrar el
+	//   comprobante en el modal de Detalles, no reemplazar).
+	// - Decisión Joel 20:30: SOLO cobranza puede hacerlo, no encargado_curso.
+	function canUploadComprobante(payment: Payment): boolean {
+		const role = $userStore.role;
+		if (role !== 'superadmin' && role !== 'admin' && role !== 'cobranza') return false;
+		if (payment.comprobante_url) return false; // ya tiene comprobante
+		// En Caja no requiere comprobante (es pago presencial). Mostrar el botón
+		// igual por si cobranza quiere adjuntar uno de todas formas.
+		return true;
+	}
+
+	function handleUploadComprobanteClick(payment: Payment) {
+		paymentToAction = payment;
+		isUploadComprobanteOpen = true;
+		openDropdownId = null;
+	}
+
 	function getDropdownOptions(payment: Payment) {
 		const options = [];
 
@@ -350,6 +374,17 @@
 			icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>`,
 			action: () => handleViewDetails(payment)
 		});
+
+		// F-COBRANZA-011: cobranza puede subir comprobante del estudiante
+		// cuando este no pudo hacerlo por sí mismo.
+		if (canUploadComprobante(payment)) {
+			options.push({
+				label: 'Subir comprobante',
+				id: 'upload',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>`,
+				action: () => handleUploadComprobanteClick(payment)
+			});
+		}
 
 		if (canApproveReject(payment)) {
 			options.push(
@@ -1033,4 +1068,23 @@
 			</div>
 		{/if}
 	</Modal>
+
+	<!-- F-COBRANZA-011 (2026-07-21): modal para que COBRANZA suba el comprobante
+	     de pago en nombre del estudiante. Solo visible para superadmin/admin/cobranza,
+	     y solo si el pago todavía no tiene comprobante_url. -->
+	<UploadComprobanteModal
+		isOpen={isUploadComprobanteOpen}
+		payment={paymentToAction}
+		onSuccess={(updated) => {
+			isUploadComprobanteOpen = false;
+			paymentToAction = null;
+			// Actualizar el pago en la lista local
+			payments = payments.map(p => p._id === updated._id ? { ...p, ...updated } : p);
+			loadPayments();
+		}}
+		onCancel={() => {
+			isUploadComprobanteOpen = false;
+			paymentToAction = null;
+		}}
+	/>
 </div>
