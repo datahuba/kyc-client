@@ -459,6 +459,58 @@
 
 	let excelLoading = $state(false);
 
+	// F-COBRANZA-019 (2026-07-22): descarga un PDF/imagen al cliente via fetch
+	// y crea un Blob URL. Cloudinary sirve los PDFs con Content-Disposition:
+	// attachment que FUERZA descarga y muestra pantalla blanca en iframes. Los
+	// Blob URLs locales NO respetan ese header y el browser SIEMPRE renderiza
+	// inline. Si falla (CORS, red), se hace fallback a Google Docs Viewer.
+	// Cache simple por URL para no re-descargar al cambiar de pago.
+	const _pdfBlobCache = new Map<string, string>();
+	let pdfBlobUrl: string | null = $state(null);
+	let pdfBlobError: string | null = $state(null);
+	let pdfBlobLoading = $state(false);
+
+	$effect(() => {
+		const url = selectedPayment?.comprobante_url;
+		const isPdf = url && (url.toLowerCase().endsWith('.pdf') || url.includes('/raw/upload/'));
+		// Reset al cambiar de pago
+		if (!isPdf) {
+			pdfBlobUrl = null;
+			pdfBlobError = null;
+			return;
+		}
+		if (!url) return;
+		// Si ya está en cache, usar directo
+		if (_pdfBlobCache.has(url)) {
+			pdfBlobUrl = _pdfBlobCache.get(url)!;
+			pdfBlobError = null;
+			pdfBlobLoading = false;
+			return;
+		}
+		// Descargar y crear blob URL
+		pdfBlobLoading = true;
+		pdfBlobError = null;
+		pdfBlobUrl = null;
+		(async () => {
+			try {
+				const response = await fetch(url);
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				const blob = await response.blob();
+				// Forzar el tipo MIME correcto (Cloudinary sirve application/octet-stream)
+				const corrected = new Blob([blob], { type: 'application/pdf' });
+				const blobUrl = URL.createObjectURL(corrected);
+				_pdfBlobCache.set(url, blobUrl);
+				pdfBlobUrl = blobUrl;
+				pdfBlobError = null;
+			} catch (e: any) {
+				console.error('Error descargando PDF para blob URL:', e);
+				pdfBlobError = e?.message || 'Error al cargar el PDF';
+			} finally {
+				pdfBlobLoading = false;
+			}
+		})();
+	});
+
 	async function downloadExcel() {
 		// F-COBRANZA-016 (2026-07-21): exporta la lista de pagos a XLSX (reemplaza
 		// al CSV). Joel pidió: "se mejoren todas las exportaciones y sean tablas".
@@ -1009,11 +1061,10 @@
 							     Content-Disposition: attachment + Content-Type: application/octet-stream.
 							     Eso FUERZA al browser a descargar el archivo en vez de renderizarlo
 							     inline en el iframe, mostrando pantalla blanca.
-							     Solución: agregamos ?fl_attachment=false a la URL de Cloudinary
-							     para forzar Content-Disposition: inline. Eso permite que el PDF
-							     se renderice inline en el iframe nativo del browser. Si el
-							     Content-Type sigue siendo octet-stream, usamos <object type="application/pdf">
-							     que fuerza al browser a usar el plugin PDF nativo. -->
+							     Solución: descargamos el PDF al cliente via fetch y creamos un
+							     Blob URL. El browser SIEMPRE renderiza Blob URLs inline (no respeta
+							     Content-Disposition del servidor). Como bonus, no depende de
+							     Google Docs Viewer ni del visor nativo (que puede fallar). -->
 							{#if selectedPayment.comprobante_url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) || selectedPayment.comprobante_url.includes('/image/upload/')}
 								<img
 									src={selectedPayment.comprobante_url}
@@ -1021,20 +1072,34 @@
 									class="max-w-full max-h-[500px] object-contain"
 								/>
 							{:else if selectedPayment.comprobante_url.toLowerCase().endsWith('.pdf') || selectedPayment.comprobante_url.includes('/raw/upload/')}
-								<!-- PDF: Cloudinary sirve con Content-Disposition: attachment
-								     que fuerza descarga en vez de renderizar inline. Probamos
-								     primero con Google Docs Viewer como proxy (siempre renderiza
-								     inline). Si falla, fallback al iframe directo + botón
-								     "Descargar comprobante" arriba. -->
-								{@const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(selectedPayment.comprobante_url)}&embedded=true`}
-								<iframe
-									src={viewerUrl}
-									title="Comprobante PDF"
-									class="w-full h-[500px] border-0 bg-white"
-								></iframe>
-								<p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-									Si el PDF no carga arriba, usa el botón "Descargar comprobante" de arriba.
-								</p>
+								<!-- PDF: Blob URL local (forza inline rendering). Loading mientras
+								     se descarga, mensaje de error si falla CORS, fallback a Google
+								     Docs Viewer. El botón "Descargar comprobante" arriba SIEMPRE
+								     funciona como última opción. -->
+								{#if pdfBlobLoading}
+									<div class="flex flex-col items-center gap-2 p-8 text-gray-500">
+										<div class="animate-spin size-8 border-4 border-primary-500 border-t-transparent rounded-full"></div>
+										<p class="text-sm">Cargando comprobante PDF...</p>
+									</div>
+								{:else if pdfBlobUrl}
+									<iframe
+										src={pdfBlobUrl}
+										title="Comprobante PDF"
+										class="w-full h-[500px] border-0 bg-white"
+									></iframe>
+								{:else}
+									<!-- Fallback: Google Docs Viewer como proxy -->
+									<iframe
+										src={`https://docs.google.com/viewer?url=${encodeURIComponent(selectedPayment.comprobante_url)}&embedded=true`}
+										title="Comprobante PDF (vía Google Docs Viewer)"
+										class="w-full h-[500px] border-0 bg-white"
+									></iframe>
+									{#if pdfBlobError}
+										<p class="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
+											No se pudo descargar el PDF directamente ({pdfBlobError}). Mostrando vía Google Docs Viewer. Si no carga, usa el botón "Descargar comprobante" arriba.
+										</p>
+									{/if}
+								{/if}
 							{:else}
 								<div class="text-center p-6">
 									<p class="text-sm text-gray-500 mb-2">El comprobante es un documento (PDF u otro).</p>
