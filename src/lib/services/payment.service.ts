@@ -94,6 +94,42 @@ class PaymentService {
 		return await apiKyC.post<Payment>(`/payments/${paymentId}/upload-by-encargado`, formData);
 	}
 
+	// F-COBRANZA-017 (2026-07-22): Cobranza REGISTRA un pago COMPLETO en
+	// nombre del estudiante. A diferencia de uploadByEncargado (que solo
+	// adjunta el comprobante a un pago existente), este método CREA un
+	// pago nuevo desde cero con todos los datos. El pago nace APROBADO.
+	// El botón "Añadir pago" en /app/payments (esquina superior derecha)
+	// abre el modal AddPagoByStaffModal que invoca este método.
+	async createByStaff(data: {
+		estudiante_id: string;
+		inscripcion_id: string;
+		metodo_pago: string;
+		monto_comprobante: number;
+		cantidad_pago: number;
+		concepto?: string;
+		numero_transaccion?: string;
+		banco?: string;
+		remitente?: string;
+		fecha_comprobante?: string;
+		cuenta_destino?: string;
+		file?: File;
+	}): Promise<Payment> {
+		const formData = new FormData();
+		formData.append('estudiante_id', data.estudiante_id);
+		formData.append('inscripcion_id', data.inscripcion_id);
+		formData.append('metodo_pago', data.metodo_pago);
+		formData.append('monto_comprobante', data.monto_comprobante.toString());
+		formData.append('cantidad_pago', data.cantidad_pago.toString());
+		if (data.concepto) formData.append('concepto', data.concepto);
+		if (data.numero_transaccion) formData.append('numero_transaccion', data.numero_transaccion);
+		if (data.banco) formData.append('banco', data.banco);
+		if (data.remitente) formData.append('remitente', data.remitente);
+		if (data.fecha_comprobante) formData.append('fecha_comprobante', data.fecha_comprobante);
+		if (data.cuenta_destino) formData.append('cuenta_destino', data.cuenta_destino);
+		if (data.file) formData.append('file', data.file);
+		return await apiKyC.post<Payment>('/payments/by-staff', formData);
+	}
+
 	// ISSUE-P-DASHBOARD-COBRANZA: resumen económico agregado (incluye matrícula
 	// como ingreso, respeta segmentación por curso). Solo roles económicos.
 	async getResumenEconomico(): Promise<ResumenEconomico> {

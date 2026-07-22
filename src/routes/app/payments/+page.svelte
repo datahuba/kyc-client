@@ -11,6 +11,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import PaymentForm from '$lib/features/payments/PaymentForm.svelte';
+	import AddPagoByStaffModal from '$lib/features/payments/AddPagoByStaffModal.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import SearchInput from '$lib/components/ui/searchInput.svelte';
 	import { Pagination } from '$lib/components/ui';
@@ -63,6 +64,8 @@
 
 	// State Modals
 	let isCreateModalOpen = $state(false);
+	// F-COBRANZA-017: modal para que cobranza registre pagos en nombre del estudiante
+	let isAddByStaffModalOpen = $state(false);
 	let preselectedEnrollmentId: string | undefined = $state(undefined);
 	let isApproveModalOpen = $state(false);
 	let isRejectModalOpen = $state(false);
@@ -508,6 +511,14 @@
 					<span class="whitespace-nowrap">Registrar Pago</span>
 				</Button>
 			{/if}
+			<!-- F-COBRANZA-017 (2026-07-22): cobranza/admin/superadmin registran
+			     pagos en nombre del estudiante cuando este no pudo subirlos. -->
+			{#if isStaff}
+				<Button onclick={() => isAddByStaffModalOpen = true} class="flex-1 sm:flex-none justify-center">
+					{#snippet leftIcon()} <PlusIcon class="size-5" /> {/snippet}
+					<span class="whitespace-nowrap">Añadir Pago</span>
+				</Button>
+			{/if}
 		</div>
 	</div>
 
@@ -800,7 +811,7 @@
 		onClose={() => { isCreateModalOpen = false; preselectedEnrollmentId = undefined; }}
 		maxWidth="sm:max-w-xl"
 	>
-		<PaymentForm 
+		<PaymentForm
 			{preselectedEnrollmentId}
 			onSuccess={() => {
 				isCreateModalOpen = false;
@@ -810,6 +821,18 @@
 			onCancel={() => { isCreateModalOpen = false; preselectedEnrollmentId = undefined; }}
 		/>
 	</Modal>
+
+	<!-- F-COBRANZA-017 (2026-07-22): modal para que cobranza/admin/superadmin
+	     registre un pago COMPLETO en nombre de un estudiante. El pago
+	     nace APROBADO y verificado_por="STAFF:<username>". -->
+	<AddPagoByStaffModal
+		isOpen={isAddByStaffModalOpen}
+		onSuccess={() => {
+			isAddByStaffModalOpen = false;
+			loadPayments();
+		}}
+		onCancel={() => { isAddByStaffModalOpen = false; }}
+	/>
 
 	<!-- Approve Confirmation Modal -->
 	<ModalConfirm
@@ -981,12 +1004,27 @@
 							</a>
 						</div>
 						<div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900 flex justify-center items-center min-h-[200px]">
-							{#if selectedPayment.comprobante_url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) || selectedPayment.comprobante_url.includes('cloudinary')}
+							<!-- F-COBRANZA-017 fix (2026-07-22): el bug era que cualquier URL
+							     de Cloudinary se renderizaba como <img>, pero los PDFs subidos
+							     a /raw/upload/ no se muestran. Ahora detectamos por el patrón
+							     de la URL: /image/upload/ → <img>, /raw/upload/ → visor PDF
+							     (<iframe> con toolbar nativa del browser). -->
+							{#if selectedPayment.comprobante_url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) || selectedPayment.comprobante_url.includes('/image/upload/')}
 								<img
 									src={selectedPayment.comprobante_url}
 									alt="Comprobante"
 									class="max-w-full max-h-[500px] object-contain"
 								/>
+							{:else if selectedPayment.comprobante_url.toLowerCase().endsWith('.pdf') || selectedPayment.comprobante_url.includes('/raw/upload/')}
+								<!-- PDF: usar <iframe> con el visor nativo del browser
+								     (Chrome/Edge lo renderizan inline; Safari/Firefox pueden
+								     requerir abrir en nueva pestaña — el botón Descargar
+								     arriba siempre funciona como fallback). -->
+								<iframe
+									src={selectedPayment.comprobante_url}
+									title="Comprobante PDF"
+									class="w-full h-[500px] border-0"
+								></iframe>
 							{:else}
 								<div class="text-center p-6">
 									<p class="text-sm text-gray-500 mb-2">El comprobante es un documento (PDF u otro).</p>
