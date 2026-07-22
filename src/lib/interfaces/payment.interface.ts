@@ -19,6 +19,16 @@ export interface Payment {
     fecha_comprobante?: string;
     metodo_pago?: string;
     en_ventana_reversion?: boolean; // ISSUE-P-REVERSION
+    // F-COBRANZA-033 (2026-07-22): Kevin pidió ver en el detalle QUIÉN subió
+    // el comprobante (estudiante o staff), no solo el "remitente" de la
+    // transferencia. El backend ya retorna este campo (model_dump() incluye
+    // todo el modelo Payment). El prefijo "STAFF:" indica que fue subido
+    // por un usuario de cobranza/admin/superadmin.
+    verificado_por?: string;
+    // F-COBRANZA-033: nombre del estudiante resuelto por el backend
+    // (enrich_payments_with_details_bulk). Útil para mostrar "Estudiante:
+    // Juan Pérez" cuando verificado_por es "SISTEMA (auto-aprobación)".
+    nombre_estudiante?: string;
 }
 
 export interface CreatePaymentFormData {

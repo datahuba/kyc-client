@@ -91,6 +91,36 @@
 	let coursesMap = $derived(
 		coursesList.reduce((acc, c) => ({ ...acc, [c._id]: c }), {} as Record<string, typeof coursesList[0]>)
 	);
+	// F-COBRANZA-033: mapa de estudiantes por ID para resolver el nombre en
+	// el modal de detalle cuando verificado_por es "SISTEMA (auto-aprobación)".
+	let studentsMap = $derived(
+		studentsList.reduce((acc, s) => ({ ...acc, [s._id]: s }), {} as Record<string, typeof studentsList[0]>)
+	);
+
+	// F-COBRANZA-033: helper que parsea `verificado_por` y devuelve una
+	// etiqueta legible de QUIÉN subió el comprobante. Devuelve {label, role}
+	// para que el modal pueda mostrar "Estudiante: Juan Pérez" o
+	// "Cobranza: sandra.zabala" según el caso.
+	function parseSubidoPor(p: Payment | null): { label: string; role: string } {
+		if (!p) return { label: '—', role: '' };
+		const vp = p.verificado_por;
+		if (!vp) return { label: 'Pendiente de verificación', role: '' };
+		if (vp.startsWith('STAFF:')) {
+			return { label: vp.replace('STAFF:', '').trim(), role: 'Cobranza / Staff' };
+		}
+		if (vp === 'SISTEMA (auto-aprobación)') {
+			const studentName = p.nombre_estudiante
+				|| studentsMap[p.estudiante_id]?.nombre
+				|| p.remitente
+				|| p.estudiante_id;
+			return { label: studentName, role: 'Estudiante (auto-aprobado)' };
+		}
+		if (vp.startsWith('SISTEMA:')) {
+			return { label: vp, role: 'Migración / Sistema' };
+		}
+		// username plano (ej: "superadmin_test", "Cobranza Diplomado IA...")
+		return { label: vp, role: 'Cobranza / Staff' };
+	}
 
 	async function loadPayments() {
 		loading = true;
@@ -1022,6 +1052,24 @@
 						<span class={`mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedPayment.estado_pago)}`}>
 							{selectedPayment.estado_pago}
 						</span>
+					</div>
+					<!--
+						F-COBRANZA-033 (2026-07-22): Kevin pidió ver QUIÉN subió el
+						comprobante, no solo el "Remitente" de la transferencia. El
+						remitente puede ser el estudiante, su mamá, su papá, etc.
+						"Subido por" indica el perfil del sistema que cargó el pago.
+					-->
+					<div>
+						<label for="subidoPor" class="block text-xs font-medium text-gray-900 uppercase">Subido por</label>
+						<p class="text-sm font-medium text-gray-700 dark:text-white mt-1" id="subidoPor">
+							{#if selectedPayment}
+								{@const sp = parseSubidoPor(selectedPayment)}
+								<span class="font-semibold">{sp.label}</span>
+								{#if sp.role}
+									<span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sp.role}</span>
+								{/if}
+							{/if}
+						</p>
 					</div>
 				</div>
 
