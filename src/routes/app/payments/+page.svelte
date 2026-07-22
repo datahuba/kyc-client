@@ -345,17 +345,17 @@
 	}
 
 	// F-COBRANZA-011 (2026-07-21): cobranza puede subir el comprobante del
-	// estudiante en nombre de él, cuando el estudiante no pudo hacerlo.
+	// estudiante en nombre de él, cuando el estudiante no pudo hacerlo, O
+	// reemplazar un comprobante existente si es ilegible o está mal.
 	// - Roles: superadmin, admin, cobranza (el backend rechaza otros roles).
-	// - Estado: solo si NO tiene comprobante todavía (si ya tiene, mostrar el
-	//   comprobante en el modal de Detalles, no reemplazar).
+	// - Estado: aparece SIEMPRE para los roles autorizados, sin importar si
+	//   ya tiene comprobante. El modal muestra el actual + opción de subir
+	//   uno nuevo (reemplazo). Antes solo aparecía si NO tenía, lo que
+	//   confundió a Joel que no encontraba el botón.
 	// - Decisión Joel 20:30: SOLO cobranza puede hacerlo, no encargado_curso.
 	function canUploadComprobante(payment: Payment): boolean {
 		const role = $userStore.role;
 		if (role !== 'superadmin' && role !== 'admin' && role !== 'cobranza') return false;
-		if (payment.comprobante_url) return false; // ya tiene comprobante
-		// En Caja no requiere comprobante (es pago presencial). Mostrar el botón
-		// igual por si cobranza quiere adjuntar uno de todas formas.
 		return true;
 	}
 
@@ -376,10 +376,14 @@
 		});
 
 		// F-COBRANZA-011: cobranza puede subir comprobante del estudiante
-		// cuando este no pudo hacerlo por sí mismo.
+		// cuando este no pudo hacerlo por sí mismo, O reemplazar el existente
+		// si es ilegible o está mal. Siempre visible para cobranza/admin/superadmin.
 		if (canUploadComprobante(payment)) {
+			const label = payment.comprobante_url
+				? 'Reemplazar comprobante'
+				: 'Subir comprobante';
 			options.push({
-				label: 'Subir comprobante',
+				label,
 				id: 'upload',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>`,
 				action: () => handleUploadComprobanteClick(payment)

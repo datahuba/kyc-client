@@ -1,11 +1,19 @@
 <script lang="ts">
 	/**
-	 * F-COBRANZA-011 (2026-07-21): Modal para que COBRANZA suba el comprobante
-	 * de pago en nombre del estudiante.
+	 * F-COBRANZA-011 (2026-07-21): Modal para que COBRANZA suba o REEMPLACE
+	 * el comprobante de pago en nombre del estudiante.
 	 *
 	 * Decisión de Joel: solo cobranza (no encargado_curso, no coordinador, no
-	 * cpd) puede usar este modal. Se muestra en /app/payments cuando el pago
-	 * no tiene comprobante_url todavía.
+	 * cpd) puede usar este modal. Se muestra en /app/payments desde el menú
+	 * de 3 puntos. Si el pago ya tiene comprobante, el modal lo muestra
+	 * previsualizado y permite REEMPLAZARLO (subir uno nuevo).
+	 *
+	 * Cambio 2026-07-21 20:58: Joel reportó que no encontraba el botón. La UI
+	 * anterior solo lo mostraba si el pago NO tenía comprobante. Como los 67
+	 * pagos actuales ya tienen comprobante subido por los estudiantes, el
+	 * botón no aparecía nunca. Ahora se muestra SIEMPRE para cobranza/admin/
+	 * superadmin, con label "Subir comprobante" o "Reemplazar comprobante"
+	 * según el caso.
 	 *
 	 * Backend: POST /api/v1/payments/{id}/upload-by-encargado
 	 *   - Roles permitidos: superadmin, admin, cobranza.
@@ -14,8 +22,8 @@
 	 *   - Devuelve: el Payment actualizado (incluye comprobante_url nuevo).
 	 *
 	 * El pago NO se vuelve a aprobar (ya estaba aprobado por F-COBRANZA-004 al
-	 * subirlo el estudiante). Solo se adjunta el comprobante. Por eso el modal
-	 * NO pide monto ni método: esos datos ya están en el pago.
+	 * subirlo el estudiante). Solo se adjunta/reemplaza el comprobante. Por
+	 * eso el modal NO pide monto ni método: esos datos ya están en el pago.
 	 */
 	import Modal from '$lib/components/ui/modal.svelte';
 	import Button from '$lib/components/ui/button.svelte';
@@ -66,7 +74,8 @@
 				remitente: remitente || undefined,
 				fecha_comprobante: fechaComprobante || undefined,
 			});
-			alert('success', 'Comprobante subido correctamente. El estudiante fue notificado.');
+			const accion = payment.comprobante_url ? 'reemplazado' : 'subido';
+			alert('success', `Comprobante ${accion} correctamente. El estudiante fue notificado.`);
 			onSuccess(updated);
 		} catch (e: any) {
 			console.error('Error al subir comprobante:', e);
@@ -75,16 +84,52 @@
 			saving = false;
 		}
 	}
+
+	const modalTitle = $derived(
+		payment?.comprobante_url ? 'Reemplazar comprobante de pago' : 'Subir comprobante de pago'
+	);
 </script>
 
 <Modal
 	{isOpen}
-	title="Subir comprobante de pago"
+	title={modalTitle}
 	onClose={onCancel}
 	maxWidth="sm:max-w-xl"
 >
 	{#if payment}
 		<div class="space-y-5 p-4">
+			<!-- Comprobante actual (si existe) — F-COBRANZA-011 (reemplazo) -->
+			{#if payment.comprobante_url}
+				<div class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 p-4">
+					<div class="flex items-start gap-3">
+						<svg class="size-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+						<div class="flex-1 min-w-0">
+							<p class="text-sm font-semibold text-amber-800 dark:text-amber-200">
+								Este pago ya tiene un comprobante
+							</p>
+							<p class="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+								Si subes un archivo nuevo, se va a REEMPLAZAR el actual. La auditoría registra ambos eventos.
+							</p>
+							<div class="mt-3 flex items-center gap-2 flex-wrap">
+								<a
+									href={payment.comprobante_url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:underline"
+								>
+									<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+									</svg>
+									Ver comprobante actual
+								</a>
+							</div>
+						</div>
+					</div>
+				</div>
+			{/if}
+
 			<!-- Info del pago (read-only) -->
 			<div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 p-4">
 				<p class="text-xs font-medium text-blue-700 dark:text-blue-300 uppercase tracking-wide">
@@ -162,7 +207,7 @@
 				Cancelar
 			</Button>
 			<Button onclick={handleSubmit} loading={saving} disabled={!file}>
-				Subir comprobante
+				{payment.comprobante_url ? 'Reemplazar comprobante' : 'Subir comprobante'}
 			</Button>
 		</div>
 	{/if}
