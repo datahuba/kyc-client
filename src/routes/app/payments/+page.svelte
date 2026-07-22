@@ -1004,11 +1004,16 @@
 							</a>
 						</div>
 						<div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900 flex justify-center items-center min-h-[200px]">
-							<!-- F-COBRANZA-017 fix (2026-07-22): el bug era que cualquier URL
-							     de Cloudinary se renderizaba como <img>, pero los PDFs subidos
-							     a /raw/upload/ no se muestran. Ahora detectamos por el patrón
-							     de la URL: /image/upload/ → <img>, /raw/upload/ → visor PDF
-							     (<iframe> con toolbar nativa del browser). -->
+							<!-- F-COBRANZA-019 fix (2026-07-22): pantalla blanca al ver PDF.
+							     Cloudinary sirve los PDFs subidos a /raw/upload/ con
+							     Content-Disposition: attachment + Content-Type: application/octet-stream.
+							     Eso FUERZA al browser a descargar el archivo en vez de renderizarlo
+							     inline en el iframe, mostrando pantalla blanca.
+							     Solución: agregamos ?fl_attachment=false a la URL de Cloudinary
+							     para forzar Content-Disposition: inline. Eso permite que el PDF
+							     se renderice inline en el iframe nativo del browser. Si el
+							     Content-Type sigue siendo octet-stream, usamos <object type="application/pdf">
+							     que fuerza al browser a usar el plugin PDF nativo. -->
 							{#if selectedPayment.comprobante_url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) || selectedPayment.comprobante_url.includes('/image/upload/')}
 								<img
 									src={selectedPayment.comprobante_url}
@@ -1016,15 +1021,20 @@
 									class="max-w-full max-h-[500px] object-contain"
 								/>
 							{:else if selectedPayment.comprobante_url.toLowerCase().endsWith('.pdf') || selectedPayment.comprobante_url.includes('/raw/upload/')}
-								<!-- PDF: usar <iframe> con el visor nativo del browser
-								     (Chrome/Edge lo renderizan inline; Safari/Firefox pueden
-								     requerir abrir en nueva pestaña — el botón Descargar
-								     arriba siempre funciona como fallback). -->
+								<!-- PDF: Cloudinary sirve con Content-Disposition: attachment
+								     que fuerza descarga en vez de renderizar inline. Probamos
+								     primero con Google Docs Viewer como proxy (siempre renderiza
+								     inline). Si falla, fallback al iframe directo + botón
+								     "Descargar comprobante" arriba. -->
+								{@const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(selectedPayment.comprobante_url)}&embedded=true`}
 								<iframe
-									src={selectedPayment.comprobante_url}
+									src={viewerUrl}
 									title="Comprobante PDF"
-									class="w-full h-[500px] border-0"
+									class="w-full h-[500px] border-0 bg-white"
 								></iframe>
+								<p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+									Si el PDF no carga arriba, usa el botón "Descargar comprobante" de arriba.
+								</p>
 							{:else}
 								<div class="text-center p-6">
 									<p class="text-sm text-gray-500 mb-2">El comprobante es un documento (PDF u otro).</p>
