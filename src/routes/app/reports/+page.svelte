@@ -33,6 +33,7 @@
 	let studentsList: Student[] = $state([]);  // F-COBRANZA-003 (mejorado): para el select de estudiante
 	let loading = $state(false);
 	let exporting = $state(false);
+	let exportingPdf = $state(false);  // F-COBRANZA-043
 
 	let page = $state(1);
 	let limit = $state(20);
@@ -141,6 +142,24 @@
 		}
 	}
 
+	// F-COBRANZA-043 (2026-07-22): descarga el PDF del Reporte de Caja.
+	async function handleExportPDF() {
+		exportingPdf = true;
+		try {
+			await paymentService.downloadReporteCajaPDF({
+				fecha_desde: filters.fecha_desde,
+				fecha_hasta: filters.fecha_hasta,
+				curso_id: filters.curso_id || undefined,
+				estudiante_id: filters.estudiante_id || undefined,
+				estado: filters.estado || undefined
+			});
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo generar el archivo PDF');
+		} finally {
+			exportingPdf = false;
+		}
+	}
+
 	function getCursoNombre(id: string): string {
 		return coursesMap[id]?.nombre_programa || 'Curso desconocido';
 	}
@@ -177,6 +196,10 @@
 				aria-label="Recargar reporte"
 			>
 				{#snippet leftIcon()}<RefreshIcon class="size-5" />{/snippet}
+			</Button>
+			<Button onclick={handleExportPDF} loading={exportingPdf} variant="secondary">
+				{#snippet leftIcon()}<DownloadIcon class="size-5" />{/snippet}
+				Exportar PDF
 			</Button>
 			<Button onclick={handleExportExcel} loading={exporting}>
 				{#snippet leftIcon()}<DownloadIcon class="size-5" />{/snippet}

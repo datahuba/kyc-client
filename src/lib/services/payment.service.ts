@@ -188,6 +188,35 @@ class PaymentService {
 		URL.revokeObjectURL(url);
 	}
 
+	// F-COBRANZA-043 (2026-07-22): descarga el PDF del Reporte de Caja.
+	// Mismos datos que el XLSX + las 4 tarjetas KPI (Cantidad, Total Aprobado,
+	// Total Pendiente, Total Anulado) en formato visual landscape A4.
+	// Kevin: "se deberia pooder tener esa opcion de descargar como pdf en el
+	// mismo modelo que creaste me gusto ... debe ser los mismos datos qu el
+	// excel que exportas mas lo delc arte que te dije ahorita".
+	async downloadReporteCajaPDF(filters?: {
+		fecha_desde?: string;
+		fecha_hasta?: string;
+		curso_id?: string;
+		estudiante_id?: string;
+		estado?: string;
+	}): Promise<void> {
+		const params = new URLSearchParams();
+		if (filters?.fecha_desde) params.append('fecha_desde', filters.fecha_desde);
+		if (filters?.fecha_hasta) params.append('fecha_hasta', filters.fecha_hasta);
+		if (filters?.curso_id) params.append('curso_id', filters.curso_id);
+		if (filters?.estudiante_id) params.append('estudiante_id', filters.estudiante_id);
+		if (filters?.estado) params.append('estado', filters.estado);
+
+		const blob = await apiKyC.getBlob(`/payments/reportes/caja/pdf?${params.toString()}`);
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = `reporte_caja_${filters?.fecha_desde ?? 'inicio'}_${filters?.fecha_hasta ?? 'hoy'}.pdf`;
+		link.click();
+		URL.revokeObjectURL(url);
+	}
+
 	// F-COBRANZA-016 (2026-07-21): exporta la lista de pagos a XLSX (reemplaza
 	// al CSV manual). Mismas reglas de RBAC que GET /payments/.
 	async downloadPaymentsExcel(filters?: {

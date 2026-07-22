@@ -52,26 +52,8 @@
 	let enrollmentToDelete: Enrollment | null = $state(null);
 	let deleteLoading: boolean = $state(false);
 
-	// F-COBRANZA-035 (2026-07-22): resumen de inscritos (total/activos/pasivos).
-	// Pedido Lic. Sandra Zabala vía Telegram 10:34 GMT-4.
-	import type { EnrollmentResumen } from '$lib/interfaces';
-	let resumen: EnrollmentResumen | null = $state(null);
-	let loadingResumen = $state(false);
-
-	async function loadResumen() {
-		if (currentRole === 'student') return;
-		loadingResumen = true;
-		try {
-			// Filtrar por curso si hay uno seleccionado y NO es 'all'
-			const cursoId = filters.curso_id !== 'all' ? filters.curso_id : undefined;
-			resumen = await enrollmentService.getResumenInscritos(cursoId);
-		} catch (e) {
-			console.error('Error al cargar resumen de inscritos:', e);
-			resumen = null;
-		} finally {
-			loadingResumen = false;
-		}
-	}
+	// F-COBRANZA-041 (2026-07-22): resumen de inscritos (total/activos/pasivos)
+	// se movió al Dashboard. Se eliminó la carga acá. Endpoint sigue existiendo.
 
 	// ISSUE P: Kardex Académico State
 	let isKardexOpen: boolean = $state(false);
@@ -166,7 +148,6 @@
 			userStore.init();
 		}
 		loadData();
-		loadResumen();  // F-035: cargar resumen de inscritos al montar
 	});
 
 	async function loadData() {
@@ -244,7 +225,6 @@
 	function handleFilterChange() {
 		page = 1;
 		loadData();
-		loadResumen();  // F-035: recargar resumen al cambiar filtros
 	}
 
 	function handleSearchInput() {
@@ -698,65 +678,9 @@
 		{/if}
 	</div>
 
-	<!--
-		F-COBRANZA-035 (2026-07-22): tarjetas KPI de inscritos.
-		Pedido Lic. Sandra Zabala (vía Telegram 10:34 GMT-4): "diferencia
-		del total de inscritos inicialmente, cuantos son los activo y
-		cuantos los pasivos". Refleja el endpoint /enrollments/stats/resumen.
-		Total inicial = todos los inscritos MENOS cancelados.
-	-->
-	{#if currentRole !== 'student' && resumen}
-		<div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-			<!-- Total inicial -->
-			<div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-				<div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Inicial</div>
-				<div class="text-2xl font-black text-gray-900 dark:text-white mt-1">{resumen.total_inicial}</div>
-				<div class="text-xs text-gray-400 dark:text-gray-500 mt-1">Inscritos (excl. cancelados)</div>
-			</div>
-			<!-- Activos -->
-			<div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-green-200 dark:border-green-900">
-				<div class="text-xs font-medium text-green-700 dark:text-green-400 uppercase tracking-wide">Activos</div>
-				<div class="text-2xl font-black text-green-600 dark:text-green-400 mt-1">{resumen.activos}</div>
-				<div class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-					{#if resumen.pendientes_pago > 0}
-						({resumen.pendientes_pago} pendiente pago)
-					{:else}
-						Cursando
-					{/if}
-				</div>
-			</div>
-			<!-- Pasivos total -->
-			<div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-amber-200 dark:border-amber-900">
-				<div class="text-xs font-medium text-amber-700 dark:text-amber-400 uppercase tracking-wide">Pasivos</div>
-				<div class="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{resumen.pasivos.total}</div>
-				<div class="text-xs text-gray-400 dark:text-gray-500 mt-1">Suspendidos (no cursan)</div>
-			</div>
-			<!-- Pasivos detalle -->
-			<div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-				<div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Detalle Pasivos</div>
-				<div class="text-sm text-gray-700 dark:text-gray-300 mt-2 space-y-0.5">
-					<div class="flex justify-between">
-						<span>Congelados:</span>
-						<span class="font-bold text-amber-600">{resumen.pasivos.congelado}</span>
-					</div>
-					<div class="flex justify-between">
-						<span>Pasivos:</span>
-						<span class="font-bold text-amber-600">{resumen.pasivos.pasivo}</span>
-					</div>
-					<div class="flex justify-between">
-						<span>Abandono:</span>
-						<span class="font-bold text-amber-600">{resumen.pasivos.abandono}</span>
-					</div>
-				</div>
-			</div>
-			<!-- Completados -->
-			<div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-blue-200 dark:border-blue-900">
-				<div class="text-xs font-medium text-blue-700 dark:text-blue-400 uppercase tracking-wide">Completados</div>
-				<div class="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{resumen.completados}</div>
-				<div class="text-xs text-gray-400 dark:text-gray-500 mt-1">Terminaron el curso</div>
-			</div>
-		</div>
-	{/if}
+	<!-- F-COBRANZA-041 (2026-07-22): las tarjetas KPI de inscritos se movieron al Dashboard.
+	     Kevin: "estos resumenes deberian salir en el dashboard no en inscripciones".
+	     Endpoint /enrollments/stats/resumen sigue existiendo. -->
 
 	{#if currentRole !== 'student'}
 		<!-- Filters -->
