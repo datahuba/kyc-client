@@ -454,10 +454,12 @@
 	}
 
 
-	let csvLoading = $state(false);
+	let excelLoading = $state(false);
 
-	async function downloadCSV() {
-		csvLoading = true;
+	async function downloadExcel() {
+		// F-COBRANZA-016 (2026-07-21): exporta la lista de pagos a XLSX (reemplaza
+		// al CSV). Joel pidió: "se mejoren todas las exportaciones y sean tablas".
+		excelLoading = true;
 		try {
 			const filterParams: any = {};
 			if (filters.q) filterParams.q = filters.q;
@@ -466,49 +468,12 @@
 			if (filters.estudiante_id) filterParams.estudiante_id = filters.estudiante_id;
 			if (filters.tipo_concepto) filterParams.tipo_concepto = filters.tipo_concepto;
 
-			const res = await paymentService.getAll(1, 500, filterParams) as any;
-			const allPayments: Payment[] = Array.isArray(res) ? res : (res?.data ?? []);
-
-			if (allPayments.length === 0) {
-				alert('error', 'No hay datos para descargar');
-				return;
-			}
-
-			const courseName = filters.curso_id
-				? (coursesList.find(c => c._id === filters.curso_id)?.codigo ?? filters.curso_id)
-				: 'todos';
-			const filename = `pagos_${courseName}_${new Date().toISOString().slice(0,10)}.csv`;
-
-			const headers = ['Remitente', 'Método', 'Banco','Monto Comprobante','Fecha Comprobante','Cuenta Destino','Fecha Registro','Concepto','Nº Transacción', isStaff ? 'Estudiante ID' : '', 'Curso', 'Estado'];
-			
-			const rows = allPayments.map(p => [
-				p.remitente || 'No disponible',
-				p.metodo_pago || 'Transferencia',
-				p.banco || 'Caja UAGRM',
-				p.monto_comprobante ? formatCurrency(p.monto_comprobante) : 'Bs 0.00',
-				p.fecha_comprobante ? formatDate(p.fecha_comprobante) : '---',
-				p.cuenta_destino || '---',
-				p.created_at ? formatDate(p.created_at) : '---',
-				p.concepto || 'No especificado',
-				p.numero_transaccion || '---',
-				isStaff ? (p.estudiante_id || '') : '',
-				`"${p.curso_id && coursesMap[p.curso_id] ? coursesMap[p.curso_id].nombre_programa : '—'}"`,
-				p.estado_pago || '---'
-			]);
-
-			const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');
-			const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-			const url = URL.createObjectURL(blob);
-			const link = document.createElement('a');
-			link.setAttribute('href', url);
-			link.setAttribute('download', filename);
-			link.click();
-			URL.revokeObjectURL(url);
+			await paymentService.downloadPaymentsExcel(filterParams);
 		} catch (error) {
-			console.error('Error al exportar CSV:', error);
+			console.error('Error al exportar Excel:', error);
 			alert('error', 'Error al generar el archivo');
 		} finally {
-			csvLoading = false;
+			excelLoading = false;
 		}
 	}
 </script>
@@ -533,9 +498,9 @@
 				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
 				<span class="sm:hidden">Recargar</span>
 			</Button>
-			<Button variant="secondary" onclick={downloadCSV} loading={csvLoading} aria-label="Descargar listado de pagos en CSV" class="flex-1 sm:flex-none justify-center">
+			<Button variant="secondary" onclick={downloadExcel} loading={excelLoading} aria-label="Descargar listado de pagos en Excel" class="flex-1 sm:flex-none justify-center">
 				{#snippet leftIcon()} <DownloadIcon class="size-5" /> {/snippet}
-				<span class="whitespace-nowrap">CSV</span>
+				<span class="whitespace-nowrap">Excel</span>
 			</Button>
 			{#if isStudent}
 				<Button onclick={() => isCreateModalOpen = true} loading={loading} class="flex-1 sm:flex-none justify-center">

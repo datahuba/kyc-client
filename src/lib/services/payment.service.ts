@@ -152,6 +152,32 @@ class PaymentService {
 		URL.revokeObjectURL(url);
 	}
 
+	// F-COBRANZA-016 (2026-07-21): exporta la lista de pagos a XLSX (reemplaza
+	// al CSV manual). Mismas reglas de RBAC que GET /payments/.
+	async downloadPaymentsExcel(filters?: {
+		q?: string;
+		estado?: string;
+		curso_id?: string;
+		estudiante_id?: string;
+		tipo_concepto?: string;
+	}): Promise<void> {
+		const params = new URLSearchParams();
+		if (filters?.q) params.append('q', filters.q);
+		if (filters?.estado) params.append('estado', filters.estado);
+		if (filters?.curso_id) params.append('curso_id', filters.curso_id);
+		if (filters?.estudiante_id) params.append('estudiante_id', filters.estudiante_id);
+		if (filters?.tipo_concepto) params.append('tipo_concepto', filters.tipo_concepto);
+
+		const blob = await apiKyC.getBlob(`/payments/export/excel?${params.toString()}`);
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		const ts = new Date().toISOString().slice(0, 10);
+		link.download = `pagos_${ts}.xlsx`;
+		link.click();
+		URL.revokeObjectURL(url);
+	}
+
 }
 
 export interface ReporteCajaResumen {

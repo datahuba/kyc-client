@@ -3,9 +3,9 @@
 	// curso y estado, exportable a Excel. Reutiliza el mismo filtro de
 	// segmentación de Cobranza por curso ya aplicado en /app/payments.
 	import { onMount } from 'svelte';
-	import { paymentService, courseService } from '$lib/services';
+	import { paymentService, courseService, studentService } from '$lib/services';
 	import type { ReporteCajaResumen } from '$lib/services/payment.service';
-	import type { Payment, Course } from '$lib/interfaces';
+	import type { Payment, Course, Student } from '$lib/interfaces';
 	import { userStore } from '$lib/stores/userStore';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
@@ -30,6 +30,7 @@
 	});
 	let coursesList: Course[] = $state([]);
 	let coursesMap: Record<string, Course> = $state({});
+	let studentsList: Student[] = $state([]);  // F-COBRANZA-003 (mejorado): para el select de estudiante
 	let loading = $state(false);
 	let exporting = $state(false);
 
@@ -65,6 +66,15 @@
 			coursesMap = map;
 		} catch (e) {
 			console.error('Error cargando cursos para el reporte', e);
+		}
+		// F-COBRANZA-003 (mejorado 2026-07-21): cargar estudiantes para el
+		// select del filtro. Se hace en paralelo con el reporte para no
+		// bloquear la UI.
+		try {
+			const stuRes = await studentService.getAll(1, 500);
+			studentsList = stuRes.data;
+		} catch (e) {
+			console.error('Error cargando estudiantes para el reporte', e);
 		}
 		await loadReporte();
 	});
@@ -192,14 +202,20 @@
 			<option value="rechazado">Rechazado</option>
 			<option value="anulado">Anulado</option>
 		</Select>
-		<!-- F-COBRANZA-003: filtro por estudiante. Se pega el ID. -->
-		<Input
-			label="ID Estudiante"
-			id="estudiante_id"
-			placeholder="Pega el ID del estudiante"
+		<!-- F-COBRANZA-003 (mejorado 2026-07-21): filtro por estudiante como
+		     SELECT con buscador typeahead. Joel pidió que sea desplegable en vez
+		     de pegar el ID (muchos cobranza no tienen el ID a mano). -->
+		<Select
+			label="Estudiante"
+			id="estudiante_id_select"
 			bind:value={filters.estudiante_id}
 			onchange={handleFilterChange}
-		/>
+		>
+			<option value="">Todos los estudiantes</option>
+			{#each studentsList as student (student._id)}
+				<option value={student._id}>{student.nombre}{student.registro ? ` (${student.registro})` : ''}</option>
+			{/each}
+		</Select>
 	</div>
 
 	<!-- Resumen agregado -->
