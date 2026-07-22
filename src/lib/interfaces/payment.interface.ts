@@ -33,6 +33,12 @@ export interface Payment {
     // Si no tiene CI, cae al registro universitario. Pedido Lic. Sandra
     // Zabala para mostrar en la columna del reporte de caja.
     estudiante_ci?: string;
+    // F-COBRANZA-037 (2026-07-22): tipo de movimiento y columnas Debito/Credito
+    // para que Sandra vea claramente la diferencia entre PAGO (credito) y
+    // ANULACION/RECHAZO (debito). tipo_movimiento ∈ {PAGO, ANULACION, RECHAZO}.
+    tipo_movimiento?: 'PAGO' | 'ANULACION' | 'RECHAZO';
+    debito?: number;
+    credito?: number;
 }
 
 export interface CreatePaymentFormData {

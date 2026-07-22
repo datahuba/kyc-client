@@ -256,7 +256,9 @@
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">C.I.</th>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Curso</th>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Concepto</th>
-						<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Monto</th>
+						<!-- F-COBRANZA-037 (2026-07-22): Debito y Credito separados -->
+						<th class="px-4 py-3 text-right text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wider">Débito</th>
+						<th class="px-4 py-3 text-right text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wider">Crédito</th>
 						<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
 					</tr>
 				</thead>
@@ -271,7 +273,13 @@
 							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 font-mono">{(payment as any).estudiante_ci || '—'}</td>
 							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs break-words" title={getCursoNombre(payment.curso_id)}>{getCursoNombre(payment.curso_id)}</td>
 							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{payment.concepto}</td>
-							<td class="px-4 py-3 text-sm text-right font-bold text-gray-900 dark:text-white">{formatCurrency(payment.cantidad_pago)}</td>
+							<!-- F-COBRANZA-037: Debito y Credito -->
+							<td class="px-4 py-3 text-sm text-right font-bold text-red-600 dark:text-red-400">
+								{(payment as any).debito > 0 ? formatCurrency((payment as any).debito) : '—'}
+							</td>
+							<td class="px-4 py-3 text-sm text-right font-bold text-green-600 dark:text-green-400">
+								{(payment as any).credito > 0 ? formatCurrency((payment as any).credito) : '—'}
+							</td>
 							<td class="px-4 py-3 text-center">
 								<span class={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide ${getStatusColor(payment.estado_pago)}`}>
 									{payment.estado_pago}
@@ -296,7 +304,10 @@
 							{/if}
 							<p class="text-xs text-gray-500 dark:text-gray-400">{getCursoNombre(payment.curso_id)}</p>
 						</div>
-						<span class="text-base font-bold text-gray-900 dark:text-white">{formatCurrency(payment.cantidad_pago)}</span>
+						<!-- F-COBRANZA-037: color segun tipo movimiento -->
+						<span class={`text-base font-bold ${(payment as any).debito > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+							{(payment as any).debito > 0 ? `- ${formatCurrency((payment as any).debito)}` : formatCurrency((payment as any).credito || payment.cantidad_pago)}
+						</span>
 					</div>
 					<div class="mt-2 flex items-center justify-between">
 						<p class="text-xs text-gray-500 dark:text-gray-400">
