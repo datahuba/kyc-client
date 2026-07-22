@@ -721,21 +721,16 @@
 								<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{formatDate(payment.fecha_comprobante || '---')}</div>
 							</td>
 							<!-- Estado -->
+							<!--
+								F-COBRANZA-032 (2026-07-22): Kevin pidió eliminar el badge
+								"En observación 48h". Todo pago aprobado (subido por estudiante
+								o por cobranza) entra directo a aprobado y se refleja en
+								resúmenes y reporte de caja sin pasar por estados intermedios.
+							-->
 							<td class="px-4 py-4 text-sm">
-								<div class="flex flex-col items-start gap-1">
-									<span class={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${getStatusColor(payment.estado_pago)}`}>
-										{payment.estado_pago}
-									</span>
-									<!-- ISSUE-P-REVERSION -->
-									{#if payment.en_ventana_reversion}
-										<span
-											class="px-2 py-0.5 inline-flex text-[10px] leading-4 font-bold uppercase tracking-wide rounded-full whitespace-nowrap bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-											title="Este pago por transferencia puede ser revertido por el banco hasta 48h después de su aprobación. Verifícalo contra el extracto bancario antes de darlo por definitivo."
-										>
-											En observación 48h
-										</span>
-									{/if}
-								</div>
+								<span class={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${getStatusColor(payment.estado_pago)}`}>
+									{payment.estado_pago}
+								</span>
 							</td>
 							<!-- Acciones -->
 							<td class="px-4 py-4 text-right text-sm font-medium relative">
@@ -807,17 +802,12 @@
 
 					<div class="mt-3 flex items-center justify-between">
 						<span class="text-base font-bold text-green-600 dark:text-green-400">{payment.monto_comprobante ? formatCurrency(payment.monto_comprobante) : '0.00'}</span>
+						<!--
+							F-COBRANZA-032 (2026-07-22): Kevin pidió eliminar el badge "48h".
+							Todo pago aprobado entra directo a aprobado sin estados intermedios.
+						-->
 						<div class="flex items-center gap-1 shrink-0">
 							<span class={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${getStatusColor(payment.estado_pago)}`}>{payment.estado_pago}</span>
-							<!-- ISSUE-P-REVERSION -->
-							{#if payment.en_ventana_reversion}
-								<span
-									class="px-2 py-0.5 inline-flex text-[10px] leading-4 font-bold uppercase tracking-wide rounded-full whitespace-nowrap bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-									title="Este pago por transferencia puede ser revertido por el banco hasta 48h después de su aprobación."
-								>
-									48h
-								</span>
-							{/if}
 						</div>
 					</div>
 
