@@ -58,6 +58,18 @@ class EnrollmentService {
 		return await apiKyC.get<Enrollment[]>(`/enrollments/course/${courseId}`);
 	}
 
+	// F-COBRANZA-035 (2026-07-22): resumen de inscritos para Sandra.
+	// Devuelve el desglose total/activos/pasivos/completados, opcionalmente
+	// filtrado por curso.
+	async getResumenInscritos(cursoId?: string): Promise<import('$lib/interfaces').EnrollmentResumen> {
+		const params = new URLSearchParams();
+		if (cursoId) params.append('curso_id', cursoId);
+		const query = params.toString();
+		return await apiKyC.get<import('$lib/interfaces').EnrollmentResumen>(
+			`/enrollments/stats/resumen${query ? `?${query}` : ''}`
+		);
+	}
+
 	// === ISSUE R: MÉTODO PARA CALIFICAR MÓDULOS DE ESTUDIANTES ===
 	// ISSUE-Q-NOTA-BORRADOR: si quien llama es DOCENTE, el backend guarda esto como borrador
 	// pendiente de validación de CPD; si es CPD/Admin/Superadmin, califica directamente.
