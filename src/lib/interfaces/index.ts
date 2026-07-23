@@ -11,3 +11,4 @@ export * from "./discount.interface"
 export * from "./response.interface"
 export * from "./classroom.interface"
 export * from "./bank-statement.interface"
+export * from "./admin.interface"  // F-044 (2026-07-22)

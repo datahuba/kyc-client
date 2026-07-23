@@ -4,7 +4,7 @@
 	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
 	import { UsersIcon, ClipboardIcon, TagIcon, XIcon, KeyIcon, QrCodeIcon, FileTextIcon, AcademicCapIcon, Menu2Icon } from '$lib/icons/outline'; // IMPORTACIÓN UNIFICADA DE MENU2ICON
 	import { slide, fade } from 'svelte/transition';
-	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon } from '$lib/icons/solid';
+	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon, ExclamationCircleIcon } from '$lib/icons/solid';  // F-044 (2026-07-22)
 	import { goto } from '$app/navigation';
 	import CourseCatalogModal from './CourseCatalogModal.svelte';
 	import BenefitsModal from './BenefitsModal.svelte';
@@ -66,9 +66,11 @@
 		{ name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
 		
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
-		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] }, 
+		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
 		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
 		{ name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
+		// F-044 (2026-07-22): visor de errores 500 (solo superadmin/admin)
+		{ name: 'Visor de Errores', href: '/app/admin/errors', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	];
 
