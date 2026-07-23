@@ -993,12 +993,12 @@
 			{@const estudiantes = matrizData.estudiantes}
 			{@const modulosCols = matrizFiltroModulo === '' ? totales.modulos : totales.modulos.filter(m => m.i === matrizFiltroModulo)}
 
-			<!-- KPI cards: una por módulo + matrícula + total ingresos + por cobrar -->
+			<!-- KPI cards: una por módulo + matrícula + total ingresos + por cobrar + KPI adicionales F-074-FIX-4 -->
 			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-3">
 				<!-- Matrícula -->
 				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
 					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Matrícula</div>
-					<div class="text-lg font-bold text-purple-700 dark:text-purple-300 mt-1">Bs {formatCurrency(totales.matricula.pagado)}</div>
+					<div class="text-lg font-bold text-purple-700 dark:text-purple-300 mt-1">{formatCurrency(totales.matricula.pagado)}</div>
 					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
 						{totales.matricula.estudiantes_pagaron} pagaron
 					</div>
@@ -1007,22 +1007,44 @@
 				{#each modulosCols as m}
 					<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
 						<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400 truncate" title={m.nombre}>Módulo {m.i + 1}</div>
-						<div class="text-lg font-bold text-blue-700 dark:text-blue-300 mt-1">Bs {formatCurrency(m.pagado)}</div>
+						<div class="text-lg font-bold text-blue-700 dark:text-blue-300 mt-1">{formatCurrency(m.pagado)}</div>
 						<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
 							{m.estudiantes_pagaron}/{m.estudiantes_pagaron + m.estudiantes_pendientes} pagaron
 						</div>
 					</div>
 				{/each}
+				<!-- F-074-FIX-4: KPI "Pagaron todo" (matrícula + todos los módulos) -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Pagaron Todo</div>
+					<div class="text-lg font-bold text-emerald-700 dark:text-emerald-300 mt-1">
+						{totales.estudiantes_pagaron_todo}/{totales.total_inscritos}
+					</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">matrícula + 5 módulos</div>
+				</div>
+				<!-- F-074-FIX-4: KPI "Becados" (descuento aplicado) -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Becados</div>
+					<div class="text-lg font-bold text-amber-700 dark:text-amber-300 mt-1">
+						{totales.estudiantes_con_beca}
+					</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">con descuento</div>
+				</div>
+				<!-- F-074-FIX-4: KPI "Ahorro por Becas" -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Ahorro Becas</div>
+					<div class="text-lg font-bold text-amber-700 dark:text-amber-300 mt-1">{formatCurrency(totales.ahorro_total_por_descuentos)}</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">total descuentos</div>
+				</div>
 				<!-- Total Ingresos -->
 				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
 					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Total Ingresos</div>
-					<div class="text-lg font-bold text-green-700 dark:text-green-300 mt-1">Bs {formatCurrency(totales.total_ingresos)}</div>
+					<div class="text-lg font-bold text-green-700 dark:text-green-300 mt-1">{formatCurrency(totales.total_ingresos)}</div>
 					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Recaudado</div>
 				</div>
 				<!-- Por Cobrar -->
 				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
 					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Por Cobrar</div>
-					<div class="text-lg font-bold text-orange-700 dark:text-orange-300 mt-1">Bs {formatCurrency(totales.por_cobrar)}</div>
+					<div class="text-lg font-bold text-orange-700 dark:text-orange-300 mt-1">{formatCurrency(totales.por_cobrar)}</div>
 					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
 						{totales.total_inscritos} inscrito(s)
 					</div>
@@ -1048,17 +1070,33 @@
 							<tr class="hover:bg-gray-50 dark:hover:bg-dark-background/40 transition-colors">
 								<!-- Estudiante (columna sticky) -->
 								<td class="sticky left-0 z-10 bg-white dark:bg-dark-surface px-4 py-3 min-w-[200px]">
-									<div class="font-medium text-gray-900 dark:text-white truncate" title={est.nombre}>{est.nombre}</div>
+									<div class="flex items-center gap-1.5">
+										<span class="font-medium text-gray-900 dark:text-white truncate" title={est.nombre}>{est.nombre}</span>
+										<!-- F-074-FIX-4: badge de beca cuando tiene descuento aplicado
+										     Regla Kevin (2026-07-23): "el descuento solamente es para modulos
+										     no matriculas eso no se cambia". El badge aclara que es SOLO módulos. -->
+										{#if est.beca_porcentaje > 0 && est.ahorro > 0.01}
+											<span
+												class="shrink-0 px-1.5 py-0.5 inline-flex text-[10px] font-bold rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+												title={`Beca ${est.beca_porcentaje}% en MÓDULOS (no aplica a matrícula) — Ahorro: ${formatCurrency(est.ahorro)} (costo original módulos: ${formatCurrency(est.costo_sin_descuento - est.matricula_monto)})`}
+											>
+												🎓 Beca {est.beca_porcentaje}%
+											</span>
+										{/if}
+									</div>
 									<div class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 font-mono">
 										{est.registro || '—'} · {est.estado_inscripcion}
+										{#if est.pago_todo}
+											· <span class="text-emerald-600 dark:text-emerald-400 font-semibold">✓ Pagó todo</span>
+										{/if}
 									</div>
 								</td>
 								<!-- Matrícula -->
 								<td class="px-3 py-3 whitespace-nowrap">
 									{#if est.matricula_pagado >= est.matricula_monto - 0.01}
-										<span class="text-green-600 dark:text-green-400 font-semibold" title="Pagado">Bs {formatCurrency(est.matricula_pagado)}</span>
+										<span class="text-green-600 dark:text-green-400 font-semibold" title="Pagado">{formatCurrency(est.matricula_pagado)}</span>
 									{:else if est.matricula_pagado > 0}
-										<span class="text-yellow-600 dark:text-yellow-400 font-semibold" title="Pago parcial">Bs {formatCurrency(est.matricula_pagado)}</span>
+										<span class="text-yellow-600 dark:text-yellow-400 font-semibold" title="Pago parcial">{formatCurrency(est.matricula_pagado)}</span>
 									{:else}
 										<span class="text-gray-300 dark:text-gray-600">—</span>
 									{/if}
@@ -1070,9 +1108,9 @@
 										{#if !mod}
 											<span class="text-gray-300 dark:text-gray-600">—</span>
 										{:else if mod.estado === 'Pagado'}
-											<span class="text-green-600 dark:text-green-400 font-semibold" title="Pagado">Bs {formatCurrency(mod.monto_pagado)}</span>
+											<span class="text-green-600 dark:text-green-400 font-semibold" title="Pagado">{formatCurrency(mod.monto_pagado)}</span>
 										{:else if mod.monto_pagado > 0}
-											<span class="text-yellow-600 dark:text-yellow-400 font-semibold" title="Pago parcial">Bs {formatCurrency(mod.monto_pagado)}</span>
+											<span class="text-yellow-600 dark:text-yellow-400 font-semibold" title="Pago parcial">{formatCurrency(mod.monto_pagado)}</span>
 										{:else}
 											<span class="text-gray-300 dark:text-gray-600">—</span>
 										{/if}
@@ -1080,12 +1118,12 @@
 								{/each}
 								<!-- Total Ingresos -->
 								<td class="px-3 py-3 whitespace-nowrap font-semibold text-green-700 dark:text-green-300 bg-green-50/50 dark:bg-green-900/10">
-									Bs {formatCurrency(est.total_ingresos)}
+									{formatCurrency(est.total_ingresos)}
 								</td>
 								<!-- Por Cobrar -->
 								<td class="px-3 py-3 whitespace-nowrap font-semibold text-orange-700 dark:text-orange-300 bg-orange-50/50 dark:bg-orange-900/10">
 									{#if est.por_cobrar > 0.01}
-										Bs {formatCurrency(est.por_cobrar)}
+										{formatCurrency(est.por_cobrar)}
 									{:else}
 										<span class="text-gray-400 dark:text-gray-500">—</span>
 									{/if}

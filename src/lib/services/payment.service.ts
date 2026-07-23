@@ -301,6 +301,11 @@ export interface MatrizEstudiante {
 	modulos: MatrizModulo[];
 	total_ingresos: number;
 	por_cobrar: number;
+	// F-074-FIX-4 (2026-07-23): auditoría de descuentos/becas
+	beca_porcentaje: number;
+	ahorro: number;
+	costo_sin_descuento: number;
+	pago_todo: boolean;
 }
 
 export interface MatrizCurso {
@@ -329,6 +334,10 @@ export interface MatrizTotales {
 	total_ingresos: number;
 	por_cobrar: number;
 	total_inscritos: number;
+	// F-074-FIX-4: contadores globales
+	estudiantes_pagaron_todo: number;
+	estudiantes_con_beca: number;
+	ahorro_total_por_descuentos: number;
 }
 
 export interface MatrizPagosResponse {
