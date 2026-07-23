@@ -259,6 +259,27 @@ class PaymentService {
 		return await apiKyC.get<ResumenModulosResponse>('/payments/resumen-modulos');
 	}
 
+	// F-075 (2026-07-23): Lista de Postgraduantes Habilitados (informe acta de notas).
+	// Retorna JSON con encabezado + filas (curso, módulo, docente, becados, etc.)
+	async getListaHabilitados(
+		cursoId: string,
+		moduloIndex?: number | null
+	): Promise<unknown> {
+		const params = new URLSearchParams();
+		params.append('curso_id', cursoId);
+		if (moduloIndex !== null && moduloIndex !== undefined) {
+			params.append('modulo_index', String(moduloIndex));
+		}
+		return await apiKyC.get<unknown>(`/payments/reportes/lista-habilitados?${params.toString()}`);
+	}
+
+	// F-075: helper genérico para hacer GET raw al backend (cuando el path
+	// se construye dinámicamente con query params que no encajan en un
+	// helper tipado)
+	async rawGet<T = any>(path: string): Promise<T> {
+		return await apiKyC.get<T>(path);
+	}
+
 }
 
 export interface ReporteCajaResumen {
