@@ -1003,10 +1003,10 @@
 						{totales.matricula.estudiantes_pagaron} pagaron
 					</div>
 				</div>
-				<!-- Módulos -->
+				<!-- Módulos (F-074-FIX-3: nombre corto "Módulo N" para no romper la grid; nombre completo en tooltip) -->
 				{#each modulosCols as m}
 					<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
-						<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400 truncate" title={m.nombre}>{m.nombre}</div>
+						<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400 truncate" title={m.nombre}>Módulo {m.i + 1}</div>
 						<div class="text-lg font-bold text-blue-700 dark:text-blue-300 mt-1">Bs {formatCurrency(m.pagado)}</div>
 						<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
 							{m.estudiantes_pagaron}/{m.estudiantes_pagaron + m.estudiantes_pendientes} pagaron
@@ -1037,7 +1037,7 @@
 							<th scope="col" class="sticky left-0 z-10 bg-gray-50 dark:bg-dark-background px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Estudiante</th>
 							<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Matrícula</th>
 							{#each modulosCols as m}
-								<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" title={m.nombre}>{m.nombre}</th>
+								<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" title={m.nombre}>Módulo {m.i + 1}</th>
 							{/each}
 							<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-green-50 dark:bg-green-900/20">Total Ingresos</th>
 							<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-orange-50 dark:bg-orange-900/20">Por Cobrar</th>
