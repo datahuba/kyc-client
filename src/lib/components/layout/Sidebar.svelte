@@ -71,6 +71,10 @@
 		{ name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
 		// F-044 (2026-07-22): visor de errores 500 (solo superadmin/admin)
 		{ name: 'Visor de Errores', href: '/app/admin/errors', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		// F-070 (2026-07-22): validación de notas (CPD/Admin/Superadmin). Surge del
+		// bug urgente: Miguel (socio de Kevin) tenía 51 notas en pendiente_validacion
+		// y no había forma rápida de aprobarlas. Aquí CPD ve, aprueba, rechaza y edita.
+		{ name: 'Validación de Notas', href: '/app/admin/grade-validation', icon: AcademicCapIcon, roles: ['cpd', 'admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	];
 
