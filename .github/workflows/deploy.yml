@@ -46,8 +46,14 @@ jobs:
 
             echo "🧨 3. DESTRUYENDO IMAGEN VIEJA DE DOCKER..."
             cd /root/postgrado
-            docker compose stop frontend || true
-            docker compose rm -f frontend || true
+            # F-ACTIONS-DEPLOY-FIX (2026-07-23): `docker compose stop` + `rm -f`
+            # no siempre elimina el container. A veces queda en estado
+            # "Created" y el `up -d --force-recreate` falla con:
+            #   "Conflict. The container name '/kyc-frontend' is already in use"
+            # Solución: `docker compose down` (que sí elimina container + red)
+            # + `docker rm -f` directo como salvaguarda adicional.
+            docker compose down frontend 2>/dev/null || true
+            docker rm -f kyc-frontend 2>/dev/null || true
             # Borra la imagen física para evitar que Docker use capas viejas
             docker rmi -f $(docker images -q postgrado-frontend) 2>/dev/null || true
             docker rmi -f $(docker images -q "*frontend*") 2>/dev/null || true
