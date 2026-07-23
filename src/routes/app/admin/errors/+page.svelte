@@ -28,8 +28,12 @@
 	let pathFilter = $state('');
 
 	// Solo superadmin/admin pueden ver esto
+	// F-069 (2026-07-22): bug era `$userStore.user?.rol` (no existe) en vez de
+	// `$userStore.user?.role` (campo correcto que viene del backend /auth/me).
+	// El userStore ya tiene un campo `role` derivado, pero usamos `user.role`
+	// para ser consistentes con la convención del backend.
 	const isAllowed = $derived(
-		$userStore.user?.rol === 'superadmin' || $userStore.user?.rol === 'admin'
+		$userStore.user?.role === 'superadmin' || $userStore.user?.role === 'admin'
 	);
 
 	onMount(async () => {
@@ -115,7 +119,7 @@
 				⚠️ Esta página solo está disponible para superadmin/admin.
 			</p>
 			<p class="text-sm text-amber-700 dark:text-amber-300 mt-2">
-				Tu rol actual: <strong>{$userStore.user?.rol || 'desconocido'}</strong>
+				Tu rol actual: <strong>{$userStore.user?.role || $userStore.user?.rol || 'desconocido'}</strong>
 			</p>
 		</div>
 	{:else}
