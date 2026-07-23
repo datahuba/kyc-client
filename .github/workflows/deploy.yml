@@ -46,14 +46,26 @@ jobs:
 
             echo "🧨 3. DESTRUYENDO IMAGEN VIEJA DE DOCKER..."
             cd /root/postgrado
-            # F-ACTIONS-DEPLOY-FIX (2026-07-23): `docker compose stop` + `rm -f`
-            # no siempre elimina el container. A veces queda en estado
-            # "Created" y el `up -d --force-recreate` falla con:
+            # F-ACTIONS-DEPLOY-FIX-2 (2026-07-23): el `docker compose down` no
+            # alcanza porque el container tiene `restart: always` en
+            # docker-compose.yml y Docker lo REINICIA automáticamente antes
+            # de que podamos crear el nuevo. El log mostraba:
             #   "Conflict. The container name '/kyc-frontend' is already in use"
-            # Solución: `docker compose down` (que sí elimina container + red)
-            # + `docker rm -f` directo como salvaguarda adicional.
-            docker compose down frontend 2>/dev/null || true
+            # aunque el `down` se ejecutaba correctamente. Solución:
+            # 1. Desactivar restart policy con `docker update --restart=no`
+            # 2. Stop + Kill + Remove directo
+            # 3. Verificar que NO existe antes de continuar
+            docker update --restart=no kyc-frontend 2>/dev/null || true
+            docker compose stop frontend 2>/dev/null || true
+            docker kill kyc-frontend 2>/dev/null || true
             docker rm -f kyc-frontend 2>/dev/null || true
+            # Verificar que NO existe (por las dudas)
+            sleep 1
+            if docker ps -a --format '{{.Names}}' | grep -q '^kyc-frontend$'; then
+                echo "❌ ERROR: kyc-frontend todavía existe después de kill+rm, abortando"
+                docker ps -a --format 'table {{.Names}} | {{.Status}}' | grep kyc-frontend
+                exit 1
+            fi
             # Borra la imagen física para evitar que Docker use capas viejas
             docker rmi -f $(docker images -q postgrado-frontend) 2>/dev/null || true
             docker rmi -f $(docker images -q "*frontend*") 2>/dev/null || true
