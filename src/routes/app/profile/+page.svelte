@@ -671,7 +671,7 @@
 						</p>
 
 						<div class="space-y-3">
-							{#each [{ tipo: 'cv', label: 'Curriculum Vitae (CV)', url: profileData.cv_url, estado: profileData.cv_estado, motivo: profileData.cv_motivo_rechazo }, { tipo: 'ci', label: 'Carnet de Identidad', url: profileData.ci_url, estado: profileData.carnet_estado, motivo: profileData.carnet_motivo_rechazo }, { tipo: 'afiliacion', label: 'Certificado de Afiliación (Colegio o convenios)', url: profileData.afiliacion_url, estado: profileData.afiliacion_estado, motivo: profileData.afiliacion_motivo_rechazo }] as doc}
+							{#each [{ tipo: 'cv', label: 'Curriculum Vitae (CV)', url: profileData.cv_url, estado: profileData.cv_estado, motivo: profileData.cv_motivo_rechazo }, { tipo: 'ci', label: 'Carnet de Identidad', url: profileData.carnet_url, estado: profileData.carnet_estado, motivo: profileData.carnet_motivo_rechazo }, { tipo: 'afiliacion', label: 'Certificado de Afiliación (Colegio o convenios)', url: profileData.afiliacion_url, estado: profileData.afiliacion_estado, motivo: profileData.afiliacion_motivo_rechazo }] as doc}
 								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-dark-border pb-3 last:border-b-0 last:pb-0">
 									<div class="min-w-0">
 										<p class="text-sm font-medium text-gray-900 dark:text-white">{doc.label}</p>

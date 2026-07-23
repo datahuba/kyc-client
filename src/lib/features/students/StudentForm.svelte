@@ -438,7 +438,7 @@
 
 			<div class="grid grid-cols-2 gap-4">
 				<FileUpload label="Foto de Perfil" accept="image/*" file={photoFile} onFileSelect={(f) => photoFile = f} initialUrl={student?.foto_url} isEditable={isEditMode} />
-				<FileUpload label="Carnet (PDF)" accept=".pdf" file={carnetFile} onFileSelect={(f) => carnetFile = f} initialUrl={student?.ci_url} isEditable={isEditMode} />
+				<FileUpload label="Carnet (PDF)" accept=".pdf" file={carnetFile} onFileSelect={(f) => carnetFile = f} initialUrl={student?.carnet_url} isEditable={isEditMode} />
 				<FileUpload label="Curriculum (PDF)" accept=".pdf" file={cvFile} onFileSelect={(f) => cvFile = f} initialUrl={student?.cv_url} isEditable={isEditMode} />
 				<FileUpload label="Afiliación (PDF)" accept=".pdf" file={afiliacionFile} onFileSelect={(f) => afiliacionFile = f} initialUrl={student?.afiliacion_url} isEditable={isEditMode} />
 			</div>
