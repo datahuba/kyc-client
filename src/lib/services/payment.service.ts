@@ -243,6 +243,22 @@ class PaymentService {
 		URL.revokeObjectURL(url);
 	}
 
+	// F-074 (2026-07-23): Vista Matricial de Pagos (estilo Excel de Sandra)
+	// Filas = estudiantes, columnas = MATRÍCULA | MODULO 1..N | TOTAL INGRESOS | POR COBRAR
+	async getMatriz(moduloIndex?: number | null): Promise<MatrizPagosResponse> {
+		const params = new URLSearchParams();
+		if (moduloIndex !== null && moduloIndex !== undefined) {
+			params.append('modulo_index', String(moduloIndex));
+		}
+		const qs = params.toString();
+		const url = qs ? `/payments/matriz?${qs}` : '/payments/matriz';
+		return await apiKyC.get<MatrizPagosResponse>(url);
+	}
+
+	async getResumenModulos(): Promise<ResumenModulosResponse> {
+		return await apiKyC.get<ResumenModulosResponse>('/payments/resumen-modulos');
+	}
+
 }
 
 export interface ReporteCajaResumen {
@@ -260,6 +276,86 @@ export interface ResumenEconomico {
 	por_cobrar: number;
 	cobros_pendientes: number;
 	total_inscritos: number;
+}
+
+// F-074 (2026-07-23): Tipos para la vista matricial de pagos
+export interface MatrizModulo {
+	i: number;
+	nombre: string;
+	costo: number;
+	monto_pagado: number;
+	estado: 'Pendiente' | 'Parcial' | 'Pagado' | string;
+	por_cobrar: number;
+}
+
+export interface MatrizEstudiante {
+	estudiante_id: string;
+	nombre: string;
+	registro: string;
+	curso_id: string;
+	curso_nombre: string;
+	estado_inscripcion: string;
+	matricula_pagada: boolean;
+	matricula_monto: number;
+	matricula_pagado: number;
+	modulos: MatrizModulo[];
+	total_ingresos: number;
+	por_cobrar: number;
+}
+
+export interface MatrizCurso {
+	_id: string;
+	nombre: string;
+	codigo?: string;
+	modulos: string[];
+}
+
+export interface MatrizTotales {
+	matricula: {
+		costo_total: number;
+		pagado: number;
+		pendiente: number;
+		estudiantes_pagaron: number;
+	};
+	modulos: Array<{
+		i: number;
+		nombre: string;
+		costo_total: number;
+		pagado: number;
+		pendiente: number;
+		estudiantes_pagaron: number;
+		estudiantes_pendientes: number;
+	}>;
+	total_ingresos: number;
+	por_cobrar: number;
+	total_inscritos: number;
+}
+
+export interface MatrizPagosResponse {
+	cursos: MatrizCurso[];
+	estudiantes: MatrizEstudiante[];
+	totales_por_columna: MatrizTotales;
+	filtros_aplicados: {
+		modulo_index: number | null;
+		cursos_count: number;
+	};
+}
+
+export interface ResumenModulosResponse {
+	matricula: {
+		cantidad_pagos: number;
+		monto_total: number;
+		monto_pendiente: number;
+		estudiantes_cursando: number;
+	};
+	modulos: Array<{
+		i: number;
+		nombre: string;
+		cantidad_pagos: number;
+		monto_total: number;
+		monto_pendiente: number;
+		estudiantes_cursando: number;
+	}>;
 }
 
 export const paymentService = new PaymentService();

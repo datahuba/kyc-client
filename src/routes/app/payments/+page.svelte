@@ -27,11 +27,31 @@
 	} from '$lib/icons/outline';
 	import { alert, formatDate, formatCurrency } from '$lib/utils';
 	import Select from '$lib/components/ui/select.svelte';
+	import type { MatrizPagosResponse, ResumenModulosResponse, MatrizModulo, MatrizEstudiante } from '$lib/services/payment.service';
 	
 
 	let payments: Payment[] = $state([]);
 	let loading = $state(true);
-	
+
+	// F-074 (2026-07-23): Toggle entre vista Lista (actual) y Matriz (estilo Excel de Sandra)
+	// Persistimos la elección en localStorage para que no se pierda al recargar.
+	let viewMode: 'lista' | 'matriz' = $state(
+		(typeof localStorage !== 'undefined' && (localStorage.getItem('payments_view') === 'matriz' || localStorage.getItem('payments_view') === 'lista'))
+			? (localStorage.getItem('payments_view') as 'lista' | 'matriz')
+			: 'lista'
+	);
+	function setViewMode(mode: 'lista' | 'matriz') {
+		viewMode = mode;
+		try { localStorage.setItem('payments_view', mode); } catch {}
+		if (mode === 'matriz') loadMatriz();
+	}
+
+	// Estado de la vista Matriz
+	let matrizData: MatrizPagosResponse | null = $state(null);
+	let matrizResumen: ResumenModulosResponse | null = $state(null);
+	let matrizLoading = $state(false);
+	let matrizFiltroModulo: number | '' = $state(''); // '' = todos, 0..N = módulo específico
+
 	// Pagination
 	let page = $state(1);
 	let limit = $state(10);
@@ -188,6 +208,36 @@
 		page = 1;
 		loadPayments();
 	}
+
+	// F-074 (2026-07-23): Carga la matriz de pagos desde el backend.
+	async function loadMatriz() {
+		matrizLoading = true;
+		try {
+			const moduloIdx = matrizFiltroModulo === '' ? null : (matrizFiltroModulo as number);
+			const [mat, res] = await Promise.all([
+				paymentService.getMatriz(moduloIdx),
+				paymentService.getResumenModulos(),
+			]);
+			matrizData = mat;
+			matrizResumen = res;
+		} catch (error: any) {
+			console.error('Error cargando matriz:', error);
+			alert('error', error?.message || 'Error al cargar la matriz de pagos');
+			matrizData = null;
+			matrizResumen = null;
+		} finally {
+			matrizLoading = false;
+		}
+	}
+
+	// F-074: cuando cambia el filtro de módulo, recargar
+	$effect(() => {
+		if (viewMode === 'matriz') {
+			// Dependencia explícita: matrizFiltroModulo
+			matrizFiltroModulo;
+			loadMatriz();
+		}
+	});
 
 	onMount(async () => {
 		const results = await Promise.all([
@@ -579,7 +629,28 @@
 		</div>
 		
 		<div class="flex flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
-			<Button variant="secondary" onclick={loadPayments} loading={loading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
+			<!-- F-074: Toggle vista Lista ⇄ Matriz (estilo Excel de Sandra) -->
+			{#if isStaff}
+				<div class="inline-flex rounded-md shadow-sm border border-gray-300 dark:border-gray-600 overflow-hidden" role="group" aria-label="Modo de vista">
+					<button
+						type="button"
+						onclick={() => setViewMode('lista')}
+						class="px-3 py-1.5 text-sm font-medium transition-colors {viewMode === 'lista' ? 'bg-primary-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'}"
+						aria-pressed={viewMode === 'lista'}
+					>
+						📋 Lista
+					</button>
+					<button
+						type="button"
+						onclick={() => setViewMode('matriz')}
+						class="px-3 py-1.5 text-sm font-medium transition-colors border-l border-gray-300 dark:border-gray-600 {viewMode === 'matriz' ? 'bg-primary-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'}"
+						aria-pressed={viewMode === 'matriz'}
+					>
+						▦ Matriz
+					</button>
+				</div>
+			{/if}
+			<Button variant="secondary" onclick={viewMode === 'matriz' ? loadMatriz : loadPayments} loading={loading || matrizLoading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
 				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
 				<span class="sm:hidden">Recargar</span>
 			</Button>
@@ -687,6 +758,8 @@
 
 
 
+	<!-- F-074: Toggle entre vista Lista (actual) y vista Matriz (estilo Excel de Sandra) -->
+	{#if viewMode === 'lista'}
 	{#if loading && payments.length === 0}
 		<TableSkeleton columns={11} rows={10} />
 	{:else}
@@ -874,6 +947,155 @@
 			onPageChange={handlePageChange}
 			onLimitChange={handleLimitChange}
 		/>
+	{/if}
+
+	<!-- ============================================================== -->
+	<!-- F-074 (2026-07-23): VISTA MATRIZ (estilo Excel de Sandra)      -->
+	<!-- Filas = estudiantes, Columnas = MATRÍCULA | MONTO | MODULO 1..N | TOTAL INGRESOS | POR COBRAR -->
+	<!-- ============================================================== -->
+	{:else if viewMode === 'matriz'}
+		<!-- Filtro adicional solo para la vista Matriz: dropdown de Módulo -->
+		<div class="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+			<label for="matriz-modulo" class="text-sm font-medium text-gray-700 dark:text-gray-200">Módulo:</label>
+			<select
+				id="matriz-modulo"
+				bind:value={matrizFiltroModulo}
+				class="rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			>
+				<option value="">Todos los módulos</option>
+				{#if matrizData}
+					{#each matrizData.totales_por_columna.modulos as m}
+						<option value={m.i}>{m.nombre}</option>
+					{/each}
+				{/if}
+			</select>
+			{#if matrizData}
+				<span class="text-xs text-gray-500 dark:text-gray-400 ml-auto">
+					{matrizData.estudiantes.length} estudiante(s) · {matrizData.totales_por_columna.modulos.length} módulo(s)
+				</span>
+			{/if}
+		</div>
+
+		{#if matrizLoading && !matrizData}
+			<TableSkeleton columns={8} rows={10} />
+		{:else if !matrizData}
+			<EmptyState
+				icon="payment"
+				variant="bordered"
+				size="md"
+				title="No se pudo cargar la matriz"
+				description="Verificá tu conexión y reintentá con el botón Recargar."
+				ctaLabel="Reintentar"
+				onCta={loadMatriz}
+			/>
+		{:else}
+			{@const totales = matrizData.totales_por_columna}
+			{@const estudiantes = matrizData.estudiantes}
+			{@const modulosCols = matrizFiltroModulo === '' ? totales.modulos : totales.modulos.filter(m => m.i === matrizFiltroModulo)}
+
+			<!-- KPI cards: una por módulo + matrícula + total ingresos + por cobrar -->
+			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-3">
+				<!-- Matrícula -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Matrícula</div>
+					<div class="text-lg font-bold text-purple-700 dark:text-purple-300 mt-1">Bs {formatCurrency(totales.matricula.pagado)}</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+						{totales.matricula.estudiantes_pagaron} pagaron
+					</div>
+				</div>
+				<!-- Módulos -->
+				{#each modulosCols as m}
+					<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+						<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400 truncate" title={m.nombre}>{m.nombre}</div>
+						<div class="text-lg font-bold text-blue-700 dark:text-blue-300 mt-1">Bs {formatCurrency(m.pagado)}</div>
+						<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+							{m.estudiantes_pagaron}/{m.estudiantes_pagaron + m.estudiantes_pendientes} pagaron
+						</div>
+					</div>
+				{/each}
+				<!-- Total Ingresos -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Total Ingresos</div>
+					<div class="text-lg font-bold text-green-700 dark:text-green-300 mt-1">Bs {formatCurrency(totales.total_ingresos)}</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Recaudado</div>
+				</div>
+				<!-- Por Cobrar -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Por Cobrar</div>
+					<div class="text-lg font-bold text-orange-700 dark:text-orange-300 mt-1">Bs {formatCurrency(totales.por_cobrar)}</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+						{totales.total_inscritos} inscrito(s)
+					</div>
+				</div>
+			</div>
+
+			<!-- Tabla matricial con scroll horizontal -->
+			<div class="border border-gray-200 dark:border-dark-border rounded-lg shadow-sm overflow-x-auto">
+				<table class="w-full divide-y divide-gray-200 dark:divide-dark-border text-sm">
+					<thead class="bg-gray-50 dark:bg-dark-background">
+						<tr>
+							<th scope="col" class="sticky left-0 z-10 bg-gray-50 dark:bg-dark-background px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Estudiante</th>
+							<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Matrícula</th>
+							{#each modulosCols as m}
+								<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" title={m.nombre}>{m.nombre}</th>
+							{/each}
+							<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-green-50 dark:bg-green-900/20">Total Ingresos</th>
+							<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-orange-50 dark:bg-orange-900/20">Por Cobrar</th>
+						</tr>
+					</thead>
+					<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
+						{#each estudiantes as est (est.estudiante_id)}
+							<tr class="hover:bg-gray-50 dark:hover:bg-dark-background/40 transition-colors">
+								<!-- Estudiante (columna sticky) -->
+								<td class="sticky left-0 z-10 bg-white dark:bg-dark-surface px-4 py-3 min-w-[200px]">
+									<div class="font-medium text-gray-900 dark:text-white truncate" title={est.nombre}>{est.nombre}</div>
+									<div class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 font-mono">
+										{est.registro || '—'} · {est.estado_inscripcion}
+									</div>
+								</td>
+								<!-- Matrícula -->
+								<td class="px-3 py-3 whitespace-nowrap">
+									{#if est.matricula_pagado >= est.matricula_monto - 0.01}
+										<span class="text-green-600 dark:text-green-400 font-semibold" title="Pagado">Bs {formatCurrency(est.matricula_pagado)}</span>
+									{:else if est.matricula_pagado > 0}
+										<span class="text-yellow-600 dark:text-yellow-400 font-semibold" title="Pago parcial">Bs {formatCurrency(est.matricula_pagado)}</span>
+									{:else}
+										<span class="text-gray-300 dark:text-gray-600">—</span>
+									{/if}
+								</td>
+								<!-- Módulos -->
+								{#each modulosCols as m}
+									{@const mod = est.modulos.find(x => x.i === m.i)}
+									<td class="px-3 py-3 whitespace-nowrap">
+										{#if !mod}
+											<span class="text-gray-300 dark:text-gray-600">—</span>
+										{:else if mod.estado === 'Pagado'}
+											<span class="text-green-600 dark:text-green-400 font-semibold" title="Pagado">Bs {formatCurrency(mod.monto_pagado)}</span>
+										{:else if mod.monto_pagado > 0}
+											<span class="text-yellow-600 dark:text-yellow-400 font-semibold" title="Pago parcial">Bs {formatCurrency(mod.monto_pagado)}</span>
+										{:else}
+											<span class="text-gray-300 dark:text-gray-600">—</span>
+										{/if}
+									</td>
+								{/each}
+								<!-- Total Ingresos -->
+								<td class="px-3 py-3 whitespace-nowrap font-semibold text-green-700 dark:text-green-300 bg-green-50/50 dark:bg-green-900/10">
+									Bs {formatCurrency(est.total_ingresos)}
+								</td>
+								<!-- Por Cobrar -->
+								<td class="px-3 py-3 whitespace-nowrap font-semibold text-orange-700 dark:text-orange-300 bg-orange-50/50 dark:bg-orange-900/10">
+									{#if est.por_cobrar > 0.01}
+										Bs {formatCurrency(est.por_cobrar)}
+									{:else}
+										<span class="text-gray-400 dark:text-gray-500">—</span>
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
 	{/if}
 
 	<!-- Create Payment Modal -->
