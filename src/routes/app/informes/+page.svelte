@@ -308,10 +308,10 @@
 									</td>
 									<td class="px-2 py-2 text-right font-semibold text-gray-900 dark:text-white">
 										{r.importe.toFixed(2)}
-										{#if r.beca && r.importe > 0}
+										{#if r.beca && r.beca_porcentaje > 0 && r.importe > 0}
 											<span
 												class="ml-1 inline-block cursor-help text-xs text-light-secondary dark:text-dark-secondary"
-												title={`Beca ${r.beca} (${r.beca_porcentaje}%). Costo original del módulo: Bs ${r.costo_total.toFixed(2)}. El estudiante paga ${r.importe.toFixed(2)} porque tiene ${r.beca_porcentaje}% de descuento aplicado a módulos.`}
+												title={`Beca ${r.beca} (${r.beca_porcentaje}%). Costo original del módulo: Bs ${(r.costo_sin_descuento ?? r.costo_total).toFixed(2)}. Costo con descuento (lo que el estudiante debe pagar): Bs ${r.costo_total.toFixed(2)}. Pagó: Bs ${r.importe.toFixed(2)}.`}
 											>
 												ℹ️
 											</span>
