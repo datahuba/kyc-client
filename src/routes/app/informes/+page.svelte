@@ -116,23 +116,26 @@
 		lines.push(`"PERÍODO: ${data.encabezado.periodo || 'N/A'}"`);
 		lines.push(`"DOCENTE: ${data.encabezado.docente || 'N/A'}"`);
 		lines.push('');
-		// Columnas (estilo papel Sandra)
-		lines.push(['N°', 'Apellido y Nombre', 'C.I.', 'Fecha', 'N° Boleta', 'Importe Bs.', 'Beca'].join(','));
+		// Columnas (estilo papel Sandra) - F-075-FIX-8 incluye Estado y Pendiente
+		lines.push(['N°', 'Apellido y Nombre', 'C.I.', 'Estado', 'Fecha', 'N° Boleta', 'Importe Bs.', 'Pendiente', 'Beca'].join(','));
 		data.rows.forEach((r, i) => {
 			const cols = [
 				String(i + 1),
 				`"${r.nombre}"`,
 				`"${r.ci}"`,
-				r.fecha_pago ? formatDate(r.fecha_pago) : 'S/F',
-				`"${r.numero_boleta || 'S/N'}"`,
-				r.importe.toFixed(2),
+				r.estado_pago || 'PENDIENTE',
+				r.fecha_pago ? formatDate(r.fecha_pago) : '',
+				`"${r.numero_boleta || ''}"`,
+				(r.importe || 0).toFixed(2),
+				(r.monto_pendiente || 0).toFixed(2),
 				r.beca ? `${r.beca} (${r.beca_porcentaje}%)` : 'Sin beca',
 			];
 			lines.push(cols.join(','));
 		});
 		lines.push('');
 		lines.push(`"TOTAL ESTUDIANTES: ${data.total_estudiantes}"`);
-		lines.push(`"TOTAL IMPORTE: Bs. ${data.total_importe.toFixed(2)}"`);
+		lines.push(`"TOTAL IMPORTE PAGADO: Bs. ${data.total_importe.toFixed(2)}"`);
+		lines.push(`"TOTAL PENDIENTE: Bs. ${(data.total_pendiente || 0).toFixed(2)}"`);
 
 		const csv = '\uFEFF' + lines.join('\n'); // BOM para que Excel respete acentos
 		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -232,10 +235,33 @@
 
 			{#if data.rows.length === 0}
 				<p class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-					No hay estudiantes con pagos aprobados para este módulo.
+					No hay estudiantes inscritos en este módulo.
 				</p>
 			{:else}
-				<!-- Tabla estilo papel -->
+				<!-- Resumen rapido (F-075-FIX-8): muestra cuantos pagaron y cuantos deben -->
+				{@const pagados = data.rows.filter((r) => r.estado_pago === 'PAGADO').length}
+				{@const parciales = data.rows.filter((r) => r.estado_pago === 'PARCIAL').length}
+				{@const pendientes = data.rows.filter((r) => r.estado_pago === 'PENDIENTE').length}
+				<div class="mb-3 flex flex-wrap gap-3 text-sm">
+					<span class="inline-flex items-center gap-1.5 rounded-full bg-light-success/15 px-3 py-1 font-semibold text-light-success dark:bg-dark-success/20 dark:text-dark-success">
+						<span class="size-2 rounded-full bg-light-success"></span>
+						{pagados} Pagados
+					</span>
+					{#if parciales > 0}
+						<span class="inline-flex items-center gap-1.5 rounded-full bg-light-warning/15 px-3 py-1 font-semibold text-light-warning dark:bg-dark-warning/20 dark:text-dark-warning">
+							<span class="size-2 rounded-full bg-light-warning"></span>
+							{parciales} Parciales
+						</span>
+					{/if}
+					{#if pendientes > 0}
+						<span class="inline-flex items-center gap-1.5 rounded-full bg-light-error/15 px-3 py-1 font-semibold text-light-error dark:bg-dark-error/20 dark:text-dark-error">
+							<span class="size-2 rounded-full bg-light-error"></span>
+							{pendientes} Pendientes
+						</span>
+					{/if}
+				</div>
+
+				<!-- Tabla estilo papel (F-075-FIX-8: incluye estado + pendiente) -->
 				<div class="overflow-x-auto">
 					<table class="w-full border-collapse text-sm">
 						<thead>
@@ -243,26 +269,49 @@
 								<th class="px-2 py-2 text-center font-bold">N°</th>
 								<th class="px-2 py-2 text-left font-bold">Apellido y Nombre</th>
 								<th class="px-2 py-2 text-center font-bold">C.I.</th>
+								<th class="px-2 py-2 text-center font-bold">Estado</th>
 								<th class="px-2 py-2 text-center font-bold">Fecha</th>
 								<th class="px-2 py-2 text-center font-bold">N° Boleta</th>
 								<th class="px-2 py-2 text-right font-bold">Importe Bs.</th>
+								<th class="px-2 py-2 text-right font-bold">Pendiente</th>
 								<th class="px-2 py-2 text-center font-bold">Beca</th>
 							</tr>
 						</thead>
 						<tbody>
 							{#each data.rows as r, i (r.estudiante_id + '-' + r.modulo_index)}
-								<tr class="border-b border-gray-200 hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-surface/30">
+								<tr
+									class="border-b border-gray-200 hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-surface/30 {r.estado_pago === 'PENDIENTE' ? 'bg-red-50/30 dark:bg-red-900/10' : r.estado_pago === 'PARCIAL' ? 'bg-amber-50/30 dark:bg-amber-900/10' : ''}"
+								>
 									<td class="px-2 py-2 text-center text-gray-700 dark:text-gray-300">{i + 1}</td>
 									<td class="px-2 py-2 font-medium text-gray-900 dark:text-white">{r.nombre}</td>
 									<td class="px-2 py-2 text-center text-gray-700 dark:text-gray-300">{r.ci}</td>
-									<td class="px-2 py-2 text-center text-gray-700 dark:text-gray-300">{formatFechaPago(r.fecha_pago)}</td>
-									<td class="px-2 py-2 text-center font-mono text-xs text-gray-700 dark:text-gray-300">{r.numero_boleta}</td>
+									<td class="px-2 py-2 text-center">
+										{#if r.estado_pago === 'PAGADO'}
+											<span class="inline-block rounded-full bg-light-success/20 px-2 py-0.5 text-[10px] font-bold uppercase text-light-success dark:bg-dark-success/30 dark:text-dark-success">
+												✓ Pagado
+											</span>
+										{:else if r.estado_pago === 'PARCIAL'}
+											<span class="inline-block rounded-full bg-light-warning/20 px-2 py-0.5 text-[10px] font-bold uppercase text-light-warning dark:bg-dark-warning/30 dark:text-dark-warning">
+												⏳ Parcial
+											</span>
+										{:else}
+											<span class="inline-block rounded-full bg-light-error/20 px-2 py-0.5 text-[10px] font-bold uppercase text-light-error dark:bg-dark-error/30 dark:text-dark-error">
+												✗ Pendiente
+											</span>
+										{/if}
+									</td>
+									<td class="px-2 py-2 text-center text-gray-700 dark:text-gray-300">
+										{r.fecha_pago ? formatFechaPago(r.fecha_pago) : '—'}
+									</td>
+									<td class="px-2 py-2 text-center font-mono text-xs text-gray-700 dark:text-gray-300">
+										{r.numero_boleta || '—'}
+									</td>
 									<td class="px-2 py-2 text-right font-semibold text-gray-900 dark:text-white">
 										{r.importe.toFixed(2)}
-										{#if r.beca}
+										{#if r.beca && r.importe > 0}
 											<span
 												class="ml-1 inline-block cursor-help text-xs text-light-secondary dark:text-dark-secondary"
-												title={`Beca ${r.beca} (${r.beca_porcentaje}%). Costo original del módulo: Bs ${r.costo_original_modulo.toFixed(2)}. El estudiante paga ${r.importe.toFixed(2)} porque tiene ${r.beca_porcentaje}% de descuento aplicado a módulos.`}
+												title={`Beca ${r.beca} (${r.beca_porcentaje}%). Costo original del módulo: Bs ${r.costo_total.toFixed(2)}. El estudiante paga ${r.importe.toFixed(2)} porque tiene ${r.beca_porcentaje}% de descuento aplicado a módulos.`}
 											>
 												ℹ️
 											</span>
@@ -285,12 +334,15 @@
 						</tbody>
 						<tfoot>
 							<tr class="border-t-2 border-gray-300 bg-gray-50 font-bold dark:border-dark-border dark:bg-dark-surface/50">
-								<td colspan="5" class="px-2 py-2 text-right uppercase">Total</td>
+								<td colspan="6" class="px-2 py-2 text-right uppercase">Totales</td>
 								<td class="px-2 py-2 text-right text-base text-light-secondary dark:text-dark-secondary">
 									Bs. {data.total_importe.toFixed(2)}
 								</td>
+								<td class="px-2 py-2 text-right text-base text-light-error dark:text-dark-error">
+									Bs. {(data.total_pendiente || 0).toFixed(2)}
+								</td>
 								<td class="text-center text-xs text-gray-600 dark:text-gray-400">
-									{data.total_estudiantes} estudiantes
+									{data.total_estudiantes} est.
 								</td>
 							</tr>
 						</tfoot>
