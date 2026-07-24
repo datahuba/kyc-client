@@ -110,14 +110,20 @@
 	// Genera el archivo desde el backend, que tiene formato "papel Sandra"
 	// con colores por estado (verde PAGADO, amarillo PARCIAL, rojo PENDIENTE).
 	async function descargarXLSX() {
-		if (!data || data.rows.length === 0 || !cursoSeleccionado) return;
+		if (!data || data.rows.length === 0 || !selectedCourseId) return;
 		downloading = 'xlsx';
 		try {
+			const modParam = selectedModulo === '' ? null : Number(selectedModulo);
 			const blob = await paymentService.getListaHabilitadosXLSX(
-				cursoSeleccionado._id,
-				moduloIndex
+				selectedCourseId,
+				modParam
 			);
-			const fname = `lista_habilitados_${cursoSeleccionado.codigo || 'curso'}_${(moduloLabel || 'todos').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}.xlsx`;
+			// Construir filename: lista_habilitados_<curso>_<<modulo|todos>>.xlsx
+			const curso = coursesList.find((c) => c._id === selectedCourseId);
+			const cursoCode = (curso?.codigo || 'curso').replace(/[^a-zA-Z0-9]/g, '_');
+			const modLabel = data.encabezado?.modulo || 'todos';
+			const modSafe = modLabel.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().slice(0, 40);
+			const fname = `lista_habilitados_${cursoCode}_${modSafe}.xlsx`;
 			descargarBlob(blob, fname);
 		} catch (e: any) {
 			console.error(e);
@@ -130,14 +136,19 @@
 	// F-078 (2026-07-24): descarga como PDF (reportlab, landscape A4).
 	// Mismo formato papel Sandra, con colores por estado en cada fila.
 	async function descargarPDF() {
-		if (!data || data.rows.length === 0 || !cursoSeleccionado) return;
+		if (!data || data.rows.length === 0 || !selectedCourseId) return;
 		downloading = 'pdf';
 		try {
+			const modParam = selectedModulo === '' ? null : Number(selectedModulo);
 			const blob = await paymentService.getListaHabilitadosPDF(
-				cursoSeleccionado._id,
-				moduloIndex
+				selectedCourseId,
+				modParam
 			);
-			const fname = `lista_habilitados_${cursoSeleccionado.codigo || 'curso'}_${(moduloLabel || 'todos').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}.pdf`;
+			const curso = coursesList.find((c) => c._id === selectedCourseId);
+			const cursoCode = (curso?.codigo || 'curso').replace(/[^a-zA-Z0-9]/g, '_');
+			const modLabel = data.encabezado?.modulo || 'todos';
+			const modSafe = modLabel.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().slice(0, 40);
+			const fname = `lista_habilitados_${cursoCode}_${modSafe}.pdf`;
 			descargarBlob(blob, fname);
 		} catch (e: any) {
 			console.error(e);
