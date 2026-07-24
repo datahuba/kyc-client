@@ -52,6 +52,7 @@
 	let selectedModulo: number | '' = $state(''); // '' = todos
 	let loading = $state(false);
 	let loadingCourses = $state(true);
+	let downloading = $state<'xlsx' | 'pdf' | null>(null);
 	let data: ListaHabilitadosResponse | null = $state(null);
 
 	// Lista de módulos del curso seleccionado (se llena al elegir curso)
@@ -105,45 +106,53 @@
 		}
 	}
 
-	// Descargar como XLSX (CSV simple por ahora, fácil de abrir en Excel)
-	function descargarCSV() {
-		if (!data || data.rows.length === 0) return;
-		const lines: string[] = [];
-		// Encabezado
-		lines.push(`"${data.encabezado.titulo}"`);
-		lines.push(`"${data.encabezado.programa_tipo}: ${data.encabezado.programa_nombre}"`);
-		lines.push(`"MÓDULO: ${data.encabezado.modulo}"`);
-		lines.push(`"PERÍODO: ${data.encabezado.periodo || 'N/A'}"`);
-		lines.push(`"DOCENTE: ${data.encabezado.docente || 'N/A'}"`);
-		lines.push('');
-		// Columnas (estilo papel Sandra) - F-075-FIX-8 incluye Estado y Pendiente
-		lines.push(['N°', 'Apellido y Nombre', 'C.I.', 'Estado', 'Fecha', 'N° Boleta', 'Importe Bs.', 'Pendiente', 'Beca'].join(','));
-		data.rows.forEach((r, i) => {
-			const cols = [
-				String(i + 1),
-				`"${r.nombre}"`,
-				`"${r.ci}"`,
-				r.estado_pago || 'PENDIENTE',
-				r.fecha_pago ? formatDate(r.fecha_pago) : '',
-				`"${r.numero_boleta || ''}"`,
-				(r.importe || 0).toFixed(2),
-				(r.monto_pendiente || 0).toFixed(2),
-				r.beca ? `${r.beca} (${r.beca_porcentaje}%)` : 'Sin beca',
-			];
-			lines.push(cols.join(','));
-		});
-		lines.push('');
-		lines.push(`"TOTAL ESTUDIANTES: ${data.total_estudiantes}"`);
-		lines.push(`"TOTAL IMPORTE PAGADO: Bs. ${data.total_importe.toFixed(2)}"`);
-		lines.push(`"TOTAL PENDIENTE: Bs. ${(data.total_pendiente || 0).toFixed(2)}"`);
+	// F-078 (2026-07-24): descarga como XLSX (Excel nativo, openpyxl).
+	// Genera el archivo desde el backend, que tiene formato "papel Sandra"
+	// con colores por estado (verde PAGADO, amarillo PARCIAL, rojo PENDIENTE).
+	async function descargarXLSX() {
+		if (!data || data.rows.length === 0 || !cursoSeleccionado) return;
+		downloading = 'xlsx';
+		try {
+			const blob = await paymentService.getListaHabilitadosXLSX(
+				cursoSeleccionado._id,
+				moduloIndex
+			);
+			const fname = `lista_habilitados_${cursoSeleccionado.codigo || 'curso'}_${(moduloLabel || 'todos').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}.xlsx`;
+			descargarBlob(blob, fname);
+		} catch (e: any) {
+			console.error(e);
+			alert('error', e?.message || 'Error al generar XLSX');
+		} finally {
+			downloading = null;
+		}
+	}
 
-		const csv = '\uFEFF' + lines.join('\n'); // BOM para que Excel respete acentos
-		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+	// F-078 (2026-07-24): descarga como PDF (reportlab, landscape A4).
+	// Mismo formato papel Sandra, con colores por estado en cada fila.
+	async function descargarPDF() {
+		if (!data || data.rows.length === 0 || !cursoSeleccionado) return;
+		downloading = 'pdf';
+		try {
+			const blob = await paymentService.getListaHabilitadosPDF(
+				cursoSeleccionado._id,
+				moduloIndex
+			);
+			const fname = `lista_habilitados_${cursoSeleccionado.codigo || 'curso'}_${(moduloLabel || 'todos').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}.pdf`;
+			descargarBlob(blob, fname);
+		} catch (e: any) {
+			console.error(e);
+			alert('error', e?.message || 'Error al generar PDF');
+		} finally {
+			downloading = null;
+		}
+	}
+
+	// Helper genérico para descargar un Blob como archivo.
+	function descargarBlob(blob: Blob, filename: string) {
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		const fname = data.encabezado.modulo.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-		a.download = `lista_habilitados_${fname}.csv`;
+		a.download = filename;
 		document.body.appendChild(a);
 		a.click();
 		document.body.removeChild(a);
@@ -218,10 +227,24 @@
 							{data.encabezado.titulo}
 						</h2>
 					</div>
-					<Button variant="secondary" onclick={descargarCSV} disabled={data.rows.length === 0}>
-						{#snippet leftIcon()}<DownloadIcon class="size-4" />{/snippet}
-						Descargar CSV
-					</Button>
+					<div class="flex items-center gap-2">
+						<Button
+							variant="primary"
+							onclick={descargarXLSX}
+							disabled={data.rows.length === 0 || downloading !== null}
+						>
+							{#snippet leftIcon()}<DownloadIcon class="size-4" />{/snippet}
+							{downloading === 'xlsx' ? 'Generando...' : 'Descargar Excel'}
+						</Button>
+						<Button
+							variant="secondary"
+							onclick={descargarPDF}
+							disabled={data.rows.length === 0 || downloading !== null}
+						>
+							{#snippet leftIcon()}<DownloadIcon class="size-4" />{/snippet}
+							{downloading === 'pdf' ? 'Generando...' : 'Descargar PDF'}
+						</Button>
+					</div>
 				</div>
 			{/snippet}
 
