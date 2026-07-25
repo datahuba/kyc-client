@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { userStore } from '$lib/stores/userStore';
-	import { enrollmentService, courseService } from '$lib/services';
+	import { studentService, enrollmentService, courseService } from '$lib/services';
 	import type { Enrollment, Course } from '$lib/interfaces';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -15,6 +15,7 @@
 	let coursesMap: Record<string, Course> = $state({});
 	let availableCourses: Course[] = $state([]);
 	let loading = $state(true);
+	let studentProfile = $state<any>(null);
 
 	// ISSUE-R-SOLICITUD-INSCRIPCION: solicitudes de inscripción ya enviadas
 	// por el estudiante (para deshabilitar el botón "Solicitar" en esa tarjeta).
@@ -24,16 +25,29 @@
 	let requestMensaje = $state('');
 	let requestLoading = $state(false);
 
+	function resolveDocStatus(url?: string, estado?: string): string {
+		if (estado === 'verificado') return 'verificado';
+		if (estado === 'rechazado') return 'rechazado';
+		if (estado === 'pendiente' || (url && url.trim().length > 0)) return 'pendiente';
+		return 'sin_subir';
+	}
+
 	// ISSUE-Q-INSCRIPCION-DOCS: Validar que el estudiante tenga sus documentos completos y verificados
 	// Objeto derivado que detalla el estado de cada documento para el mensaje
 	let docStatus = $derived.by(() => {
-		const u = $userStore.user as any;
+		const u = studentProfile || ($userStore.user as any);
 		if (!u) return { completo: false, items: [] as { label: string; estado: string; verificado: boolean }[] };
+
+		const cvState = resolveDocStatus(u.cv_url, u.cv_estado);
+		const carnetState = resolveDocStatus(u.carnet_url, u.carnet_estado);
+		const afiliacionState = resolveDocStatus(u.afiliacion_url, u.afiliacion_estado);
+		const tituloState = resolveDocStatus(u.titulo?.titulo_url || (u.titulo as any)?.url, u.titulo?.estado);
+
 		const items = [
-			{ label: 'Curriculum Vitae (CV)', estado: u.cv_estado || 'sin_subir', verificado: u.cv_estado === 'verificado' },
-			{ label: 'Carnet de Identidad', estado: u.carnet_estado || 'sin_subir', verificado: u.carnet_estado === 'verificado' },
-			{ label: 'Certificado de Afiliación', estado: u.afiliacion_estado || 'sin_subir', verificado: u.afiliacion_estado === 'verificado' },
-			{ label: 'Título Profesional', estado: u.titulo?.estado || 'sin_subir', verificado: u.titulo?.estado === 'verificado' }
+			{ label: 'Curriculum Vitae (CV)', estado: cvState, verificado: cvState === 'verificado' },
+			{ label: 'Carnet de Identidad', estado: carnetState, verificado: carnetState === 'verificado' },
+			{ label: 'Certificado de Afiliación', estado: afiliacionState, verificado: afiliacionState === 'verificado' },
+			{ label: 'Título Profesional', estado: tituloState, verificado: tituloState === 'verificado' }
 		];
 		return { completo: items.every(i => i.verificado), items };
 	});
@@ -87,12 +101,16 @@
 	onMount(async () => {
 		if ($userStore.user?._id) {
 			try {
-				const [enrRes, coursesRes, myRequestsRes] = await Promise.all([
+				const [stProfile, enrRes, coursesRes, myRequestsRes] = await Promise.all([
+					studentService.getById($userStore.user._id).catch(() => null),
 					enrollmentService.getByStudentId($userStore.user._id),
 					courseService.getAll(1, 100),
 					apiKyC.get<any[]>('/enrollment-requests/me').catch(() => [])
 				]);
 				
+				if (stProfile) {
+					studentProfile = stProfile;
+				}
 				enrollments = Array.isArray(enrRes) ? enrRes : (enrRes as any).data || [];
 				const courses = coursesRes.data || [];
 				// Construir el mapa en un objeto local y asignarlo una sola vez al $state
