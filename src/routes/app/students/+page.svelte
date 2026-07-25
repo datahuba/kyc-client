@@ -213,7 +213,18 @@
 		if (cursoIdParam) {
 			filters.curso_id = cursoIdParam;
 		}
-		loadStudents();
+
+		const qParam = $appPage.url.searchParams.get('q');
+		if (qParam) {
+			filters.q = qParam;
+		}
+
+		await loadStudents();
+
+		if (qParam && students.length > 0) {
+			const target = students.find(s => s._id === qParam || s.carnet === qParam || s.registro === qParam) || students[0];
+			handleViewDetails(target);
+		}
 	});
 
 	function handleCreate() {
