@@ -239,6 +239,10 @@
 
 	// Acciones de Validación
 	async function handleAprobar(doc: UnifiedDocItem) {
+		if (!doc.url) {
+			alert('error', 'No se puede aprobar un documento sin archivo adjunto');
+			return;
+		}
 		actionLoading = doc.id;
 		try {
 			if (doc.docCategory === 'titulo') {
@@ -258,6 +262,10 @@
 	}
 
 	async function handleRechazar(doc: UnifiedDocItem) {
+		if (!doc.url) {
+			alert('error', 'No se puede rechazar un documento sin archivo adjunto');
+			return;
+		}
 		if (!motivoRechazo.trim()) {
 			alert('error', 'Ingresa el motivo del rechazo');
 			return;
@@ -606,11 +614,12 @@
 												<div class="flex items-center gap-2">
 													<span class="font-bold text-gray-800 dark:text-gray-200">{doc.docLabel}</span>
 													<span class={`px-2 py-0.5 text-[10px] font-bold rounded ${
+														!doc.url ? 'bg-gray-200/80 text-gray-600 dark:bg-gray-800 dark:text-gray-400' :
 														doc.estado === 'verificado' || doc.estado === 'aprobado' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
 														doc.estado === 'rechazado' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
 														'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
 													}`}>
-														{doc.estado === 'pendiente' ? 'Pendiente Revisión' : doc.estado}
+														{!doc.url ? 'Sin archivo subido' : doc.estado === 'pendiente' ? 'Pendiente Revisión' : doc.estado}
 													</span>
 												</div>
 
@@ -658,8 +667,13 @@
 												<button
 													type="button"
 													onclick={() => handleAprobar(doc)}
-													disabled={actionLoading === key}
-													class="px-2.5 py-1.5 text-xs font-semibold text-white bg-uagrm-green hover:opacity-90 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50"
+													disabled={!doc.url || actionLoading === key}
+													title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar documento'}
+													class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 ${
+														!doc.url 
+															? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+															: 'bg-uagrm-green text-white hover:opacity-90 disabled:opacity-50'
+													}`}
 												>
 													<CheckIcon class="size-3.5" />
 													<span>{actionLoading === key ? '...' : 'Aprobar'}</span>
@@ -675,8 +689,13 @@
 															motivoRechazo = '';
 														}
 													}}
-													disabled={actionLoading === key}
-													class="px-2.5 py-1.5 text-xs font-semibold text-white bg-uagrm-red hover:opacity-90 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50"
+													disabled={!doc.url || actionLoading === key}
+													title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar documento'}
+													class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 ${
+														!doc.url 
+															? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+															: 'bg-uagrm-red text-white hover:opacity-90 disabled:opacity-50'
+													}`}
 												>
 													<XMarkIcon class="size-3.5" />
 													<span>Rechazar</span>
@@ -729,6 +748,8 @@
 													<a href={doc.url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline mt-1">
 														<EyeIcon class="size-3.5" /> Ver PDF/Imagen
 													</a>
+												{:else}
+													<span class="text-[11px] text-gray-400 italic block mt-1">Sin archivo adjunto</span>
 												{/if}
 											</div>
 											<div class="flex items-center gap-1.5 shrink-0">
@@ -736,10 +757,10 @@
 												<button type="button" onclick={() => triggerStaffUpload(doc.id)} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg flex items-center gap-1">
 													<DocumentAddIcon class="size-3.5" /> Adjuntar
 												</button>
-												<button type="button" onclick={() => handleAprobar(doc)} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-uagrm-green hover:opacity-90 rounded-lg flex items-center gap-1">
+												<button type="button" onclick={() => handleAprobar(doc)} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-green text-white hover:opacity-90'}`}>
 													<CheckIcon class="size-3.5" /> Aprobar
 												</button>
-												<button type="button" onclick={() => { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; }} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-uagrm-red hover:opacity-90 rounded-lg flex items-center gap-1">
+												<button type="button" onclick={() => { if (doc.url) { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; } }} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-red text-white hover:opacity-90'}`}>
 													<XMarkIcon class="size-3.5" /> Rechazar
 												</button>
 											</div>
@@ -774,6 +795,8 @@
 													<a href={doc.url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline mt-1">
 														<EyeIcon class="size-3.5" /> Abrir Documento
 													</a>
+												{:else}
+													<span class="text-[11px] text-gray-400 italic block mt-1">Sin archivo adjunto</span>
 												{/if}
 											</div>
 											<div class="flex items-center gap-1.5 shrink-0">
@@ -781,10 +804,10 @@
 												<button type="button" onclick={() => triggerStaffUpload(doc.id)} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg flex items-center gap-1">
 													<DocumentAddIcon class="size-3.5" /> Adjuntar
 												</button>
-												<button type="button" onclick={() => handleAprobar(doc)} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-uagrm-green hover:opacity-90 rounded-lg flex items-center gap-1">
+												<button type="button" onclick={() => handleAprobar(doc)} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-green text-white hover:opacity-90'}`}>
 													<CheckIcon class="size-3.5" /> Aprobar
 												</button>
-												<button type="button" onclick={() => { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; }} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-uagrm-red hover:opacity-90 rounded-lg flex items-center gap-1">
+												<button type="button" onclick={() => { if (doc.url) { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; } }} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-red text-white hover:opacity-90'}`}>
 													<XMarkIcon class="size-3.5" /> Rechazar
 												</button>
 											</div>
@@ -811,6 +834,8 @@
 													<a href={doc.url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline mt-1">
 														<EyeIcon class="size-3.5" /> Ver Adjunto
 													</a>
+												{:else}
+													<span class="text-[11px] text-gray-400 italic block mt-1">Sin archivo adjunto</span>
 												{/if}
 											</div>
 											<div class="flex items-center gap-1.5 shrink-0">
@@ -818,10 +843,10 @@
 												<button type="button" onclick={() => triggerStaffUpload(doc.id)} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg flex items-center gap-1">
 													<DocumentAddIcon class="size-3.5" /> Adjuntar
 												</button>
-												<button type="button" onclick={() => handleAprobar(doc)} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-uagrm-green hover:opacity-90 rounded-lg flex items-center gap-1">
+												<button type="button" onclick={() => handleAprobar(doc)} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-green text-white hover:opacity-90'}`}>
 													<CheckIcon class="size-3.5" /> Aprobar
 												</button>
-												<button type="button" onclick={() => { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; }} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-uagrm-red hover:opacity-90 rounded-lg flex items-center gap-1">
+												<button type="button" onclick={() => { if (doc.url) { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; } }} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-red text-white hover:opacity-90'}`}>
 													<XMarkIcon class="size-3.5" /> Rechazar
 												</button>
 											</div>
