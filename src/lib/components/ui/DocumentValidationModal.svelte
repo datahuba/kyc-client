@@ -28,12 +28,22 @@
 	// Subida por Staff Modal / Panel Formulario
 	let showStaffUploadForm = $state(false);
 	let selectedStudentForUpload = $state('');
-	let uploadDocType = $state<'titulo' | 'cv' | 'ci' | 'afiliacion' | 'requisito'>('titulo');
+	let uploadDocType = $state<'titulo' | 'cv' | 'carnet' | 'afiliacion' | 'requisito'>('titulo');
 	let uploadTituloForm = $state({ titulo: '', numero_titulo: '', universidad: '', año_expedicion: '' });
 	let uploadRequisitoEnrId = $state('');
 	let uploadRequisitoIndex = $state(0);
 	let staffFileToUpload = $state<File | null>(null);
 	let isSubmittingStaffUpload = $state(false);
+
+	function getSafeDocumentUrl(url: string): string {
+		if (!url) return '';
+		if (!/\.(pdf|jpg|jpeg|png|webp)($|\?)/i.test(url)) {
+			if (url.includes('cloudinary.com')) {
+				return `${url}.pdf`;
+			}
+		}
+		return url;
+	}
 
 	// Interfaces unificadas
 	export interface UnifiedDocItem {
@@ -47,7 +57,7 @@
 		estado: string;
 		motivoRechazo?: string | null;
 		// Referencias internas
-		docTypePersonal?: 'cv' | 'ci' | 'afiliacion';
+		docTypePersonal?: 'cv' | 'carnet' | 'afiliacion';
 		enrollmentId?: string;
 		reqIndex?: number;
 		tituloData?: { titulo: string; numeroTitulo: string; universidad: string; añoExpedicion: string };
@@ -137,13 +147,13 @@
 				}
 				if (s.carnet_url || s.carnet_estado === 'pendiente') {
 					docs.push({
-						id: `personal-${s._id}-ci`,
+						id: `personal-${s._id}-carnet`,
 						studentId: s._id,
 						studentName: s.nombre,
 						carnet: s.carnet || s.registro,
 						docCategory: 'personal',
 						docLabel: '🪪 Carnet de Identidad',
-						docTypePersonal: 'ci',
+						docTypePersonal: 'carnet',
 						url: s.carnet_url || '',
 						estado: s.carnet_estado || 'pendiente',
 						motivoRechazo: s.carnet_motivo_rechazo
@@ -312,7 +322,7 @@
 				});
 				await studentService.verifyTitulo(doc.studentId, {});
 			} else if (doc.docCategory === 'personal' && doc.docTypePersonal) {
-				if (doc.docTypePersonal === 'ci') await studentService.uploadCarnet(doc.studentId, file);
+				if (doc.docTypePersonal === 'carnet') await studentService.uploadCarnet(doc.studentId, file);
 				else if (doc.docTypePersonal === 'cv') await studentService.uploadCV(doc.studentId, file);
 				else if (doc.docTypePersonal === 'afiliacion') await studentService.uploadAfiliacion(doc.studentId, file);
 				await studentService.verifyDocument(doc.studentId, doc.docTypePersonal);
@@ -356,8 +366,8 @@
 					año_expedicion: uploadTituloForm.año_expedicion || new Date().getFullYear().toString()
 				});
 				await studentService.verifyTitulo(selectedStudentForUpload, {});
-			} else if (['cv', 'ci', 'afiliacion'].includes(uploadDocType)) {
-				if (uploadDocType === 'ci') await studentService.uploadCarnet(selectedStudentForUpload, staffFileToUpload);
+			} else if (['cv', 'carnet', 'afiliacion'].includes(uploadDocType)) {
+				if (uploadDocType === 'carnet') await studentService.uploadCarnet(selectedStudentForUpload, staffFileToUpload);
 				else if (uploadDocType === 'cv') await studentService.uploadCV(selectedStudentForUpload, staffFileToUpload);
 				else if (uploadDocType === 'afiliacion') await studentService.uploadAfiliacion(selectedStudentForUpload, staffFileToUpload);
 				await studentService.verifyDocument(selectedStudentForUpload, uploadDocType);
@@ -473,7 +483,7 @@
 								>
 									<option value="titulo">🎓 Título Profesional</option>
 									<option value="cv">📄 Curriculum Vitae (CV)</option>
-									<option value="ci">🪪 Carnet de Identidad</option>
+									<option value="carnet">🪪 Carnet de Identidad</option>
 									<option value="afiliacion">📜 Certificado de Afiliación</option>
 									<option value="requisito">📝 Requisito de Programa</option>
 								</select>
@@ -629,7 +639,7 @@
 
 												{#if doc.url}
 													<a 
-														href={doc.url} 
+														href={getSafeDocumentUrl(doc.url)} 
 														target="_blank" 
 														rel="noopener noreferrer"
 														class="inline-flex items-center gap-1 font-semibold text-primary-600 dark:text-primary-400 hover:underline mt-1"
@@ -745,7 +755,7 @@
 												</div>
 												<p class="text-xs text-gray-600 dark:text-gray-300 font-medium mt-0.5">{doc.docLabel}</p>
 												{#if doc.url}
-													<a href={doc.url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline mt-1">
+													<a href={getSafeDocumentUrl(doc.url)} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline mt-1">
 														<EyeIcon class="size-3.5" /> Ver PDF/Imagen
 													</a>
 												{:else}
@@ -792,7 +802,7 @@
 												</div>
 												<p class="text-xs text-blue-700 dark:text-blue-300 font-medium mt-0.5">{doc.docLabel}</p>
 												{#if doc.url}
-													<a href={doc.url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline mt-1">
+													<a href={getSafeDocumentUrl(doc.url)} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline mt-1">
 														<EyeIcon class="size-3.5" /> Abrir Documento
 													</a>
 												{:else}
@@ -831,7 +841,7 @@
 												<p class="text-xs text-primary-600 dark:text-primary-400 font-semibold">{doc.courseName}</p>
 												<p class="text-xs text-gray-700 dark:text-gray-300 mt-1">{doc.docLabel}</p>
 												{#if doc.url}
-													<a href={doc.url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline mt-1">
+													<a href={getSafeDocumentUrl(doc.url)} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline mt-1">
 														<EyeIcon class="size-3.5" /> Ver Adjunto
 													</a>
 												{:else}
