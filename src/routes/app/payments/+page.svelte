@@ -129,8 +129,10 @@
 	// "Cobranza: sandra.zabala" según el caso.
 	function parseSubidoPor(p: Payment | null): { label: string; role: string } {
 		if (!p) return { label: '—', role: '' };
+		if (p.estado_pago === 'pendiente' || !p.verificado_por) {
+			return { label: 'Pendiente de revisión por Cobranza/CPD', role: 'Pendiente' };
+		}
 		const vp = p.verificado_por;
-		if (!vp) return { label: 'Pendiente de verificación', role: '' };
 		if (vp.startsWith('STAFF:')) {
 			return { label: vp.replace('STAFF:', '').trim(), role: 'Cobranza / Staff' };
 		}
@@ -139,7 +141,7 @@
 				|| studentsMap[p.estudiante_id]?.nombre
 				|| p.remitente
 				|| p.estudiante_id;
-			return { label: studentName, role: 'Estudiante (auto-aprobado)' };
+			return { label: studentName, role: 'Estudiante (auto-aprobado histórico)' };
 		}
 		if (vp.startsWith('SISTEMA:')) {
 			return { label: vp, role: 'Migración / Sistema' };
