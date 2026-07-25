@@ -35,12 +35,18 @@
 
 	// F-074 (2026-07-23): Toggle entre vista Lista (actual) y Matriz (estilo Excel de Sandra)
 	// Persistimos la elección en localStorage para que no se pierda al recargar.
-	let viewMode: 'lista' | 'matriz' = $state(
-		(typeof localStorage !== 'undefined' && (localStorage.getItem('payments_view') === 'matriz' || localStorage.getItem('payments_view') === 'lista'))
-			? (localStorage.getItem('payments_view') as 'lista' | 'matriz')
-			: 'lista'
-	);
+	// FIX: estudiantes SIEMPRE ven 'lista' — ignorar localStorage para no-staff,
+	// porque si un staff dejó 'matriz' el estudiante dispararía endpoints 403.
+	let viewMode: 'lista' | 'matriz' = $state('lista');
+	function initViewMode() {
+		if (!isStaff) { viewMode = 'lista'; return; }
+		if (typeof localStorage !== 'undefined') {
+			const saved = localStorage.getItem('payments_view');
+			if (saved === 'matriz' || saved === 'lista') viewMode = saved;
+		}
+	}
 	function setViewMode(mode: 'lista' | 'matriz') {
+		if (!isStaff && mode === 'matriz') return; // estudiante no puede activar matriz
 		viewMode = mode;
 		try { localStorage.setItem('payments_view', mode); } catch {}
 		if (mode === 'matriz') loadMatriz();
@@ -231,8 +237,9 @@
 	}
 
 	// F-074: cuando cambia el filtro de módulo, recargar
+	// FIX: solo staff puede usar la vista matriz (estudiantes obtendrían 403)
 	$effect(() => {
-		if (viewMode === 'matriz') {
+		if (isStaff && viewMode === 'matriz') {
 			// Dependencia explícita: matrizFiltroModulo
 			matrizFiltroModulo;
 			loadMatriz();
@@ -240,6 +247,7 @@
 	});
 
 	onMount(async () => {
+		initViewMode(); // FIX: restaurar viewMode desde localStorage solo si es staff
 		const results = await Promise.all([
 			courseService.getAll(1, 100),
 			isStaff ? studentService.getAll(1, 100) : Promise.resolve(null)
@@ -613,10 +621,10 @@
 	}
 </script>
 
-<div class="space-y-6">
+<div class="space-y-6 relative z-10">
 	<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 		<div>
-			<Heading level="h1">Gestión de Pagos</Heading>
+			<Heading level="h1">{isStudent ? 'Mis Pagos' : 'Gestión de Pagos'}</Heading>
 			<p class="text-gray-500 dark:text-gray-400 text-sm mt-1">
 				{#if isStaff}Administre los pagos recibidos{:else}Historial de sus pagos realizados{/if}
 			</p>
@@ -650,14 +658,16 @@
 					</button>
 				</div>
 			{/if}
-			<Button variant="secondary" onclick={viewMode === 'matriz' ? loadMatriz : loadPayments} loading={loading || matrizLoading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
+			<Button variant="secondary" onclick={isStaff && viewMode === 'matriz' ? loadMatriz : loadPayments} loading={loading || matrizLoading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
 				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
 				<span class="sm:hidden">Recargar</span>
 			</Button>
-			<Button variant="secondary" onclick={downloadExcel} loading={excelLoading} aria-label="Descargar listado de pagos en Excel" class="flex-1 sm:flex-none justify-center">
-				{#snippet leftIcon()} <DownloadIcon class="size-5" /> {/snippet}
-				<span class="whitespace-nowrap">Excel</span>
-			</Button>
+			{#if isStaff}
+				<Button variant="secondary" onclick={downloadExcel} loading={excelLoading} aria-label="Descargar listado de pagos en Excel" class="flex-1 sm:flex-none justify-center">
+					{#snippet leftIcon()} <DownloadIcon class="size-5" /> {/snippet}
+					<span class="whitespace-nowrap">Excel</span>
+				</Button>
+			{/if}
 			{#if isStudent}
 				<Button onclick={() => isCreateModalOpen = true} loading={loading} class="flex-1 sm:flex-none justify-center">
 					{#snippet leftIcon()} <PlusIcon class="size-5" /> {/snippet}
@@ -675,13 +685,13 @@
 		</div>
 	</div>
 
-	<!-- Filters -->
-	<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-		<div class="md:col-span-1">
+	<!-- Filters: estudiante ve solo búsqueda + concepto + estado; staff ve todo -->
+	<div class={`grid gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 ${isStaff ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-5' : 'grid-cols-1 sm:grid-cols-3'}`}>
+		<div>
 			<label for="search" class="sr-only">Buscar</label>
 			<SearchInput
 				bind:value={filters.q}
-				placeholder="Buscar recibo o nombre..."
+				placeholder={isStudent ? 'Buscar recibo...' : 'Buscar recibo o nombre...'}
 				onInput={() => handleSearchInput()}
 			/>
 		</div>

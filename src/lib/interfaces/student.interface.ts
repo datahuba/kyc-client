@@ -30,6 +30,8 @@ export interface Student {
 	lista_cursos_ids: string[];
 	lista_titulos_ids: string[];
 	nombre: string;
+	nombre_funcional?: string;
+	username?: string;
 	registro: string;
 	updated_at: string;
 	afiliacion_url?: string | null;

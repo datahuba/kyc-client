@@ -19,11 +19,11 @@
 
 <div
 	aria-hidden="true"
-	class="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
+	class="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden"
 >
 	<img
 		src="/images/logo_uagrm_watermark.png"
 		alt=""
-		class="w-[28rem] max-w-[65vw] opacity-[0.05] select-none dark:opacity-[0.08]"
+		class="w-[28rem] max-w-[65vw] opacity-[0.025] select-none dark:opacity-[0.04]"
 	/>
 </div>

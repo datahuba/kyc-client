@@ -26,6 +26,7 @@
 	let hours = $state(24);
 	let limit = $state(100);
 	let pathFilter = $state('');
+	let statusCodeFilter = $state<number | ''>('');
 
 	// Solo superadmin/admin pueden ver esto
 	// F-069 (2026-07-22): bug era `$userStore.user?.rol` (no existe) en vez de
@@ -47,7 +48,8 @@
 	async function load() {
 		loading = true;
 		try {
-			data = await adminService.getRecentErrors(hours, limit, undefined, pathFilter || undefined);
+			const sc = typeof statusCodeFilter === 'number' ? statusCodeFilter : undefined;
+			data = await adminService.getRecentErrors(hours, limit, sc, pathFilter || undefined);
 		} catch (error: any) {
 			alert('error', error.message || 'Error al cargar el visor de errores');
 		} finally {
@@ -106,9 +108,9 @@
 <div class="space-y-6 max-w-7xl mx-auto">
 	<div class="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
 		<div>
-			<Heading level="h1">Visor de Errores 500</Heading>
+			<Heading level="h1">Visor de Errores</Heading>
 			<p class="text-gray-500 dark:text-gray-400 mt-1">
-				Errores capturados en producción (últimas {hours}h, TTL 7 días)
+				Errores y eventos HTTP capturados en producción (últimas {hours}h, TTL 7 días)
 			</p>
 		</div>
 	</div>
@@ -139,6 +141,23 @@
 						<option value={24}>Últimas 24h</option>
 						<option value={72}>Últimos 3 días</option>
 						<option value={168}>Últimos 7 días</option>
+					</select>
+				</div>
+				<div class="flex-1">
+					<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+						Código Estado
+					</label>
+					<select
+						bind:value={statusCodeFilter}
+						class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm"
+					>
+						<option value="">Todos los errores (4xx y 5xx)</option>
+						<option value={400}>400 (Bad Request)</option>
+						<option value={401}>401 (No Autorizado)</option>
+						<option value={403}>403 (Prohibido)</option>
+						<option value={404}>404 (No Encontrado)</option>
+						<option value={422}>422 (Error Validación)</option>
+						<option value={500}>500 (Error Servidor)</option>
 					</select>
 				</div>
 				<div class="flex-1">

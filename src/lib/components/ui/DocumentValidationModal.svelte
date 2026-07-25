@@ -10,7 +10,14 @@
 	export let onClose: () => void;
 
 	let loading = true;
+	interface PendingTitleStudent {
+		_id: string;
+		nombre: string;
+		carnet: string;
+		tituloNombre?: string;
+	}
 	let enrollments: (Enrollment & { studentName?: string; courseName?: string })[] = [];
+	let pendingTitles: PendingTitleStudent[] = [];
 	
 	$: if (isOpen) {
 		loadPendingDocuments();
@@ -19,20 +26,28 @@
 	async function loadPendingDocuments() {
 		loading = true;
 		try {
-			// Fetches all enrollments that require document action
-			const res = await enrollmentService.getAll(1, 50, { requiere_accion_documentos: true });
+			// Fetches all enrollments that require document action and pending Títulos
+			const [res, studentsReq, coursesReq, pendingStudentsRes] = await Promise.all([
+				enrollmentService.getAll(1, 50, { requiere_accion_documentos: true }),
+				studentService.getAll(1, 100),
+				courseService.getAll(),
+				studentService.getAll(1, 100, { estado_titulo: 'pendiente' }).catch(() => ({ data: [] }))
+			]);
 			
-			// Resolve names
-			const studentsReq = await studentService.getAll(1, 100);
-			const coursesReq = await courseService.getAll();
+			const studentsMap = (studentsReq.data || []).reduce((acc, s) => ({ ...acc, [s._id]: s.nombre }), {} as Record<string, string>);
+			const coursesMap = (coursesReq.data || []).reduce((acc, c) => ({ ...acc, [c._id]: c.nombre_programa }), {} as Record<string, string>);
 			
-			const studentsMap = studentsReq.data.reduce((acc, s) => ({ ...acc, [s._id]: s.nombre }), {} as Record<string, string>);
-			const coursesMap = coursesReq.data.reduce((acc, c) => ({ ...acc, [c._id]: c.nombre_programa }), {} as Record<string, string>);
-			
-			enrollments = res.data.map(e => ({
+			enrollments = (res.data || []).map(e => ({
 				...e,
 				studentName: studentsMap[e.estudiante_id] || 'Estudiante Desconocido',
 				courseName: coursesMap[e.curso_id] || 'Programa Desconocido'
+			}));
+
+			pendingTitles = (pendingStudentsRes.data || []).map(s => ({
+				_id: s._id,
+				nombre: s.nombre,
+				carnet: s.carnet_identidad || s.registro,
+				tituloNombre: s.titulo?.titulo || 'Título Profesional'
 			}));
 		} catch (error) {
 			console.error("Error loading pending documents", error);
@@ -44,6 +59,11 @@
 	function goToEnrollment(id: string) {
 		onClose();
 		goto(`/app/enrollments?q=${id}`);
+	}
+
+	function goToStudent(id: string) {
+		onClose();
+		goto(`/app/students?q=${id}`);
 	}
 </script>
 
@@ -66,7 +86,7 @@
 					</div>
 					<div>
 						<h2 class="text-lg font-bold text-gray-800 dark:text-gray-200">Validación de Documentos</h2>
-						<p class="text-xs text-gray-500 dark:text-gray-400">Solicitudes pendientes de revisión o subida</p>
+						<p class="text-xs text-gray-500 dark:text-gray-400">Solicitudes y Títulos pendientes de revisión o subida</p>
 					</div>
 				</div>
 				<button onclick={onClose} class="p-2 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
@@ -80,46 +100,84 @@
 						<svg class="animate-spin size-8 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
 						<p class="text-sm">Buscando solicitudes pendientes...</p>
 					</div>
-				{:else if enrollments.length === 0}
+				{:else if enrollments.length === 0 && pendingTitles.length === 0}
 					<div class="flex flex-col items-center justify-center py-16 text-center">
 						<div class="size-16 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mb-4">
 							<CircleCheckIcon class="size-8" />
 						</div>
 						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">¡Todo al día!</h3>
-						<p class="text-gray-500 dark:text-gray-400 max-w-sm mt-2">No hay documentos pendientes de revisión o subida.</p>
+						<p class="text-gray-500 dark:text-gray-400 max-w-sm mt-2">No hay documentos ni títulos pendientes de revisión.</p>
 					</div>
 				{:else}
-					<div class="space-y-4">
-						{#each enrollments as enr}
-							<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow">
-								<div class="flex-1 min-w-0">
-									<h4 class="font-bold text-gray-900 dark:text-white truncate">{enr.studentName}</h4>
-									<p class="text-xs text-primary-600 dark:text-primary-400 font-medium truncate">{enr.courseName}</p>
-									
-									<div class="mt-3 flex flex-wrap gap-2">
-										{#each (enr.requisitos || []).filter(r => r.estado !== 'aprobado') as req}
-											<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium {req.estado === 'pendiente' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'} border {req.estado === 'pendiente' ? 'border-amber-200 dark:border-amber-800' : 'border-gray-200 dark:border-gray-600'}">
-												{#if req.estado === 'pendiente'}
-													<StopwatchIcon class="size-3" /> Revisión
-												{:else if req.estado === 'sin_subir'}
-													Falta subir
-												{:else}
-													Rechazado
-												{/if}
-												<span class="opacity-50 ml-1">|</span> <span class="truncate max-w-[120px]" title={req.descripcion}>{req.descripcion}</span>
-											</span>
-										{/each}
-									</div>
-								</div>
-								
-								<div class="shrink-0 flex items-center">
-									<Button variant="secondary" size="sm" onclick={() => goToEnrollment(enr._id)} class="w-full sm:w-auto">
-										Ir al Kardex
-										<svg class="size-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-									</Button>
+					<div class="space-y-6">
+						{#if pendingTitles.length > 0}
+							<div>
+								<h3 class="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-3 flex items-center gap-1.5">
+									<StopwatchIcon class="size-4" /> Títulos Profesionales por Verificar ({pendingTitles.length})
+								</h3>
+								<div class="space-y-3">
+									{#each pendingTitles as st}
+										<div class="bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+											<div class="min-w-0">
+												<h4 class="font-bold text-gray-900 dark:text-white truncate">{st.nombre}</h4>
+												<p class="text-xs text-gray-500 dark:text-gray-400 font-mono">C.I.: {st.carnet}</p>
+												<span class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+													🎓 {st.tituloNombre}
+												</span>
+											</div>
+											<Button variant="secondary" size="sm" onclick={() => goToStudent(st._id)} class="shrink-0">
+												Revisar Estudiante
+											</Button>
+										</div>
+									{/each}
 								</div>
 							</div>
-						{/each}
+						{/if}
+
+						{#if enrollments.length > 0}
+							<div>
+								<h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+									Documentos de Inscripción ({enrollments.length})
+								</h3>
+								<div class="space-y-3">
+									{#each enrollments as enr}
+										<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow">
+											<div class="flex-1 min-w-0">
+												<h4 class="font-bold text-gray-900 dark:text-white truncate">{enr.studentName}</h4>
+												<p class="text-xs text-primary-600 dark:text-primary-400 font-medium truncate">{enr.courseName}</p>
+												
+												<div class="mt-3 flex flex-wrap gap-2">
+													{#if enr.formulario_inscripcion_url}
+														<span class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+															📄 Formulario Oficial Subido
+														</span>
+													{/if}
+													{#each (enr.requisitos || []).filter(r => r.estado !== 'aprobado') as req}
+														<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium {req.estado === 'pendiente' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'} border {req.estado === 'pendiente' ? 'border-amber-200 dark:border-amber-800' : 'border-gray-200 dark:border-gray-600'}">
+															{#if req.estado === 'pendiente'}
+																<StopwatchIcon class="size-3" /> Revisión
+															{:else if (req.estado as string) === 'sin_subir'}
+																Falta subir
+															{:else}
+																Rechazado
+															{/if}
+															<span class="opacity-50 ml-1">|</span> <span class="truncate max-w-[120px]" title={req.descripcion}>{req.descripcion}</span>
+														</span>
+													{/each}
+												</div>
+											</div>
+											
+											<div class="shrink-0 flex items-center">
+												<Button variant="secondary" size="sm" onclick={() => goToEnrollment(enr._id)} class="w-full sm:w-auto">
+													Ir al Kardex
+													<svg class="size-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+												</Button>
+											</div>
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
 					</div>
 				{/if}
 			</div>

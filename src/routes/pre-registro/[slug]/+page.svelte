@@ -15,10 +15,11 @@
 		CircleCheckIcon,
 		CopyIcon
 	} from '$lib/icons/outline';
-	import { fly, fade, slide } from 'svelte/transition';
+	import { fly, fade, slide, scale } from 'svelte/transition';
 	import { cubicOut, quintOut } from 'svelte/easing';
 	import { goto } from '$app/navigation';
 	import { userStore } from '$lib/stores/userStore';
+	import { alert } from '$lib/utils';
 
 	let slug = $derived($page.params.slug);
 
@@ -90,7 +91,7 @@
 	async function loadForm() {
 		loading = true;
 		try {
-			form = await getPublicForm(slug);
+			form = await getPublicForm(slug || '');
 		} catch (e: any) {
 			errorMessage = e?.message || 'No se pudo cargar el formulario.';
 		} finally {
@@ -260,7 +261,7 @@
 		}
 		submitting = true;
 		try {
-			const result = await submitPublicForm(slug, {
+			const result = await submitPublicForm(slug || '', {
 				nombre: nombre.trim(),
 				email: email.trim().toLowerCase(),
 				carnet: carnet.trim(),

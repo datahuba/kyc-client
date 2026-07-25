@@ -25,7 +25,11 @@
 		fecha_pago: string | null;
 		numero_boleta: string;
 		importe: number;
-		costo_original_modulo: number;
+		costo_original_modulo?: number;
+		costo_sin_descuento?: number;
+		costo_total?: number;
+		monto_pendiente?: number;
+		estado_pago?: string;
 		beca: string | null;
 		beca_porcentaje: number;
 	}
@@ -44,6 +48,7 @@
 		encabezado: Encabezado;
 		rows: FilaHabilitado[];
 		total_importe: number;
+		total_pendiente?: number;
 		total_estudiantes: number;
 	}
 
@@ -235,14 +240,14 @@
 				<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 					<div>
 						<h2 class="text-center text-xl font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-							{data.encabezado.titulo}
+							{data?.encabezado.titulo}
 						</h2>
 					</div>
 					<div class="flex items-center gap-2">
 						<Button
 							variant="primary"
 							onclick={descargarXLSX}
-							disabled={data.rows.length === 0 || downloading !== null}
+							disabled={!data || data.rows.length === 0 || downloading !== null}
 						>
 							{#snippet leftIcon()}<DownloadIcon class="size-4" />{/snippet}
 							{downloading === 'xlsx' ? 'Generando...' : 'Descargar Excel'}
@@ -250,7 +255,7 @@
 						<Button
 							variant="secondary"
 							onclick={descargarPDF}
-							disabled={data.rows.length === 0 || downloading !== null}
+							disabled={!data || data.rows.length === 0 || downloading !== null}
 						>
 							{#snippet leftIcon()}<DownloadIcon class="size-4" />{/snippet}
 							{downloading === 'pdf' ? 'Generando...' : 'Descargar PDF'}
@@ -345,7 +350,7 @@
 										{#if r.beca && r.beca_porcentaje > 0 && r.importe > 0}
 											<span
 												class="ml-1 inline-block cursor-help text-xs text-light-secondary dark:text-dark-secondary"
-												title={`Beca ${r.beca} (${r.beca_porcentaje}%). Costo original del módulo: Bs ${(r.costo_sin_descuento ?? r.costo_total).toFixed(2)}. Costo con descuento (lo que el estudiante debe pagar): Bs ${r.costo_total.toFixed(2)}. Pagó: Bs ${r.importe.toFixed(2)}.`}
+												title={`Beca ${r.beca} (${r.beca_porcentaje}%). Costo original del módulo: Bs ${(r.costo_sin_descuento ?? r.costo_total ?? 0).toFixed(2)}. Costo con descuento (lo que el estudiante debe pagar): Bs ${(r.costo_total ?? 0).toFixed(2)}. Pagó: Bs ${r.importe.toFixed(2)}.`}
 											>
 												ℹ️
 											</span>

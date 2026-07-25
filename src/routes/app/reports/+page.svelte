@@ -98,11 +98,17 @@
 				estudiante_id: filters.estudiante_id || undefined,  // F-COBRANZA-003
 				estado: filters.estado || undefined
 			});
-			payments = res.data;
-			resumen = res.resumen;
-			totalItems = res.meta.totalItems;
-			totalPages = res.meta.totalPages;
+			payments = Array.isArray(res?.data) ? res.data : [];
+			resumen = res?.resumen ?? {
+				cantidad_pagos: 0,
+				total_aprobado: 0,
+				total_pendiente: 0,
+				total_anulado: 0
+			};
+			totalItems = res?.meta?.totalItems ?? 0;
+			totalPages = res?.meta?.totalPages ?? 1;
 		} catch (e: any) {
+			payments = [];
 			alert('error', e?.message || 'No se pudo generar el reporte');
 		} finally {
 			loading = false;
