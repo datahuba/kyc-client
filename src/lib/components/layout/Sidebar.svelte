@@ -8,9 +8,11 @@
 	import { goto } from '$app/navigation';
 	import CourseCatalogModal from './CourseCatalogModal.svelte';
 	import BenefitsModal from './BenefitsModal.svelte';
+	import DocumentValidationModal from '$lib/components/ui/DocumentValidationModal.svelte';
 
 	let isCatalogOpen = $state(false);
 	let isBenefitsOpen = $state(false);
+	let isDocValidationOpen = $state(false);
 
 	const classroomSections = [
 		{ id: 'muro',           label: 'Muro' },
@@ -87,6 +89,7 @@
 	let academicRole = $derived($userStore?.academicRole);
 
 	let isStudentUser = $derived(userRole === 'student' || academicRole === 'student');
+	let canValidateDocs = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(userRole));
 
 	// ISSUE-R-PERFIL-GENERICO: solo el coordinador FINANCIERO ve las vistas económicas.
 	let esCoordinadorFinanciero = $derived($userStore.user?.subtipo_coordinador === 'financiero');
@@ -227,7 +230,21 @@
 					</li>
 				{/if}
 
-				<li class={isStudentUser ? '' : 'mt-auto'}>
+				{#if canValidateDocs}
+					<li class={isStudentUser ? '' : 'mt-auto border-t border-gray-200 dark:border-gray-800 pt-2'}>
+						<button
+							type="button"
+							onclick={() => isDocValidationOpen = true}
+							title={isCollapsed ? 'Validación de Docs' : ''}
+							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}
+						>
+							<ClipboardIcon class="size-6 shrink-0 text-amber-600 dark:text-amber-400 group-hover:text-primary-600" />
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Validación de Docs</span>{/if}
+						</button>
+					</li>
+				{/if}
+
+				<li class={isStudentUser || canValidateDocs ? '' : 'mt-auto'}>
 					<button onclick={logout} title={isCollapsed ? 'Cerrar Sesión' : ''} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 hover:bg-gray-50 hover:text-red-600 w-full text-left transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}>
 						<LogoutIcon class="size-6 shrink-0 text-gray-400 group-hover:text-red-600" />
 						{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Cerrar Sesión</span>{/if}
@@ -241,6 +258,10 @@
 {#if isStudentUser}
 	<CourseCatalogModal isOpen={isCatalogOpen} onClose={() => isCatalogOpen = false} />
 	<BenefitsModal isOpen={isBenefitsOpen} onClose={() => isBenefitsOpen = false} />
+{/if}
+
+{#if canValidateDocs}
+	<DocumentValidationModal isOpen={isDocValidationOpen} onClose={() => isDocValidationOpen = false} />
 {/if}
 
 <style>
