@@ -37,11 +37,6 @@
 
 	function getSafeDocumentUrl(url: string): string {
 		if (!url) return '';
-		if (!/\.(pdf|jpg|jpeg|png|webp)($|\?)/i.test(url)) {
-			if (url.includes('cloudinary.com')) {
-				return `${url}.pdf`;
-			}
-		}
 		return url;
 	}
 
@@ -671,45 +666,47 @@
 													class="px-2.5 py-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50"
 												>
 													<DocumentAddIcon class="size-3.5" />
-													<span>Adjuntar</span>
+													<span>{doc.url ? 'Reemplazar' : 'Adjuntar'}</span>
 												</button>
 
-												<button
-													type="button"
-													onclick={() => handleAprobar(doc)}
-													disabled={!doc.url || actionLoading === key}
-													title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar documento'}
-													class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 ${
-														!doc.url 
-															? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-															: 'bg-uagrm-green text-white hover:opacity-90 disabled:opacity-50'
-													}`}
-												>
-													<CheckIcon class="size-3.5" />
-													<span>{actionLoading === key ? '...' : 'Aprobar'}</span>
-												</button>
+												{#if doc.estado !== 'verificado' && doc.estado !== 'aprobado'}
+													<button
+														type="button"
+														onclick={() => handleAprobar(doc)}
+														disabled={!doc.url || actionLoading === key}
+														title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar documento'}
+														class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 ${
+															!doc.url 
+																? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+																: 'bg-uagrm-green text-white hover:opacity-90 disabled:opacity-50'
+														}`}
+													>
+														<CheckIcon class="size-3.5" />
+														<span>{actionLoading === key ? '...' : 'Aprobar'}</span>
+													</button>
 
-												<button
-													type="button"
-													onclick={() => {
-														if (rejectingKey === key) {
-															rejectingKey = null;
-														} else {
-															rejectingKey = key;
-															motivoRechazo = '';
-														}
-													}}
-													disabled={!doc.url || actionLoading === key}
-													title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar documento'}
-													class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 ${
-														!doc.url 
-															? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-															: 'bg-uagrm-red text-white hover:opacity-90 disabled:opacity-50'
-													}`}
-												>
-													<XMarkIcon class="size-3.5" />
-													<span>Rechazar</span>
-												</button>
+													<button
+														type="button"
+														onclick={() => {
+															if (rejectingKey === key) {
+																rejectingKey = null;
+															} else {
+																rejectingKey = key;
+																motivoRechazo = '';
+															}
+														}}
+														disabled={!doc.url || actionLoading === key}
+														title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar documento'}
+														class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 ${
+															!doc.url 
+																? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+																: 'bg-uagrm-red text-white hover:opacity-90 disabled:opacity-50'
+														}`}
+													>
+														<XMarkIcon class="size-3.5" />
+														<span>Rechazar</span>
+													</button>
+												{/if}
 											</div>
 										</div>
 
@@ -765,14 +762,16 @@
 											<div class="flex items-center gap-1.5 shrink-0">
 												<input bind:this={fileInputEls[doc.id]} type="file" accept="application/pdf,image/*" class="hidden" onchange={(e) => handleFileSelectedForDoc(e, doc)} />
 												<button type="button" onclick={() => triggerStaffUpload(doc.id)} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg flex items-center gap-1">
-													<DocumentAddIcon class="size-3.5" /> Adjuntar
+													<DocumentAddIcon class="size-3.5" /> {doc.url ? 'Reemplazar' : 'Adjuntar'}
 												</button>
-												<button type="button" onclick={() => handleAprobar(doc)} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-green text-white hover:opacity-90'}`}>
-													<CheckIcon class="size-3.5" /> Aprobar
-												</button>
-												<button type="button" onclick={() => { if (doc.url) { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; } }} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-red text-white hover:opacity-90'}`}>
-													<XMarkIcon class="size-3.5" /> Rechazar
-												</button>
+												{#if doc.estado !== 'verificado' && doc.estado !== 'aprobado'}
+													<button type="button" onclick={() => handleAprobar(doc)} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-green text-white hover:opacity-90'}`}>
+														<CheckIcon class="size-3.5" /> Aprobar
+													</button>
+													<button type="button" onclick={() => { if (doc.url) { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; } }} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-red text-white hover:opacity-90'}`}>
+														<XMarkIcon class="size-3.5" /> Rechazar
+													</button>
+												{/if}
 											</div>
 										</div>
 										{#if rejectingKey === key}
@@ -812,14 +811,16 @@
 											<div class="flex items-center gap-1.5 shrink-0">
 												<input bind:this={fileInputEls[doc.id]} type="file" accept="application/pdf,image/*" class="hidden" onchange={(e) => handleFileSelectedForDoc(e, doc)} />
 												<button type="button" onclick={() => triggerStaffUpload(doc.id)} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg flex items-center gap-1">
-													<DocumentAddIcon class="size-3.5" /> Adjuntar
+													<DocumentAddIcon class="size-3.5" /> {doc.url ? 'Reemplazar' : 'Adjuntar'}
 												</button>
-												<button type="button" onclick={() => handleAprobar(doc)} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-green text-white hover:opacity-90'}`}>
-													<CheckIcon class="size-3.5" /> Aprobar
-												</button>
-												<button type="button" onclick={() => { if (doc.url) { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; } }} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-red text-white hover:opacity-90'}`}>
-													<XMarkIcon class="size-3.5" /> Rechazar
-												</button>
+												{#if doc.estado !== 'verificado' && doc.estado !== 'aprobado'}
+													<button type="button" onclick={() => handleAprobar(doc)} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-green text-white hover:opacity-90'}`}>
+														<CheckIcon class="size-3.5" /> Aprobar
+													</button>
+													<button type="button" onclick={() => { if (doc.url) { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; } }} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-red text-white hover:opacity-90'}`}>
+														<XMarkIcon class="size-3.5" /> Rechazar
+													</button>
+												{/if}
 											</div>
 										</div>
 									{/each}
@@ -851,14 +852,16 @@
 											<div class="flex items-center gap-1.5 shrink-0">
 												<input bind:this={fileInputEls[doc.id]} type="file" accept="application/pdf,image/*" class="hidden" onchange={(e) => handleFileSelectedForDoc(e, doc)} />
 												<button type="button" onclick={() => triggerStaffUpload(doc.id)} class="px-2.5 py-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg flex items-center gap-1">
-													<DocumentAddIcon class="size-3.5" /> Adjuntar
+													<DocumentAddIcon class="size-3.5" /> {doc.url ? 'Reemplazar' : 'Adjuntar'}
 												</button>
-												<button type="button" onclick={() => handleAprobar(doc)} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-green text-white hover:opacity-90'}`}>
-													<CheckIcon class="size-3.5" /> Aprobar
-												</button>
-												<button type="button" onclick={() => { if (doc.url) { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; } }} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-red text-white hover:opacity-90'}`}>
-													<XMarkIcon class="size-3.5" /> Rechazar
-												</button>
+												{#if doc.estado !== 'verificado' && doc.estado !== 'aprobado'}
+													<button type="button" onclick={() => handleAprobar(doc)} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Aprobar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-green text-white hover:opacity-90'}`}>
+														<CheckIcon class="size-3.5" /> Aprobar
+													</button>
+													<button type="button" onclick={() => { if (doc.url) { rejectingKey = rejectingKey === key ? null : key; motivoRechazo = ''; } }} disabled={!doc.url || actionLoading === key} title={!doc.url ? 'Sin archivo adjunto para evaluar' : 'Rechazar'} class={`px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${!doc.url ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-uagrm-red text-white hover:opacity-90'}`}>
+														<XMarkIcon class="size-3.5" /> Rechazar
+													</button>
+												{/if}
 											</div>
 										</div>
 									{/each}
