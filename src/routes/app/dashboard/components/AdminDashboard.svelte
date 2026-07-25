@@ -15,6 +15,11 @@
 	import { get } from 'svelte/store';
 	import DocumentValidationModal from '$lib/components/ui/DocumentValidationModal.svelte';
 	import { FileTextIcon } from '$lib/icons/outline';
+	// F-COBRANZA-041 (2026-07-22): tarjetas KPI de inscritos movidas de
+	// /app/enrollments al Dashboard (Kevin: "deberian salir en el dashboard
+	// no en inscripciones").
+	import type { EnrollmentResumen } from '$lib/interfaces';
+	import KpiInscritosCards from '$lib/components/dashboard/KpiInscritosCards.svelte';
 
 	// ISSUE-P-DASHBOARD-COBRANZA: el resumen económico (con matrícula como
 	// ingreso) solo aplica a los roles que ven finanzas, igual que los reportes.
@@ -24,11 +29,18 @@
 	const ROLES_ECONOMICOS_BASE = ['superadmin', 'admin', 'cobranza', 'mae'];
 	const ROLES_QUE_VEN_PAGOS = ['superadmin', 'admin', 'mae', 'cobranza', 'cpd'];
 	let resumenEconomico: ResumenEconomico | null = null;
+	// F-COBRANZA-041: KPI de inscritos (Total Inicial, Activos, Pasivos, Detalle, Completados).
+	let resumenInscritos: EnrollmentResumen | null = null;
+	// ROLES QUE VEN INSCRITOS: todos los administrativos (excluye student).
+	// Encargado_curso y coordinador también lo ven (es su info operativa).
+	const ROLES_QUE_VEN_INSCRITOS = ['superadmin', 'admin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'];
 
 	$: currentRole = $userStore.role || $userStore.user?.rol || '';
 	$: esCoordinadorFinanciero = $userStore.user?.subtipo_coordinador === 'financiero';
 	$: verResumenEconomico = ROLES_ECONOMICOS_BASE.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero);
 	$: puedeVerPagos = ROLES_QUE_VEN_PAGOS.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero);
+	// F-COBRANZA-041: KPI inscritos visible para roles administrativos.
+	$: verKpiInscritos = ROLES_QUE_VEN_INSCRITOS.includes(currentRole);
 
 	// Perfiles segmentados (cobranza/encargado con cursos_asignados) NO necesitan
 	// el "Desglose por Curso": su vista ya está acotada a sus cursos, así que sería
@@ -226,6 +238,17 @@
 				}
 			}
 
+			// F-COBRANZA-041 (2026-07-22): KPI de inscritos.
+			// Carga en paralelo con el resto, no bloquea si falla.
+			// Endpoint filtra automáticamente por cursos_asignados si el rol los tiene.
+			if (ROLES_QUE_VEN_INSCRITOS.includes(roleNow)) {
+				try {
+					resumenInscritos = await enrollmentService.getResumenInscritos();
+				} catch (e) {
+					console.error('Error cargando resumen de inscritos:', e);
+				}
+			}
+
 		} catch (error) {
 			console.error('Error loading dashboard data:', error);
 		} finally {
@@ -362,6 +385,12 @@
 					</div>
 				</div>
 			</div>
+		{/if}
+
+		<!-- F-COBRANZA-041 (2026-07-22): KPI de inscritos movido de /app/enrollments al Dashboard.
+		     Visible para roles administrativos. Refleja el endpoint /enrollments/stats/resumen. -->
+		{#if verKpiInscritos}
+			<KpiInscritosCards resumen={resumenInscritos} loading={loading} />
 		{/if}
 
 		<!-- Stats Grid -->

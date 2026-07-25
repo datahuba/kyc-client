@@ -56,35 +56,42 @@
 		if (!tituloForm.numero_titulo.trim()) errs.numero_titulo = 'El número de título es obligatorio';
 		if (!tituloForm.universidad.trim()) errs.universidad = 'La universidad es obligatoria';
 		if (!tituloForm.año_expedicion.trim()) errs.año_expedicion = 'El año de expedición es obligatorio';
-		if (!tituloFile && !profileData?.titulo?.titulo_url) errs.file = 'Debes adjuntar el documento del título';
+		
+		const existingUrl = profileData?.titulo?.titulo_url || (profileData?.titulo as any)?.url;
+		if (!tituloFile && !existingUrl) errs.file = 'Debes adjuntar el documento del título (PDF o imagen)';
 		tituloErrors = errs;
 		if (Object.keys(errs).length > 0) return;
 
 		const id = $userStore.user?._id;
 		if (!id) return;
 
-		// Si no se seleccionó archivo nuevo pero ya existe uno, no hay nada que subir aquí
-		// (este modal siempre re-sube; exigimos archivo salvo que ya exista y solo se editen datos,
-		// pero el endpoint requiere el archivo, así que pedimos uno si no hay URL previa).
-		if (!tituloFile) {
+		if (!tituloFile && existingUrl) {
 			alert('error', 'Selecciona el archivo del título para actualizar');
 			return;
 		}
 
 		uploadingTitulo = true;
 		try {
-			const updated = await studentService.uploadTitulo(id, tituloFile, {
+			const updated = await studentService.uploadTitulo(id, tituloFile!, {
 				titulo: tituloForm.titulo.trim(),
 				numero_titulo: tituloForm.numero_titulo.trim(),
 				año_expedicion: tituloForm.año_expedicion.trim(),
 				universidad: tituloForm.universidad.trim()
 			});
-			profileData = updated;
+			if (updated.titulo) {
+				const urlVal = updated.titulo.titulo_url || (updated.titulo as any).url;
+				updated.titulo.titulo_url = urlVal;
+				(updated.titulo as any).url = urlVal;
+			}
+			profileData = { ...updated };
+			if ($userStore.user) {
+				userStore.updateCurrentUser(updated as any);
+			}
 			showTituloModal = false;
-			alert('success', 'Título subido correctamente. Quedará pendiente de verificación por CPD.');
+			alert('success', 'Archivo subido correctamente.');
 		} catch (e: any) {
 			console.error(e);
-			alert('error', 'Error al subir el título');
+			alert('error', e?.message || 'Error al subir el título');
 		} finally {
 			uploadingTitulo = false;
 		}
@@ -354,11 +361,14 @@
 				return;
 			}
 			
-			profileData = updated;
-			alert('success', 'Documento subido correctamente');
+			profileData = { ...updated };
+			if ($userStore.user) {
+				userStore.updateCurrentUser(updated);
+			}
+			alert('success', 'Archivo subido correctamente.');
 		} catch (e: any) {
 			console.error(e);
-			alert('error', 'Error al subir documento');
+			alert('error', e?.message || 'Error al subir documento');
 		} finally {
 			uploadingDoc = null;
 		}
@@ -671,7 +681,7 @@
 						</p>
 
 						<div class="space-y-3">
-							{#each [{ tipo: 'cv', label: 'Curriculum Vitae (CV)', url: profileData.cv_url, estado: profileData.cv_estado, motivo: profileData.cv_motivo_rechazo }, { tipo: 'ci', label: 'Carnet de Identidad', url: profileData.ci_url, estado: profileData.carnet_estado, motivo: profileData.carnet_motivo_rechazo }, { tipo: 'afiliacion', label: 'Certificado de Afiliación (Colegio o convenios)', url: profileData.afiliacion_url, estado: profileData.afiliacion_estado, motivo: profileData.afiliacion_motivo_rechazo }] as doc}
+							{#each [{ tipo: 'cv', label: 'Curriculum Vitae (CV)', url: profileData.cv_url, estado: profileData.cv_estado, motivo: profileData.cv_motivo_rechazo }, { tipo: 'ci', label: 'Carnet de Identidad', url: profileData.carnet_url, estado: profileData.carnet_estado, motivo: profileData.carnet_motivo_rechazo }, { tipo: 'afiliacion', label: 'Certificado de Afiliación (Colegio o convenios)', url: profileData.afiliacion_url, estado: profileData.afiliacion_estado, motivo: profileData.afiliacion_motivo_rechazo }] as doc}
 								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-dark-border pb-3 last:border-b-0 last:pb-0">
 									<div class="min-w-0">
 										<p class="text-sm font-medium text-gray-900 dark:text-white">{doc.label}</p>
@@ -680,9 +690,9 @@
 												{#if doc.estado === 'verificado'}
 													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-success/15 text-light-success dark:bg-dark-success/20 dark:text-dark-success">Verificado</span>
 												{:else if doc.estado === 'rechazado'}
-													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-red-100 text-red-800">Rechazado</span>
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">Rechazado</span>
 												{:else}
-													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-yellow-100 text-yellow-800">En revisión</span>
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">Archivo Subido</span>
 												{/if}
 												<a href={doc.url} target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-light-secondary dark:text-dark-secondary hover:underline">Ver documento</a>
 											{:else}
@@ -711,7 +721,7 @@
 												{:else}
 													<DocumentAddIcon class="h-4 w-4" />
 												{/if}
-												<span>{doc.url ? 'Reemplazar' : 'Subir'}</span>
+												<span>{doc.url ? 'Reemplazar Archivo' : 'Subir Documento'}</span>
 											</button>
 										</FileUpload>
 									</div>
@@ -723,15 +733,15 @@
 								<div class="min-w-0">
 									<p class="text-sm font-medium text-gray-900 dark:text-white">Título Profesional</p>
 									<div class="mt-1 flex flex-wrap items-center gap-2">
-										{#if profileData.titulo?.titulo_url}
+										{#if profileData.titulo?.titulo_url || profileData.titulo?.url}
 											{#if profileData.titulo.estado === 'verificado'}
 												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-success/15 text-light-success dark:bg-dark-success/20 dark:text-dark-success">Verificado</span>
 											{:else if profileData.titulo.estado === 'rechazado'}
 												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-error/15 text-light-error dark:bg-dark-error/20 dark:text-dark-error">Rechazado</span>
 											{:else}
-												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-warning/15 text-light-warning dark:bg-dark-warning/20 dark:text-dark-warning">En verificación</span>
+												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">Archivo Subido</span>
 											{/if}
-											<a href={profileData.titulo.titulo_url} target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-light-secondary dark:text-dark-secondary hover:underline">Ver documento</a>
+											<a href={profileData.titulo.titulo_url || profileData.titulo.url} target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-light-secondary dark:text-dark-secondary hover:underline">Ver documento</a>
 										{:else}
 											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Sin subir</span>
 										{/if}
@@ -748,7 +758,7 @@
 											class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-light-secondary dark:bg-dark-secondary hover:bg-light-secondary_d dark:hover:bg-dark-secondary_d rounded-lg transition-colors"
 										>
 											<DocumentAddIcon class="h-4 w-4" />
-											<span>{profileData.titulo?.titulo_url ? 'Reemplazar' : 'Subir'}</span>
+											<span>{profileData.titulo?.titulo_url || profileData.titulo?.url ? 'Reemplazar Archivo' : 'Subir Título'}</span>
 										</button>
 									</div>
 								{/if}
@@ -773,14 +783,14 @@
 										<div class="min-w-0">
 											<p class="text-sm font-medium text-gray-900 dark:text-white">{req.descripcion}</p>
 											<div class="mt-1 flex flex-wrap items-center gap-2">
-												{#if req.estado === 'pendiente'}
-													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Sin subir</span>
-												{:else if req.estado === 'en_proceso'}
-													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-warning/15 text-light-warning dark:bg-dark-warning/20 dark:text-dark-warning">En revisión</span>
-												{:else if req.estado === 'aprobado'}
+												{#if req.estado === 'aprobado'}
 													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-success/15 text-light-success dark:bg-dark-success/20 dark:text-dark-success">Aprobado</span>
 												{:else if req.estado === 'rechazado'}
 													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-error/15 text-light-error dark:bg-dark-error/20 dark:text-dark-error">Rechazado</span>
+												{:else if req.url || req.estado === 'en_proceso'}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">Archivo Subido</span>
+												{:else}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Sin subir</span>
 												{/if}
 												{#if req.url}
 													<a href={req.url} target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-light-secondary dark:text-dark-secondary hover:underline">Ver documento</a>
@@ -810,7 +820,7 @@
 													{:else}
 														<DocumentAddIcon class="h-4 w-4" />
 													{/if}
-													<span>{req.url ? 'Reemplazar' : 'Subir'}</span>
+													<span>{req.url ? 'Reemplazar Archivo' : 'Subir Documento'}</span>
 												</button>
 											</div>
 										{/if}
@@ -907,17 +917,18 @@
 												? 'bg-light-success/10 text-light-success dark:bg-dark-success/10 dark:text-dark-success' :
 											profileData.titulo.estado === 'rechazado' 
 												? 'bg-light-error/10 text-light-error dark:bg-dark-error/10 dark:text-dark-error' :
-												'bg-light-warning/10 text-light-warning dark:bg-dark-warning/10 dark:text-dark-warning'
+												'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
 										}`}>
 											{profileData.titulo.estado === 'verificado' ? '✓ Verificado' :
-											 profileData.titulo.estado === 'rechazado' ? '✗ Rechazado' :
-											 '⏳ Pendiente'}
+											 profileData.titulo.estado === 'rechazado' ? '✗ Observado' :
+											 '✓ Archivo Subido'}
 										</span>
 									</div>
-									{#if profileData.titulo.titulo_url}
+									{#if profileData.titulo.titulo_url || profileData.titulo.url}
 										<a 
-											href={profileData.titulo.titulo_url} 
+											href={profileData.titulo.titulo_url || profileData.titulo.url} 
 											target="_blank"
+											rel="noopener noreferrer"
 											class="text-sm font-medium text-light-secondary dark:text-dark-secondary hover:underline"
 										>
 											Ver Documento →

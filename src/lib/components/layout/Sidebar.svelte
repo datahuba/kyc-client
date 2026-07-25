@@ -4,13 +4,15 @@
 	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
 	import { UsersIcon, ClipboardIcon, TagIcon, XIcon, KeyIcon, QrCodeIcon, FileTextIcon, AcademicCapIcon, Menu2Icon } from '$lib/icons/outline'; // IMPORTACIÓN UNIFICADA DE MENU2ICON
 	import { slide, fade } from 'svelte/transition';
-	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon } from '$lib/icons/solid';
+	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon, ExclamationCircleIcon } from '$lib/icons/solid';  // F-044 (2026-07-22)
 	import { goto } from '$app/navigation';
 	import CourseCatalogModal from './CourseCatalogModal.svelte';
 	import BenefitsModal from './BenefitsModal.svelte';
+	import DocumentValidationModal from '$lib/components/ui/DocumentValidationModal.svelte';
 
 	let isCatalogOpen = $state(false);
 	let isBenefitsOpen = $state(false);
+	let isDocValidationOpen = $state(false);
 
 	const classroomSections = [
 		{ id: 'muro',           label: 'Muro' },
@@ -58,7 +60,11 @@
 		{ name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
 		{ name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
 		{ name: 'Reportes de Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'coordinador'], loginTypes: ['admin'] },
-		
+		// F-075 (2026-07-23): nuevo item 'Informes' para informes administrativos
+		// (acta de notas, etc.). Diferente de "Reportes de Caja" que es para
+		// gestión financiera interna.
+		{ name: 'Informes', href: '/app/informes', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd', 'coordinador'], loginTypes: ['admin'] },
+
 		{ name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
 		{ name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
 
@@ -66,9 +72,15 @@
 		{ name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
 		
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
-		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] }, 
+		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
 		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
 		{ name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
+		// F-044 (2026-07-22): visor de errores 500 (solo superadmin/admin)
+		{ name: 'Visor de Errores', href: '/app/admin/errors', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		// F-070 (2026-07-22): validación de notas (CPD/Admin/Superadmin). Surge del
+		// bug urgente: Miguel (socio de Kevin) tenía 51 notas en pendiente_validacion
+		// y no había forma rápida de aprobarlas. Aquí CPD ve, aprueba, rechaza y edita.
+		{ name: 'Validación de Notas', href: '/app/admin/grade-validation', icon: AcademicCapIcon, roles: ['cpd', 'admin', 'superadmin'], loginTypes: ['admin'] },
 		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	];
 
@@ -77,10 +89,11 @@
 	let academicRole = $derived($userStore?.academicRole);
 
 	let isStudentUser = $derived(userRole === 'student' || academicRole === 'student');
+	let canValidateDocs = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(userRole));
 
 	// ISSUE-R-PERFIL-GENERICO: solo el coordinador FINANCIERO ve las vistas económicas.
 	let esCoordinadorFinanciero = $derived($userStore.user?.subtipo_coordinador === 'financiero');
-	const ECONOMIC_HREFS = ['/app/reports', '/app/payments', '/app/payment-config', '/app/bank-statements'];
+	const ECONOMIC_HREFS = ['/app/reports', '/app/payments', '/app/payment-config', '/app/bank-statements', '/app/informes'];
 
 	let filteredNavigation = $derived(navigation.filter(item => {
 		// ISSUE-R-ROLES: encargado_curso y coordinador son staff administrativo también
@@ -217,7 +230,21 @@
 					</li>
 				{/if}
 
-				<li class={isStudentUser ? '' : 'mt-auto'}>
+				{#if canValidateDocs}
+					<li class={isStudentUser ? '' : 'mt-auto border-t border-gray-200 dark:border-gray-800 pt-2'}>
+						<button
+							type="button"
+							onclick={() => isDocValidationOpen = true}
+							title={isCollapsed ? 'Validación de Docs' : ''}
+							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}
+						>
+							<ClipboardIcon class="size-6 shrink-0 text-amber-600 dark:text-amber-400 group-hover:text-primary-600" />
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Validación de Docs</span>{/if}
+						</button>
+					</li>
+				{/if}
+
+				<li class={isStudentUser || canValidateDocs ? '' : 'mt-auto'}>
 					<button onclick={logout} title={isCollapsed ? 'Cerrar Sesión' : ''} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 hover:bg-gray-50 hover:text-red-600 w-full text-left transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}>
 						<LogoutIcon class="size-6 shrink-0 text-gray-400 group-hover:text-red-600" />
 						{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Cerrar Sesión</span>{/if}
@@ -231,6 +258,10 @@
 {#if isStudentUser}
 	<CourseCatalogModal isOpen={isCatalogOpen} onClose={() => isCatalogOpen = false} />
 	<BenefitsModal isOpen={isBenefitsOpen} onClose={() => isBenefitsOpen = false} />
+{/if}
+
+{#if canValidateDocs}
+	<DocumentValidationModal isOpen={isDocValidationOpen} onClose={() => isDocValidationOpen = false} />
 {/if}
 
 <style>

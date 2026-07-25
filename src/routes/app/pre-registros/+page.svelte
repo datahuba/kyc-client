@@ -498,9 +498,9 @@
 		<div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-border dark:bg-dark-surface">
 			<div class="flex items-center justify-between">
 				<div>
-					<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Tasa de aprobación</p>
+					<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Formularios activos</p>
 					<p class="mt-1 text-3xl font-extrabold text-gray-900 dark:text-white">
-						{counters.forms_total > 0 ? Math.round(((counters.forms_total - counters.submissions_pendientes) / counters.forms_total) * 100) : 0}<span class="text-lg">%</span>
+						{counters.forms_total > 0 ? Math.round((counters.forms_activos / counters.forms_total) * 100) : 0}<span class="text-lg">%</span>
 					</p>
 				</div>
 				<div class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400">
@@ -508,7 +508,7 @@
 				</div>
 			</div>
 			<p class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
-				Aprobados vs total
+				{counters.forms_activos} de {counters.forms_total} abiertos ahora
 			</p>
 		</div>
 	</div>

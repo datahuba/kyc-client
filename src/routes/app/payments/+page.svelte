@@ -11,24 +11,53 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import PaymentForm from '$lib/features/payments/PaymentForm.svelte';
+	import AddPagoByStaffModal from '$lib/features/payments/AddPagoByStaffModal.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import SearchInput from '$lib/components/ui/searchInput.svelte';
 	import { Pagination } from '$lib/components/ui';
+	import UploadComprobanteModal from '$lib/features/payments/UploadComprobanteModal.svelte';
 	import { 
 		PlusIcon, 
 		DotsVerticalIcon, 
 		CheckIcon, 
 		XIcon, 
 		RefreshIcon,
-		DownloadIcon
+		DownloadIcon,
+		UploadIcon
 	} from '$lib/icons/outline';
 	import { alert, formatDate, formatCurrency } from '$lib/utils';
 	import Select from '$lib/components/ui/select.svelte';
+	import type { MatrizPagosResponse, ResumenModulosResponse, MatrizModulo, MatrizEstudiante } from '$lib/services/payment.service';
 	
 
 	let payments: Payment[] = $state([]);
 	let loading = $state(true);
-	
+
+	// F-074 (2026-07-23): Toggle entre vista Lista (actual) y Matriz (estilo Excel de Sandra)
+	// Persistimos la elección en localStorage para que no se pierda al recargar.
+	// FIX: estudiantes SIEMPRE ven 'lista' — ignorar localStorage para no-staff,
+	// porque si un staff dejó 'matriz' el estudiante dispararía endpoints 403.
+	let viewMode: 'lista' | 'matriz' = $state('lista');
+	function initViewMode() {
+		if (!isStaff) { viewMode = 'lista'; return; }
+		if (typeof localStorage !== 'undefined') {
+			const saved = localStorage.getItem('payments_view');
+			if (saved === 'matriz' || saved === 'lista') viewMode = saved;
+		}
+	}
+	function setViewMode(mode: 'lista' | 'matriz') {
+		if (!isStaff && mode === 'matriz') return; // estudiante no puede activar matriz
+		viewMode = mode;
+		try { localStorage.setItem('payments_view', mode); } catch {}
+		if (mode === 'matriz') loadMatriz();
+	}
+
+	// Estado de la vista Matriz
+	let matrizData: MatrizPagosResponse | null = $state(null);
+	let matrizResumen: ResumenModulosResponse | null = $state(null);
+	let matrizLoading = $state(false);
+	let matrizFiltroModulo: number | '' = $state(''); // '' = todos, 0..N = módulo específico
+
 	// Pagination
 	let page = $state(1);
 	let limit = $state(10);
@@ -61,11 +90,14 @@
 
 	// State Modals
 	let isCreateModalOpen = $state(false);
+	// F-COBRANZA-017: modal para que cobranza registre pagos en nombre del estudiante
+	let isAddByStaffModalOpen = $state(false);
 	let preselectedEnrollmentId: string | undefined = $state(undefined);
 	let isApproveModalOpen = $state(false);
 	let isRejectModalOpen = $state(false);
 	let isRevertModalOpen = $state(false); // ISSUE-P-CANALES: Modal de anulación
 	let isDeleteModalOpen = $state(false); // Borrado definitivo (solo superadmin)
+	let isUploadComprobanteOpen = $state(false); // F-COBRANZA-011: cobranza sube comprobante del estudiante
 	
 	let paymentToAction: Payment | null = $state(null);
 	let actionLoading = $state(false);
@@ -85,6 +117,38 @@
 	let coursesMap = $derived(
 		coursesList.reduce((acc, c) => ({ ...acc, [c._id]: c }), {} as Record<string, typeof coursesList[0]>)
 	);
+	// F-COBRANZA-033: mapa de estudiantes por ID para resolver el nombre en
+	// el modal de detalle cuando verificado_por es "SISTEMA (auto-aprobación)".
+	let studentsMap = $derived(
+		studentsList.reduce((acc, s) => ({ ...acc, [s._id]: s }), {} as Record<string, typeof studentsList[0]>)
+	);
+
+	// F-COBRANZA-033: helper que parsea `verificado_por` y devuelve una
+	// etiqueta legible de QUIÉN subió el comprobante. Devuelve {label, role}
+	// para que el modal pueda mostrar "Estudiante: Juan Pérez" o
+	// "Cobranza: sandra.zabala" según el caso.
+	function parseSubidoPor(p: Payment | null): { label: string; role: string } {
+		if (!p) return { label: '—', role: '' };
+		if (p.estado_pago === 'pendiente' || !p.verificado_por) {
+			return { label: 'Pendiente de revisión por Cobranza/CPD', role: 'Pendiente' };
+		}
+		const vp = p.verificado_por;
+		if (vp.startsWith('STAFF:')) {
+			return { label: vp.replace('STAFF:', '').trim(), role: 'Cobranza / Staff' };
+		}
+		if (vp === 'SISTEMA (auto-aprobación)') {
+			const studentName = p.nombre_estudiante
+				|| studentsMap[p.estudiante_id]?.nombre
+				|| p.remitente
+				|| p.estudiante_id;
+			return { label: studentName, role: 'Estudiante (auto-aprobado histórico)' };
+		}
+		if (vp.startsWith('SISTEMA:')) {
+			return { label: vp, role: 'Migración / Sistema' };
+		}
+		// username plano (ej: "superadmin_test", "Cobranza Diplomado IA...")
+		return { label: vp, role: 'Cobranza / Staff' };
+	}
 
 	async function loadPayments() {
 		loading = true;
@@ -153,7 +217,39 @@
 		loadPayments();
 	}
 
+	// F-074 (2026-07-23): Carga la matriz de pagos desde el backend.
+	async function loadMatriz() {
+		matrizLoading = true;
+		try {
+			const moduloIdx = matrizFiltroModulo === '' ? null : (matrizFiltroModulo as number);
+			const [mat, res] = await Promise.all([
+				paymentService.getMatriz(moduloIdx),
+				paymentService.getResumenModulos(),
+			]);
+			matrizData = mat;
+			matrizResumen = res;
+		} catch (error: any) {
+			console.error('Error cargando matriz:', error);
+			alert('error', error?.message || 'Error al cargar la matriz de pagos');
+			matrizData = null;
+			matrizResumen = null;
+		} finally {
+			matrizLoading = false;
+		}
+	}
+
+	// F-074: cuando cambia el filtro de módulo, recargar
+	// FIX: solo staff puede usar la vista matriz (estudiantes obtendrían 403)
+	$effect(() => {
+		if (isStaff && viewMode === 'matriz') {
+			// Dependencia explícita: matrizFiltroModulo
+			matrizFiltroModulo;
+			loadMatriz();
+		}
+	});
+
 	onMount(async () => {
+		initViewMode(); // FIX: restaurar viewMode desde localStorage solo si es staff
 		const results = await Promise.all([
 			courseService.getAll(1, 100),
 			isStaff ? studentService.getAll(1, 100) : Promise.resolve(null)
@@ -341,6 +437,27 @@
 		return role === 'admin' || role === 'superadmin' || role === 'cobranza';
 	}
 
+	// F-COBRANZA-011 (2026-07-21): cobranza puede subir el comprobante del
+	// estudiante en nombre de él, cuando el estudiante no pudo hacerlo, O
+	// reemplazar un comprobante existente si es ilegible o está mal.
+	// - Roles: superadmin, admin, cobranza (el backend rechaza otros roles).
+	// - Estado: aparece SIEMPRE para los roles autorizados, sin importar si
+	//   ya tiene comprobante. El modal muestra el actual + opción de subir
+	//   uno nuevo (reemplazo). Antes solo aparecía si NO tenía, lo que
+	//   confundió a Joel que no encontraba el botón.
+	// - Decisión Joel 20:30: SOLO cobranza puede hacerlo, no encargado_curso.
+	function canUploadComprobante(payment: Payment): boolean {
+		const role = $userStore.role;
+		if (role !== 'superadmin' && role !== 'admin' && role !== 'cobranza') return false;
+		return true;
+	}
+
+	function handleUploadComprobanteClick(payment: Payment) {
+		paymentToAction = payment;
+		isUploadComprobanteOpen = true;
+		openDropdownId = null;
+	}
+
 	function getDropdownOptions(payment: Payment) {
 		const options = [];
 
@@ -350,6 +467,21 @@
 			icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>`,
 			action: () => handleViewDetails(payment)
 		});
+
+		// F-COBRANZA-011: cobranza puede subir comprobante del estudiante
+		// cuando este no pudo hacerlo por sí mismo, O reemplazar el existente
+		// si es ilegible o está mal. Siempre visible para cobranza/admin/superadmin.
+		if (canUploadComprobante(payment)) {
+			const label = payment.comprobante_url
+				? 'Reemplazar comprobante'
+				: 'Subir comprobante';
+			options.push({
+				label,
+				id: 'upload',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>`,
+				action: () => handleUploadComprobanteClick(payment)
+			});
+		}
 
 		if (canApproveReject(payment)) {
 			options.push(
@@ -415,10 +547,64 @@
 	}
 
 
-	let csvLoading = $state(false);
+	let excelLoading = $state(false);
 
-	async function downloadCSV() {
-		csvLoading = true;
+	// F-COBRANZA-019 (2026-07-22): descarga un PDF/imagen al cliente via fetch
+	// y crea un Blob URL. Cloudinary sirve los PDFs con Content-Disposition:
+	// attachment que FUERZA descarga y muestra pantalla blanca en iframes. Los
+	// Blob URLs locales NO respetan ese header y el browser SIEMPRE renderiza
+	// inline. Si falla (CORS, red), se hace fallback a Google Docs Viewer.
+	// Cache simple por URL para no re-descargar al cambiar de pago.
+	const _pdfBlobCache = new Map<string, string>();
+	let pdfBlobUrl: string | null = $state(null);
+	let pdfBlobError: string | null = $state(null);
+	let pdfBlobLoading = $state(false);
+
+	$effect(() => {
+		const url = selectedPayment?.comprobante_url;
+		const isPdf = url && (url.toLowerCase().endsWith('.pdf') || url.includes('/raw/upload/'));
+		// Reset al cambiar de pago
+		if (!isPdf) {
+			pdfBlobUrl = null;
+			pdfBlobError = null;
+			return;
+		}
+		if (!url) return;
+		// Si ya está en cache, usar directo
+		if (_pdfBlobCache.has(url)) {
+			pdfBlobUrl = _pdfBlobCache.get(url)!;
+			pdfBlobError = null;
+			pdfBlobLoading = false;
+			return;
+		}
+		// Descargar y crear blob URL
+		pdfBlobLoading = true;
+		pdfBlobError = null;
+		pdfBlobUrl = null;
+		(async () => {
+			try {
+				const response = await fetch(url);
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				const blob = await response.blob();
+				// Forzar el tipo MIME correcto (Cloudinary sirve application/octet-stream)
+				const corrected = new Blob([blob], { type: 'application/pdf' });
+				const blobUrl = URL.createObjectURL(corrected);
+				_pdfBlobCache.set(url, blobUrl);
+				pdfBlobUrl = blobUrl;
+				pdfBlobError = null;
+			} catch (e: any) {
+				console.error('Error descargando PDF para blob URL:', e);
+				pdfBlobError = e?.message || 'Error al cargar el PDF';
+			} finally {
+				pdfBlobLoading = false;
+			}
+		})();
+	});
+
+	async function downloadExcel() {
+		// F-COBRANZA-016 (2026-07-21): exporta la lista de pagos a XLSX (reemplaza
+		// al CSV). Joel pidió: "se mejoren todas las exportaciones y sean tablas".
+		excelLoading = true;
 		try {
 			const filterParams: any = {};
 			if (filters.q) filterParams.q = filters.q;
@@ -427,57 +613,20 @@
 			if (filters.estudiante_id) filterParams.estudiante_id = filters.estudiante_id;
 			if (filters.tipo_concepto) filterParams.tipo_concepto = filters.tipo_concepto;
 
-			const res = await paymentService.getAll(1, 500, filterParams) as any;
-			const allPayments: Payment[] = Array.isArray(res) ? res : (res?.data ?? []);
-
-			if (allPayments.length === 0) {
-				alert('error', 'No hay datos para descargar');
-				return;
-			}
-
-			const courseName = filters.curso_id
-				? (coursesList.find(c => c._id === filters.curso_id)?.codigo ?? filters.curso_id)
-				: 'todos';
-			const filename = `pagos_${courseName}_${new Date().toISOString().slice(0,10)}.csv`;
-
-			const headers = ['Remitente', 'Método', 'Banco','Monto Comprobante','Fecha Comprobante','Cuenta Destino','Fecha Registro','Concepto','Nº Transacción', isStaff ? 'Estudiante ID' : '', 'Curso', 'Estado'];
-			
-			const rows = allPayments.map(p => [
-				p.remitente || 'No disponible',
-				p.metodo_pago || 'Transferencia',
-				p.banco || 'Caja UAGRM',
-				p.monto_comprobante ? formatCurrency(p.monto_comprobante) : 'Bs 0.00',
-				p.fecha_comprobante ? formatDate(p.fecha_comprobante) : '---',
-				p.cuenta_destino || '---',
-				p.created_at ? formatDate(p.created_at) : '---',
-				p.concepto || 'No especificado',
-				p.numero_transaccion || '---',
-				isStaff ? (p.estudiante_id || '') : '',
-				`"${p.curso_id && coursesMap[p.curso_id] ? coursesMap[p.curso_id].nombre_programa : '—'}"`,
-				p.estado_pago || '---'
-			]);
-
-			const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');
-			const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-			const url = URL.createObjectURL(blob);
-			const link = document.createElement('a');
-			link.setAttribute('href', url);
-			link.setAttribute('download', filename);
-			link.click();
-			URL.revokeObjectURL(url);
+			await paymentService.downloadPaymentsExcel(filterParams);
 		} catch (error) {
-			console.error('Error al exportar CSV:', error);
+			console.error('Error al exportar Excel:', error);
 			alert('error', 'Error al generar el archivo');
 		} finally {
-			csvLoading = false;
+			excelLoading = false;
 		}
 	}
 </script>
 
-<div class="space-y-6">
+<div class="space-y-6 relative z-10">
 	<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 		<div>
-			<Heading level="h1">Gestión de Pagos</Heading>
+			<Heading level="h1">{isStudent ? 'Mis Pagos' : 'Gestión de Pagos'}</Heading>
 			<p class="text-gray-500 dark:text-gray-400 text-sm mt-1">
 				{#if isStaff}Administre los pagos recibidos{:else}Historial de sus pagos realizados{/if}
 			</p>
@@ -490,30 +639,61 @@
 		</div>
 		
 		<div class="flex flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
-			<Button variant="secondary" onclick={loadPayments} loading={loading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
+			<!-- F-074: Toggle vista Lista ⇄ Matriz (estilo Excel de Sandra) -->
+			{#if isStaff}
+				<div class="inline-flex rounded-md shadow-sm border border-gray-300 dark:border-gray-600 overflow-hidden" role="group" aria-label="Modo de vista">
+					<button
+						type="button"
+						onclick={() => setViewMode('lista')}
+						class="px-3 py-1.5 text-sm font-medium transition-colors {viewMode === 'lista' ? 'bg-primary-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'}"
+						aria-pressed={viewMode === 'lista'}
+					>
+						📋 Lista
+					</button>
+					<button
+						type="button"
+						onclick={() => setViewMode('matriz')}
+						class="px-3 py-1.5 text-sm font-medium transition-colors border-l border-gray-300 dark:border-gray-600 {viewMode === 'matriz' ? 'bg-primary-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'}"
+						aria-pressed={viewMode === 'matriz'}
+					>
+						▦ Matriz
+					</button>
+				</div>
+			{/if}
+			<Button variant="secondary" onclick={isStaff && viewMode === 'matriz' ? loadMatriz : loadPayments} loading={loading || matrizLoading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
 				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
 				<span class="sm:hidden">Recargar</span>
 			</Button>
-			<Button variant="secondary" onclick={downloadCSV} loading={csvLoading} aria-label="Descargar listado de pagos en CSV" class="flex-1 sm:flex-none justify-center">
-				{#snippet leftIcon()} <DownloadIcon class="size-5" /> {/snippet}
-				<span class="whitespace-nowrap">CSV</span>
-			</Button>
+			{#if isStaff}
+				<Button variant="secondary" onclick={downloadExcel} loading={excelLoading} aria-label="Descargar listado de pagos en Excel" class="flex-1 sm:flex-none justify-center">
+					{#snippet leftIcon()} <DownloadIcon class="size-5" /> {/snippet}
+					<span class="whitespace-nowrap">Excel</span>
+				</Button>
+			{/if}
 			{#if isStudent}
 				<Button onclick={() => isCreateModalOpen = true} loading={loading} class="flex-1 sm:flex-none justify-center">
 					{#snippet leftIcon()} <PlusIcon class="size-5" /> {/snippet}
 					<span class="whitespace-nowrap">Registrar Pago</span>
 				</Button>
 			{/if}
+			<!-- F-COBRANZA-017 (2026-07-22): cobranza/admin/superadmin registran
+			     pagos en nombre del estudiante cuando este no pudo subirlos. -->
+			{#if isStaff}
+				<Button onclick={() => isAddByStaffModalOpen = true} class="flex-1 sm:flex-none justify-center">
+					{#snippet leftIcon()} <PlusIcon class="size-5" /> {/snippet}
+					<span class="whitespace-nowrap">Añadir Pago</span>
+				</Button>
+			{/if}
 		</div>
 	</div>
 
-	<!-- Filters -->
-	<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-		<div class="md:col-span-1">
+	<!-- Filters: estudiante ve solo búsqueda + concepto + estado; staff ve todo -->
+	<div class={`grid gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 ${isStaff ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-5' : 'grid-cols-1 sm:grid-cols-3'}`}>
+		<div>
 			<label for="search" class="sr-only">Buscar</label>
 			<SearchInput
 				bind:value={filters.q}
-				placeholder="Buscar recibo o nombre..."
+				placeholder={isStudent ? 'Buscar recibo...' : 'Buscar recibo o nombre...'}
 				onInput={() => handleSearchInput()}
 			/>
 		</div>
@@ -590,6 +770,8 @@
 
 
 
+	<!-- F-074: Toggle entre vista Lista (actual) y vista Matriz (estilo Excel de Sandra) -->
+	{#if viewMode === 'lista'}
 	{#if loading && payments.length === 0}
 		<TableSkeleton columns={11} rows={10} />
 	{:else}
@@ -654,21 +836,16 @@
 								<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{formatDate(payment.fecha_comprobante || '---')}</div>
 							</td>
 							<!-- Estado -->
+							<!--
+								F-COBRANZA-032 (2026-07-22): Kevin pidió eliminar el badge
+								"En observación 48h". Todo pago aprobado (subido por estudiante
+								o por cobranza) entra directo a aprobado y se refleja en
+								resúmenes y reporte de caja sin pasar por estados intermedios.
+							-->
 							<td class="px-4 py-4 text-sm">
-								<div class="flex flex-col items-start gap-1">
-									<span class={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${getStatusColor(payment.estado_pago)}`}>
-										{payment.estado_pago}
-									</span>
-									<!-- ISSUE-P-REVERSION -->
-									{#if payment.en_ventana_reversion}
-										<span
-											class="px-2 py-0.5 inline-flex text-[10px] leading-4 font-bold uppercase tracking-wide rounded-full whitespace-nowrap bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-											title="Este pago por transferencia puede ser revertido por el banco hasta 48h después de su aprobación. Verifícalo contra el extracto bancario antes de darlo por definitivo."
-										>
-											En observación 48h
-										</span>
-									{/if}
-								</div>
+								<span class={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${getStatusColor(payment.estado_pago)}`}>
+									{payment.estado_pago}
+								</span>
 							</td>
 							<!-- Acciones -->
 							<td class="px-4 py-4 text-right text-sm font-medium relative">
@@ -740,17 +917,12 @@
 
 					<div class="mt-3 flex items-center justify-between">
 						<span class="text-base font-bold text-green-600 dark:text-green-400">{payment.monto_comprobante ? formatCurrency(payment.monto_comprobante) : '0.00'}</span>
+						<!--
+							F-COBRANZA-032 (2026-07-22): Kevin pidió eliminar el badge "48h".
+							Todo pago aprobado entra directo a aprobado sin estados intermedios.
+						-->
 						<div class="flex items-center gap-1 shrink-0">
 							<span class={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${getStatusColor(payment.estado_pago)}`}>{payment.estado_pago}</span>
-							<!-- ISSUE-P-REVERSION -->
-							{#if payment.en_ventana_reversion}
-								<span
-									class="px-2 py-0.5 inline-flex text-[10px] leading-4 font-bold uppercase tracking-wide rounded-full whitespace-nowrap bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-									title="Este pago por transferencia puede ser revertido por el banco hasta 48h después de su aprobación."
-								>
-									48h
-								</span>
-							{/if}
 						</div>
 					</div>
 
@@ -789,6 +961,193 @@
 		/>
 	{/if}
 
+	<!-- ============================================================== -->
+	<!-- F-074 (2026-07-23): VISTA MATRIZ (estilo Excel de Sandra)      -->
+	<!-- Filas = estudiantes, Columnas = MATRÍCULA | MONTO | MODULO 1..N | TOTAL INGRESOS | POR COBRAR -->
+	<!-- ============================================================== -->
+	{:else if viewMode === 'matriz'}
+		<!-- Filtro adicional solo para la vista Matriz: dropdown de Módulo -->
+		<div class="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+			<label for="matriz-modulo" class="text-sm font-medium text-gray-700 dark:text-gray-200">Módulo:</label>
+			<select
+				id="matriz-modulo"
+				bind:value={matrizFiltroModulo}
+				class="rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+			>
+				<option value="">Todos los módulos</option>
+				{#if matrizData}
+					{#each matrizData.totales_por_columna.modulos as m}
+						<option value={m.i}>{m.nombre}</option>
+					{/each}
+				{/if}
+			</select>
+			{#if matrizData}
+				<span class="text-xs text-gray-500 dark:text-gray-400 ml-auto">
+					{matrizData.estudiantes.length} estudiante(s) · {matrizData.totales_por_columna.modulos.length} módulo(s)
+				</span>
+			{/if}
+		</div>
+
+		{#if matrizLoading && !matrizData}
+			<TableSkeleton columns={8} rows={10} />
+		{:else if !matrizData}
+			<EmptyState
+				icon="payment"
+				variant="bordered"
+				size="md"
+				title="No se pudo cargar la matriz"
+				description="Verificá tu conexión y reintentá con el botón Recargar."
+				ctaLabel="Reintentar"
+				onCta={loadMatriz}
+			/>
+		{:else}
+			{@const totales = matrizData.totales_por_columna}
+			{@const estudiantes = matrizData.estudiantes}
+			{@const modulosCols = matrizFiltroModulo === '' ? totales.modulos : totales.modulos.filter(m => m.i === matrizFiltroModulo)}
+
+			<!-- KPI cards: una por módulo + matrícula + total ingresos + por cobrar + KPI adicionales F-074-FIX-4 -->
+			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-3">
+				<!-- Matrícula -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Matrícula</div>
+					<div class="text-lg font-bold text-purple-700 dark:text-purple-300 mt-1">{formatCurrency(totales.matricula.pagado)}</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+						{totales.matricula.estudiantes_pagaron} pagaron
+					</div>
+				</div>
+				<!-- Módulos (F-074-FIX-3: nombre corto "Módulo N" para no romper la grid; nombre completo en tooltip) -->
+				{#each modulosCols as m}
+					<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+						<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400 truncate" title={m.nombre}>Módulo {m.i + 1}</div>
+						<div class="text-lg font-bold text-blue-700 dark:text-blue-300 mt-1">{formatCurrency(m.pagado)}</div>
+						<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+							{m.estudiantes_pagaron}/{m.estudiantes_pagaron + m.estudiantes_pendientes} pagaron
+						</div>
+					</div>
+				{/each}
+				<!-- F-074-FIX-4: KPI "Pagaron todo" (matrícula + todos los módulos) -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Pagaron Todo</div>
+					<div class="text-lg font-bold text-emerald-700 dark:text-emerald-300 mt-1">
+						{totales.estudiantes_pagaron_todo}/{totales.total_inscritos}
+					</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">matrícula + 5 módulos</div>
+				</div>
+				<!-- F-074-FIX-4: KPI "Becados" (descuento aplicado) -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Becados</div>
+					<div class="text-lg font-bold text-amber-700 dark:text-amber-300 mt-1">
+						{totales.estudiantes_con_beca}
+					</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">con descuento</div>
+				</div>
+				<!-- F-074-FIX-4: KPI "Ahorro por Becas" -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Ahorro Becas</div>
+					<div class="text-lg font-bold text-amber-700 dark:text-amber-300 mt-1">{formatCurrency(totales.ahorro_total_por_descuentos)}</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">total descuentos</div>
+				</div>
+				<!-- Total Ingresos -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Total Ingresos</div>
+					<div class="text-lg font-bold text-green-700 dark:text-green-300 mt-1">{formatCurrency(totales.total_ingresos)}</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Recaudado</div>
+				</div>
+				<!-- Por Cobrar -->
+				<div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+					<div class="text-[10px] uppercase font-semibold text-gray-500 dark:text-gray-400">Por Cobrar</div>
+					<div class="text-lg font-bold text-orange-700 dark:text-orange-300 mt-1">{formatCurrency(totales.por_cobrar)}</div>
+					<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+						{totales.total_inscritos} inscrito(s)
+					</div>
+				</div>
+			</div>
+
+			<!-- Tabla matricial con scroll horizontal -->
+			<div class="border border-gray-200 dark:border-dark-border rounded-lg shadow-sm overflow-x-auto">
+				<table class="w-full divide-y divide-gray-200 dark:divide-dark-border text-sm">
+					<thead class="bg-gray-50 dark:bg-dark-background">
+						<tr>
+							<th scope="col" class="sticky left-0 z-10 bg-gray-50 dark:bg-dark-background px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Estudiante</th>
+							<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Matrícula</th>
+							{#each modulosCols as m}
+								<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" title={m.nombre}>Módulo {m.i + 1}</th>
+							{/each}
+							<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-green-50 dark:bg-green-900/20">Total Ingresos</th>
+							<th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-orange-50 dark:bg-orange-900/20">Por Cobrar</th>
+						</tr>
+					</thead>
+					<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
+						{#each estudiantes as est (est.estudiante_id)}
+							<tr class="hover:bg-gray-50 dark:hover:bg-dark-background/40 transition-colors">
+								<!-- Estudiante (columna sticky) -->
+								<td class="sticky left-0 z-10 bg-white dark:bg-dark-surface px-4 py-3 min-w-[200px]">
+									<div class="flex items-center gap-1.5">
+										<span class="font-medium text-gray-900 dark:text-white truncate" title={est.nombre}>{est.nombre}</span>
+										<!-- F-074-FIX-4: badge de beca cuando tiene descuento aplicado
+										     Regla Kevin (2026-07-23): "el descuento solamente es para modulos
+										     no matriculas eso no se cambia". El badge aclara que es SOLO módulos. -->
+										{#if est.beca_porcentaje > 0 && est.ahorro > 0.01}
+											<span
+												class="shrink-0 px-1.5 py-0.5 inline-flex text-[10px] font-bold rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+												title={`Beca ${est.beca_porcentaje}% en MÓDULOS (no aplica a matrícula) — Ahorro: ${formatCurrency(est.ahorro)} (costo original módulos: ${formatCurrency(est.costo_sin_descuento - est.matricula_monto)})`}
+											>
+												🎓 Beca {est.beca_porcentaje}%
+											</span>
+										{/if}
+									</div>
+									<div class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 font-mono">
+										{est.registro || '—'} · {est.estado_inscripcion}
+										{#if est.pago_todo}
+											· <span class="text-emerald-600 dark:text-emerald-400 font-semibold">✓ Pagó todo</span>
+										{/if}
+									</div>
+								</td>
+								<!-- Matrícula -->
+								<td class="px-3 py-3 whitespace-nowrap">
+									{#if est.matricula_pagado >= est.matricula_monto - 0.01}
+										<span class="text-green-600 dark:text-green-400 font-semibold" title="Pagado">{formatCurrency(est.matricula_pagado)}</span>
+									{:else if est.matricula_pagado > 0}
+										<span class="text-yellow-600 dark:text-yellow-400 font-semibold" title="Pago parcial">{formatCurrency(est.matricula_pagado)}</span>
+									{:else}
+										<span class="text-gray-300 dark:text-gray-600">—</span>
+									{/if}
+								</td>
+								<!-- Módulos -->
+								{#each modulosCols as m}
+									{@const mod = est.modulos.find(x => x.i === m.i)}
+									<td class="px-3 py-3 whitespace-nowrap">
+										{#if !mod}
+											<span class="text-gray-300 dark:text-gray-600">—</span>
+										{:else if mod.estado === 'Pagado'}
+											<span class="text-green-600 dark:text-green-400 font-semibold" title="Pagado">{formatCurrency(mod.monto_pagado)}</span>
+										{:else if mod.monto_pagado > 0}
+											<span class="text-yellow-600 dark:text-yellow-400 font-semibold" title="Pago parcial">{formatCurrency(mod.monto_pagado)}</span>
+										{:else}
+											<span class="text-gray-300 dark:text-gray-600">—</span>
+										{/if}
+									</td>
+								{/each}
+								<!-- Total Ingresos -->
+								<td class="px-3 py-3 whitespace-nowrap font-semibold text-green-700 dark:text-green-300 bg-green-50/50 dark:bg-green-900/10">
+									{formatCurrency(est.total_ingresos)}
+								</td>
+								<!-- Por Cobrar -->
+								<td class="px-3 py-3 whitespace-nowrap font-semibold text-orange-700 dark:text-orange-300 bg-orange-50/50 dark:bg-orange-900/10">
+									{#if est.por_cobrar > 0.01}
+										{formatCurrency(est.por_cobrar)}
+									{:else}
+										<span class="text-gray-400 dark:text-gray-500">—</span>
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
+	{/if}
+
 	<!-- Create Payment Modal -->
 	<Modal
 		isOpen={isCreateModalOpen}
@@ -796,7 +1155,7 @@
 		onClose={() => { isCreateModalOpen = false; preselectedEnrollmentId = undefined; }}
 		maxWidth="sm:max-w-xl"
 	>
-		<PaymentForm 
+		<PaymentForm
 			{preselectedEnrollmentId}
 			onSuccess={() => {
 				isCreateModalOpen = false;
@@ -806,6 +1165,18 @@
 			onCancel={() => { isCreateModalOpen = false; preselectedEnrollmentId = undefined; }}
 		/>
 	</Modal>
+
+	<!-- F-COBRANZA-017 (2026-07-22): modal para que cobranza/admin/superadmin
+	     registre un pago COMPLETO en nombre de un estudiante. El pago
+	     nace APROBADO y verificado_por="STAFF:<username>". -->
+	<AddPagoByStaffModal
+		isOpen={isAddByStaffModalOpen}
+		onSuccess={() => {
+			isAddByStaffModalOpen = false;
+			loadPayments();
+		}}
+		onCancel={() => { isAddByStaffModalOpen = false; }}
+	/>
 
 	<!-- Approve Confirmation Modal -->
 	<ModalConfirm
@@ -954,18 +1325,91 @@
 							{selectedPayment.estado_pago}
 						</span>
 					</div>
+					<!--
+						F-COBRANZA-033 (2026-07-22): Kevin pidió ver QUIÉN subió el
+						comprobante, no solo el "Remitente" de la transferencia. El
+						remitente puede ser el estudiante, su mamá, su papá, etc.
+						"Subido por" indica el perfil del sistema que cargó el pago.
+					-->
+					<div>
+						<label for="subidoPor" class="block text-xs font-medium text-gray-900 uppercase">Subido por</label>
+						<p class="text-sm font-medium text-gray-700 dark:text-white mt-1" id="subidoPor">
+							{#if selectedPayment}
+								{@const sp = parseSubidoPor(selectedPayment)}
+								<span class="font-semibold">{sp.label}</span>
+								{#if sp.role}
+									<span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sp.role}</span>
+								{/if}
+							{/if}
+						</p>
+					</div>
 				</div>
 
 				<div class="border-t border-gray-200 dark:border-gray-700 pt-4">
 					<label for="comprobante" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Comprobante</label>
 					{#if selectedPayment.comprobante_url}
+						<!-- F-COBRANZA-012 (2026-07-21): botón de descarga prominentemente.
+						     Funciona para cualquier tipo de comprobante (imagen o PDF).
+						     El atributo `download` fuerza la descarga en vez de abrir nueva pestaña. -->
+						<div class="flex justify-end mb-2">
+							<a
+								href={selectedPayment.comprobante_url}
+								download
+								target="_blank"
+								rel="noopener noreferrer"
+								class="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 active:scale-95 text-white text-sm font-medium rounded-lg transition-all"
+							>
+								<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+								</svg>
+								Descargar comprobante
+							</a>
+						</div>
 						<div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900 flex justify-center items-center min-h-[200px]">
-							{#if selectedPayment.comprobante_url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) || selectedPayment.comprobante_url.includes('cloudinary')} 
-								<img 
-									src={selectedPayment.comprobante_url} 
-									alt="Comprobante" 
-									class="max-w-full max-h-[500px] object-contain" 
+							<!-- F-COBRANZA-019 fix (2026-07-22): pantalla blanca al ver PDF.
+							     Cloudinary sirve los PDFs subidos a /raw/upload/ con
+							     Content-Disposition: attachment + Content-Type: application/octet-stream.
+							     Eso FUERZA al browser a descargar el archivo en vez de renderizarlo
+							     inline en el iframe, mostrando pantalla blanca.
+							     Solución: descargamos el PDF al cliente via fetch y creamos un
+							     Blob URL. El browser SIEMPRE renderiza Blob URLs inline (no respeta
+							     Content-Disposition del servidor). Como bonus, no depende de
+							     Google Docs Viewer ni del visor nativo (que puede fallar). -->
+							{#if selectedPayment.comprobante_url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) || selectedPayment.comprobante_url.includes('/image/upload/')}
+								<img
+									src={selectedPayment.comprobante_url}
+									alt="Comprobante"
+									class="max-w-full max-h-[500px] object-contain"
 								/>
+							{:else if selectedPayment.comprobante_url.toLowerCase().endsWith('.pdf') || selectedPayment.comprobante_url.includes('/raw/upload/')}
+								<!-- PDF: Blob URL local (forza inline rendering). Loading mientras
+								     se descarga, mensaje de error si falla CORS, fallback a Google
+								     Docs Viewer. El botón "Descargar comprobante" arriba SIEMPRE
+								     funciona como última opción. -->
+								{#if pdfBlobLoading}
+									<div class="flex flex-col items-center gap-2 p-8 text-gray-500">
+										<div class="animate-spin size-8 border-4 border-primary-500 border-t-transparent rounded-full"></div>
+										<p class="text-sm">Cargando comprobante PDF...</p>
+									</div>
+								{:else if pdfBlobUrl}
+									<iframe
+										src={pdfBlobUrl}
+										title="Comprobante PDF"
+										class="w-full h-[500px] border-0 bg-white"
+									></iframe>
+								{:else}
+									<!-- Fallback: Google Docs Viewer como proxy -->
+									<iframe
+										src={`https://docs.google.com/viewer?url=${encodeURIComponent(selectedPayment.comprobante_url)}&embedded=true`}
+										title="Comprobante PDF (vía Google Docs Viewer)"
+										class="w-full h-[500px] border-0 bg-white"
+									></iframe>
+									{#if pdfBlobError}
+										<p class="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
+											No se pudo descargar el PDF directamente ({pdfBlobError}). Mostrando vía Google Docs Viewer. Si no carga, usa el botón "Descargar comprobante" arriba.
+										</p>
+									{/if}
+								{/if}
 							{:else}
 								<div class="text-center p-6">
 									<p class="text-sm text-gray-500 mb-2">El comprobante es un documento (PDF u otro).</p>
@@ -1016,4 +1460,23 @@
 			</div>
 		{/if}
 	</Modal>
+
+	<!-- F-COBRANZA-011 (2026-07-21): modal para que COBRANZA suba el comprobante
+	     de pago en nombre del estudiante. Solo visible para superadmin/admin/cobranza,
+	     y solo si el pago todavía no tiene comprobante_url. -->
+	<UploadComprobanteModal
+		isOpen={isUploadComprobanteOpen}
+		payment={paymentToAction}
+		onSuccess={(updated) => {
+			isUploadComprobanteOpen = false;
+			paymentToAction = null;
+			// Actualizar el pago en la lista local
+			payments = payments.map(p => p._id === updated._id ? { ...p, ...updated } : p);
+			loadPayments();
+		}}
+		onCancel={() => {
+			isUploadComprobanteOpen = false;
+			paymentToAction = null;
+		}}
+	/>
 </div>

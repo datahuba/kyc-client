@@ -5,12 +5,12 @@
 
 	interface Props {
 		options: DropdownOption[];
-		width: string;
-		class: string;
+		width?: string;
+		class?: string;
 		isOpen: boolean;
 	}
 
-	let { options, width, class: className, isOpen }: Props = $props();
+	let { options, width = 'w-48', class: className = '', isOpen }: Props = $props();
 
 	function handleSelect(option: DropdownOption) {
 		if (option.disabled) return;

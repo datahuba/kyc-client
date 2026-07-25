@@ -19,6 +19,8 @@
 	let calificacionInputs: Record<string, number | ''> = $state({});
 	let savingCalificacion: Record<string, boolean> = $state({});
 	let savingAll = $state(false);
+	// F-047: indicador de si hay borrador activo en localStorage
+	let hasActiveDraft = $state(false);
 
 	onMount(async () => {
 		try {
@@ -41,6 +43,10 @@
             moduleEnrollments = courseEnrollments.filter(e => e.estado === 'activo');
             let missingCount = 0;
 
+            // F-047: cargar draft desde localStorage ANTES de poblar inputs
+            const draft = loadDraft(module.curso_id, module.modulo_index);
+            const hasDraft = draft !== null && Object.keys(draft).length > 0;
+
             // Carga concurrente segura (Tolerante a fallos 404 por borrado físico)
             await Promise.all(
                 moduleEnrollments.map(async (enrollment) => {
@@ -61,6 +67,12 @@
                         }
                     }
 
+                    // F-047: si hay draft, usar el valor del draft; si no, valor de BD
+                    if (hasDraft && draft![enrollment._id] !== undefined) {
+                        calificacionInputs[enrollment._id] = draft![enrollment._id];
+                        return;
+                    }
+
                     const realIndex = module.modulo_index - 1;
                     if (enrollment.modulos && enrollment.modulos.length > realIndex) {
                         const modulo = enrollment.modulos[realIndex];
@@ -75,6 +87,14 @@
                     }
                 })
             );
+
+            // F-047: notificar si se restauró un draft
+            if (hasDraft) {
+                const cant = Object.keys(draft!).filter(k => draft![k] !== '' && draft![k] !== null).length;
+                if (cant > 0) {
+                    alert('info', `Se restauraron ${cant} notas del borrador local.`);
+                }
+            }
         } catch (error: any) {
             alert('error', 'Error al cargar inscripciones del módulo.');
         } finally {
@@ -120,20 +140,116 @@
 		savingAll = true;
 		let successCount = 0;
 		let failCount = 0;
+		const failedIds: string[] = [];
+
+		// F-047 FIX: usar Promise.allSettled para que un fallo no aborte los demás
+		// y poder reintentar las que fallaron.
+		const promesas = moduleEnrollments
+			.filter(e => {
+				const nota = calificacionInputs[e._id];
+				return nota !== '' && nota !== null && nota !== undefined;
+			})
+			.map(async (enrollment) => {
+				const result = await saveCalificacion(enrollment._id, false);
+				if (result) {
+					successCount++;
+				} else {
+					failCount++;
+					failedIds.push(enrollment._id);
+				}
+			});
+
+		await Promise.allSettled(promesas);
+
+		savingAll = false;
+		if (successCount > 0) {
+			alert('success', `Se guardaron ${successCount} calificaciones exitosamente.`);
+			// F-047: limpiar el draft si todo se guardó OK
+			if (failCount === 0 && activeModule) {
+				clearDraft(activeModule.curso_id, activeModule.modulo_index);
+			}
+		}
+		if (failCount > 0) {
+			alert(
+				'error',
+				`Hubo problemas guardando ${failCount} calificaciones. El draft se mantiene. Usa "Reintentar fallidas" para volver a intentarlo.`
+			);
+		}
+	}
+
+	async function retryFailed() {
+		// Reintenta solo las que fallaron en el último saveAllCalificaciones
+		// (identificadas por tener un valor en calificacionInputs pero no en BD)
+		// Simplificado: reintenta todas las que tienen valor en input
+		savingAll = true;
+		let successCount = 0;
+		let failCount = 0;
 
 		for (const enrollment of moduleEnrollments) {
 			const nota = calificacionInputs[enrollment._id];
 			if (nota !== '' && nota !== null && nota !== undefined) {
-				const result = await saveCalificacion(enrollment._id, false);
-				if (result) successCount++;
-				else failCount++;
+				const realIndex = activeModule!.modulo_index - 1;
+				const notaEnBD = enrollment.modulos?.[realIndex]?.nota;
+				// Solo reintentar si el valor en input difiere del de BD
+				if (Number(nota) !== notaEnBD) {
+					const result = await saveCalificacion(enrollment._id, false);
+					if (result) successCount++;
+					else failCount++;
+				}
 			}
 		}
 
 		savingAll = false;
-		if (successCount > 0) alert('success', `Se guardaron ${successCount} calificaciones exitosamente.`);
-		if (failCount > 0) alert('error', `Hubo problemas guardando ${failCount} calificaciones.`);
+		if (successCount > 0) alert('success', `Reintentadas: ${successCount} guardadas.`);
+		if (failCount > 0) alert('error', `Aún ${failCount} con problemas.`);
 	}
+
+	// ─── DRAFT en localStorage (F-047) ─────────────────────────────────────
+	// Si el docente cierra la pestaña o se equivoca, las notas no se pierden.
+	function getDraftKey(cursoId: string, moduloIndex: number): string {
+		return `kyc_draft_notas_${cursoId}_${moduloIndex}`;
+	}
+
+	function saveDraft(cursoId: string, moduloIndex: number) {
+		if (typeof localStorage === 'undefined') return;
+		const key = getDraftKey(cursoId, moduloIndex);
+		const draft = { ...calificacionInputs };
+		localStorage.setItem(key, JSON.stringify(draft));
+	}
+
+	function loadDraft(cursoId: string, moduloIndex: number): Record<string, number | ''> | null {
+		if (typeof localStorage === 'undefined') return null;
+		const key = getDraftKey(cursoId, moduloIndex);
+		const raw = localStorage.getItem(key);
+		if (!raw) return null;
+		try {
+			return JSON.parse(raw);
+		} catch {
+			return null;
+		}
+	}
+
+	function clearDraft(cursoId: string, moduloIndex: number) {
+		if (typeof localStorage === 'undefined') return;
+		localStorage.removeItem(getDraftKey(cursoId, moduloIndex));
+		hasActiveDraft = false;
+	}
+
+	// F-047: $effect que observa cambios en calificacionInputs y auto-guarda
+	// el draft en localStorage. Si tiene al menos 1 nota, marca hasActiveDraft.
+	$effect(() => {
+		if (!activeModule) return;
+		// Track calificacionInputs (lectura para reactividad)
+		const inputs = calificacionInputs;
+		const nonEmpty = Object.values(inputs).filter(v => v !== '' && v !== null && v !== undefined);
+		if (nonEmpty.length > 0) {
+			saveDraft(activeModule.curso_id, activeModule.modulo_index);
+			hasActiveDraft = true;
+		} else {
+			// Si todos están vacíos, limpiar el draft
+			clearDraft(activeModule.curso_id, activeModule.modulo_index);
+		}
+	});
 
 	function exportCSV() {
 		if (!activeModule || moduleEnrollments.length === 0) return;
@@ -309,7 +425,7 @@
 							{/snippet}
 							Exportar Planilla
 						</Button>
-						
+
 						<input type="file" id="csv-upload" accept=".csv" class="hidden" onchange={importCSV} />
 						<Button variant="secondary" class="text-sm py-1.5" onclick={() => document.getElementById('csv-upload')?.click()}>
 							{#snippet leftIcon()}
@@ -319,6 +435,18 @@
 							{/snippet}
 							Importar Notas
 						</Button>
+
+						<!-- F-047: botón para reintentar SOLO las que fallaron (visible si hay draft activo) -->
+						{#if hasActiveDraft}
+							<Button variant="secondary" class="text-sm py-1.5" loading={savingAll} onclick={retryFailed}>
+								{#snippet leftIcon()}
+									<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+									</svg>
+								{/snippet}
+								Reintentar pendientes
+							</Button>
+						{/if}
 
 						<Button variant="primary" class="text-sm py-1.5 ml-auto" loading={savingAll} onclick={saveAllCalificaciones}>
 							{#snippet leftIcon()}

@@ -19,6 +19,26 @@ export interface Payment {
     fecha_comprobante?: string;
     metodo_pago?: string;
     en_ventana_reversion?: boolean; // ISSUE-P-REVERSION
+    // F-COBRANZA-033 (2026-07-22): Kevin pidió ver en el detalle QUIÉN subió
+    // el comprobante (estudiante o staff), no solo el "remitente" de la
+    // transferencia. El backend ya retorna este campo (model_dump() incluye
+    // todo el modelo Payment). El prefijo "STAFF:" indica que fue subido
+    // por un usuario de cobranza/admin/superadmin.
+    verificado_por?: string;
+    // F-COBRANZA-033: nombre del estudiante resuelto por el backend
+    // (enrich_payments_with_details_bulk). Útil para mostrar "Estudiante:
+    // Juan Pérez" cuando verificado_por es "SISTEMA (auto-aprobación)".
+    nombre_estudiante?: string;
+    // F-COBRANZA-036 (2026-07-22): C.I. (carnet_identidad) del estudiante.
+    // Si no tiene CI, cae al registro universitario. Pedido Lic. Sandra
+    // Zabala para mostrar en la columna del reporte de caja.
+    estudiante_ci?: string;
+    // F-COBRANZA-037 (2026-07-22): tipo de movimiento y columnas Debito/Credito
+    // para que Sandra vea claramente la diferencia entre PAGO (credito) y
+    // ANULACION/RECHAZO (debito). tipo_movimiento ∈ {PAGO, ANULACION, RECHAZO}.
+    tipo_movimiento?: 'PAGO' | 'ANULACION' | 'RECHAZO';
+    debito?: number;
+    credito?: number;
 }
 
 export interface CreatePaymentFormData {

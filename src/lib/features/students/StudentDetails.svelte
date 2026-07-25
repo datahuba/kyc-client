@@ -353,7 +353,7 @@
 			<div class="grid grid-cols-2 gap-4">
 				{#each [
 					{ label: 'Foto Perfil', url: student.foto_url, type: 'photo', accept: 'image/*', estado: undefined, motivo: undefined },
-					{ label: 'Carnet', url: student.ci_url, type: 'carnet', accept: '.pdf', estado: student.carnet_estado, motivo: student.carnet_motivo_rechazo },
+					{ label: 'Carnet', url: student.carnet_url, type: 'carnet', accept: '.pdf', estado: student.carnet_estado, motivo: student.carnet_motivo_rechazo },
 					{ label: 'Curriculum', url: student.cv_url, type: 'cv', accept: '.pdf', estado: student.cv_estado, motivo: student.cv_motivo_rechazo },
 					{ label: 'Afiliación', url: student.afiliacion_url, type: 'afiliacion', accept: '.pdf', estado: student.afiliacion_estado, motivo: student.afiliacion_motivo_rechazo }
 				] as doc}

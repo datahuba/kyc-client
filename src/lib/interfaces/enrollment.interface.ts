@@ -70,3 +70,23 @@ export interface UpdateEnrollmentRequest {
 	total_pagado?: number;
 	saldo_pendiente?: number;
 }
+
+// F-COBRANZA-035 (2026-07-22): resumen de inscritos para vista KPI.
+// Pedido Lic. Sandra Zabala: "diferencia del total de inscritos
+// inicialmente, cuantos son los activo y cuantos los pasivos".
+export interface EnrollmentPasivos {
+	total: number;
+	congelado: number;
+	pasivo: number;
+	abandono: number;
+}
+
+export interface EnrollmentResumen {
+	total_inicial: number;   // todos los inscritos MENOS cancelados
+	activos: number;         // activo + pendiente_pago
+	pendientes_pago: number; // sub-categoria de activos
+	pasivos: EnrollmentPasivos;
+	completados: number;
+	cancelados: number;      // NO cuentan como inscritos
+	curso_id: string | null;
+}

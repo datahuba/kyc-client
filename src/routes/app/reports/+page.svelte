@@ -3,9 +3,9 @@
 	// curso y estado, exportable a Excel. Reutiliza el mismo filtro de
 	// segmentación de Cobranza por curso ya aplicado en /app/payments.
 	import { onMount } from 'svelte';
-	import { paymentService, courseService } from '$lib/services';
+	import { paymentService, courseService, studentService } from '$lib/services';
 	import type { ReporteCajaResumen } from '$lib/services/payment.service';
-	import type { Payment, Course } from '$lib/interfaces';
+	import type { Payment, Course, Student } from '$lib/interfaces';
 	import { userStore } from '$lib/stores/userStore';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
@@ -30,8 +30,10 @@
 	});
 	let coursesList: Course[] = $state([]);
 	let coursesMap: Record<string, Course> = $state({});
+	let studentsList: Student[] = $state([]);  // F-COBRANZA-003 (mejorado): para el select de estudiante
 	let loading = $state(false);
 	let exporting = $state(false);
+	let exportingPdf = $state(false);  // F-COBRANZA-043
 
 	let page = $state(1);
 	let limit = $state(20);
@@ -42,6 +44,7 @@
 		fecha_desde: hoyISO(),
 		fecha_hasta: hoyISO(),
 		curso_id: '',
+		estudiante_id: '',  // F-COBRANZA-003
 		estado: ''
 	});
 
@@ -65,6 +68,15 @@
 		} catch (e) {
 			console.error('Error cargando cursos para el reporte', e);
 		}
+		// F-COBRANZA-003 (mejorado 2026-07-21): cargar estudiantes para el
+		// select del filtro. Se hace en paralelo con el reporte para no
+		// bloquear la UI.
+		try {
+			const stuRes = await studentService.getAll(1, 500);
+			studentsList = stuRes.data;
+		} catch (e) {
+			console.error('Error cargando estudiantes para el reporte', e);
+		}
 		await loadReporte();
 	});
 
@@ -83,13 +95,20 @@
 				fecha_desde: filters.fecha_desde,
 				fecha_hasta: filters.fecha_hasta,
 				curso_id: filters.curso_id || undefined,
+				estudiante_id: filters.estudiante_id || undefined,  // F-COBRANZA-003
 				estado: filters.estado || undefined
 			});
-			payments = res.data;
-			resumen = res.resumen;
-			totalItems = res.meta.totalItems;
-			totalPages = res.meta.totalPages;
+			payments = Array.isArray(res?.data) ? res.data : [];
+			resumen = res?.resumen ?? {
+				cantidad_pagos: 0,
+				total_aprobado: 0,
+				total_pendiente: 0,
+				total_anulado: 0
+			};
+			totalItems = res?.meta?.totalItems ?? 0;
+			totalPages = res?.meta?.totalPages ?? 1;
 		} catch (e: any) {
+			payments = [];
 			alert('error', e?.message || 'No se pudo generar el reporte');
 		} finally {
 			loading = false;
@@ -119,12 +138,31 @@
 				fecha_desde: filters.fecha_desde,
 				fecha_hasta: filters.fecha_hasta,
 				curso_id: filters.curso_id || undefined,
+				estudiante_id: filters.estudiante_id || undefined,  // F-COBRANZA-003
 				estado: filters.estado || undefined
 			});
 		} catch (e: any) {
 			alert('error', e?.message || 'No se pudo generar el archivo Excel');
 		} finally {
 			exporting = false;
+		}
+	}
+
+	// F-COBRANZA-043 (2026-07-22): descarga el PDF del Reporte de Caja.
+	async function handleExportPDF() {
+		exportingPdf = true;
+		try {
+			await paymentService.downloadReporteCajaPDF({
+				fecha_desde: filters.fecha_desde,
+				fecha_hasta: filters.fecha_hasta,
+				curso_id: filters.curso_id || undefined,
+				estudiante_id: filters.estudiante_id || undefined,
+				estado: filters.estado || undefined
+			});
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo generar el archivo PDF');
+		} finally {
+			exportingPdf = false;
 		}
 	}
 
@@ -165,6 +203,10 @@
 			>
 				{#snippet leftIcon()}<RefreshIcon class="size-5" />{/snippet}
 			</Button>
+			<Button onclick={handleExportPDF} loading={exportingPdf} variant="secondary">
+				{#snippet leftIcon()}<DownloadIcon class="size-5" />{/snippet}
+				Exportar PDF
+			</Button>
 			<Button onclick={handleExportExcel} loading={exporting}>
 				{#snippet leftIcon()}<DownloadIcon class="size-5" />{/snippet}
 				Exportar Excel
@@ -173,7 +215,7 @@
 	</div>
 
 	<!-- Filtros -->
-	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-dark-border">
+	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-gray-700">
 		<Input label="Desde" id="fecha_desde" type="date" bind:value={filters.fecha_desde} onchange={handleFilterChange} />
 		<Input label="Hasta" id="fecha_hasta" type="date" bind:value={filters.fecha_hasta} onchange={handleFilterChange} />
 		<Select label="Curso" bind:value={filters.curso_id} onchange={handleFilterChange}>
@@ -188,6 +230,20 @@
 			<option value="aprobado">Aprobado</option>
 			<option value="rechazado">Rechazado</option>
 			<option value="anulado">Anulado</option>
+		</Select>
+		<!-- F-COBRANZA-003 (mejorado 2026-07-21): filtro por estudiante como
+		     SELECT con buscador typeahead. Joel pidió que sea desplegable en vez
+		     de pegar el ID (muchos cobranza no tienen el ID a mano). -->
+		<Select
+			label="Estudiante"
+			id="estudiante_id_select"
+			bind:value={filters.estudiante_id}
+			onchange={handleFilterChange}
+		>
+			<option value="">Todos los estudiantes</option>
+			{#each studentsList as student (student._id)}
+				<option value={student._id}>{student.nombre}{student.registro ? ` (${student.registro})` : ''}</option>
+			{/each}
 		</Select>
 	</div>
 
@@ -225,9 +281,13 @@
 					<tr>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha Comprobante</th>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
+						<!-- F-COBRANZA-036 (2026-07-22): columna C.I. pedido por Sandra -->
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">C.I.</th>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Curso</th>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Concepto</th>
-						<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Monto</th>
+						<!-- F-COBRANZA-037 (2026-07-22): Debito y Credito separados -->
+						<th class="px-4 py-3 text-right text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wider">Débito</th>
+						<th class="px-4 py-3 text-right text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wider">Crédito</th>
 						<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
 					</tr>
 				</thead>
@@ -238,9 +298,17 @@
 								{payment.fecha_comprobante ? formatDate(payment.fecha_comprobante) : 'Sin registrar'}
 							</td>
 							<td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{(payment as any).nombre_estudiante || '—'}</td>
+							<!-- F-COBRANZA-036: C.I. (carnet_identidad) o registro -->
+							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 font-mono">{(payment as any).estudiante_ci || '—'}</td>
 							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs break-words" title={getCursoNombre(payment.curso_id)}>{getCursoNombre(payment.curso_id)}</td>
 							<td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{payment.concepto}</td>
-							<td class="px-4 py-3 text-sm text-right font-bold text-gray-900 dark:text-white">{formatCurrency(payment.cantidad_pago)}</td>
+							<!-- F-COBRANZA-037: Debito y Credito -->
+							<td class="px-4 py-3 text-sm text-right font-bold text-red-600 dark:text-red-400">
+								{(payment as any).debito > 0 ? formatCurrency((payment as any).debito) : '—'}
+							</td>
+							<td class="px-4 py-3 text-sm text-right font-bold text-green-600 dark:text-green-400">
+								{(payment as any).credito > 0 ? formatCurrency((payment as any).credito) : '—'}
+							</td>
 							<td class="px-4 py-3 text-center">
 								<span class={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide ${getStatusColor(payment.estado_pago)}`}>
 									{payment.estado_pago}
@@ -259,9 +327,16 @@
 					<div class="flex items-start justify-between gap-3">
 						<div>
 							<p class="text-sm font-bold text-gray-900 dark:text-white">{(payment as any).nombre_estudiante || '—'}</p>
+							<!-- F-COBRANZA-036: CI/registro del estudiante -->
+							{#if (payment as any).estudiante_ci}
+								<p class="text-xs text-gray-500 dark:text-gray-400 font-mono">C.I. {(payment as any).estudiante_ci}</p>
+							{/if}
 							<p class="text-xs text-gray-500 dark:text-gray-400">{getCursoNombre(payment.curso_id)}</p>
 						</div>
-						<span class="text-base font-bold text-gray-900 dark:text-white">{formatCurrency(payment.cantidad_pago)}</span>
+						<!-- F-COBRANZA-037: color segun tipo movimiento -->
+						<span class={`text-base font-bold ${(payment as any).debito > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+							{(payment as any).debito > 0 ? `- ${formatCurrency((payment as any).debito)}` : formatCurrency((payment as any).credito || payment.cantidad_pago)}
+						</span>
 					</div>
 					<div class="mt-2 flex items-center justify-between">
 						<p class="text-xs text-gray-500 dark:text-gray-400">

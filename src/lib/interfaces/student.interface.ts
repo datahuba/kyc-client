@@ -30,12 +30,18 @@ export interface Student {
 	lista_cursos_ids: string[];
 	lista_titulos_ids: string[];
 	nombre: string;
+	nombre_funcional?: string;
+	username?: string;
 	registro: string;
 	updated_at: string;
 	afiliacion_url?: string | null;
 	afiliacion_estado?: 'pendiente' | 'verificado' | 'rechazado';
 	afiliacion_motivo_rechazo?: string | null;
-	ci_url?: string | null;
+	// F-074-FIX-6 (2026-07-23): bug histórico -- el backend retorna `carnet_url`
+	// (modelo Student) y NO `ci_url`. El template de profile leía
+	// `profileData.ci_url` que era siempre `undefined`, por lo que el carnet
+	// siempre aparecía como "Sin subir" aunque la URL estuviera guardada en BD.
+	carnet_url?: string | null;
 	carnet_estado?: 'pendiente' | 'verificado' | 'rechazado';
 	carnet_motivo_rechazo?: string | null;
 	cv_url?: string | null;

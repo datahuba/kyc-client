@@ -98,7 +98,7 @@
 	const cardStyle = $derived(
 		isDragging && dragOffset !== 0
 			? `transform: translateX(${dragOffset}px); transition: none;`
-			: `transform: translateX(0); transition: transform 200ms ${cubicOut ? 'ease-out' : ''};`
+			: `transform: translateX(0); transition: transform 200ms ease-out;`
 	);
 
 	function handleActionClick(action: SwipeAction) {

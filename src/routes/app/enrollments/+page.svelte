@@ -52,6 +52,9 @@
 	let enrollmentToDelete: Enrollment | null = $state(null);
 	let deleteLoading: boolean = $state(false);
 
+	// F-COBRANZA-041 (2026-07-22): resumen de inscritos (total/activos/pasivos)
+	// se movió al Dashboard. Se eliminó la carga acá. Endpoint sigue existiendo.
+
 	// ISSUE P: Kardex Académico State
 	let isKardexOpen: boolean = $state(false);
 	let selectedKardex: Enrollment | null = $state(null);
@@ -675,6 +678,10 @@
 		{/if}
 	</div>
 
+	<!-- F-COBRANZA-041 (2026-07-22): las tarjetas KPI de inscritos se movieron al Dashboard.
+	     Kevin: "estos resumenes deberian salir en el dashboard no en inscripciones".
+	     Endpoint /enrollments/stats/resumen sigue existiendo. -->
+
 	{#if currentRole !== 'student'}
 		<!-- Filters -->
 		<div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
@@ -1059,21 +1066,21 @@
 								<div class="min-w-0">
 									<p class="text-sm font-medium text-slate-900 dark:text-white">{req.descripcion}</p>
 									<div class="mt-1 flex items-center gap-2">
-										{#if req.estado === 'pendiente'}
-											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-												Sin subir
-											</span>
-										{:else if req.estado === 'en_proceso'}
-											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-												Pendiente de revisión
-											</span>
-										{:else if req.estado === 'aprobado'}
+										{#if req.estado === 'aprobado'}
 											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
 												Aprobado
 											</span>
 										{:else if req.estado === 'rechazado'}
 											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" title={req.motivo_rechazo || ''}>
 												Rechazado
+											</span>
+										{:else if req.url || req.estado === 'en_proceso'}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+												{currentRole === 'student' ? 'Archivo Subido' : 'Pendiente de revisión'}
+											</span>
+										{:else}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+												Sin subir
 											</span>
 										{/if}
 										{#if req.url}
@@ -1097,7 +1104,7 @@
 											onchange={(e) => handleRequisitoFileChange(e, reqIndex)}
 										/>
 										<Button size="sm" variant="secondary" onclick={() => triggerRequisitoUpload(reqIndex)} loading={requisitoUploading[reqIndex]}>
-											{req.url ? 'Reemplazar' : 'Subir Documento'}
+											{req.url ? 'Reemplazar Archivo' : 'Subir Documento'}
 										</Button>
 									{/if}
 									<!-- CPD/Encargado de Curso aprueban o rechazan una vez subido -->
