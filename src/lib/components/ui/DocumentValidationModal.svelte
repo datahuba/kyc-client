@@ -46,7 +46,7 @@
 		studentId: string;
 		studentName: string;
 		carnet: string;
-		docCategory: 'titulo' | 'personal' | 'requisito';
+		docCategory: 'titulo' | 'personal' | 'requisito' | 'formulario';
 		docLabel: string;
 		url: string;
 		estado: string;
@@ -170,7 +170,7 @@
 				}
 			}
 
-			// 3. Requisitos por Curso
+			// 3. Requisitos por Curso + 4. Formularios de Inscripción
 			for (const enr of (resEnrollments.data || [])) {
 				const sName = studentsMap[enr.estudiante_id]?.nombre || 'Estudiante Desconocido';
 				const sCarnet = studentsMap[enr.estudiante_id]?.carnet || studentsMap[enr.estudiante_id]?.registro || 'N/A';
@@ -196,6 +196,22 @@
 						}
 					});
 				}
+
+				// 4. Formularios de Inscripción (por inscripción)
+				const formUrl = (enr as any).formulario_inscripcion_url || '';
+				const formEstado = (enr as any).formulario_inscripcion_estado || (formUrl ? 'subido' : 'sin_subir');
+				docs.push({
+					id: `form-${enr._id}`,
+					studentId: enr.estudiante_id,
+					studentName: sName,
+					carnet: sCarnet,
+					docCategory: 'formulario',
+					docLabel: `📋 Formulario de Inscripción`,
+					courseName: cName,
+					url: formUrl,
+					estado: formEstado === 'verificado' ? 'verificado' : formEstado === 'subido' ? 'pendiente' : 'sin_subir',
+					enrollmentId: enr._id
+				});
 			}
 
 			unifiedDocList = docs;
@@ -239,7 +255,8 @@
 	let docsGroupedByCategory = $derived({
 		titulos: filteredDocs.filter(d => d.docCategory === 'titulo'),
 		personales: filteredDocs.filter(d => d.docCategory === 'personal'),
-		requisitos: filteredDocs.filter(d => d.docCategory === 'requisito')
+		requisitos: filteredDocs.filter(d => d.docCategory === 'requisito'),
+		formularios: filteredDocs.filter(d => d.docCategory === 'formulario')
 	});
 
 	// Acciones de Validación
@@ -391,9 +408,9 @@
 		allEnrollmentsList.filter(e => e.estudiante_id === selectedStudentForUpload)
 	);
 
-	function goToStudent(id: string) {
+	function goToStudent(carnet: string) {
 		onClose();
-		goto(`/app/students?q=${id}`);
+		goto(`/app/students?q=${encodeURIComponent(carnet)}`);
 	}
 </script>
 
@@ -603,7 +620,7 @@
 									</div>
 									<button
 										type="button"
-										onclick={() => goToStudent(group.studentId)}
+										onclick={() => goToStudent(group.carnet)}
 										class="text-xs font-semibold text-primary-600 hover:underline"
 									>
 										Ver Perfil Alumno →
@@ -868,8 +885,48 @@
 								</div>
 							</div>
 						{/if}
-					</div>
-				{/if}
+
+					{#if docsGroupedByCategory.formularios.length > 0}
+						<div class="mt-6">
+							<h3 class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-3">
+								📋 Formularios de Inscripción ({docsGroupedByCategory.formularios.length})
+							</h3>
+							<div class="space-y-2">
+								{#each docsGroupedByCategory.formularios as doc (doc.id)}
+									<div class="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+										<div class="min-w-0 flex-1">
+											<h4 class="font-bold text-gray-900 dark:text-white text-sm">{doc.studentName}</h4>
+											<p class="text-xs text-primary-600 dark:text-primary-400 font-semibold">{doc.courseName}</p>
+											{#if doc.url}
+												<a href={getSafeDocumentUrl(doc.url)} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:underline mt-1">
+													<EyeIcon class="size-3.5" /> Ver Formulario
+												</a>
+											{:else}
+												<span class="text-[11px] text-gray-400 italic block mt-1">Sin formulario subido</span>
+											{/if}
+										</div>
+										<div class="flex items-center gap-1.5 shrink-0">
+											{#if doc.estado === 'verificado' || doc.estado === 'aprobado'}
+												<span class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 rounded-lg">
+													<CheckIcon class="size-3.5" /> Verificado
+												</span>
+											{:else if doc.url}
+												<span class="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
+													Pendiente revisión
+												</span>
+											{:else}
+												<span class="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-gray-500 dark:bg-gray-800 rounded-full">
+													Sin subir
+												</span>
+											{/if}
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+				</div>
+			{/if}
 			</div>
 			
 			<!-- Footer -->

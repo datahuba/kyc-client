@@ -25,16 +25,19 @@
 	let requestLoading = $state(false);
 
 	// ISSUE-Q-INSCRIPCION-DOCS: Validar que el estudiante tenga sus documentos completos y verificados
-	let documentosCompletos = $derived.by(() => {
+	// Objeto derivado que detalla el estado de cada documento para el mensaje
+	let docStatus = $derived.by(() => {
 		const u = $userStore.user as any;
-		if (!u) return false;
-		return (
-			u.cv_estado === 'verificado' &&
-			u.carnet_estado === 'verificado' &&
-			u.afiliacion_estado === 'verificado' &&
-			u.titulo?.estado === 'verificado'
-		);
+		if (!u) return { completo: false, items: [] as { label: string; estado: string; verificado: boolean }[] };
+		const items = [
+			{ label: 'Curriculum Vitae (CV)', estado: u.cv_estado || 'sin_subir', verificado: u.cv_estado === 'verificado' },
+			{ label: 'Carnet de Identidad', estado: u.carnet_estado || 'sin_subir', verificado: u.carnet_estado === 'verificado' },
+			{ label: 'Certificado de Afiliación', estado: u.afiliacion_estado || 'sin_subir', verificado: u.afiliacion_estado === 'verificado' },
+			{ label: 'Título Profesional', estado: u.titulo?.estado || 'sin_subir', verificado: u.titulo?.estado === 'verificado' }
+		];
+		return { completo: items.every(i => i.verificado), items };
 	});
+	let documentosCompletos = $derived(docStatus.completo);
 
 	function openRequestModal(course: Course) {
 		requestTargetCourse = course;
@@ -209,11 +212,44 @@
 					<div class="mb-4 p-4 rounded-xl bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/30 dark:border-red-900 dark:text-red-300">
 						<div class="flex items-start gap-3">
 							<svg class="w-5 h-5 mt-0.5 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-							<div>
+							<div class="flex-1">
 								<h4 class="text-sm font-bold">Documentación Incompleta</h4>
-								<p class="text-xs mt-1">
-									No puedes solicitar inscripción a nuevos programas porque te faltan documentos obligatorios o aún no han sido validados por el CPD.
-									Por favor, ve a tu <a href="/app/profile" class="underline font-semibold hover:text-red-900 dark:hover:text-red-200">Perfil</a> y asegúrate de tener tu CV, Carnet, Formulario de Inscripción y Título Profesional en estado <strong>Verificado</strong>.
+								<p class="text-xs mt-1 mb-2.5">
+									No puedes solicitar inscripción a nuevos programas hasta que los siguientes documentos estén verificados por el CPD.
+								</p>
+								<ul class="space-y-1.5">
+									{#each docStatus.items as item}
+										<li class="flex items-center gap-2 text-xs">
+											{#if item.verificado}
+												<span class="inline-flex items-center justify-center size-4 rounded-full bg-green-500/20 text-green-600 dark:text-green-400 shrink-0">
+													<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+												</span>
+												<span class="text-green-700 dark:text-green-400 line-through opacity-70">{item.label}</span>
+												<span class="text-[10px] font-bold text-green-600 dark:text-green-400 ml-auto">Verificado</span>
+											{:else if item.estado === 'pendiente'}
+												<span class="inline-flex items-center justify-center size-4 rounded-full bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 shrink-0">
+													<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+												</span>
+												<span class="font-medium">{item.label}</span>
+												<span class="text-[10px] font-bold text-yellow-600 dark:text-yellow-400 ml-auto">Pendiente de revisión</span>
+											{:else if item.estado === 'rechazado'}
+												<span class="inline-flex items-center justify-center size-4 rounded-full bg-red-500/20 text-red-600 dark:text-red-400 shrink-0">
+													<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+												</span>
+												<span class="font-medium">{item.label}</span>
+												<span class="text-[10px] font-bold text-red-600 dark:text-red-400 ml-auto">Rechazado — re-subir</span>
+											{:else}
+												<span class="inline-flex items-center justify-center size-4 rounded-full bg-gray-300/30 text-gray-500 dark:text-gray-400 shrink-0">
+													<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+												</span>
+												<span class="font-medium">{item.label}</span>
+												<span class="text-[10px] font-bold text-gray-500 dark:text-gray-400 ml-auto">Sin subir</span>
+											{/if}
+										</li>
+									{/each}
+								</ul>
+								<p class="text-xs mt-2.5">
+									Ve a tu <a href="/app/profile" class="underline font-semibold hover:text-red-900 dark:hover:text-red-200">Perfil</a> para subir o actualizar tus documentos.
 								</p>
 							</div>
 						</div>
