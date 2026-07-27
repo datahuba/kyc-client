@@ -4,7 +4,7 @@
 	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
 	import { UsersIcon, ClipboardIcon, TagIcon, XIcon, KeyIcon, QrCodeIcon, FileTextIcon, AcademicCapIcon, Menu2Icon } from '$lib/icons/outline'; // IMPORTACIÓN UNIFICADA DE MENU2ICON
 	import { slide, fade } from 'svelte/transition';
-	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon, ExclamationCircleIcon } from '$lib/icons/solid';  // F-044 (2026-07-22)
+	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon, ExclamationCircleIcon, CalendarIcon } from '$lib/icons/solid';  // F-044 (2026-07-22) | F-080 CalendarIcon
 	import { goto } from '$app/navigation';
 	import CourseCatalogModal from './CourseCatalogModal.svelte';
 	import BenefitsModal from './BenefitsModal.svelte';
@@ -58,6 +58,9 @@
 		{ name: 'Pre-inscripciones', href: '/app/pre-registros', icon: ClipboardIcon, roles: ['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
+		// F-080 (2026-07-27): nuevo item "Calendario" — vista general de programas (timeline + lista)
+		// Visible para todos los administrativos y docentes (no estudiantes).
+		{ name: 'Calendario', href: '/app/courses/calendario', icon: CalendarIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['admin'] },
 		{ name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
 		{ name: 'Reportes de Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'coordinador'], loginTypes: ['admin'] },
 		// F-075 (2026-07-23): nuevo item 'Informes' para informes administrativos

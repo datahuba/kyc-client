@@ -104,26 +104,48 @@
 				const [stProfile, enrRes, coursesRes, myRequestsRes] = await Promise.all([
 					studentService.getById($userStore.user._id).catch(() => null),
 					enrollmentService.getByStudentId($userStore.user._id),
-					courseService.getAll(1, 100),
+					// F-080: usar getDisponibles() en vez de getAll() — el endpoint
+					// ya filtra los cursos CERRADOS (regla de Kevin: no se puede
+					// solicitar inscripción a un programa que ya pasó o está en
+					// plena ejecución). PROGRAMADO y EN_EJECUCION sí aparecen.
+					courseService.getDisponibles().catch(() => ({ success: false, total: 0, items: [] })),
 					apiKyC.get<any[]>('/enrollment-requests/me').catch(() => [])
 				]);
-				
+
 				if (stProfile) {
 					studentProfile = stProfile;
 				}
 				enrollments = Array.isArray(enrRes) ? enrRes : (enrRes as any).data || [];
-				const courses = coursesRes.data || [];
-				// Construir el mapa en un objeto local y asignarlo una sola vez al $state
-				// (evita el warning assignment_value_stale de Svelte 5 por mutar el proxy en el forEach)
+
+				// F-080: el endpoint /courses/disponibles ya devuelve SOLO los cursos
+				// en PROGRAMADO o EN_EJECUCION (no CERRADOS). Mapeamos al formato
+				// Course que el resto del componente espera.
+				const cursosDisponibles = (coursesRes as any).items || [];
+				const cursosComoCourse: Course[] = cursosDisponibles.map((c: any) => ({
+					_id: c.id,
+					id: c.id,
+					codigo: c.codigo,
+					nombre_programa: c.nombre_programa,
+					tipo_curso: c.tipo_curso,
+					modalidad: c.modalidad,
+					fecha_inicio: c.fecha_inicio,
+					fecha_fin: c.fecha_fin,
+					costo_total_interno: c.costo_total_interno,
+					matricula_interno: c.matricula_interno,
+					modulos: Array(c.cantidad_modulos || 0).fill({}),
+					activo: true,
+					inscritos: []
+				}));
+
 				const nuevoMapa: Record<string, Course> = {};
-				for (const c of courses) {
+				for (const c of cursosComoCourse) {
 					nuevoMapa[c._id] = c;
 				}
 				coursesMap = nuevoMapa;
 
-				// Programas disponibles = cursos activos en los que el estudiante NO está inscrito
+				// Programas disponibles = cursos en los que el estudiante NO está inscrito
 				const enrolledIds = new Set(enrollments.map((e) => e.curso_id));
-				availableCourses = courses.filter((c) => c.activo && !enrolledIds.has(c._id)).slice(0, 12);
+				availableCourses = cursosComoCourse.filter((c) => !enrolledIds.has(c._id)).slice(0, 12);
 
 				// Solicitudes ya enviadas (pendientes o aprobadas) para deshabilitar el botón
 				const solicitudesActivas = (Array.isArray(myRequestsRes) ? myRequestsRes : []).filter(
