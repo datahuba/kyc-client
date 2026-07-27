@@ -6,12 +6,15 @@
 
 	type Vista = 'lista' | 'timeline';
 
-	let items: CalendarioItem[] = [];
-	let loading = true;
-	let vista: Vista = 'lista';
-	let filtroEstado: string = '';
-	let filtroTipo: string = '';
-	let filtroYear: number | '' = '';
+	// F-080 FIX (2026-07-27): usar $state (Svelte 5) en vez de let para que
+	// las variables sean reactivas. El bug era que con `let` + `$:` el filtro
+	// reactivo se disparaba antes del primer onMount y quedaba en loop infinito.
+	let items = $state<CalendarioItem[]>([]);
+	let loading = $state(true);
+	let vista: Vista = $state('lista');
+	let filtroEstado = $state<string>('');
+	let filtroTipo = $state<string>('');
+	let filtroYear = $state<number | ''>('');
 
 	const TIPOS_CURSO = [
 		{ value: '', label: 'Todos los tipos' },
@@ -50,11 +53,6 @@
 
 	onMount(cargar);
 
-	$: if (filtroEstado !== undefined || filtroTipo !== undefined || filtroYear !== undefined) {
-		// Trigger reload on filter change (skip on initial)
-		if (!loading) cargar();
-	}
-
 	function formatDate(d: string | null): string {
 		if (!d) return '—';
 		try {
@@ -69,8 +67,8 @@
 		return new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(n);
 	}
 
-	// Agrupar por mes-año para vista timeline
-	$: itemsAgrupados = (() => {
+	// Agrupar por mes-año para vista timeline (reactivo con $derived)
+	const itemsAgrupados = $derived.by(() => {
 		const grupos: Record<string, CalendarioItem[]> = {};
 		for (const it of items) {
 			const ref = it.fecha_inicio || it.fecha_fin;
@@ -85,7 +83,7 @@
 			grupos[key].push(it);
 		}
 		return Object.entries(grupos).sort(([a], [b]) => a.localeCompare(b));
-	})();
+	});
 
 	function mesLabel(key: string): string {
 		if (key === '__sin_fecha') return 'Sin fecha definida';
@@ -94,14 +92,18 @@
 		return `${meses[Number(m) - 1]} ${y}`;
 	}
 
-	$: yearsDisponibles = (() => {
+	const yearsDisponibles = $derived.by(() => {
 		const years = new Set<number>();
 		for (const it of items) {
 			const ref = it.fecha_inicio || it.fecha_fin;
 			if (ref) years.add(new Date(ref).getFullYear());
 		}
 		return Array.from(years).sort((a, b) => b - a);
-	})();
+	});
+
+	function onFiltroChange() {
+		cargar();
+	}
 </script>
 
 <svelte:head>
@@ -123,6 +125,7 @@
 			<select
 				id="filtro-year"
 				bind:value={filtroYear}
+				on:change={onFiltroChange}
 				class="text-sm border border-slate-300 rounded px-2 py-1 bg-white"
 			>
 				<option value="">Todos</option>
@@ -137,6 +140,7 @@
 			<select
 				id="filtro-tipo"
 				bind:value={filtroTipo}
+				on:change={onFiltroChange}
 				class="text-sm border border-slate-300 rounded px-2 py-1 bg-white"
 			>
 				{#each TIPOS_CURSO as t}
@@ -150,6 +154,7 @@
 			<select
 				id="filtro-estado"
 				bind:value={filtroEstado}
+				on:change={onFiltroChange}
 				class="text-sm border border-slate-300 rounded px-2 py-1 bg-white"
 			>
 				{#each ESTADOS as e}
