@@ -259,6 +259,25 @@ class PaymentService {
 		return await apiKyC.get<ResumenModulosResponse>('/payments/resumen-modulos');
 	}
 
+	// F-087 (2026-07-28): Vista "Por Pago" - 1 fila por cada pago individual
+	// (a diferencia de la matriz que agrupa por estudiante/módulo).
+	// Permite auditar cada Bs: cada pago lleva su comprobante, su número de
+	// transacción, su fecha, y quién lo subió.
+	async getMatrizPorPago(filtros: PorPagoFiltros = {}): Promise<PorPagoResponse> {
+		const params = new URLSearchParams();
+		if (filtros.curso_id) params.append('curso_id', filtros.curso_id);
+		if (filtros.modulo_index !== null && filtros.modulo_index !== undefined) {
+			params.append('modulo_index', String(filtros.modulo_index));
+		}
+		if (filtros.estado_pago) params.append('estado_pago', filtros.estado_pago);
+		if (filtros.subido_por) params.append('subido_por', filtros.subido_por);
+		if (filtros.page) params.append('page', String(filtros.page));
+		if (filtros.per_page) params.append('per_page', String(filtros.per_page));
+		const qs = params.toString();
+		const url = qs ? '/payments/matriz/por-pago?' + qs : '/payments/matriz/por-pago';
+		return await apiKyC.get<PorPagoResponse>(url);
+	}
+
 	// F-049 (2026-07-28): Resumen enriquecido de pagos por enrollment.
 	// Retorna desglose por módulo, total a pagar, total pagado, saldo a favor
 	// y saldo pendiente. Usado por cobranza para ver el desglose que el
@@ -422,6 +441,65 @@ export interface ResumenModulosResponse {
 		monto_pendiente: number;
 		estudiantes_cursando: number;
 	}>;
+}
+
+// F-087 (2026-07-28): Vista "Por Pago" - 1 fila por cada pago individual
+export interface PorPagoFiltros {
+	curso_id?: string;
+	modulo_index?: number | null;
+	estado_pago?: string;
+	subido_por?: string;
+	page?: number;
+	per_page?: number;
+}
+
+export interface PorPagoItem {
+	payment_id: string;
+	inscripcion_id: string;
+	estudiante_id: string | null;
+	estudiante_nombre: string | null;
+	estudiante_ci: string | null;
+	estudiante_registro: string | null;
+	curso_id: string | null;
+	curso_codigo: string | null;
+	curso_nombre: string | null;
+	modulo_index: number | null;
+	modulo_nombre: string | null;
+	concepto: string | null;
+	monto: number;
+	monto_total_pago: number;
+	estado_pago: string;
+	subido_por: string | null;     // null | "estudiante" | "encargado"
+	metodo_pago: string | null;
+	banco: string | null;
+	remitente: string | null;
+	numero_transaccion: string | null;
+	comprobante_url: string | null;
+	fecha_subida: string | null;
+	fecha_comprobante: string | null;
+	fecha_verificacion: string | null;
+	verificado_por: string | null;
+	motivo_rechazo: string | null;
+	motivo_reversion: string | null;
+}
+
+export interface PorPagoResumen {
+	total_aprobado: number;
+	total_anulado: number;
+	total_pendiente: number;
+	total_rechazado: number;
+	total_pagos: number;
+	pagos_con_comprobante: number;
+}
+
+export interface PorPagoResponse {
+	items: PorPagoItem[];
+	total: number;
+	page: number;
+	per_page: number;
+	total_pages: number;
+	resumen: PorPagoResumen;
+	filtros_aplicados: PorPagoFiltros;
 }
 
 // F-049 (2026-07-28): resumen enriquecido de pagos de un enrollment

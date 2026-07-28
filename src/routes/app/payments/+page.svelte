@@ -33,23 +33,27 @@
 	let payments: Payment[] = $state([]);
 	let loading = $state(true);
 
-	// F-074 (2026-07-23): Toggle entre vista Lista (actual) y Matriz (estilo Excel de Sandra)
+	// F-074 (2026-07-23) + F-087 (2026-07-28): Toggle entre 3 vistas:
+	//   - 'lista'   : vista tradicional (cada pago con su dropdown de acciones)
+	//   - 'matriz'  : estilo Excel de Sandra, una fila por estudiante
+	//   - 'porpago' : estilo auditoría, una fila por cada pago individual
 	// Persistimos la elección en localStorage para que no se pierda al recargar.
 	// FIX: estudiantes SIEMPRE ven 'lista' — ignorar localStorage para no-staff,
-	// porque si un staff dejó 'matriz' el estudiante dispararía endpoints 403.
-	let viewMode: 'lista' | 'matriz' = $state('lista');
+	// porque si un staff dejó 'matriz' o 'porpago' el estudiante dispararía endpoints 403.
+	let viewMode: 'lista' | 'matriz' | 'porpago' = $state('lista');
 	function initViewMode() {
 		if (!isStaff) { viewMode = 'lista'; return; }
 		if (typeof localStorage !== 'undefined') {
 			const saved = localStorage.getItem('payments_view');
-			if (saved === 'matriz' || saved === 'lista') viewMode = saved;
+			if (saved === 'matriz' || saved === 'lista' || saved === 'porpago') viewMode = saved;
 		}
 	}
-	function setViewMode(mode: 'lista' | 'matriz') {
-		if (!isStaff && mode === 'matriz') return; // estudiante no puede activar matriz
+	function setViewMode(mode: 'lista' | 'matriz' | 'porpago') {
+		if (!isStaff && mode !== 'lista') return; // estudiante solo puede estar en 'lista'
 		viewMode = mode;
 		try { localStorage.setItem('payments_view', mode); } catch {}
 		if (mode === 'matriz') loadMatriz();
+		if (mode === 'porpago') loadPorPago();
 	}
 
 	// Estado de la vista Matriz
@@ -57,6 +61,19 @@
 	let matrizResumen: ResumenModulosResponse | null = $state(null);
 	let matrizLoading = $state(false);
 	let matrizFiltroModulo: number | '' = $state(''); // '' = todos, 0..N = módulo específico
+
+	// F-087: Estado de la vista "Por Pago"
+	import type { PorPagoResponse, PorPagoItem, PorPagoFiltros } from '$lib/services/payment.service';
+	let porPagoData: PorPagoResponse | null = $state(null);
+	let porPagoLoading = $state(false);
+	let porPagoFiltros: PorPagoFiltros = $state({
+		curso_id: '',
+		modulo_index: null,
+		estado_pago: '',
+		subido_por: '',
+		page: 1,
+		per_page: 50,
+	});
 
 	// Pagination
 	let page = $state(1);
@@ -245,6 +262,45 @@
 			// Dependencia explícita: matrizFiltroModulo
 			matrizFiltroModulo;
 			loadMatriz();
+		}
+	});
+
+	// F-087 (2026-07-28): Carga la vista "Por Pago" desde el backend.
+	// 1 fila por cada pago individual, sin agrupar por módulo/estudiante.
+	async function loadPorPago() {
+		porPagoLoading = true;
+		try {
+			// Convertir '' a undefined para no mandar filtros vacíos
+			const filtrosLimpios: PorPagoFiltros = {
+				page: porPagoFiltros.page || 1,
+				per_page: porPagoFiltros.per_page || 50,
+			};
+			if (porPagoFiltros.curso_id) filtrosLimpios.curso_id = porPagoFiltros.curso_id;
+			if (porPagoFiltros.modulo_index !== null && porPagoFiltros.modulo_index !== undefined) {
+				filtrosLimpios.modulo_index = porPagoFiltros.modulo_index;
+			}
+			if (porPagoFiltros.estado_pago) filtrosLimpios.estado_pago = porPagoFiltros.estado_pago;
+			if (porPagoFiltros.subido_por) filtrosLimpios.subido_por = porPagoFiltros.subido_por;
+			porPagoData = await paymentService.getMatrizPorPago(filtrosLimpios);
+		} catch (error: any) {
+			console.error('Error cargando vista por-pago:', error);
+			alert('error', error?.message || 'Error al cargar la vista por-pago');
+			porPagoData = null;
+		} finally {
+			porPagoLoading = false;
+		}
+	}
+
+	// F-087: cuando cambian los filtros de por-pago, recargar
+	$effect(() => {
+		if (isStaff && viewMode === 'porpago') {
+			// Dependencias explícitas
+			porPagoFiltros.curso_id;
+			porPagoFiltros.modulo_index;
+			porPagoFiltros.estado_pago;
+			porPagoFiltros.subido_por;
+			porPagoFiltros.page;
+			loadPorPago();
 		}
 	});
 
@@ -639,7 +695,7 @@
 		</div>
 		
 		<div class="flex flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
-			<!-- F-074: Toggle vista Lista ⇄ Matriz (estilo Excel de Sandra) -->
+			<!-- F-074 + F-087: Toggle vista Lista ⇄ Matriz ⇄ Por Pago (estilo Excel de Sandra / auditoría) -->
 			{#if isStaff}
 				<div class="inline-flex rounded-md shadow-sm border border-gray-300 dark:border-gray-600 overflow-hidden" role="group" aria-label="Modo de vista">
 					<button
@@ -658,9 +714,18 @@
 					>
 						▦ Matriz
 					</button>
+					<button
+						type="button"
+						onclick={() => setViewMode('porpago')}
+						class="px-3 py-1.5 text-sm font-medium transition-colors border-l border-gray-300 dark:border-gray-600 {viewMode === 'porpago' ? 'bg-primary-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'}"
+						aria-pressed={viewMode === 'porpago'}
+						title="Vista de auditoría: 1 fila por cada pago individual (F-087)"
+					>
+						🧾 Por Pago
+					</button>
 				</div>
 			{/if}
-			<Button variant="secondary" onclick={isStaff && viewMode === 'matriz' ? loadMatriz : loadPayments} loading={loading || matrizLoading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
+			<Button variant="secondary" onclick={isStaff && viewMode === 'matriz' ? loadMatriz : (isStaff && viewMode === 'porpago' ? loadPorPago : loadPayments)} loading={loading || matrizLoading || porPagoLoading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
 				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
 				<span class="sm:hidden">Recargar</span>
 			</Button>
@@ -1146,6 +1211,263 @@
 				</table>
 			</div>
 		{/if}
+	{/if}
+
+	<!-- ============================================================== -->
+	<!-- F-087 (2026-07-28): Vista "Por Pago" - 1 fila por cada pago    -->
+	<!-- individual. Auditoría: cada Bs queda trazado a su comprobante,  -->
+	<!-- transacción, fecha y responsable de subida.                     -->
+	<!-- ============================================================== -->
+	{#if viewMode === 'porpago' && isStaff}
+		<!-- Filtros de la vista Por Pago -->
+		<div class="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+			<!-- Curso -->
+			<label class="text-xs text-gray-600 dark:text-gray-400">Curso:</label>
+			<select
+				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+				value={porPagoFiltros.curso_id}
+				onchange={(e) => { porPagoFiltros.curso_id = (e.currentTarget as HTMLSelectElement).value; porPagoFiltros.page = 1; }}
+			>
+				<option value="">Todos</option>
+				{#each coursesListFiltrada as c}
+					<option value={c._id}>{c.codigo} — {c.nombre_programa}</option>
+				{/each}
+			</select>
+
+			<!-- Módulo -->
+			<label class="text-xs text-gray-600 dark:text-gray-400">Módulo:</label>
+			<select
+				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+				value={porPagoFiltros.modulo_index === null || porPagoFiltros.modulo_index === undefined ? '' : String(porPagoFiltros.modulo_index)}
+				onchange={(e) => {
+					const v = (e.currentTarget as HTMLSelectElement).value;
+					porPagoFiltros.modulo_index = v === '' ? null : Number(v);
+					porPagoFiltros.page = 1;
+				}}
+			>
+				<option value="">Todos</option>
+				<option value="0">Matrícula</option>
+				{#if porPagoData && porPagoData.items.length > 0}
+					{#each Array.from(new Set(porPagoData.items.filter((i) => (i.modulo_index ?? -1) > 0).map((i) => i.modulo_index))) as mi}
+						<option value={String(mi)}>Módulo {mi}</option>
+					{/each}
+				{/if}
+			</select>
+
+			<!-- Estado -->
+			<label class="text-xs text-gray-600 dark:text-gray-400">Estado:</label>
+			<select
+				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+				value={porPagoFiltros.estado_pago}
+				onchange={(e) => { porPagoFiltros.estado_pago = (e.currentTarget as HTMLSelectElement).value; porPagoFiltros.page = 1; }}
+			>
+				<option value="">Todos</option>
+				<option value="aprobado">Aprobado</option>
+				<option value="pendiente">Pendiente</option>
+				<option value="rechazado">Rechazado</option>
+				<option value="anulado">Anulado</option>
+			</select>
+
+			<!-- Subido por -->
+			<label class="text-xs text-gray-600 dark:text-gray-400">Subido por:</label>
+			<select
+				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+				value={porPagoFiltros.subido_por}
+				onchange={(e) => { porPagoFiltros.subido_por = (e.currentTarget as HTMLSelectElement).value; porPagoFiltros.page = 1; }}
+			>
+				<option value="">Todos</option>
+				<option value="estudiante">Estudiante</option>
+				<option value="encargado">Encargado (Cobranza)</option>
+			</select>
+
+			{#if porPagoData}
+				<span class="text-xs text-gray-500 dark:text-gray-400 ml-auto">
+					{porPagoData.total} pago(s) · {porPagoData.resumen.pagos_con_comprobante} con comprobante
+				</span>
+			{/if}
+		</div>
+
+		<!-- Resumen KPI -->
+		{#if porPagoData}
+			<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+				<div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
+					<div class="text-xs text-emerald-700 dark:text-emerald-300 font-medium">Aprobado</div>
+					<div class="text-lg font-bold text-emerald-900 dark:text-emerald-100">Bs {porPagoData.resumen.total_aprobado.toFixed(2)}</div>
+				</div>
+				<div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+					<div class="text-xs text-amber-700 dark:text-amber-300 font-medium">Pendiente</div>
+					<div class="text-lg font-bold text-amber-900 dark:text-amber-100">Bs {porPagoData.resumen.total_pendiente.toFixed(2)}</div>
+				</div>
+				<div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+					<div class="text-xs text-red-700 dark:text-red-300 font-medium">Anulado</div>
+					<div class="text-lg font-bold text-red-900 dark:text-red-100">Bs {porPagoData.resumen.total_anulado.toFixed(2)}</div>
+				</div>
+				<div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+					<div class="text-xs text-gray-700 dark:text-gray-300 font-medium">Rechazado</div>
+					<div class="text-lg font-bold text-gray-900 dark:text-gray-100">Bs {porPagoData.resumen.total_rechazado.toFixed(2)}</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Tabla de pagos individuales -->
+		<div class="mt-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto">
+			{#if porPagoLoading}
+				<div class="p-8 text-center text-gray-500 dark:text-gray-400">Cargando pagos...</div>
+			{:else if !porPagoData || porPagoData.items.length === 0}
+				<EmptyState
+					title="Sin pagos"
+					description="No hay pagos que coincidan con los filtros actuales."
+					icon="document"
+				/>
+			{:else}
+				<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+					<thead class="bg-gray-50 dark:bg-gray-900/40">
+						<tr>
+							<th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Estudiante</th>
+							<th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">CI</th>
+							<th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Curso</th>
+							<th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Módulo</th>
+							<th class="px-3 py-2 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Monto</th>
+							<th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Fecha</th>
+							<th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Nro Transacción</th>
+							<th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Subido por</th>
+							<th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Verificado por</th>
+							<th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Comprobante</th>
+							<th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Estado</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+						{#each porPagoData.items as item (item.payment_id + '-' + item.modulo_index)}
+							<tr class="hover:bg-gray-50 dark:hover:bg-gray-900/30">
+								<!-- Estudiante -->
+								<td class="px-3 py-2">
+									<div class="text-gray-900 dark:text-white font-medium text-sm">{item.estudiante_nombre || '—'}</div>
+									<div class="text-xs text-gray-500 dark:text-gray-400 font-mono">{item.estudiante_registro || ''}</div>
+								</td>
+								<!-- CI -->
+								<td class="px-3 py-2 font-mono text-xs">{item.estudiante_ci || '—'}</td>
+								<!-- Curso -->
+								<td class="px-3 py-2">
+									{#if item.curso_codigo}
+										<span class="font-mono text-xs">{item.curso_codigo}</span>
+									{:else}
+										<span class="text-gray-400">—</span>
+									{/if}
+								</td>
+								<!-- Módulo -->
+								<td class="px-3 py-2">
+									{#if item.modulo_index === 0}
+										<span class="inline-block px-2 py-0.5 text-xs font-semibold rounded bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">Matrícula</span>
+									{:else if item.modulo_index !== null}
+										<span class="inline-block px-2 py-0.5 text-xs font-semibold rounded bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200">Módulo {item.modulo_index}</span>
+										{#if item.modulo_nombre}
+											<div class="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-[150px]" title={item.modulo_nombre}>{item.modulo_nombre}</div>
+										{/if}
+									{:else}
+										<span class="text-xs text-gray-400 italic">{item.concepto || 'Sin módulo'}</span>
+									{/if}
+								</td>
+								<!-- Monto (prorrateado si es multi-módulo) -->
+								<td class="px-3 py-2 text-right">
+									<div class="font-mono font-semibold text-gray-900 dark:text-white">Bs {item.monto.toFixed(2)}</div>
+									{#if item.monto_total_pago && Math.abs(item.monto_total_pago - item.monto) > 0.01}
+										<div class="text-[10px] text-gray-500 dark:text-gray-400" title="Monto prorrateado del total del pago">de Bs {item.monto_total_pago.toFixed(2)}</div>
+									{/if}
+								</td>
+								<!-- Fecha -->
+								<td class="px-3 py-2 text-xs">
+									{#if item.fecha_comprobante}
+										<div class="text-gray-900 dark:text-white">{formatDate(item.fecha_comprobante)}</div>
+										<div class="text-[10px] text-gray-500 dark:text-gray-400" title="Fecha de subida al sistema">↑ {formatDate(item.fecha_subida || '')}</div>
+									{:else if item.fecha_subida}
+										<div class="text-gray-900 dark:text-white">{formatDate(item.fecha_subida)}</div>
+									{:else}
+										<span class="text-gray-400">—</span>
+									{/if}
+								</td>
+								<!-- Nro transacción -->
+								<td class="px-3 py-2 font-mono text-xs">
+									{#if item.numero_transaccion}
+										<span title={item.numero_transaccion}>{item.numero_transaccion.length > 16 ? item.numero_transaccion.substring(0, 16) + '...' : item.numero_transaccion}</span>
+									{:else}
+										<span class="text-gray-400">—</span>
+									{/if}
+								</td>
+								<!-- Subido por -->
+								<td class="px-3 py-2 text-xs">
+									{#if item.subido_por === 'estudiante'}
+										<span class="inline-block px-2 py-0.5 rounded bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-200">👤 Estudiante</span>
+									{:else if item.subido_por === 'encargado'}
+										<span class="inline-block px-2 py-0.5 rounded bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200">👥 Encargado</span>
+									{:else}
+										<span class="text-gray-400">—</span>
+									{/if}
+								</td>
+								<!-- Verificado por -->
+								<td class="px-3 py-2 text-xs">
+									{#if item.verificado_por}
+										<span class="font-mono">{item.verificado_por}</span>
+									{:else}
+										<span class="text-gray-400">—</span>
+									{/if}
+								</td>
+								<!-- Comprobante -->
+								<td class="px-3 py-2 text-xs">
+									{#if item.comprobante_url}
+										<a href={item.comprobante_url} target="_blank" rel="noopener" class="text-primary-600 hover:text-primary-800 dark:text-primary-400 underline" title={item.comprobante_url}>
+											Ver ↗
+										</a>
+									{:else}
+										<span class="text-gray-400">—</span>
+									{/if}
+								</td>
+								<!-- Estado -->
+								<td class="px-3 py-2 text-xs">
+									{#if item.estado_pago === 'aprobado'}
+										<span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">✓ Aprobado</span>
+									{:else if item.estado_pago === 'pendiente'}
+										<span class="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">⏳ Pendiente</span>
+									{:else if item.estado_pago === 'anulado'}
+										<span class="inline-block px-2 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200">⊘ Anulado</span>
+									{:else if item.estado_pago === 'rechazado'}
+										<span class="inline-block px-2 py-0.5 rounded bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200">✕ Rechazado</span>
+									{:else}
+										<span class="text-gray-400">{item.estado_pago}</span>
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+
+				<!-- Paginación -->
+				{#if porPagoData.total_pages > 1}
+					<div class="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+						<div class="text-xs text-gray-600 dark:text-gray-400">
+							Página {porPagoData.page} de {porPagoData.total_pages} · {porPagoData.total} resultados
+						</div>
+						<div class="flex gap-2">
+							<button
+								type="button"
+								disabled={porPagoData.page <= 1}
+								onclick={() => { porPagoFiltros.page = Math.max(1, porPagoData!.page - 1); }}
+								class="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700"
+							>
+								← Anterior
+							</button>
+							<button
+								type="button"
+								disabled={porPagoData.page >= porPagoData.total_pages}
+								onclick={() => { porPagoFiltros.page = porPagoData!.page + 1; }}
+								class="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700"
+							>
+								Siguiente →
+							</button>
+						</div>
+					</div>
+				{/if}
+			{/if}
+		</div>
 	{/if}
 
 	<!-- Create Payment Modal -->
