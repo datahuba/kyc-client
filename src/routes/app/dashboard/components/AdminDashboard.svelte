@@ -35,7 +35,7 @@
 	// Encargado_curso y coordinador también lo ven (es su info operativa).
 	const ROLES_QUE_VEN_INSCRITOS = ['superadmin', 'admin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'];
 
-	$: currentRole = $userStore.role || $userStore.user?.rol || '';
+	$: currentRole = $userStore.role || '';
 	$: esCoordinadorFinanciero = $userStore.user?.subtipo_coordinador === 'financiero';
 	$: verResumenEconomico = ROLES_ECONOMICOS_BASE.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero);
 	$: puedeVerPagos = ROLES_QUE_VEN_PAGOS.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero);

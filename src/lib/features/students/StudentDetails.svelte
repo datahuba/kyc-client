@@ -35,7 +35,7 @@
 	});
 
 	// Permisos granulares de escritura de archivos académicos y verificación KYC (Bug 4)
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let currentRole = $derived($userStore.role || '');
 	let canUploadAndVerify = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 
 	// ISSUE-P-RECORDATORIO-PAGO (2026-07-08, reunión de postgrado contaduría):

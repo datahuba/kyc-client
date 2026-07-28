@@ -83,7 +83,7 @@
 	let discountsMap: Record<string, Discount> = $state({});
 
 	// ISSUE N: Control de Permisos Visuales (RBAC Frontend)
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let currentRole = $derived($userStore.role || '');
 	// ISSUE-R-ROLES (2026-07-10): encargado_curso/coordinador pueden crear inscripciones
 	// (el backend valida que el encargado solo inscriba en sus cursos asignados)
 	let canCreateEnrollment = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));

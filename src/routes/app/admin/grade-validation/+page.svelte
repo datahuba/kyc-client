@@ -231,7 +231,7 @@
 				⚠️ Esta página solo está disponible para CPD/Admin/Superadmin.
 			</p>
 			<p class="text-sm text-amber-700 dark:text-amber-300 mt-2">
-				Tu rol actual: <strong>{$userStore.user?.role || $userStore.user?.rol || 'desconocido'}</strong>
+				Tu rol actual: <strong>{$userStore.user?.role || 'desconocido'}</strong>
 			</p>
 		</div>
 	{:else}

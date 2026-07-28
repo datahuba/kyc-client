@@ -41,7 +41,7 @@
 	import type { PreRegistrationForm, PreRegistration } from '$lib/services/pre-registration.service';
 
 	// Permisos
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let currentRole = $derived($userStore.role || '');
 	let isSuperAdmin = $derived(currentRole === 'superadmin');
 	let isAdmin = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 	// Para tabs: super admin puede ver todo. CPD/encargado solo ven lo suyo.

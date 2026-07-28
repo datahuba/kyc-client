@@ -77,7 +77,7 @@
 	let allCourses: Course[] = $state([]);
 
 	// Permisos Visuales Granulares
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let currentRole = $derived($userStore.role || '');
 	let isSuperAdmin = $derived(currentRole === 'superadmin');
 	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 	let canEditStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));

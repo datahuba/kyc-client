@@ -22,7 +22,7 @@
 		userStore.init();
 		
 		if (isAuthenticated && user) {
-			const userRole = user.rol || user.role || '';
+			const userRole = user.role || '';
 			// Redirección inteligente si ya está logueado
 			if (userRole === 'cpd') {
 				goto('/app/students');

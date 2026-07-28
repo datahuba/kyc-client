@@ -36,7 +36,7 @@
 	// --- GUARDIÁN DE SEGURIDAD REACTIVO (Issue #7 - Control de Crossover) ---
 	$effect(() => {
 		const path = $page.url.pathname;
-		const role = String($userStore.user?.rol || $userStore.user?.role || '');
+		const role = String($userStore.user?.role || '');
 		const isAuthenticated = $userStore.isAuthenticated;
 
 		if (isAuthenticated) {

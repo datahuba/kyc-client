@@ -23,7 +23,7 @@
 	// conservan acceso por jerarquía. Reemplaza a ISSUE-P-DESCUENTO-ROL (que
 	// había movido esta gestión de Cobranza a Admin, sin incluir CPD).
 	// Cobranza conserva acceso de solo lectura a esta vista.
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let currentRole = $derived($userStore.role || '');
 	let canManageDiscounts = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canDeleteDiscount = $derived(currentRole === 'superadmin');
 

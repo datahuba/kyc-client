@@ -87,7 +87,7 @@
 		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	];
 
-	let userRole = $derived($userStore?.role || $userStore?.user?.rol || 'student');
+	let userRole = $derived($userStore?.role || 'student');
 	let loginType = $derived($userStore?.loginType);
 	let academicRole = $derived($userStore?.academicRole);
 

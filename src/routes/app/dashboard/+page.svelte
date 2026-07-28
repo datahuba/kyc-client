@@ -6,7 +6,7 @@
 	import { onMount } from 'svelte';
 	import { alert } from '$lib/utils';
 
-	let role = $derived($userStore.role || $userStore.user?.rol || '');
+	let role = $derived($userStore.role || '');
 	let isLoading = $derived($userStore.loading);
 
 	// ISS-003: detectar si el loading se queda colgado (>8s) y mostrar error visible

@@ -134,7 +134,7 @@
 	}
 
 	function resolveUserRole(user: UserApiResponse): Role {
-		const rawRole = user.role ?? user.rol;
+		const rawRole = user.role ?? user.role;
 
 		if (typeof rawRole === 'string' && rawRole.trim()) {
 			return rawRole as Role;

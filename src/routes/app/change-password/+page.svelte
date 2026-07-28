@@ -22,7 +22,7 @@
 	let showConfirm = $state(false);
 
 	// Evaluación de rol en Svelte 5
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let currentRole = $derived($userStore.role || '');
 	let isUserStudent = $derived(currentRole === 'student' || currentRole === 'estudiante');
 
 	// Validaciones de negocio reactivas en tiempo real
