@@ -1309,148 +1309,144 @@
 			</div>
 		{/if}
 
-		<!-- Tabla de pagos individuales (F-087-FIX: 1 pago = 1 fila, no prorrateo) -->
+		<!-- Tabla MATRIZ: F-087-FIX2. Estudiantes como filas, cada pago como columna horizontal. -->
 		<div class="mt-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto">
 			{#if porPagoLoading}
 				<div class="p-8 text-center text-gray-500 dark:text-gray-400">Cargando pagos...</div>
-			{:else if !porPagoData || porPagoData.items.length === 0}
+			{:else if !porPagoData || porPagoData.estudiantes.length === 0}
 				<EmptyState
 					title="Sin pagos"
 					description="No hay pagos que coincidan con los filtros actuales."
 					icon="document"
 				/>
 			{:else}
+				{@const maxCols = Math.min(porPagoData.max_pagos || 0, 20)}
+				{@const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 				<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
 					<thead class="bg-gray-50 dark:bg-gray-900/40">
 						<tr>
-							<th class="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Estudiante</th>
-							<th class="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">CI</th>
-							<th class="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Curso</th>
-							<th class="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Módulos cubiertos</th>
-							<th class="px-2 py-2 text-right text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Monto</th>
-							<th class="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Fecha</th>
-							<th class="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Nro Transacción</th>
-							<th class="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Subido por</th>
-							<th class="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Verificado por</th>
-							<th class="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Comprobante</th>
-							<th class="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Estado</th>
+							<th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap sticky left-0 bg-gray-50 dark:bg-gray-900/40 z-10">Estudiante</th>
+							<th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap sticky left-[180px] bg-gray-50 dark:bg-gray-900/40 z-10">CI</th>
+							<th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Curso</th>
+							{#each Array(maxCols) as _, i}
+								<th class="px-2 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap min-w-[110px]">
+									Pago {i + 1}
+								</th>
+							{/each}
+							{#if porPagoData.max_pagos > maxCols}
+								<th class="px-2 py-2 text-center text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap min-w-[60px]">+{porPagoData.max_pagos - maxCols} más</th>
+							{/if}
+							<th class="px-3 py-2 text-right text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 uppercase whitespace-nowrap min-w-[100px] sticky right-0 bg-gray-50 dark:bg-gray-900/40 z-10">Total Aprobado</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-						{#each porPagoData.items as item (item.payment_id)}
+						{#each porPagoData.estudiantes as est (est.estudiante_id)}
 							<tr class="hover:bg-gray-50 dark:hover:bg-gray-900/30">
-								<!-- Estudiante -->
-								<td class="px-2 py-1.5">
-									<div class="text-gray-900 dark:text-white font-medium text-xs whitespace-nowrap">{item.estudiante_nombre || '—'}</div>
-									<div class="text-[10px] text-gray-500 dark:text-gray-400 font-mono">{item.estudiante_registro || ''}</div>
+								<!-- Estudiante (sticky left) -->
+								<td class="px-3 py-2 sticky left-0 bg-white dark:bg-gray-800 z-10 border-r border-gray-100 dark:border-gray-700">
+									<div class="text-gray-900 dark:text-white font-medium text-xs whitespace-nowrap">{est.estudiante_nombre || '—'}</div>
+									<div class="text-[10px] text-gray-500 dark:text-gray-400 font-mono">{est.estudiante_registro || ''}</div>
 								</td>
-								<!-- CI -->
-								<td class="px-2 py-1.5 font-mono text-[11px] whitespace-nowrap">{item.estudiante_ci || '—'}</td>
+								<!-- CI (sticky left) -->
+								<td class="px-3 py-2 font-mono text-[11px] whitespace-nowrap sticky left-[180px] bg-white dark:bg-gray-800 z-10 border-r border-gray-100 dark:border-gray-700">
+									{est.estudiante_ci || '—'}
+								</td>
 								<!-- Curso -->
-								<td class="px-2 py-1.5">
-									{#if item.curso_codigo}
-										<span class="font-mono text-[11px] whitespace-nowrap">{item.curso_codigo}</span>
+								<td class="px-3 py-2">
+									{#if est.curso_codigo}
+										<span class="font-mono text-[11px] whitespace-nowrap">{est.curso_codigo}</span>
 									{:else}
 										<span class="text-gray-400 text-[11px]">—</span>
 									{/if}
 								</td>
-								<!-- Módulos cubiertos (F-087-FIX) -->
-								<td class="px-2 py-1.5">
-									{#if item.modulo_index === 0}
-										<span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 whitespace-nowrap">Matrícula</span>
-									{:else if item.modulos_cubiertos && item.modulos_cubiertos.length > 1}
-										<!-- Multi-módulo: muestra rango -->
-										<span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200 whitespace-nowrap" title="Cubre {item.modulos_cubiertos.length} módulos: {item.modulos_cubiertos.join(', ')}">
-											M{item.modulos_cubiertos[0]}-{item.modulos_cubiertos[item.modulos_cubiertos.length - 1]}
-											<span class="text-[9px] opacity-70">({item.modulos_cubiertos.length})</span>
-										</span>
-									{:else if item.modulos_cubiertos && item.modulos_cubiertos.length === 1}
-										<span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200 whitespace-nowrap">
-											M{item.modulos_cubiertos[0]}
-										</span>
-										{#if item.modulo_nombre}
-											<div class="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-[140px]" title={item.modulo_nombre}>{item.modulo_nombre}</div>
+								<!-- Pagos (columnas horizontales) -->
+								{#each Array(maxCols) as _, i}
+									{@const pago = est.pagos[i]}
+									<td class="px-2 py-2 text-center align-top">
+										{#if pago}
+											<!-- Card del pago -->
+											<div class="inline-flex flex-col items-center gap-0.5 px-1.5 py-1 rounded min-w-[90px]
+												{pago.estado_pago === 'aprobado' ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800' :
+												 pago.estado_pago === 'pendiente' ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' :
+												 pago.estado_pago === 'anulado' ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 line-through opacity-60' :
+												 pago.estado_pago === 'rechazado' ? 'bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600' :
+												 'bg-white border border-gray-200'}
+											">
+												<div class="font-mono font-bold text-gray-900 dark:text-white text-xs whitespace-nowrap" title={pago.concepto || ''}>
+													{fmt(pago.monto)}
+												</div>
+												<!-- Módulos cubiertos -->
+												<div class="text-[9px] text-gray-600 dark:text-gray-300 whitespace-nowrap">
+													{#if pago.modulo_index === 0}
+														Matrícula
+													{:else if pago.modulos_cubiertos && pago.modulos_cubiertos.length > 1}
+														M{pago.modulos_cubiertos[0]}-{pago.modulos_cubiertos[pago.modulos_cubiertos.length - 1]}
+														<span class="opacity-70">({pago.modulos_cubiertos.length})</span>
+													{:else if pago.modulos_cubiertos && pago.modulos_cubiertos.length === 1}
+														M{pago.modulos_cubiertos[0]}
+													{:else}
+														—
+													{/if}
+												</div>
+												<!-- Fecha + estado -->
+												<div class="text-[9px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
+													{pago.fecha_comprobante ? new Date(pago.fecha_comprobante).toLocaleDateString('es-BO', {day: '2-digit', month: 'short'}) :
+													 pago.fecha_subida ? new Date(pago.fecha_subida).toLocaleDateString('es-BO', {day: '2-digit', month: 'short'}) : '—'}
+												</div>
+												<!-- Comprobante link -->
+												{#if pago.comprobante_url}
+													<a href={pago.comprobante_url} target="_blank" rel="noopener" class="text-[9px] text-primary-600 hover:text-primary-800 dark:text-primary-400 underline whitespace-nowrap" title="Ver comprobante">
+														Ver ↗
+													</a>
+												{/if}
+											</div>
+										{:else}
+											<span class="text-gray-300 dark:text-gray-600 text-xs">—</span>
 										{/if}
-									{:else}
-										<span class="text-[10px] text-gray-400 italic">{item.concepto || '—'}</span>
-									{/if}
-								</td>
-								<!-- Monto (F-087-FIX: NO se prorratea, va el total del pago, sin decimales ni separador) -->
-								<td class="px-2 py-1.5 text-right">
-									<div class="font-mono font-semibold text-gray-900 dark:text-white text-xs whitespace-nowrap">
-										{Math.round(item.monto)}
-									</div>
-								</td>
-								<!-- Fecha -->
-								<td class="px-2 py-1.5 text-[10px] whitespace-nowrap">
-									{#if item.fecha_comprobante}
-										<div class="text-gray-900 dark:text-white">{formatDate(item.fecha_comprobante)}</div>
-									{:else if item.fecha_subida}
-										<div class="text-gray-900 dark:text-white">{formatDate(item.fecha_subida)}</div>
-									{:else}
-										<span class="text-gray-400">—</span>
-									{/if}
-								</td>
-								<!-- Nro transacción -->
-								<td class="px-2 py-1.5 font-mono text-[10px]">
-									{#if item.numero_transaccion}
-										<span title={item.numero_transaccion} class="whitespace-nowrap">{item.numero_transaccion.length > 14 ? item.numero_transaccion.substring(0, 14) + '…' : item.numero_transaccion}</span>
-									{:else}
-										<span class="text-gray-400">—</span>
-									{/if}
-								</td>
-								<!-- Subido por -->
-								<td class="px-2 py-1.5 text-[10px] whitespace-nowrap">
-									{#if item.subido_por === 'estudiante'}
-										<span class="inline-block px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-200">👤 Est</span>
-									{:else if item.subido_por === 'encargado'}
-										<span class="inline-block px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200">👥 Enc</span>
-									{:else}
-										<span class="text-gray-400">—</span>
-									{/if}
-								</td>
-								<!-- Verificado por -->
-								<td class="px-2 py-1.5 text-[10px]">
-									{#if item.verificado_por}
-										<span class="font-mono whitespace-nowrap" title={item.verificado_por}>{item.verificado_por.length > 12 ? item.verificado_por.substring(0, 12) + '…' : item.verificado_por}</span>
-									{:else}
-										<span class="text-gray-400">—</span>
-									{/if}
-								</td>
-								<!-- Comprobante -->
-								<td class="px-2 py-1.5 text-[10px]">
-									{#if item.comprobante_url}
-										<a href={item.comprobante_url} target="_blank" rel="noopener" class="text-primary-600 hover:text-primary-800 dark:text-primary-400 underline whitespace-nowrap" title={item.comprobante_url}>
-											Ver ↗
-										</a>
-									{:else}
-										<span class="text-gray-400">—</span>
-									{/if}
-								</td>
-								<!-- Estado -->
-								<td class="px-2 py-1.5 text-[10px] whitespace-nowrap">
-									{#if item.estado_pago === 'aprobado'}
-										<span class="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">✓ Aprob</span>
-									{:else if item.estado_pago === 'pendiente'}
-										<span class="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">⏳ Pend</span>
-									{:else if item.estado_pago === 'anulado'}
-										<span class="inline-block px-1.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200">⊘ Anul</span>
-									{:else if item.estado_pago === 'rechazado'}
-										<span class="inline-block px-1.5 py-0.5 rounded bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200">✕ Rech</span>
-									{:else}
-										<span class="text-gray-400">{item.estado_pago}</span>
-									{/if}
+									</td>
+								{/each}
+								{#if porPagoData.max_pagos > maxCols}
+									<td class="px-2 py-2 text-center text-xs text-gray-500 dark:text-gray-400">
+										+{est.cantidad_pagos - maxCols}
+									</td>
+								{/if}
+								<!-- Total Aprobado (sticky right) -->
+								<td class="px-3 py-2 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm whitespace-nowrap sticky right-0 bg-white dark:bg-gray-800 z-10 border-l border-gray-100 dark:border-gray-700">
+									{fmt(est.total_pagado_aprobado)}
 								</td>
 							</tr>
 						{/each}
 					</tbody>
+					<tfoot class="bg-gray-100 dark:bg-gray-900/60 border-t-2 border-gray-300 dark:border-gray-600">
+						<tr>
+							<td colspan="3" class="px-3 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase">
+								Totales ({porPagoData.total} estudiantes · {porPagoData.resumen.total_pagos} pagos):
+							</td>
+							{#each Array(maxCols) as _, i}
+								{@const colSum = porPagoData.estudiantes.reduce((acc, e) => acc + (e.pagos[i]?.monto || 0), 0)}
+								<td class="px-2 py-2 text-center text-[10px] text-gray-600 dark:text-gray-300 font-mono">
+									{#if colSum > 0}
+										<span class="font-semibold text-gray-700 dark:text-gray-200">{fmt(colSum)}</span>
+									{:else}
+										<span class="text-gray-400">—</span>
+									{/if}
+								</td>
+							{/each}
+							{#if porPagoData.max_pagos > maxCols}
+								<td class="px-2 py-2"></td>
+							{/if}
+							<td class="px-3 py-2 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm sticky right-0 bg-gray-100 dark:bg-gray-900/60 z-10 border-l border-gray-100 dark:border-gray-700">
+								{fmt(porPagoData.resumen.total_aprobado)}
+							</td>
+						</tr>
+					</tfoot>
 				</table>
 
 				<!-- Paginación -->
 				{#if porPagoData.total_pages > 1}
 					<div class="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
 						<div class="text-xs text-gray-600 dark:text-gray-400">
-							Página {porPagoData.page} de {porPagoData.total_pages} · {porPagoData.total} resultados
+							Página {porPagoData.page} de {porPagoData.total_pages} · {porPagoData.total} estudiantes
 						</div>
 						<div class="flex gap-2">
 							<button

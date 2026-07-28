@@ -455,32 +455,38 @@ export interface PorPagoFiltros {
 
 export interface PorPagoItem {
 	payment_id: string;
-	inscripcion_id: string;
-	estudiante_id: string | null;
+	monto: number;
+	concepto: string | null;
+	modulo_index: number | null;
+	modulos_cubiertos: number[];     // ej: [1,2,3,4]
+	estado_pago: string;
+	subido_por: string | null;
+	verificado_por: string | null;
+	comprobante_url: string | null;
+	numero_transaccion: string | null;
+	fecha_subida: string | null;
+	fecha_comprobante: string | null;
+	banco: string | null;
+	metodo_pago: string | null;
+	remitente: string | null;
+}
+
+export interface PorPagoEstudiante {
+	estudiante_id: string;
 	estudiante_nombre: string | null;
 	estudiante_ci: string | null;
 	estudiante_registro: string | null;
 	curso_id: string | null;
 	curso_codigo: string | null;
 	curso_nombre: string | null;
-	modulo_index: number | null;
-	modulo_nombre: string | null;
-	modulos_cubiertos: number[];     // F-087-FIX: lista de TODOS los módulos que cubre el pago (ej: [1,2,3,4])
-	concepto: string | null;
-	monto: number;                  // F-087-FIX: monto TOTAL del pago (NO prorrateado)
-	estado_pago: string;
-	subido_por: string | null;     // null | "estudiante" | "encargado"
-	metodo_pago: string | null;
-	banco: string | null;
-	remitente: string | null;
-	numero_transaccion: string | null;
-	comprobante_url: string | null;
-	fecha_subida: string | null;
-	fecha_comprobante: string | null;
-	fecha_verificacion: string | null;
-	verificado_por: string | null;
-	motivo_rechazo: string | null;
-	motivo_reversion: string | null;
+	pagos: PorPagoItem[];            // F-087-FIX2: lista de pagos del estudiante
+	total_pagado_aprobado: number;
+	total_pagado_anulado: number;
+	total_pagado_pendiente: number;
+	total_pagado_rechazado: number;
+	total_a_pagar: number | null;
+	saldo_pendiente: number | null;
+	cantidad_pagos: number;
 }
 
 export interface PorPagoResumen {
@@ -490,14 +496,16 @@ export interface PorPagoResumen {
 	total_rechazado: number;
 	total_pagos: number;
 	pagos_con_comprobante: number;
+	total_estudiantes: number;
 }
 
 export interface PorPagoResponse {
-	items: PorPagoItem[];
+	estudiantes: PorPagoEstudiante[];  // F-087-FIX2: estructura tipo matriz
 	total: number;
 	page: number;
 	per_page: number;
 	total_pages: number;
+	max_pagos: number;                  // max de pagos por estudiante (para # columnas)
 	resumen: PorPagoResumen;
 	filtros_aplicados: PorPagoFiltros;
 }
