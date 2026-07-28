@@ -465,9 +465,9 @@ export interface PorPagoItem {
 	curso_nombre: string | null;
 	modulo_index: number | null;
 	modulo_nombre: string | null;
+	modulos_cubiertos: number[];     // F-087-FIX: lista de TODOS los módulos que cubre el pago (ej: [1,2,3,4])
 	concepto: string | null;
-	monto: number;
-	monto_total_pago: number;
+	monto: number;                  // F-087-FIX: monto TOTAL del pago (NO prorrateado)
 	estado_pago: string;
 	subido_por: string | null;     // null | "estudiante" | "encargado"
 	metodo_pago: string | null;
