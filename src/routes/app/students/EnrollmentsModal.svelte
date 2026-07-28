@@ -5,6 +5,7 @@
 	import { formatCurrency } from '$lib/utils';
 	import { userStore } from '$lib/stores/userStore';
 	import { apiKyC } from '$lib/config/apiKyC.config'; // IMPORTACIÓN DEL CLIENTE ESTÁNDAR
+	import ResumenPagosEnrollment from '$lib/features/payments/ResumenPagosEnrollment.svelte'; // F-049: desglose por módulo + saldo a favor
 
 	interface Props {
 		isOpen: boolean;
@@ -40,6 +41,9 @@
 	let cajaConcepto = $state<string>('');
 	let cajaRemitente = $state<string>('');
 	let cajaLoading = $state(false);
+
+	// F-049: enrollment seleccionado para ver el resumen enriquecido de pagos
+	let selectedEnrollmentIdForResumen = $state<string | null>(null);
 
 	// Obtener ID resiliente para MongoDB
 	const studentId = $derived(student?._id || student?.id);
@@ -256,7 +260,13 @@
 					</thead>
 					<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
 						{#each studentEnrollments as enrollment (enrollment._id)}
-							<tr>
+							<tr
+								class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors {selectedEnrollmentIdForResumen === (enrollment._id || enrollment.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}"
+								onclick={() => {
+									const eid = enrollment._id || enrollment.id;
+									selectedEnrollmentIdForResumen = selectedEnrollmentIdForResumen === eid ? null : eid;
+								}}
+							>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{new Date(enrollment.fecha_inscripcion).toLocaleDateString()}</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<div class="text-xs text-gray-500">Total: {formatCurrency(enrollment.total_a_pagar)}</div>
@@ -266,19 +276,20 @@
 									<span class={`font-medium ${enrollment.saldo_pendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(enrollment.saldo_pendiente)}</span>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
-									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{enrollment.estado}</span>
+									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : enrollment.estado === 'retirado' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800'}`}>{enrollment.estado}</span>
 								</td>
 								{#if isFinanciero}
 									<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
 										{#if enrollment.saldo_pendiente > 0}
-											<button 
-												type="button" 
-												onclick={() => { 
-													selectedEnrollmentForCaja = enrollment; 
-													cajaMonto = enrollment.saldo_pendiente; 
+											<button
+												type="button"
+												onclick={(e) => {
+													e.stopPropagation();
+													selectedEnrollmentForCaja = enrollment;
+													cajaMonto = enrollment.saldo_pendiente;
 													cajaConcepto = '';
 													cajaRemitente = student?.nombre || '';
-													showCajaForm = true; 
+													showCajaForm = true;
 												}}
 												class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
 											>
@@ -294,6 +305,27 @@
 					</tbody>
 				</table>
 			</div>
+
+			<!-- F-049: Panel de resumen enriquecido (click en una fila para mostrar) -->
+			{#if selectedEnrollmentIdForResumen}
+				<div class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+					<div class="flex items-center justify-between mb-3">
+						<h4 class="text-sm font-semibold text-gray-900 dark:text-white">
+							Resumen detallado de pagos
+						</h4>
+						<button
+							type="button"
+							onclick={() => (selectedEnrollmentIdForResumen = null)}
+							class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+						>
+							✕ Cerrar
+						</button>
+					</div>
+					{#key selectedEnrollmentIdForResumen}
+						<ResumenPagosEnrollment enrollmentId={selectedEnrollmentIdForResumen} />
+					{/key}
+				</div>
+			{/if}
 		{/if}
 		<div class="mt-6 flex justify-end"><Button variant="secondary" onclick={onClose}>Cerrar</Button></div>
 	</div>

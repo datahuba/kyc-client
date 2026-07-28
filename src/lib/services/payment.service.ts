@@ -259,6 +259,16 @@ class PaymentService {
 		return await apiKyC.get<ResumenModulosResponse>('/payments/resumen-modulos');
 	}
 
+	// F-049 (2026-07-28): Resumen enriquecido de pagos por enrollment.
+	// Retorna desglose por módulo, total a pagar, total pagado, saldo a favor
+	// y saldo pendiente. Usado por cobranza para ver el desglose que el
+	// estudiante ya veia (cuando paga de más, ej: 300 en lugar de 294).
+	async getResumenPagosEnrollment(enrollmentId: string): Promise<ResumenPagosEnrollment> {
+		return await apiKyC.get<ResumenPagosEnrollment>(
+			`/payments/enrollment/${enrollmentId}/resumen`
+		);
+	}
+
 	// F-075 (2026-07-23): Lista de Postgraduantes Habilitados (informe acta de notas).
 	// Retorna JSON con encabezado + filas (curso, módulo, docente, becados, etc.)
 	async getListaHabilitados(
@@ -412,6 +422,29 @@ export interface ResumenModulosResponse {
 		monto_pendiente: number;
 		estudiantes_cursando: number;
 	}>;
+}
+
+// F-049 (2026-07-28): resumen enriquecido de pagos de un enrollment
+export interface ResumenPagosEnrollment {
+	total_pagos: number;
+	pendientes: number;
+	aprobados: number;
+	rechazados: number;
+	anulados: number;
+	monto_total_aprobado: number;
+	// Enriquecido (F-049)
+	modulos: Array<{
+		index: number;
+		nombre: string;
+		monto: number;
+		monto_pagado: number;
+		saldo_modulo: number;
+		pagado: boolean;
+	}>;
+	total_a_pagar: number;
+	total_pagado: number;
+	saldo_a_favor: number;
+	saldo_pendiente: number;
 }
 
 export const paymentService = new PaymentService();
