@@ -24,6 +24,7 @@
 	];
 
 	interface NavigationItem {
+		type: 'item';
 		name: string;
 		href: string;
 		icon: any;
@@ -34,6 +35,17 @@
 		rel?: string;
 	}
 
+	interface NavigationGroup {
+		type: 'group';
+		name: string;
+		icon: any;
+		roles: string[];
+		loginTypes: ('admin' | 'academic')[];
+		children: NavigationItem[];
+	}
+
+	type NavigationEntry = NavigationItem | NavigationGroup;
+
 	interface Props {
 		isOpen: boolean;
 		onClose: () => void;
@@ -42,49 +54,61 @@
 	let { isOpen, onClose }: Props = $props();
 	let isCollapsed = $state(false);
 
-	const navigation: NavigationItem[] = [
-		{ name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
-		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		
-		// ACCESO DIRECTO A INSCRIPCIONES
-		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		
-		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ name: 'Solicitudes', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
-		{ name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
-		{ name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+	const navigation: NavigationEntry[] = [
+		// === Académico (estudiantes y docentes) ===
+		// Orden alfabético
+		{ type: 'item', name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
+		{ type: 'item', name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
+		{ type: 'item', name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
+		{ type: 'item', name: 'Mis Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
+		{ type: 'item', name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
+		{ type: 'item', name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
+
+		// === Staff administrativo (orden alfabético) ===
 		// ISSUE-Q-PRE-REGISTRO-FORM: formularios dinámicos de pre-inscripción. Lo ven super admin,
 		// admin, cpd (para los formularios generales) y encargado/coordinador (los delegados a sus cursos).
-		{ name: 'Pre-inscripciones', href: '/app/pre-registros', icon: ClipboardIcon, roles: ['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
-		// F-080 (2026-07-27): nuevo item "Calendario" — vista general de programas (timeline + lista)
-		// Visible para todos los administrativos y docentes (no estudiantes).
-		{ name: 'Calendario', href: '/app/courses/calendario', icon: CalendarIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['admin'] },
-		{ name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
-		{ name: 'Reportes de Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'coordinador'], loginTypes: ['admin'] },
-		// F-075 (2026-07-23): nuevo item 'Informes' para informes administrativos
-		// (acta de notas, etc.). Diferente de "Reportes de Caja" que es para
-		// gestión financiera interna.
-		{ name: 'Informes', href: '/app/informes', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd', 'coordinador'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Calendario', href: '/app/courses/calendario', icon: CalendarIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
 
-		{ name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
-		{ name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
+		// F-074 / F-075 (2026-07-29): GRUPO "Financiero" — Sandra pidió en la
+		// reunión 2026-07-29 que Gestión de Pagos, Reportes de Caja e Informes
+		// estén juntos en un solo menú desplegable ("Dashboard académico y
+		// financiero") para ver todo lo económico a un golpe de vista.
+		{
+			type: 'group',
+			name: 'Financiero',
+			icon: CreditCardIcon,
+			roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador'],
+			loginTypes: ['admin'],
+			children: [
+				// F-087: Gestión de Pagos (incluye Por Pago con matriz de auditoría)
+				{ type: 'item', name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
+				// F-075: Informes (acta de notas, etc.)
+				{ type: 'item', name: 'Informes', href: '/app/informes', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd', 'coordinador'], loginTypes: ['admin'] },
+				// Reportes de Caja (gestión financiera interna)
+				{ type: 'item', name: 'Reportes de Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'coordinador'], loginTypes: ['admin'] },
+			]
+		},
 
-		{ name: 'Mis Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
-		{ name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
-		
-		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
-		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
-		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-		{ name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-		// F-044 (2026-07-22): visor de errores 500 (solo superadmin/admin)
-		{ name: 'Visor de Errores', href: '/app/admin/errors', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
+		// ACCESO DIRECTO A INSCRIPCIONES
+		{ type: 'item', name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Pre-inscripciones', href: '/app/pre-registros', icon: ClipboardIcon, roles: ['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Solicitudes', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
 		// F-070 (2026-07-22): validación de notas (CPD/Admin/Superadmin). Surge del
 		// bug urgente: Miguel (socio de Kevin) tenía 51 notas en pendiente_validacion
 		// y no había forma rápida de aprobarlas. Aquí CPD ve, aprueba, rechaza y edita.
-		{ name: 'Validación de Notas', href: '/app/admin/grade-validation', icon: AcademicCapIcon, roles: ['cpd', 'admin', 'superadmin'], loginTypes: ['admin'] },
-		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
+		{ type: 'item', name: 'Validación de Notas', href: '/app/admin/grade-validation', icon: AcademicCapIcon, roles: ['cpd', 'admin', 'superadmin'], loginTypes: ['admin'] },
+		// F-044 (2026-07-22): visor de errores 500 (solo superadmin/admin)
+		{ type: 'item', name: 'Visor de Errores', href: '/app/admin/errors', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 	];
 
 	let userRole = $derived($userStore?.role || 'student');
@@ -98,26 +122,55 @@
 	let esCoordinadorFinanciero = $derived($userStore.user?.subtipo_coordinador === 'financiero');
 	const ECONOMIC_HREFS = ['/app/reports', '/app/payments', '/app/payment-config', '/app/bank-statements', '/app/informes'];
 
-	let filteredNavigation = $derived(navigation.filter(item => {
+	function entryAllowed(entry: NavigationEntry): boolean {
 		// ISSUE-R-ROLES: encargado_curso y coordinador son staff administrativo también
 		const isStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(userRole);
 		const isTeacher = userRole === 'docente' || academicRole === 'teacher';
 		const isStudent = userRole === 'student' || academicRole === 'student';
 
 		if (isStaff) {
-			if (!(item.loginTypes.includes('admin') && item.roles.includes(userRole))) return false;
-			// Coordinador: solo el financiero ve vistas económicas
-			if (userRole === 'coordinador' && ECONOMIC_HREFS.includes(item.href) && !esCoordinadorFinanciero) return false;
+			if (!(entry.loginTypes.includes('admin') && entry.roles.includes(userRole))) return false;
+			// Coordinador: solo el financiero ve vistas económicas (dentro de items; los grupos los filtra el children-only)
+			if (entry.type === 'item' && userRole === 'coordinador' && ECONOMIC_HREFS.includes(entry.href) && !esCoordinadorFinanciero) return false;
 			return true;
 		}
 		if (loginType === 'academic' || isTeacher || isStudent) {
-			if (item.name === 'Aula Virtual UAGRM' || item.name === 'Perfil de Notas UAGRM') {
-				return isTeacher ? item.roles.includes('docente') : item.roles.includes('student');
+			if (entry.name === 'Aula Virtual UAGRM' || entry.name === 'Perfil de Notas UAGRM') {
+				return isTeacher ? entry.roles.includes('docente') : entry.roles.includes('student');
 			}
-			return isTeacher ? item.roles.includes('docente') : item.roles.includes('student');
+			return isTeacher ? entry.roles.includes('docente') : entry.roles.includes('student');
 		}
 		return false;
-	}));
+	}
+
+	let filteredNavigation = $derived(navigation
+		.map((entry): NavigationEntry | null => {
+			// Si es un grupo, filtrar sus hijos. Si no queda ninguno, descartar el grupo.
+			if (entry.type === 'group') {
+				const visibleChildren = entry.children.filter(c => entryAllowed(c));
+				if (visibleChildren.length === 0) return null;
+				// ISSUE-R-PERFIL-GENERICO: si el coordinador no es financiero, no mostrar el grupo Financiero
+				if (userRole === 'coordinador' && !esCoordinadorFinanciero) return null;
+				return { ...entry, children: visibleChildren };
+			}
+			return entryAllowed(entry) ? entry : null;
+		})
+		.filter((e): e is NavigationEntry => e !== null)
+	);
+
+	// F-074 / F-075 (2026-07-29): auto-expand del grupo Financiero si la ruta
+	// actual está dentro de sus hijos. Da feedback visual sin obligar al user
+	// a hacer click extra.
+	let expandedGroups = $state<Record<string, boolean>>({});
+	$effect(() => {
+		const path = $page.url.pathname;
+		for (const entry of filteredNavigation) {
+			if (entry.type === 'group') {
+				const isChildActive = entry.children.some(c => path.startsWith(c.href) && c.href !== '/app/dashboard');
+				expandedGroups[entry.name] = isChildActive;
+			}
+		}
+	});
 
 	function isCurrent(href: string) {
 		if (href.startsWith('http')) return false;
@@ -168,20 +221,69 @@
 			<ul role="list" class="flex flex-1 flex-col gap-y-7">
 				<li>
 					<ul role="list" class="-mx-2 space-y-1">
-						{#each filteredNavigation as item}
-							<li>
-								<a href={item.href} target={item.external ? (item.target ?? '_blank') : undefined} rel={item.external ? (item.rel ?? 'noopener noreferrer') : undefined} title={isCollapsed ? item.name : ''} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isCurrent(item.href) ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-50'}`}>
-									<!-- RENDIMIENTO DE ÍCONOS DINÁMICOS COMPATIBLE CON COMPILADOR ESTRICTO EN LINUX -->
-									{#snippet icon()}
-										<svelte:component 
-											this={item.icon} 
-											class={`size-6 shrink-0 ${isCurrent(item.href) ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 group-hover:text-primary-600'}`} 
-										/>
-									{/snippet}
-									{@render icon()}
-									{#if !isCollapsed}<span in:fade={{ duration: 100 }}>{item.name}</span>{/if}
-								</a>
-							</li>
+						{#each filteredNavigation as entry (entry.name)}
+							{#if entry.type === 'item'}
+								<li>
+									<a href={entry.href} target={entry.external ? (entry.target ?? '_blank') : undefined} rel={entry.external ? (entry.rel ?? 'noopener noreferrer') : undefined} title={isCollapsed ? entry.name : ''} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isCurrent(entry.href) ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-50'}`}>
+										<!-- RENDIMIENTO DE ÍCONOS DINÁMICOS COMPATIBLE CON COMPILADOR ESTRICTO EN LINUX -->
+										{#snippet icon()}
+											<svelte:component
+												this={entry.icon}
+												class={`size-6 shrink-0 ${isCurrent(entry.href) ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 group-hover:text-primary-600'}`}
+											/>
+										{/snippet}
+										{@render icon()}
+										{#if !isCollapsed}<span in:fade={{ duration: 100 }}>{entry.name}</span>{/if}
+									</a>
+								</li>
+							{:else if entry.type === 'group' && !isCollapsed}
+								<!-- F-074 / F-075 (2026-07-29): grupo "Financiero" — desplegable
+								     que agrupa Gestión de Pagos / Reportes de Caja / Informes. -->
+								<li>
+									<button
+										type="button"
+										onclick={() => expandedGroups[entry.name] = !expandedGroups[entry.name]}
+										aria-expanded={!!expandedGroups[entry.name]}
+										class="group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all px-2"
+									>
+										<svelte:component this={entry.icon} class="size-6 shrink-0 text-gray-400 group-hover:text-primary-600" />
+										<span class="flex-1 text-left">{entry.name}</span>
+										<svg
+											class={`size-4 shrink-0 text-gray-400 transition-transform ${expandedGroups[entry.name] ? 'rotate-180' : ''}`}
+											fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+										>
+											<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+										</svg>
+									</button>
+									{#if expandedGroups[entry.name]}
+										<ul role="list" class="mt-0.5 space-y-0.5 pl-4" transition:slide={{ duration: 150 }}>
+											{#each entry.children as child (child.href)}
+												<li>
+													<a
+														href={child.href}
+														title={child.name}
+														class={`group flex gap-x-3 rounded-md py-1.5 pl-3 pr-2 text-sm leading-6 font-medium transition-all ${
+															isCurrent(child.href)
+																? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400 border-l-2 border-primary-500 -ml-[2px] pl-[14px]'
+																: 'text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+														}`}
+													>
+														<span class="size-1.5 mt-2 rounded-full shrink-0 bg-gray-300 group-hover:bg-primary-400"></span>
+														<span>{child.name}</span>
+													</a>
+												</li>
+											{/each}
+										</ul>
+									{/if}
+								</li>
+							{:else if entry.type === 'group' && isCollapsed}
+								<!-- Modo colapsado: el grupo se ve como un solo item (el primero de sus hijos) -->
+								<li>
+									<a href={entry.children[0]?.href ?? '#'} title={entry.name} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all justify-center px-0 ${entry.children.some(c => isCurrent(c.href)) ? 'text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-400 hover:text-primary-600'}`}>
+										<svelte:component this={entry.icon} class="size-6 shrink-0" />
+									</a>
+								</li>
+							{/if}
 						{/each}
 					</ul>
 				</li>

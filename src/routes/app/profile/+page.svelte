@@ -11,7 +11,8 @@
 	import { FileUpload, Modal, Button, Select } from '$lib/components/ui';
 	import DocumentRow from '$lib/components/ui/documentRow.svelte';
 	import FormularioInscripcionModal from '$lib/features/enrollments/FormularioInscripcionModal.svelte';
-	import type { Student, UpdateStudentSelfRequest, TituloData } from '$lib/interfaces/student.interface';
+	import MisCursosActivos from '$lib/components/dashboard/MisCursosActivos.svelte';
+	import type { Student, UpdateStudentSelfRequest, TituloData, MyCoursesResumen } from '$lib/interfaces';
 	import { authService } from '$lib/services';
 	import { ExclamationCircleIcon } from '$lib/icons/solid';
 
@@ -21,6 +22,23 @@
 	let editMode = $state(false);
 	let uploadingPhoto = $state(false);
 	let uploadingDoc = $state<string | null>(null);
+
+	// F-087-CAL · Mis Cursos (en ejecución / por iniciar / finalizados).
+	// Aparece solo para estudiantes y se renderiza al final de la columna
+	// principal del perfil, antes del sidebar de Información del Sistema.
+	let myCourses: MyCoursesResumen | null = $state(null);
+	let myCoursesLoading = $state(true);
+
+	async function loadMyCoursesResumen() {
+		try {
+			myCourses = await enrollmentService.getMyCoursesResumen();
+		} catch (e) {
+			console.error('Error cargando Mis Cursos:', e);
+			myCourses = null;
+		} finally {
+			myCoursesLoading = false;
+		}
+	}
 
 	// ISSUE-A-VERIFICACION: no bloqueante, solo informativo
 	let resendingVerification = $state(false);
@@ -248,6 +266,10 @@
 				editData = buildEditData();
 				// ISSUE-Q-DOCUMENTOS-KYC: cargar sus inscripciones para mostrar documentos requeridos
 				await cargarDocumentosEstudiante(id);
+				// F-087-CAL · cargar resumen de cursos del estudiante (Mis Cursos)
+				// en paralelo (no bloquea el resto del perfil). Se muestra al final
+				// de la columna principal, antes del sidebar.
+				loadMyCoursesResumen();
 			} else {
 				profileData = $userStore.user; 
 			}
@@ -940,8 +962,11 @@
 					{/if}
 				</div>
 
+				<!-- F-087-CAL · Mis Cursos (en ejecución / por iniciar / finalizados) -->
+				<MisCursosActivos data={myCourses} loading={myCoursesLoading} />
+
 				<!-- Sidebar -->
-				<div class="space-y-6">				
+				<div class="space-y-6">
 					<!-- Información del Sistema -->
 					<Card>
 						{#snippet header()}
