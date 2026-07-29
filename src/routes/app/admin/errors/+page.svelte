@@ -103,11 +103,32 @@
 		}
 	}
 
-	// F-XXX (2026-07-29): bulk resolve para los 401 de token expirado.
-	async function autoResolveExpiredTokens() {
-		if (!confirm('¿Marcar como resueltos todos los 401 de "Token expirado" en la ventana actual? (acción masiva)')) return;
+	// F-XXX (2026-07-29): bulk resolve para errores esperados.
+	async function autoResolveErrors() {
+		// Patrones predefinidos que matchean errores esperados del sistema.
+		// El admin puede ejecutarlos todos o uno por uno.
+		const patterns = [
+			{ label: '401 Token expirado', pattern: 'Token.*inválido|expirado', status: 401, note: 'Auto-resuelto: token expirado (esperado)' },
+			{ label: '401 Credenciales incorrectas', pattern: 'Credenciales incorrectas|Se requiere autenticación', status: 401, note: 'Auto-resuelto: login fallido (esperado)' },
+			{ label: '422 JSON inválido', pattern: 'JSON (inválido|decode)', status: 422, note: 'Auto-resuelto: cliente envió JSON malformado' },
+			{ label: '429 Demasiados intentos', pattern: 'Demasiados intentos', status: 429, note: 'Auto-resuelto: rate limit (esperado)' },
+			{ label: '400 imagen >5MB', pattern: 'imagen es demasiado grande', status: 400, note: 'Auto-resuelto: imagen excede límite (validación cliente)' },
+		];
+		// Construir mensaje con la lista
+		const list = patterns.map((p, i) => `${i + 1}. ${p.label}`).join('\n');
+		const choice = prompt(
+			`¿Qué tipo de errores esperados querés marcar como resueltos?\n\n${list}\n\nIngresá el número (1-${patterns.length}) o Cancelar:`
+		);
+		if (!choice) return;
+		const idx = parseInt(choice) - 1;
+		if (isNaN(idx) || idx < 0 || idx >= patterns.length) {
+			alert('error', 'Opción inválida');
+			return;
+		}
+		const p = patterns[idx];
+		if (!confirm(`¿Marcar como resueltos todos los "${p.label}" en la ventana actual?`)) return;
 		try {
-			const res = await adminService.autoResolveExpiredTokens(hours);
+			const res = await adminService.autoResolveErrors(hours, p.pattern, p.status, p.note);
 			alert('success', `Se marcaron ${res.resolved_count} errores como resueltos.`);
 			await load();
 		} catch (e: any) {
@@ -240,8 +261,8 @@
 						Solo no resueltos
 					</span>
 				</label>
-				<Button variant="secondary" onclick={autoResolveExpiredTokens} disabled={loading}>
-					🧹 Auto-resolver 401 expirados
+				<Button variant="secondary" onclick={autoResolveErrors} disabled={loading}>
+					🧹 Auto-resolver errores esperados
 				</Button>
 				<Button variant="primary" onclick={load} loading={loading}>
 					🔄 Refrescar

@@ -63,14 +63,23 @@ class AdminService {
 	}
 
 	/**
-	 * F-XXX (2026-07-29): auto-resuelve todos los 401 de "Token inválido o
-	 * expirado" en la ventana de tiempo indicada. Útil cuando hay miles
-	 * de errores de tokens vencidos (por usuarios con sesión expirada
-	 * que recargaron la página).
+	 * F-XXX (2026-07-29): auto-resuelve todos los errores que matcheen el
+	 * patrón regex en su mensaje. Útil para limpiar el visor de errores
+	 * esperados (401 de token expirado, 422 de JSON inválido, etc).
 	 */
-	async autoResolveExpiredTokens(hours: number = 168): Promise<{ resolved_count: number }> {
-		return await apiKyC.post<{ resolved_count: number }>(
-			`/admin/errors/auto-resolve-expired-tokens?hours=${hours}`,
+	async autoResolveErrors(
+		hours: number = 168,
+		pattern: string = 'Token.*inválido|expirado',
+		statusCode: number = 401,
+		note: string = 'Auto-resuelto: error esperado'
+	): Promise<{ resolved_count: number; window_hours: number; pattern: string }> {
+		const params = new URLSearchParams();
+		params.append('hours', String(hours));
+		params.append('pattern', pattern);
+		if (statusCode > 0) params.append('status_code', String(statusCode));
+		params.append('note', note);
+		return await apiKyC.post<{ resolved_count: number; window_hours: number; pattern: string }>(
+			`/admin/errors/auto-resolve-expired-tokens?${params.toString()}`,
 			{}
 		);
 	}
