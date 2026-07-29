@@ -43,12 +43,17 @@
 		$userStore.user?.role === 'superadmin' || $userStore.user?.role === 'admin'
 	);
 
-	onMount(async () => {
-		if (!isAllowed) {
+	// F-XXX (2026-07-29): usar $effect en vez de onMount porque al momento
+	// del onMount, `$userStore.user` puede aún no estar cargado. El $effect
+	// se re-ejecuta cuando cambia `isAllowed` y vuelve a llamar load().
+	let hasLoaded = $state(false);
+	$effect(() => {
+		if (isAllowed && !hasLoaded) {
+			hasLoaded = true;
+			load();
+		} else if (!isAllowed) {
 			loading = false;
-			return;
 		}
-		await load();
 	});
 
 	async function load() {
