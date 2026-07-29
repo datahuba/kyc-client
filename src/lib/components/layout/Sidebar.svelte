@@ -8,7 +8,7 @@
 	import { goto } from '$app/navigation';
 	import CourseCatalogModal from './CourseCatalogModal.svelte';
 	import BenefitsModal from './BenefitsModal.svelte';
-	import DocumentValidationModal from '$lib/components/ui/DocumentValidationModal.svelte';
+	import DocumentValidationTable from '$lib/components/ui/DocumentValidationTable.svelte';
 
 	let isCatalogOpen = $state(false);
 	let isBenefitsOpen = $state(false);
@@ -370,7 +370,7 @@
 {/if}
 
 {#if canValidateDocs}
-	<DocumentValidationModal isOpen={isDocValidationOpen} onClose={() => isDocValidationOpen = false} />
+	<DocumentValidationTable isOpen={isDocValidationOpen} onClose={() => isDocValidationOpen = false} />
 {/if}
 
 <style>

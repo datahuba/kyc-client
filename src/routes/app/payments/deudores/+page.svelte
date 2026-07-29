@@ -21,8 +21,8 @@
 	import type { DeudoresResponse, DeudoresEstudiante, DeudoresModulo, DeudoresMatricula, Course } from '$lib/services/payment.service';
 	import Card from '$lib/components/ui/card.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
-	import { DownloadIcon, FilterIcon, ExclamationCircleIcon, CheckIcon, RefreshIcon } from '$lib/icons/outline';
-	import { CreditCardIcon } from '$lib/icons/solid';
+	import { DownloadIcon, FilterIcon, CheckIcon, RefreshIcon } from '$lib/icons/outline';
+	import { CreditCardIcon, ExclamationCircleIcon } from '$lib/icons/solid';
 
 	let cursos: Course[] = $state([]);
 	let cursoSeleccionado: string = $state('');
