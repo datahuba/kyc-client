@@ -272,7 +272,9 @@
 	// F-087 (2026-07-28): Carga la vista "Por Pago" desde el backend.
 	// 1 fila por cada pago individual, sin agrupar por módulo/estudiante.
 	async function loadPorPago() {
+		console.log('[F-087] loadPorPago START, porPagoLoading was:', porPagoLoading);
 		porPagoLoading = true;
+		console.log('[F-087] after set porPagoLoading=true, value:', porPagoLoading);
 		// FIX: hacer la request con await suelto (sin try/finally) para que
 		// Svelte 5 aplique correctamente el cambio de estado al re-render.
 		// El catch se hace por separado.
@@ -289,15 +291,18 @@
 
 		paymentService.getMatrizPorPago(filtrosLimpios)
 			.then((data) => {
+				console.log('[F-087] THEN: got data, est count:', data.estudiantes?.length);
 				porPagoData = data;
 			})
 			.catch((error: any) => {
-				console.error('Error cargando vista por-pago:', error);
+				console.error('[F-087] CATCH:', error);
 				alert('error', error?.message || 'Error al cargar la vista por-pago');
 				porPagoData = null;
 			})
 			.finally(() => {
+				console.log('[F-087] FINALLY: setting porPagoLoading=false, was:', porPagoLoading);
 				porPagoLoading = false;
+				console.log('[F-087] FINALLY: after, value:', porPagoLoading);
 			});
 	}
 
