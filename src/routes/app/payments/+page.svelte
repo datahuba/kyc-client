@@ -68,6 +68,11 @@
 
 	// F-087: Estado de la vista "Por Pago"
 	import type { PorPagoResponse, PorPagoItem, PorPagoFiltros } from '$lib/services/payment.service';
+	// F-087-FIX9 (2026-07-28): fmt movido del template al script. El {@const fmt} dentro
+	// del {:else} de la tabla no era accesible desde las cards de resumen (que están
+	// ANTES en el DOM). Svelte 5 no hace hoist de {@const}, así que el render de las
+	// cards fallaba con "fmt is not defined", ocultando Aprobado/Pendiente/etc.
+	const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 	let porPagoData: PorPagoResponse | null = $state(null);
 	let porPagoLoading = $state(false);
 	let porPagoFiltros: PorPagoFiltros = $state({
@@ -1371,7 +1376,6 @@
 				/>
 			{:else}
 				{@const maxCols = Math.min(porPagoData.max_pagos || 0, 20)}
-				{@const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 				<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
 					<thead class="bg-gray-50 dark:bg-gray-900/40">
 						<tr>
