@@ -560,7 +560,7 @@
 	<div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
 		<Heading level="h1">Estudiantes</Heading>
 		<div class="flex flex-wrap gap-3 ml-auto w-full sm:w-auto justify-end">
-			<Button onclick={downloadStudentsCSV} variant="secondary" loading={csvLoading} aria-label="Descargar listado de estudiantes en CSV">
+			<Button onclick={downloadStudentsCSV} variant="secondary" loading={csvLoading} aria-label="Descargar listado de estudiantes en Excel">
 				{#snippet leftIcon()}
 					<DownloadIcon class="size-5" />
 				{/snippet}
