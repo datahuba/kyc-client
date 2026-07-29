@@ -242,11 +242,21 @@
 			);
 			if (cursoIds.length > 0) {
 				try {
-					const allCourses = await courseService.getAll(1, 200);
+					// FIX: backend /courses/ limita per_page a 100 (422 si se pasa
+					// más). Paginamos en bucle para no perder cursos.
 					const map: Record<string, Course> = {};
-					const data: any[] = (allCourses as any).data || allCourses || [];
-					for (const c of data) {
-						if (c && c._id) map[c._id] = c;
+					let page = 1;
+					let hasMore = true;
+					while (hasMore) {
+						const resp: any = await courseService.getAll(page, 100);
+						const data: any[] = (resp as any).data || resp || [];
+						for (const c of data) {
+							if (c && c._id) map[c._id] = c;
+						}
+						const totalPages = (resp as any).meta?.totalPages ?? (resp as any).total_pages ?? 1;
+						hasMore = page < totalPages;
+						page += 1;
+						if (page > 20) break; // safety: máximo 2000 cursos
 					}
 					coursesMap = map;
 				} catch (err) {
@@ -268,24 +278,62 @@
 	async function cargarDatosStaff() {
 		loading = true;
 		try {
+			// FIX: backend limita per_page a 100 para /courses/ (422 si se pasa
+			// más). Paginamos en bucle para traer todos los cursos y estudiantes.
 			const [allStudents, allCourses] = await Promise.all([
-				studentService.getAll(1, 500).catch((err) => {
-					console.warn('No se pudieron cargar estudiantes:', err);
-					return { data: [] };
-				}),
-				courseService.getAll(1, 500).catch((err) => {
-					console.warn('No se pudieron cargar cursos:', err);
-					return { data: [] };
-				})
+				fetchAllStudents(),
+				fetchAllCourses()
 			]);
-			staffStudents = (allStudents as any).data || allStudents || [];
-			staffCourses = (allCourses as any).data || allCourses || [];
+			staffStudents = allStudents;
+			staffCourses = allCourses;
 		} catch (err: any) {
 			console.error('Error cargando datos staff:', err);
 			alert('error', err?.message || 'No se pudieron cargar los datos.');
 		} finally {
 			loading = false;
 		}
+	}
+
+	async function fetchAllCourses(): Promise<Course[]> {
+		const all: Course[] = [];
+		let page = 1;
+		let hasMore = true;
+		while (hasMore) {
+			try {
+				const resp: any = await courseService.getAll(page, 100);
+				const data: any[] = (resp as any).data || resp || [];
+				all.push(...data);
+				const totalPages = (resp as any).meta?.totalPages ?? (resp as any).total_pages ?? 1;
+				hasMore = page < totalPages;
+				page += 1;
+				if (page > 20) break; // safety: máximo 2000 cursos
+			} catch (err) {
+				console.warn('No se pudieron cargar cursos:', err);
+				break;
+			}
+		}
+		return all;
+	}
+
+	async function fetchAllStudents(): Promise<any[]> {
+		const all: any[] = [];
+		let page = 1;
+		let hasMore = true;
+		while (hasMore) {
+			try {
+				const resp: any = await studentService.getAll(page, 100);
+				const data: any[] = (resp as any).data || resp || [];
+				all.push(...data);
+				const totalPages = (resp as any).meta?.totalPages ?? (resp as any).total_pages ?? 1;
+				hasMore = page < totalPages;
+				page += 1;
+				if (page > 50) break; // safety: máximo 5000 estudiantes
+			} catch (err) {
+				console.warn('No se pudieron cargar estudiantes:', err);
+				break;
+			}
+		}
+		return all;
 	}
 
 	async function cargarCertificadosStaff() {

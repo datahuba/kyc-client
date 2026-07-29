@@ -62,9 +62,22 @@
 			return;
 		}
 		// cargar cursos para el filtro
+		// FIX: backend /courses/ limita per_page a 100 (422 si se pasa más).
+		// Paginamos en bucle.
 		try {
-			const res = await courseService.getAll(1, 200);
-			cursos = (res as any).data || (res as any).items || (Array.isArray(res) ? res : []);
+			const collected: any[] = [];
+			let page = 1;
+			let hasMore = true;
+			while (hasMore) {
+				const res: any = await courseService.getAll(page, 100);
+				const data: any[] = (res as any).data || (res as any).items || (Array.isArray(res) ? res : []);
+				collected.push(...data);
+				const totalPages = (res as any).meta?.totalPages ?? (res as any).total_pages ?? 1;
+				hasMore = page < totalPages;
+				page += 1;
+				if (page > 20) break; // safety
+			}
+			cursos = collected;
 		} catch (e: any) {
 			console.error('Error cargando cursos:', e);
 		}
