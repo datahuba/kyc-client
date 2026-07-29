@@ -1312,19 +1312,19 @@
 			<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
 				<div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
 					<div class="text-xs text-emerald-700 dark:text-emerald-300 font-medium">Aprobado</div>
-					<div class="text-lg font-bold text-emerald-900 dark:text-emerald-100">Bs {Math.round(porPagoData.resumen.total_aprobado)}</div>
+					<div class="text-lg font-bold text-emerald-900 dark:text-emerald-100">Bs {fmt(porPagoData.resumen.total_aprobado)}</div>
 				</div>
 				<div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
 					<div class="text-xs text-amber-700 dark:text-amber-300 font-medium">Pendiente</div>
-					<div class="text-lg font-bold text-amber-900 dark:text-amber-100">Bs {Math.round(porPagoData.resumen.total_pendiente)}</div>
+					<div class="text-lg font-bold text-amber-900 dark:text-amber-100">Bs {fmt(porPagoData.resumen.total_pendiente)}</div>
 				</div>
 				<div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
 					<div class="text-xs text-red-700 dark:text-red-300 font-medium">Anulado</div>
-					<div class="text-lg font-bold text-red-900 dark:text-red-100">Bs {Math.round(porPagoData.resumen.total_anulado)}</div>
+					<div class="text-lg font-bold text-red-900 dark:text-red-100">Bs {fmt(porPagoData.resumen.total_anulado)}</div>
 				</div>
 				<div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
 					<div class="text-xs text-gray-700 dark:text-gray-300 font-medium">Rechazado</div>
-					<div class="text-lg font-bold text-gray-900 dark:text-gray-100">Bs {Math.round(porPagoData.resumen.total_rechazado)}</div>
+					<div class="text-lg font-bold text-gray-900 dark:text-gray-100">Bs {fmt(porPagoData.resumen.total_rechazado)}</div>
 				</div>
 			</div>
 		{/if}
@@ -1397,7 +1397,7 @@
 												</div>
 												<!-- Módulos cubiertos -->
 												<div class="text-[9px] text-gray-600 dark:text-gray-300 whitespace-nowrap">
-													{#if pago.modulo_index === 0}
+													{#if pago.modulo_index === 0 || pago.modulo_index === null || (pago.concepto && pago.concepto.toLowerCase().includes('matrícula'))}
 														Matrícula
 													{:else if pago.modulos_cubiertos && pago.modulos_cubiertos.length > 1}
 														M{pago.modulos_cubiertos[0]}-{pago.modulos_cubiertos[pago.modulos_cubiertos.length - 1]}
@@ -1413,11 +1413,15 @@
 													{pago.fecha_comprobante ? new Date(pago.fecha_comprobante).toLocaleDateString('es-BO', {day: '2-digit', month: 'short'}) :
 													 pago.fecha_subida ? new Date(pago.fecha_subida).toLocaleDateString('es-BO', {day: '2-digit', month: 'short'}) : '—'}
 												</div>
-												<!-- Comprobante link -->
+												<!-- Comprobante: botón SIEMPRE visible (deshabilitado si no hay URL) -->
 												{#if pago.comprobante_url}
-													<a href={pago.comprobante_url} target="_blank" rel="noopener" class="text-[9px] text-primary-600 hover:text-primary-800 dark:text-primary-400 underline whitespace-nowrap" title="Ver comprobante">
-														Ver ↗
+													<a href={pago.comprobante_url} target="_blank" rel="noopener" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-white bg-primary-600 hover:bg-primary-700 rounded whitespace-nowrap" title="Ver comprobante: {pago.comprobante_url}">
+														📎 Comprobante
 													</a>
+												{:else}
+													<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 bg-gray-100 dark:bg-gray-700 rounded whitespace-nowrap" title="Este pago no tiene comprobante adjunto">
+														📎 Sin comprobante
+													</span>
 												{/if}
 											</div>
 										{:else}
