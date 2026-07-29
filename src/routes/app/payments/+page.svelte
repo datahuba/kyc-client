@@ -273,26 +273,32 @@
 	// 1 fila por cada pago individual, sin agrupar por módulo/estudiante.
 	async function loadPorPago() {
 		porPagoLoading = true;
-		try {
-			// Convertir '' a undefined para no mandar filtros vacíos
-			const filtrosLimpios: PorPagoFiltros = {
-				page: porPagoFiltros.page || 1,
-				per_page: porPagoFiltros.per_page || 50,
-			};
-			if (porPagoFiltros.curso_id) filtrosLimpios.curso_id = porPagoFiltros.curso_id;
-			if (porPagoFiltros.modulo_index !== null && porPagoFiltros.modulo_index !== undefined) {
-				filtrosLimpios.modulo_index = porPagoFiltros.modulo_index;
-			}
-			if (porPagoFiltros.estado_pago) filtrosLimpios.estado_pago = porPagoFiltros.estado_pago;
-			if (porPagoFiltros.subido_por) filtrosLimpios.subido_por = porPagoFiltros.subido_por;
-			porPagoData = await paymentService.getMatrizPorPago(filtrosLimpios);
-		} catch (error: any) {
-			console.error('Error cargando vista por-pago:', error);
-			alert('error', error?.message || 'Error al cargar la vista por-pago');
-			porPagoData = null;
-		} finally {
-			porPagoLoading = false;
+		// FIX: hacer la request con await suelto (sin try/finally) para que
+		// Svelte 5 aplique correctamente el cambio de estado al re-render.
+		// El catch se hace por separado.
+		const filtrosLimpios: PorPagoFiltros = {
+			page: porPagoFiltros.page || 1,
+			per_page: porPagoFiltros.per_page || 50,
+		};
+		if (porPagoFiltros.curso_id) filtrosLimpios.curso_id = porPagoFiltros.curso_id;
+		if (porPagoFiltros.modulo_index !== null && porPagoFiltros.modulo_index !== undefined) {
+			filtrosLimpios.modulo_index = porPagoFiltros.modulo_index;
 		}
+		if (porPagoFiltros.estado_pago) filtrosLimpios.estado_pago = porPagoFiltros.estado_pago;
+		if (porPagoFiltros.subido_por) filtrosLimpios.subido_por = porPagoFiltros.subido_por;
+
+		paymentService.getMatrizPorPago(filtrosLimpios)
+			.then((data) => {
+				porPagoData = data;
+			})
+			.catch((error: any) => {
+				console.error('Error cargando vista por-pago:', error);
+				alert('error', error?.message || 'Error al cargar la vista por-pago');
+				porPagoData = null;
+			})
+			.finally(() => {
+				porPagoLoading = false;
+			});
 	}
 
 	// F-087: cuando cambian los filtros de por-pago, recargar
