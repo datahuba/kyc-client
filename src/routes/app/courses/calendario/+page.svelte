@@ -28,9 +28,9 @@
 
 	const ESTADOS = [
 		{ value: '', label: 'Todos los estados' },
-		{ value: 'programado', label: '🟡 Próximos' },
+		{ value: 'programado', label: '🟡 Por iniciar' },
 		{ value: 'en_ejecucion', label: '🟢 En ejecución' },
-		{ value: 'cerrado', label: '⚫ Cerrados' }
+		{ value: 'cerrado', label: '⚫ Finalizados' }
 	];
 
 	async function cargar() {
@@ -61,6 +61,44 @@
 		} catch {
 			return d;
 		}
+	}
+
+	/**
+	 * F-087-CAL · Devuelve un texto contextual sobre el avance del programa:
+	 *   - programado: "Inicia en X días" (o "Inicia hoy" / "Inicia en 1 día")
+	 *   - en_ejecucion: "Lleva X días · Faltan Y días" (o "Último día" si hoy = fecha_fin)
+	 *   - cerrado: "Finalizó hace X días"
+	 * Devuelve string vacío si no hay fechas suficientes.
+	 */
+	function avanceLabel(estadoCalc: string, fechaInicio: string | null, fechaFin: string | null): string {
+		if (!fechaInicio || !fechaFin) return '';
+		const inicio = new Date(fechaInicio);
+		const fin = new Date(fechaFin);
+		const hoy = new Date();
+		// Normalizar a inicio del día para comparaciones justas
+		inicio.setHours(0, 0, 0, 0);
+		fin.setHours(0, 0, 0, 0);
+		hoy.setHours(0, 0, 0, 0);
+		const MS_PER_DAY = 24 * 60 * 60 * 1000;
+		const dias = (a: Date, b: Date) => Math.round((a.getTime() - b.getTime()) / MS_PER_DAY);
+
+		if (estadoCalc === 'programado') {
+			const f = dias(inicio, hoy);
+			if (f < 0) return `Inicia en ${Math.abs(f)} ${Math.abs(f) === 1 ? 'día' : 'días'}`;
+			if (f === 0) return 'Inicia hoy';
+			return `Inició hace ${f} ${f === 1 ? 'día' : 'días'}`; // caso borde: hoy == inicio pero estado aún no refrescó
+		}
+		if (estadoCalc === 'en_ejecucion') {
+			const lleva = dias(hoy, inicio);
+			const faltan = dias(fin, hoy);
+			if (faltan === 0) return `Último día · lleva ${lleva} ${lleva === 1 ? 'día' : 'días'}`;
+			return `Lleva ${lleva} ${lleva === 1 ? 'día' : 'días'} · faltan ${faltan} ${faltan === 1 ? 'día' : 'días'}`;
+		}
+		if (estadoCalc === 'cerrado') {
+			const f = dias(hoy, fin);
+			return `Finalizó hace ${f} ${f === 1 ? 'día' : 'días'}`;
+		}
+		return '';
 	}
 
 	function formatMoney(n: number): string {
@@ -101,6 +139,24 @@
 		return Array.from(years).sort((a, b) => b - a);
 	});
 
+	// F-087-CAL · KPIs de estado (cuenta considerando TODOS los programas del
+	// año, no solo los filtrados por estado — para que cada KPI muestre el
+	// total real y el usuario pueda comparar).
+	const kpis = $derived.by(() => {
+		const counts = { total: items.length, programado: 0, en_ejecucion: 0, cerrado: 0 };
+		for (const it of items) {
+			const e = it.estado_calculado as keyof typeof counts;
+			if (e in counts && e !== 'total') counts[e]++;
+		}
+		return counts;
+	});
+
+	function setFiltroEstado(estado: string) {
+		// Si ya está activo ese filtro, lo limpiamos (toggle). Si no, lo aplicamos.
+		filtroEstado = filtroEstado === estado ? '' : estado;
+		onFiltroChange();
+	}
+
 	function onFiltroChange() {
 		cargar();
 	}
@@ -114,9 +170,61 @@
 	<header class="mb-6">
 		<h1 class="text-2xl font-bold text-slate-800">📅 Calendario de Programas</h1>
 		<p class="text-sm text-slate-600 mt-1">
-			Vista general de todos los programas académicos: en ejecución, próximos y cerrados.
+			Vista general de todos los programas académicos: en ejecución, por iniciar y finalizados.
 		</p>
 	</header>
+
+	<!-- F-087-CAL · KPIs de estado (clickables como atajo de filtro) -->
+	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+		<button
+			type="button"
+			onclick={() => setFiltroEstado('')}
+			class="text-left p-3 rounded-lg border transition shadow-sm
+				{filtroEstado === ''
+					? 'bg-slate-800 text-white border-slate-800'
+					: 'bg-white text-slate-700 border-slate-200 hover:border-slate-400'}"
+		>
+			<div class="text-[10px] uppercase font-semibold opacity-80">Total</div>
+			<div class="text-2xl font-bold mt-1">{kpis.total}</div>
+			<div class="text-[10px] opacity-80">programas</div>
+		</button>
+		<button
+			type="button"
+			onclick={() => setFiltroEstado('programado')}
+			class="text-left p-3 rounded-lg border transition shadow-sm
+				{filtroEstado === 'programado'
+					? 'bg-amber-500 text-white border-amber-500'
+					: 'bg-amber-50 text-amber-900 border-amber-200 hover:border-amber-400'}"
+		>
+			<div class="text-[10px] uppercase font-semibold opacity-80">🟡 Por iniciar</div>
+			<div class="text-2xl font-bold mt-1">{kpis.programado}</div>
+			<div class="text-[10px] opacity-80">futuro</div>
+		</button>
+		<button
+			type="button"
+			onclick={() => setFiltroEstado('en_ejecucion')}
+			class="text-left p-3 rounded-lg border transition shadow-sm
+				{filtroEstado === 'en_ejecucion'
+					? 'bg-green-600 text-white border-green-600'
+					: 'bg-green-50 text-green-900 border-green-200 hover:border-green-400'}"
+		>
+			<div class="text-[10px] uppercase font-semibold opacity-80">🟢 En ejecución</div>
+			<div class="text-2xl font-bold mt-1">{kpis.en_ejecucion}</div>
+			<div class="text-[10px] opacity-80">corriendo ahora</div>
+		</button>
+		<button
+			type="button"
+			onclick={() => setFiltroEstado('cerrado')}
+			class="text-left p-3 rounded-lg border transition shadow-sm
+				{filtroEstado === 'cerrado'
+					? 'bg-slate-600 text-white border-slate-600'
+					: 'bg-slate-50 text-slate-700 border-slate-300 hover:border-slate-500'}"
+		>
+			<div class="text-[10px] uppercase font-semibold opacity-80">⚫ Finalizados</div>
+			<div class="text-2xl font-bold mt-1">{kpis.cerrado}</div>
+			<div class="text-[10px] opacity-80">histórico</div>
+		</button>
+	</div>
 
 	<!-- Filtros y toggle de vista -->
 	<div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 mb-6 flex flex-wrap items-center gap-3">
@@ -233,6 +341,11 @@
 						<div>
 							<span class="font-semibold">Fin:</span> {formatDate(item.fecha_fin)}
 						</div>
+						{#if avanceLabel(item.estado_calculado, item.fecha_inicio, item.fecha_fin)}
+							<div class="text-slate-700 font-medium italic">
+								{avanceLabel(item.estado_calculado, item.fecha_inicio, item.fecha_fin)}
+							</div>
+						{/if}
 						<div class="text-slate-500">
 							{formatMoney(item.costo_total_interno)}
 							{#if item.matricula_interno > 0}
@@ -271,6 +384,11 @@
 									<div class="text-xs text-slate-500 mt-0.5">
 										{item.codigo} · {item.cantidad_modulos} módulos · {item.cantidad_inscritos} inscritos
 									</div>
+									{#if avanceLabel(item.estado_calculado, item.fecha_inicio, item.fecha_fin)}
+										<div class="text-[11px] text-slate-700 italic mt-0.5">
+											{avanceLabel(item.estado_calculado, item.fecha_inicio, item.fecha_fin)}
+										</div>
+									{/if}
 								</div>
 								<div class="text-xs text-slate-600 shrink-0">
 									{formatMoney(item.costo_total_interno)}

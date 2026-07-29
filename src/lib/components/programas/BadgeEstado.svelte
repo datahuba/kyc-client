@@ -4,7 +4,7 @@
 	 * Reusable: muestra el estado con color, ícono y texto.
 	 *
 	 * Colores:
-	 *   - programado      → amarillo (próximo)
+	 *   - programado      → amarillo (por iniciar)
 	 *   - en_ejecucion   → verde (corriendo)
 	 *   - cerrado        → gris (finalizado)
 	 */
@@ -16,7 +16,7 @@
 			bg: 'bg-amber-100',
 			text: 'text-amber-800',
 			border: 'border-amber-300',
-			label: 'PRÓXIMO',
+			label: 'POR INICIAR',
 			icon: '🟡'
 		},
 		en_ejecucion: {
@@ -30,7 +30,7 @@
 			bg: 'bg-slate-200',
 			text: 'text-slate-700',
 			border: 'border-slate-400',
-			label: 'CERRADO',
+			label: 'FINALIZADO',
 			icon: '⚫'
 		}
 	} as const;

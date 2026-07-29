@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { studentService } from '$lib/services';
-	import type { Student } from '$lib/interfaces';
+	import { studentService, enrollmentService } from '$lib/services';
+	import type { Student, MyCoursesResumen } from '$lib/interfaces';
 	import { userStore } from '$lib/stores/userStore';
 	import { ClipboardIcon, TagIcon, UserIcon, KeyIcon } from '$lib/icons/outline';
 	import { CreditCardIcon } from '$lib/icons/solid';
@@ -9,11 +9,16 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import { goto } from '$app/navigation';
 	import DashboardSkeleton from '$lib/components/skeletons/DashboardSkeleton.svelte';
+	import MisCursosActivos from '$lib/components/dashboard/MisCursosActivos.svelte';
 
 	let loading = true;
 	let studentData: Student | null = null;
 	let greeting = '';
 	let interval: any;
+
+	// F-087-CAL · Mis cursos (en ejecución / por iniciar / finalizados)
+	let myCourses: MyCoursesResumen | null = null;
+	let myCoursesLoading = true;
 
 	function setGreeting() {
 		const hour = new Date().getHours();
@@ -36,6 +41,17 @@
 				console.error('Error loading student data:', error);
 			} finally {
 				loading = false;
+			}
+		})();
+
+		// Cargar mis cursos en paralelo (no bloquea el saludo ni el profile)
+		(async () => {
+			try {
+				myCourses = await enrollmentService.getMyCoursesResumen();
+			} catch (error) {
+				console.error('Error loading my courses:', error);
+			} finally {
+				myCoursesLoading = false;
 			}
 		})();
 
@@ -92,6 +108,11 @@
 						</h3>
 					</button>
 				{/each}
+			</div>
+
+			<!-- F-087-CAL · Mis cursos activos (en ejecución / por iniciar / finalizados) -->
+			<div class="mt-8">
+				<MisCursosActivos data={myCourses} loading={myCoursesLoading} />
 			</div>
 
 			<!-- Quick Info -->

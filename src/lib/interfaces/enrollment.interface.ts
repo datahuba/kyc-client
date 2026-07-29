@@ -90,3 +90,39 @@ export interface EnrollmentResumen {
 	cancelados: number;      // NO cuentan como inscritos
 	curso_id: string | null;
 }
+
+// F-087-CAL · Resumen de cursos del estudiante para el dashboard.
+// Cada item es la combinación enrollment + curso + estado calculado del
+// programa. Permite al estudiante ver de un vistazo "Mis cursos activos"
+// (en ejecución / por iniciar / finalizados) sin hacer N requests.
+export interface MyCourseResumenItem {
+	enrollment_id: string;
+	curso_id: string;
+	curso_codigo: string;
+	curso_nombre: string;
+	curso_tipo: string;
+	curso_modalidad: string;
+	fecha_inicio: string | null;
+	fecha_fin: string | null;
+	estado_programa: 'programado' | 'en_ejecucion' | 'cerrado';
+	estado_inscripcion: string;
+	motivo_suspension?: string | null;
+	total_a_pagar: number;
+	total_pagado: number;
+	saldo_pendiente: number;
+	modulos_total: number;
+	modulos_pagados: number;
+	matricula_pagada: boolean;
+	fecha_inscripcion: string | null;
+}
+
+export interface MyCoursesResumen {
+	items: MyCourseResumenItem[];
+	resumen: {
+		total_cursos: number;
+		en_ejecucion: number;
+		programado: number;
+		cerrado: number;
+		saldo_pendiente_total: number;
+	};
+}

@@ -54,6 +54,16 @@ class EnrollmentService {
 		return await apiKyC.get<Enrollment[]>(`/enrollments/student/${studentId}`);
 	}
 
+	// F-087-CAL · Mis cursos activos para el dashboard del estudiante.
+	// Enriquece cada enrollment con metadata del curso + estado calculado del
+	// programa (F-080: programado | en_ejecucion | cerrado) para poder
+	// agruparlos y mostrar "Mis cursos en ejecución", "Por iniciar", etc.
+	async getMyCoursesResumen(): Promise<import('$lib/interfaces').MyCoursesResumen> {
+		return await apiKyC.get<import('$lib/interfaces').MyCoursesResumen>(
+			'/enrollments/me/cursos-resumen'
+		);
+	}
+
 	async getByCourseId(courseId: string): Promise<Enrollment[]> {
 		return await apiKyC.get<Enrollment[]>(`/enrollments/course/${courseId}`);
 	}
