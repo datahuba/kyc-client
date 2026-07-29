@@ -21,7 +21,7 @@
 	import type { DeudoresResponse, DeudoresEstudiante, DeudoresModulo, DeudoresMatricula, Course } from '$lib/services/payment.service';
 	import Card from '$lib/components/ui/card.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
-	import { DownloadIcon, FilterIcon, CheckIcon, RefreshIcon } from '$lib/icons/outline';
+	import { DownloadIcon, CheckIcon, RefreshIcon } from '$lib/icons/outline';
 	import { CreditCardIcon, ExclamationCircleIcon } from '$lib/icons/solid';
 
 	let cursos: Course[] = $state([]);
@@ -252,7 +252,9 @@
 	{#if !cursoSeleccionado && !loading}
 		<Card>
 			<div class="py-12 text-center text-gray-500">
-				<FilterIcon class="size-12 mx-auto mb-3 text-gray-300" />
+				<svg class="size-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h18M6 12h12M10 19.5h4" />
+				</svg>
 				<p class="text-sm">Selecciona un curso para ver los deudores.</p>
 			</div>
 		</Card>
