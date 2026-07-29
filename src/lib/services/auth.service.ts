@@ -29,6 +29,17 @@ class AuthService {
 	async resendVerification(): Promise<{ message: string; enviado?: boolean }> {
 		return await apiKyC.post<{ message: string }>('/auth/resend-verification', {});
 	}
+
+	// ISSUE-Q-PRE (2026-07-29): Aceptar TyC de Posgrado en el primer login.
+	// Funciona para User (admin/docente) Y Student.
+	async acceptTerms(): Promise<{
+		ok: boolean;
+		user_type: 'user' | 'student';
+		terminos_aceptados: boolean;
+		fecha_aceptacion_terminos: string | null;
+	}> {
+		return await apiKyC.post('/auth/me/accept-terms', {});
+	}
 }
 
 export const authService = new AuthService();

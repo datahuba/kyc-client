@@ -1,11 +1,12 @@
 <script lang="ts">
-	// ISSUE-Q-PRE: Términos y Condiciones en el primer login del estudiante.
-	// Modal BLOQUEANTE (sin botón de cerrar ni click-outside): el estudiante
+	// ISSUE-Q-PRE (2026-07-29): Términos y Condiciones en el primer login
+	// de CUALQUIER usuario (estudiantes + personal admin/docente).
+	// Modal BLOQUEANTE (sin botón de cerrar ni click-outside): el usuario
 	// no puede navegar el portal hasta aceptar el reglamento de Posgrado.
 	import BlurOverlay from '$lib/components/ui/blurOverlay.svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
-	import { studentService } from '$lib/services/student.service';
+	import { authService } from '$lib/services/auth.service';
 	import { userStore } from '$lib/stores/userStore';
 	import { alert } from '$lib/utils';
 
@@ -22,8 +23,8 @@
 		if (!checked) return;
 		isLoading = true;
 		try {
-			const updated = await studentService.acceptTerms();
-			userStore.updateCurrentUser({ terminos_aceptados: updated.terminos_aceptados });
+			const res = await authService.acceptTerms();
+			userStore.updateCurrentUser({ terminos_aceptados: res.terminos_aceptados });
 			alert('success', 'Términos y condiciones aceptados. ¡Bienvenido/a!');
 		} catch (error: any) {
 			alert('error', error?.message || 'No se pudo registrar la aceptación. Intenta nuevamente.');

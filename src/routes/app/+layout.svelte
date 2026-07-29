@@ -13,12 +13,12 @@
 	let { children } = $props();
 	let sidebarOpen = $state(false);
 
-	// ISSUE-Q-PRE: bloquea la navegación del estudiante hasta que acepte
-	// el reglamento de Posgrado. Personal admin/docente siempre tiene
-	// terminos_aceptados=true desde el backend (no aplica a ellos).
+	// ISSUE-Q-PRE: bloquea la navegación del usuario hasta que acepte
+	// el reglamento de Posgrado. Aplica a TODO usuario autenticado
+	// (estudiantes + personal admin/docente). El modal se muestra la
+	// primera vez que se loguea cada uno, y se persiste la aceptación.
 	const showTermsModal = $derived(
 		$userStore.isAuthenticated &&
-			$userStore.user?.user_type === 'student' &&
 			$userStore.user?.terminos_aceptados === false
 	);
 
