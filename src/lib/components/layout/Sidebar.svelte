@@ -85,6 +85,10 @@
 			roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador'],
 			loginTypes: ['admin'],
 			children: [
+				// F-088 (2026-07-29): Vista "Deudores" unificada para cobranza.
+				// Sandra pidió en reunión poder ver a un golpe visual qué
+				// estudiantes deben qué módulos del curso. Acceso: roles económicos.
+				{ type: 'item', name: 'Deudores', href: '/app/payments/deudores', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'cpd', 'coordinador'], loginTypes: ['admin'] },
 				// F-087: Gestión de Pagos (incluye Por Pago con matriz de auditoría)
 				{ type: 'item', name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
 				// F-075: Informes (acta de notas, etc.)

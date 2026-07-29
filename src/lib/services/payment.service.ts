@@ -259,6 +259,26 @@ class PaymentService {
 		return await apiKyC.get<ResumenModulosResponse>('/payments/resumen-modulos');
 	}
 
+	// F-088 (2026-07-29): Vista "Deudores" unificada para Cobranza.
+	// Estudiantes como filas, módulos como columnas, con estado por celda
+	// (pagado / debe / no_le_toca). Sandra pidió en reunión poder ver a un
+	// solo golpe visual qué módulos debe cada estudiante.
+	async getDeudores(cursoId: string, soloDeudores = true): Promise<DeudoresResponse> {
+		const params = new URLSearchParams();
+		params.append('curso_id', cursoId);
+		params.append('solo_deudores', soloDeudores ? 'true' : 'false');
+		return await apiKyC.get<DeudoresResponse>(`/payments/deudores?${params.toString()}`);
+	}
+
+	// F-088 (2026-07-29): Exportar deudores a XLSX (mismo layout que la vista).
+	// Devuelve un Blob con el archivo XLSX. La vista se encarga de descargarlo.
+	async getDeudoresXLSX(cursoId: string, soloDeudores = true): Promise<Blob> {
+		const params = new URLSearchParams();
+		params.append('curso_id', cursoId);
+		params.append('solo_deudores', soloDeudores ? 'true' : 'false');
+		return await apiKyC.getBlob(`/payments/deudores/export-excel?${params.toString()}`);
+	}
+
 	// F-087 (2026-07-28): Vista "Por Pago" - 1 fila por cada pago individual
 	// (a diferencia de la matriz que agrupa por estudiante/módulo).
 	// Permite auditar cada Bs: cada pago lleva su comprobante, su número de
@@ -531,6 +551,67 @@ export interface ResumenPagosEnrollment {
 	total_pagado: number;
 	saldo_a_favor: number;
 	saldo_pendiente: number;
+}
+
+// =============================================================================
+// F-088 (2026-07-29): Interfaces de la vista "Deudores"
+// =============================================================================
+// Sandra pidió en reunión 2026-07-29: vista a un solo golpe visual con
+// estudiantes como filas y módulos como columnas. Verde = pagado, rojo = debe,
+// gris = no_le_toca. Filtro "solo deudores" y export Excel.
+export interface DeudoresModulo {
+	i: number;
+	nombre: string;
+	costo: number;
+	pagado: number;
+	pendiente: number;
+	estado: 'pagado' | 'debe' | 'no_le_toca';
+}
+
+export interface DeudoresMatricula {
+	costo: number;
+	pagado: number;
+	pendiente: number;
+	estado: 'pagado' | 'debe' | 'no_le_toca';
+}
+
+export interface DeudoresEstudiante {
+	estudiante_id: string;
+	registro: string;
+	nombre: string;
+	ci: string;
+	email: string;
+	celular: string;
+	estado_inscripcion: string;
+	matricula: DeudoresMatricula;
+	modulos: DeudoresModulo[];
+	deuda_total: number;
+	modulos_pendientes: number[];  // 1-based
+}
+
+export interface DeudoresResumen {
+	total_estudiantes: number;
+	total_deudores: number;
+	deuda_total_curso: number;
+	por_columna: {
+		matricula: { deben: number; monto_pendiente: number };
+		modulos: Array<{ i: number; deben: number; monto_pendiente: number }>;
+	};
+}
+
+export interface DeudoresCurso {
+	_id: string;
+	nombre: string;
+	codigo: string;
+	modulos: string[];
+	matricula_monto: number;
+}
+
+export interface DeudoresResponse {
+	curso: DeudoresCurso;
+	estudiantes: DeudoresEstudiante[];
+	resumen: DeudoresResumen;
+	filtros_aplicados: { curso_id: string; solo_deudores: boolean };
 }
 
 export const paymentService = new PaymentService();
