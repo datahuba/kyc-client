@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { page as appPage } from '$app/stores';
 	import { paymentService, studentService, courseService } from '$lib/services';
 	import type { Payment, Student, Course } from '$lib/interfaces';
@@ -271,13 +271,23 @@
 
 	// F-087 (2026-07-28): Carga la vista "Por Pago" desde el backend.
 	// 1 fila por cada pago individual, sin agrupar por módulo/estudiante.
-	let _porPagoCallCount = 0;
+	// FIX 8 (2026-07-28): usar await + tick() para que Svelte 5 re-renderice el cambio
+	// de porPagoLoading=false al terminar la carga. Con .then/.catch/.finally (FIX 5/6/7)
+	// el spinner quedaba pegado en "Cargando pagos..." aunque porPagoData ya tenía datos.
+	// Causa raíz: Svelte 5 a veces NO propaga re-renders cuando se asigna un $state dentro
+	// de un .finally() que se ejecuta en un microtask separado del .then(). Solución: usar
+	// await (microtask unificado) + await tick() para forzar el flush del DOM.
+	// FIX 8b: dedupe con _porPagoCallId — si llega una llamada nueva mientras hay una en
+	// vuelo, la vieja se ignora (stale). Esto previene el escenario donde 2 fetches en
+	// paralelo dejan porPagoLoading pegado en true si la 2da tarda más que la 1ra.
+	let _porPagoCallId = 0;
 	async function loadPorPago() {
-		_porPagoCallCount++;
-		const _callNum = _porPagoCallCount;
-		// Mostrar en pantalla el estado de la carga para debug
-		document.title = `[F-087] call=${_callNum} loading=${porPagoLoading} hasData=${!!porPagoData}`;
+		const myCallId = ++_porPagoCallId;
+		document.title = `[F-087] call#${myCallId} START loading=${porPagoLoading} hasData=${!!porPagoData}`;
 		porPagoLoading = true;
+		// Forzar re-render para que aparezca el spinner
+		await tick();
+
 		const filtrosLimpios: PorPagoFiltros = {
 			page: porPagoFiltros.page || 1,
 			per_page: porPagoFiltros.per_page || 50,
@@ -289,20 +299,30 @@
 		if (porPagoFiltros.estado_pago) filtrosLimpios.estado_pago = porPagoFiltros.estado_pago;
 		if (porPagoFiltros.subido_por) filtrosLimpios.subido_por = porPagoFiltros.subido_por;
 
-		paymentService.getMatrizPorPago(filtrosLimpios)
-			.then((data) => {
-				porPagoData = data;
-				document.title = `[F-087] call=${_callNum} DATA OK, loading=${porPagoLoading} est=${data.estudiantes?.length}`;
-			})
-			.catch((error: any) => {
-				console.error('Error cargando vista por-pago:', error);
-				alert('error', error?.message || 'Error al cargar la vista por-pago');
-				porPagoData = null;
-			})
-			.finally(() => {
+		try {
+			const data = await paymentService.getMatrizPorPago(filtrosLimpios);
+			// Si una llamada más nueva llegó mientras esperábamos, ignorar este resultado (stale)
+			if (myCallId !== _porPagoCallId) {
+				document.title = `[F-087] call#${myCallId} STALE (current=#${_porPagoCallId}), ignoring data`;
+				return;
+			}
+			porPagoData = data;
+			document.title = `[F-087] call#${myCallId} DATA OK, est=${data.estudiantes?.length} loading=${porPagoLoading}`;
+		} catch (error: any) {
+			if (myCallId !== _porPagoCallId) return;
+			console.error('[F-087] error cargando vista por-pago:', error);
+			alert('error', error?.message || 'Error al cargar la vista por-pago');
+			porPagoData = null;
+			document.title = `[F-087] call#${myCallId} ERROR: ${error?.message || 'unknown'}`;
+		} finally {
+			// Solo la última llamada en vuelo es dueña del estado de loading
+			if (myCallId === _porPagoCallId) {
 				porPagoLoading = false;
-				document.title = `[F-087] call=${_callNum} FINALLY, loading=${porPagoLoading} hasData=${!!porPagoData}`;
-			});
+				// Forzar re-render para que desaparezca el spinner
+				await tick();
+				document.title = `[F-087] call#${myCallId} FINALLY loading=${porPagoLoading} hasData=${!!porPagoData}`;
+			}
+		}
 	}
 
 	// F-087: cuando cambian los filtros de por-pago, recargar
