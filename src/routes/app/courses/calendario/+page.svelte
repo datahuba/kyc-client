@@ -83,10 +83,13 @@
 		const dias = (a: Date, b: Date) => Math.round((a.getTime() - b.getTime()) / MS_PER_DAY);
 
 		if (estadoCalc === 'programado') {
+			// f > 0 → inicio es en el futuro
+			// f < 0 → inicio ya pasó (caso borde: estado aún calculado como programado)
+			// f === 0 → hoy es el día de inicio
 			const f = dias(inicio, hoy);
-			if (f < 0) return `Inicia en ${Math.abs(f)} ${Math.abs(f) === 1 ? 'día' : 'días'}`;
+			if (f > 0) return `Inicia en ${f} ${f === 1 ? 'día' : 'días'}`;
 			if (f === 0) return 'Inicia hoy';
-			return `Inició hace ${f} ${f === 1 ? 'día' : 'días'}`; // caso borde: hoy == inicio pero estado aún no refrescó
+			return `Inició hace ${Math.abs(f)} ${Math.abs(f) === 1 ? 'día' : 'días'}`;
 		}
 		if (estadoCalc === 'en_ejecucion') {
 			const lleva = dias(hoy, inicio);
