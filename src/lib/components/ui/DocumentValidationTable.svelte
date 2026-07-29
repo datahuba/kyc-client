@@ -27,6 +27,7 @@
 	import { userStore } from '$lib/stores/userStore';
 	import { alert } from '$lib/utils';
 	import { formatDate } from '$lib/utils/formatters';
+	import { exportToExcel } from '$lib/utils/excelExport';
 
 	interface Props {
 		isOpen?: boolean;
@@ -334,38 +335,45 @@
 		motivoRechazo = '';
 	}
 
-	function exportCSV() {
-		// Construir CSV: nombre | ci | cada columna con label de estado
+	function exportXLSX() {
+		// F-XXX (2026-07-29): XLSX real en vez de CSV.
 		const cols = todasColumnas;
-		const header = ['#', 'Estudiante', 'CI', 'Email', 'Programa', ...cols.map((c) => c.label), 'Pendientes'];
-		const lines: string[] = [header.map(csvCell).join(',')];
-		filasFiltradas.forEach((f, i) => {
-			const row = [
-				String(i + 1),
-				f.estudiante.nombre || '',
-				`${f.estudiante.carnet || ''}${f.estudiante.complemento_carnet ? '-' + f.estudiante.complemento_carnet : ''}`,
-				f.estudiante.email || '',
-				f.enrollment ? coursesMap[f.enrollment.curso_id]?.codigo || '' : '',
-				...cols.map((c) => getEstadoLabel(f.celdas[c.key] || 'no_subido')),
-				String(f.pendientes),
-			];
-			lines.push(row.map(csvCell).join(','));
+		const headerLabels = ['#', 'Estudiante', 'CI', 'Email', 'Programa', ...cols.map((c) => c.label), 'Pendientes'];
+		// Mapeo a columnas para exportToExcel
+		const columnDefs = [
+			{ header: '#', key: 'numero', width: 6 },
+			{ header: 'Estudiante', key: 'estudiante', width: 30 },
+			{ header: 'CI', key: 'ci', width: 14 },
+			{ header: 'Email', key: 'email', width: 28 },
+			{ header: 'Programa', key: 'programa', width: 18 },
+			...cols.map((c) => ({ header: c.label, key: c.key, width: 18 })),
+			{ header: 'Pendientes', key: 'pendientes', width: 12 },
+		];
+		const rows = filasFiltradas.map((f, i) => {
+			const base: any = {
+				numero: i + 1,
+				estudiante: f.estudiante.nombre || '',
+				ci: `${f.estudiante.carnet || ''}${f.estudiante.complemento_carnet ? '-' + f.estudiante.complemento_carnet : ''}`,
+				email: f.estudiante.email || '',
+				programa: f.enrollment ? coursesMap[f.enrollment.curso_id]?.codigo || '' : '',
+				pendientes: f.pendientes,
+			};
+			// Celdas dinámicas
+			for (const c of cols) {
+				base[c.key] = getEstadoLabel(f.celdas[c.key] || 'no_subido');
+			}
+			return base;
 		});
-		const csv = lines.join('\n');
-		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `validacion_documentos_${new Date().toISOString().slice(0, 10)}.csv`;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
-	}
-
-	function csvCell(v: string): string {
-		const s = String(v || '').replace(/"/g, '""');
-		return /[",\n]/.test(s) ? `"${s}"` : s;
+		// Validar que headerLabels == columnDefs.map(c => c.header) para no perder datos
+		try {
+			exportToExcel(rows, columnDefs, 'validacion_documentos');
+		} catch (e) {
+			console.error('Error al exportar XLSX:', e);
+			alert('error', 'No se pudo generar el Excel. Intenta de nuevo.');
+			return;
+		}
+		// headerLabels no se usa (exportToExcel usa columnDefs.header)
+		void headerLabels;
 	}
 
 	$effect(() => {
@@ -436,12 +444,12 @@
 
 			<button
 				type="button"
-				onclick={exportCSV}
+				onclick={exportXLSX}
 				disabled={filasFiltradas.length === 0}
 				class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
 			>
 				<DownloadIcon class="size-4" />
-				CSV
+				Excel
 			</button>
 		</div>
 

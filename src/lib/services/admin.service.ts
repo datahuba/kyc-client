@@ -25,13 +25,16 @@ class AdminService {
 		hours: number = 24,
 		limit: number = 100,
 		statusCode?: number,
-		pathContains?: string
+		pathContains?: string,
+		unresolvedOnly: boolean = true
 	): Promise<ErrorLogsListResponse> {
 		const params = new URLSearchParams();
 		params.append('hours', String(hours));
 		params.append('limit', String(limit));
 		if (statusCode) params.append('status_code', String(statusCode));
 		if (pathContains) params.append('path_contains', pathContains);
+		// F-XXX (2026-07-29): incluir filtro resolved (default true = solo no resueltos)
+		params.append('unresolved_only', String(unresolvedOnly));
 
 		return await apiKyC.get<ErrorLogsListResponse>(
 			`/admin/errors/recent?${params.toString()}`
@@ -43,6 +46,33 @@ class AdminService {
 	 */
 	async getErrorDetail(errorId: string): Promise<ErrorLogDetail> {
 		return await apiKyC.get<ErrorLogDetail>(`/admin/errors/${errorId}`);
+	}
+
+	/**
+	 * F-XXX (2026-07-29): marca un error como resuelto.
+	 */
+	async resolveError(errorId: string, note?: string): Promise<any> {
+		return await apiKyC.post<any>(`/admin/errors/${errorId}/resolve`, { note: note || '' });
+	}
+
+	/**
+	 * F-XXX (2026-07-29): reabre un error marcado como resuelto.
+	 */
+	async unresolveError(errorId: string): Promise<any> {
+		return await apiKyC.post<any>(`/admin/errors/${errorId}/unresolve`, {});
+	}
+
+	/**
+	 * F-XXX (2026-07-29): auto-resuelve todos los 401 de "Token inválido o
+	 * expirado" en la ventana de tiempo indicada. Útil cuando hay miles
+	 * de errores de tokens vencidos (por usuarios con sesión expirada
+	 * que recargaron la página).
+	 */
+	async autoResolveExpiredTokens(hours: number = 168): Promise<{ resolved_count: number }> {
+		return await apiKyC.post<{ resolved_count: number }>(
+			`/admin/errors/auto-resolve-expired-tokens?hours=${hours}`,
+			{}
+		);
 	}
 
 	/**

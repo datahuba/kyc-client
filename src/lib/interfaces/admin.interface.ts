@@ -17,6 +17,11 @@ export interface ErrorLogItem {
 	user_email: string | null;
 	user_type: string | null; // 'user' | 'student' | 'anonymous' | null
 	environment: string; // 'production' | 'staging' | 'development'
+	// F-XXX (2026-07-29): estado de resolución
+	resolved?: boolean;
+	resolved_by?: string | null;
+	resolved_at?: string | null;
+	resolution_note?: string | null;
 }
 
 /** Item con detalle completo (incluye stack_trace, request_body, query_params). */

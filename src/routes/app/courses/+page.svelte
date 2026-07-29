@@ -13,6 +13,7 @@
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
+	import { exportToExcel } from '$lib/utils/excelExport';
 	import SearchInput from '$lib/components/ui/searchInput.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon, DownloadIcon } from '$lib/icons/outline';
@@ -252,36 +253,32 @@
             return;
         }
 
-        const headers = ["Estudiante", "CI", "Email", "Celular", "Estado", "Fecha Inscripcion", "Total", "Pagado", "Saldo"];
-        
+        // F-XXX (2026-07-29): XLSX en vez de CSV.
+        const columnDefs = [
+            { header: 'Estudiante', key: 'nombre', width: 30 },
+            { header: 'CI', key: 'carnet', width: 14 },
+            { header: 'Email', key: 'email', width: 28 },
+            { header: 'Celular', key: 'celular', width: 14 },
+            { header: 'Estado', key: 'estado', width: 14 },
+            { header: 'Fecha Inscripcion', key: 'fecha_inscripcion', width: 16 },
+            { header: 'Total', key: 'total_a_pagar', width: 12, format: 'currency' as const },
+            { header: 'Pagado', key: 'total_pagado', width: 12, format: 'currency' as const },
+            { header: 'Saldo', key: 'saldo_pendiente', width: 12, format: 'currency' as const },
+        ];
         try {
-            const rows = courseStudents.map(s => [
-                `"${s.nombre}"`,
-                s.carnet,
-                s.contacto.email,
-                s.contacto.celular,
-                s.inscripcion.estado,
-                formatDate(s.inscripcion.fecha_inscripcion),
-                s.financiero.total_a_pagar,
-                s.financiero.total_pagado,
-                s.financiero.saldo_pendiente
-            ]);
-
-            const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-            const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
-            
-            const year = new Date().getFullYear();
+            const rows = courseStudents.map((s: any) => ({
+                nombre: s.nombre,
+                carnet: s.carnet,
+                email: s.contacto?.email,
+                celular: s.contacto?.celular,
+                estado: s.inscripcion?.estado,
+                fecha_inscripcion: formatDate(s.inscripcion?.fecha_inscripcion),
+                total_a_pagar: s.financiero?.total_a_pagar,
+                total_pagado: s.financiero?.total_pagado,
+                saldo_pendiente: s.financiero?.saldo_pendiente,
+            }));
             const courseNameClean = (selectedCourseStudents?.nombre_programa || 'curso').replace(/\s+/g, '_');
-            const fileName = `Inscritos_${courseNameClean}_${year}.csv`;
-
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+            exportToExcel(rows, columnDefs, `Inscritos_${courseNameClean}`);
             
         } catch (error) {
             console.error("Error al exportar:", error);
@@ -559,7 +556,7 @@
 					{#snippet leftIcon()}
 						<DownloadIcon class="size-4" />
 					{/snippet}
-					Descargar CSV
+					Descargar Excel
                 </Button>
             </div>
 			<div class="overflow-x-auto">

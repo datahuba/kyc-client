@@ -16,17 +16,23 @@
 	import type { ErrorLogItem, ErrorLogDetail, ErrorLogsListResponse } from '$lib/interfaces';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Button from '$lib/components/ui/button.svelte';
+	import { slide } from 'svelte/transition';
 
 	let loading = $state(true);
 	let data: ErrorLogsListResponse | null = $state(null);
 	let selectedError: ErrorLogDetail | null = $state(null);
 	let loadingDetail = $state(false);
+	let resolvingId = $state<string | null>(null);
+	let showResolveInput = $state<string | null>(null);
+	let resolveNote = $state('');
 
 	// Filtros
 	let hours = $state(24);
 	let limit = $state(100);
 	let pathFilter = $state('');
 	let statusCodeFilter = $state<number | ''>('');
+	// F-XXX (2026-07-29): por default solo muestra errores NO resueltos
+	let unresolvedOnly = $state(true);
 
 	// Solo superadmin/admin pueden ver esto
 	// F-069 (2026-07-22): bug era `$userStore.user?.rol` (no existe) en vez de
@@ -49,11 +55,58 @@
 		loading = true;
 		try {
 			const sc = typeof statusCodeFilter === 'number' ? statusCodeFilter : undefined;
-			data = await adminService.getRecentErrors(hours, limit, sc, pathFilter || undefined);
+			data = await adminService.getRecentErrors(
+				hours,
+				limit,
+				sc,
+				pathFilter || undefined,
+				unresolvedOnly
+			);
 		} catch (error: any) {
 			alert('error', error.message || 'Error al cargar el visor de errores');
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function resolveError(errorId: string, note: string) {
+		resolvingId = errorId;
+		try {
+			await adminService.resolveError(errorId, note || undefined);
+			// Re-cargar para refrescar la lista
+			await load();
+			alert('success', 'Error marcado como resuelto.');
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo marcar como resuelto');
+		} finally {
+			resolvingId = null;
+			showResolveInput = null;
+			resolveNote = '';
+		}
+	}
+
+	async function unresolveError(errorId: string) {
+		resolvingId = errorId;
+		try {
+			await adminService.unresolveError(errorId);
+			await load();
+			alert('success', 'Error reabierto.');
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo reabrir el error');
+		} finally {
+			resolvingId = null;
+		}
+	}
+
+	// F-XXX (2026-07-29): bulk resolve para los 401 de token expirado.
+	async function autoResolveExpiredTokens() {
+		if (!confirm('¿Marcar como resueltos todos los 401 de "Token expirado" en la ventana actual? (acción masiva)')) return;
+		try {
+			const res = await adminService.autoResolveExpiredTokens(hours);
+			alert('success', `Se marcaron ${res.resolved_count} errores como resueltos.`);
+			await load();
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo auto-resolver');
 		}
 	}
 
@@ -171,6 +224,20 @@
 						class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm"
 					/>
 				</div>
+				<!-- F-XXX (2026-07-29): toggle "Solo no resueltos" -->
+				<label class="inline-flex items-center gap-2 cursor-pointer select-none pb-1">
+					<input
+						type="checkbox"
+						bind:checked={unresolvedOnly}
+						class="size-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+					/>
+					<span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+						Solo no resueltos
+					</span>
+				</label>
+				<Button variant="secondary" onclick={autoResolveExpiredTokens} disabled={loading}>
+					🧹 Auto-resolver 401 expirados
+				</Button>
 				<Button variant="primary" onclick={load} loading={loading}>
 					🔄 Refrescar
 				</Button>
@@ -239,12 +306,13 @@
 								<th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Path</th>
 								<th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Error</th>
 								<th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">User</th>
+								<th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Resuelto</th>
 								<th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Acción</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
 							{#each data.items as err (err.id)}
-								<tr class="hover:bg-gray-50/50 dark:hover:bg-gray-700/30">
+								<tr class={`hover:bg-gray-50/50 dark:hover:bg-gray-700/30 ${err.resolved ? 'opacity-60' : ''}`}>
 									<td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
 										{formatTimestamp(err.timestamp)}
 									</td>
@@ -274,13 +342,70 @@
 									<td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
 										{err.user_email || '—'}
 									</td>
+									<td class="px-4 py-3 text-xs">
+										{#if err.resolved}
+											<span class="inline-flex items-center gap-1 text-green-700 dark:text-green-400 font-semibold" title={`Resuelto por ${err.resolved_by || '?'} el ${err.resolved_at ? formatTimestamp(err.resolved_at) : ''}`}>
+												✓ Resuelto
+											</span>
+										{:else}
+											<span class="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold">
+												⏳ Pendiente
+											</span>
+										{/if}
+									</td>
 									<td class="px-4 py-3 text-right">
-										<button
-											onclick={() => viewDetail(err.id)}
-											class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium"
-										>
-											Ver detalle →
-										</button>
+										<div class="flex items-center justify-end gap-2">
+											{#if !err.resolved && showResolveInput === err.id}
+												<!-- F-XXX (2026-07-29): input inline para resolver con nota -->
+												<div class="flex items-center gap-1" transition:slide={{ duration: 150 }}>
+													<input
+														type="text"
+														bind:value={resolveNote}
+														placeholder="Nota opcional..."
+														class="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-900 w-40"
+													/>
+													<button
+														onclick={() => resolveError(err.id, resolveNote)}
+														disabled={resolvingId === err.id}
+														class="text-xs bg-green-600 hover:bg-green-700 text-white font-semibold rounded px-2 py-1 disabled:opacity-50"
+														title="Confirmar resolución"
+													>
+														✓
+													</button>
+													<button
+														onclick={() => { showResolveInput = null; resolveNote = ''; }}
+														class="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1"
+														title="Cancelar"
+													>
+														✗
+													</button>
+												</div>
+											{:else if !err.resolved}
+												<button
+													onclick={() => { showResolveInput = err.id; resolveNote = ''; }}
+													disabled={resolvingId === err.id}
+													class="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 dark:text-emerald-300 font-semibold rounded px-2 py-1 disabled:opacity-50"
+													title="Marcar como resuelto"
+												>
+													✓ Resolver
+												</button>
+											{:else}
+												<button
+													onclick={() => unresolveError(err.id)}
+													disabled={resolvingId === err.id}
+													class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 font-semibold rounded px-2 py-1 disabled:opacity-50"
+													title="Reabrir este error"
+												>
+													↻ Reabrir
+												</button>
+											{/if}
+											<button
+												onclick={() => viewDetail(err.id)}
+												class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium"
+											>
+												Detalle →
+											</button>
+										</div>
 									</td>
 								</tr>
 							{/each}

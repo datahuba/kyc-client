@@ -347,8 +347,13 @@
 								<th class="text-left p-2 font-bold min-w-[110px]">CI</th>
 								<th class="text-left p-2 font-bold min-w-[100px]">Celular</th>
 								<th class="text-center p-2 font-bold min-w-[110px]">Matrícula</th>
-								{#each data.curso.modulos as m, idx (idx)}
-									<th class="text-center p-2 font-bold min-w-[110px]">{m}</th>
+								<!-- F-XXX (2026-07-29): columnas de módulos como "Módulo 1, 2..."
+								     en vez del nombre largo. El nombre del módulo queda
+								     como tooltip en el header (al hacer hover). -->
+								{#each data.curso.modulos as _m, idx (idx)}
+									<th class="text-center p-2 font-bold min-w-[110px]" title={data.curso.modulos[idx]}>
+										Módulo {idx + 1}
+									</th>
 								{/each}
 								<th class="text-right p-2 font-bold min-w-[110px]">Deuda total</th>
 							</tr>

@@ -6,6 +6,7 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import { alert } from '$lib/utils';
 	import type { Course, Enrollment, Student } from '$lib/interfaces';
+	import { exportToExcel } from '$lib/utils/excelExport';
 
 	let loading = $state(true);
     let myModules: any[] = $state([]); 
@@ -254,30 +255,25 @@
 	function exportCSV() {
 		if (!activeModule || moduleEnrollments.length === 0) return;
 
-		const headers = ['Estudiante', 'Registro', 'CI', 'Calificacion'];
+		// F-XXX (2026-07-29): XLSX en vez de CSV.
+		const columnDefs = [
+			{ header: 'Estudiante', key: 'nombre', width: 30 },
+			{ header: 'Registro', key: 'registro', width: 14 },
+			{ header: 'CI', key: 'carnet', width: 14 },
+			{ header: 'Calificacion', key: 'calificacion', width: 14 },
+		];
 		const rows = moduleEnrollments.map(e => {
 			const student = students[e.estudiante_id];
 			const realIndex = activeModule.modulo_index - 1;
 			const notaActual = (e.modulos && e.modulos.length > realIndex) ? e.modulos[realIndex].nota : '';
-			
-			return [
-				`"${student?.nombre || 'Desconocido'}"`,
-				student?.registro || '',
-				student?.carnet || '',
-				notaActual !== null ? notaActual : ''
-			];
+			return {
+				nombre: student?.nombre || 'Desconocido',
+				registro: student?.registro || '',
+				carnet: student?.carnet || '',
+				calificacion: notaActual !== null ? notaActual : '',
+			};
 		});
-
-		const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');
-		const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = `Planilla_${activeModule.curso_codigo}_Modulo${activeModule.modulo_index}.csv`;
-		document.body.appendChild(link);
-		link.click();
-		document.body.removeChild(link);
-		URL.revokeObjectURL(url);
+		exportToExcel(rows, columnDefs, `Planilla_${activeModule.curso_codigo}_Modulo${activeModule.modulo_index}`);
 	}
 
 	function importCSV(event: Event) {

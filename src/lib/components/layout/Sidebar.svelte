@@ -44,7 +44,13 @@
 		children: NavigationItem[];
 	}
 
-	type NavigationEntry = NavigationItem | NavigationGroup;
+	// F-XXX (2026-07-29): spacer visual entre Dashboard y el resto del menú.
+	// Se ignora en el filtrado (entryAllowed retorna true siempre).
+	interface NavigationSpacer {
+		type: 'spacer';
+	}
+
+	type NavigationEntry = NavigationItem | NavigationGroup | NavigationSpacer;
 
 	interface Props {
 		isOpen: boolean;
@@ -56,19 +62,21 @@
 
 	const navigation: NavigationEntry[] = [
 		// === Académico (estudiantes y docentes) ===
-		// Orden alfabético
+		// F-XXX (2026-07-29): Dashboard primero, espacio, resto alfabético
+		{ type: 'item', name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
+		{ type: 'spacer' },
 		{ type: 'item', name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
 		{ type: 'item', name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
-		{ type: 'item', name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 		{ type: 'item', name: 'Mis Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ type: 'item', name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ type: 'item', name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
 
-		// === Staff administrativo (orden alfabético) ===
-		// ISSUE-Q-PRE-REGISTRO-FORM: formularios dinámicos de pre-inscripción. Lo ven super admin,
-		// admin, cpd (para los formularios generales) y encargado/coordinador (los delegados a sus cursos).
-		{ type: 'item', name: 'Calendario', href: '/app/courses/calendario', icon: CalendarIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['admin'] },
+		// === Staff administrativo ===
+		// F-XXX (2026-07-29): Dashboard primero, espacio, resto alfabético.
+		// Grupos (Financiero, Solicitudes) intercalados alfabéticamente.
 		{ type: 'item', name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		{ type: 'spacer' },
+		{ type: 'item', name: 'Calendario', href: '/app/courses/calendario', icon: CalendarIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
@@ -86,8 +94,6 @@
 			loginTypes: ['admin'],
 			children: [
 				// F-088 (2026-07-29): Vista "Deudores" unificada para cobranza.
-				// Sandra pidió en reunión poder ver a un golpe visual qué
-				// estudiantes deben qué módulos del curso. Acceso: roles económicos.
 				{ type: 'item', name: 'Deudores', href: '/app/payments/deudores', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'cpd', 'coordinador'], loginTypes: ['admin'] },
 				// F-087: Gestión de Pagos (incluye Por Pago con matriz de auditoría)
 				{ type: 'item', name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
@@ -103,9 +109,27 @@
 		{ type: 'item', name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Pre-inscripciones', href: '/app/pre-registros', icon: ClipboardIcon, roles: ['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Solicitudes', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
+
+		// F-XXX (2026-07-29): GRUPO "Solicitudes" — Kevin pidió agrupar las 3
+		// vistas de solicitudes en un solo menú desplegable (Solicitudes,
+		// Solicitudes de Inscripción, Solicitudes de Pasivo). El grupo va
+		// alfabéticamente entre "Programas" y "Usuarios".
+		{
+			type: 'group',
+			name: 'Solicitudes',
+			icon: ClipboardIcon,
+			roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'],
+			loginTypes: ['admin'],
+			children: [
+				// Solicitudes de creación de cuenta de estudiante
+				{ type: 'item', name: 'Solicitudes de Cuenta', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
+				// Solicitudes de Inscripción (pre-inscripción a cursos)
+				{ type: 'item', name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+				// Solicitudes de Pasivo (solicitar estado pasivo)
+				{ type: 'item', name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
+			]
+		},
+
 		{ type: 'item', name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
 		// F-070 (2026-07-22): validación de notas (CPD/Admin/Superadmin). Surge del
 		// bug urgente: Miguel (socio de Kevin) tenía 51 notas en pendiente_validacion
@@ -127,6 +151,9 @@
 	const ECONOMIC_HREFS = ['/app/reports', '/app/payments', '/app/payment-config', '/app/bank-statements', '/app/informes'];
 
 	function entryAllowed(entry: NavigationEntry): boolean {
+		// F-XXX (2026-07-29): los spacers se aceptan siempre (no son items).
+		if (entry.type === 'spacer') return true;
+
 		// ISSUE-R-ROLES: encargado_curso y coordinador son staff administrativo también
 		const isStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(userRole);
 		const isTeacher = userRole === 'docente' || academicRole === 'teacher';
@@ -149,12 +176,14 @@
 
 	let filteredNavigation = $derived(navigation
 		.map((entry): NavigationEntry | null => {
+			// F-XXX (2026-07-29): spacer siempre pasa, no se filtra.
+			if (entry.type === 'spacer') return entry;
 			// Si es un grupo, filtrar sus hijos. Si no queda ninguno, descartar el grupo.
 			if (entry.type === 'group') {
 				const visibleChildren = entry.children.filter(c => entryAllowed(c));
 				if (visibleChildren.length === 0) return null;
 				// ISSUE-R-PERFIL-GENERICO: si el coordinador no es financiero, no mostrar el grupo Financiero
-				if (userRole === 'coordinador' && !esCoordinadorFinanciero) return null;
+				if (entry.name === 'Financiero' && userRole === 'coordinador' && !esCoordinadorFinanciero) return null;
 				return { ...entry, children: visibleChildren };
 			}
 			return entryAllowed(entry) ? entry : null;
@@ -175,6 +204,10 @@
 			}
 		}
 	});
+
+	// F-XXX (2026-07-29): auto-expand del grupo "Solicitudes" si la ruta
+	// actual está dentro de sus hijos. (Patrón equivalente al de Financiero.)
+	// El effect de arriba ya cubre esto (es genérico por nombre de grupo).
 
 	function isCurrent(href: string) {
 		if (href.startsWith('http')) return false;
@@ -225,8 +258,11 @@
 			<ul role="list" class="flex flex-1 flex-col gap-y-7">
 				<li>
 					<ul role="list" class="-mx-2 space-y-1">
-						{#each filteredNavigation as entry (entry.name)}
-							{#if entry.type === 'item'}
+						{#each filteredNavigation as entry, idx (idx + '-' + ((entry as any).name ?? 'spacer-' + idx))}
+							{#if entry.type === 'spacer'}
+								<!-- F-XXX (2026-07-29): separador visual entre Dashboard y el resto -->
+								<li class="my-2 border-t border-gray-200 dark:border-gray-800" aria-hidden="true"></li>
+							{:else if entry.type === 'item'}
 								<li>
 									<a href={entry.href} target={entry.external ? (entry.target ?? '_blank') : undefined} rel={entry.external ? (entry.rel ?? 'noopener noreferrer') : undefined} title={isCollapsed ? entry.name : ''} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isCurrent(entry.href) ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-50'}`}>
 										<!-- RENDIMIENTO DE ÍCONOS DINÁMICOS COMPATIBLE CON COMPILADOR ESTRICTO EN LINUX -->

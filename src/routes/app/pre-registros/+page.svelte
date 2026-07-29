@@ -22,6 +22,7 @@
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import { Pagination } from '$lib/components/ui';
+	import { exportToExcel } from '$lib/utils/excelExport';
 	import {
 		PlusIcon,
 		ClipboardIcon,
@@ -361,15 +362,35 @@
 				escapeCSV(d.mensaje || '')
 			].join(',');
 		});
-		const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
-		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		const filename = `pre-inscripciones-${new Date().toISOString().split('T')[0]}.csv`;
-		a.download = filename;
-		a.click();
-		URL.revokeObjectURL(url);
+		// F-XXX (2026-07-29): XLSX en vez de CSV.
+		const columnDefs = [
+			{ header: 'Formulario', key: 'formulario', width: 28 },
+			{ header: 'Nombre', key: 'nombre', width: 30 },
+			{ header: 'Email', key: 'email', width: 28 },
+			{ header: 'CI', key: 'ci', width: 18 },
+			{ header: 'Celular', key: 'celular', width: 14 },
+			{ header: 'Fecha de nacimiento', key: 'fecha_nac', width: 16 },
+			{ header: 'Sexo', key: 'sexo', width: 10 },
+			{ header: 'Estado', key: 'estado', width: 14 },
+			{ header: 'Fecha de envío', key: 'created_at', width: 22 },
+			{ header: 'Mensaje', key: 'mensaje', width: 32 },
+		];
+		const rowsForExcel = submissions.map((s: any) => {
+			const d = s.data || {};
+			return {
+				formulario: s.form_nombre || formNameById.get(s.form_id) || s.form_id || '',
+				nombre: d.nombre || '',
+				email: d.email || '',
+				ci: d.carnet + (d.extension ? ' ' + d.extension : ''),
+				celular: d.celular || '',
+				fecha_nac: d.fecha_nacimiento || '',
+				sexo: d.sexo || '',
+				estado: s.estado,
+				created_at: s.created_at ? new Date(s.created_at).toLocaleString('es-BO') : '',
+				mensaje: d.mensaje || '',
+			};
+		});
+		exportToExcel(rowsForExcel, columnDefs, 'pre-inscripciones');
 		alert('success', `${submissions.length} pre-inscripciones exportadas.`);
 	}
 
