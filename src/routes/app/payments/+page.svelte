@@ -271,13 +271,13 @@
 
 	// F-087 (2026-07-28): Carga la vista "Por Pago" desde el backend.
 	// 1 fila por cada pago individual, sin agrupar por módulo/estudiante.
+	let _porPagoCallCount = 0;
 	async function loadPorPago() {
-		console.log('[F-087] loadPorPago START, porPagoLoading was:', porPagoLoading);
+		_porPagoCallCount++;
+		const _callNum = _porPagoCallCount;
+		// Mostrar en pantalla el estado de la carga para debug
+		document.title = `[F-087] call=${_callNum} loading=${porPagoLoading} hasData=${!!porPagoData}`;
 		porPagoLoading = true;
-		console.log('[F-087] after set porPagoLoading=true, value:', porPagoLoading);
-		// FIX: hacer la request con await suelto (sin try/finally) para que
-		// Svelte 5 aplique correctamente el cambio de estado al re-render.
-		// El catch se hace por separado.
 		const filtrosLimpios: PorPagoFiltros = {
 			page: porPagoFiltros.page || 1,
 			per_page: porPagoFiltros.per_page || 50,
@@ -291,18 +291,17 @@
 
 		paymentService.getMatrizPorPago(filtrosLimpios)
 			.then((data) => {
-				console.log('[F-087] THEN: got data, est count:', data.estudiantes?.length);
 				porPagoData = data;
+				document.title = `[F-087] call=${_callNum} DATA OK, loading=${porPagoLoading} est=${data.estudiantes?.length}`;
 			})
 			.catch((error: any) => {
-				console.error('[F-087] CATCH:', error);
+				console.error('Error cargando vista por-pago:', error);
 				alert('error', error?.message || 'Error al cargar la vista por-pago');
 				porPagoData = null;
 			})
 			.finally(() => {
-				console.log('[F-087] FINALLY: setting porPagoLoading=false, was:', porPagoLoading);
 				porPagoLoading = false;
-				console.log('[F-087] FINALLY: after, value:', porPagoLoading);
+				document.title = `[F-087] call=${_callNum} FINALLY, loading=${porPagoLoading} hasData=${!!porPagoData}`;
 			});
 	}
 
