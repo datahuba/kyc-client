@@ -19,7 +19,8 @@
 	 */
 	import { onMount, tick } from 'svelte';
 	import { slide, fade } from 'svelte/transition';
-	import { XIcon, CircleCheckIcon, StopwatchIcon, CheckIcon, XMarkIcon, EyeIcon, FileTextIcon, UsersIcon, RefreshIcon, DownloadIcon, ExclamationCircleIcon } from '$lib/icons/outline';
+	import { XIcon, CircleCheckIcon, StopwatchIcon, CheckIcon, XMarkIcon, EyeIcon, FileTextIcon, UsersIcon, RefreshIcon, DownloadIcon } from '$lib/icons/outline';
+	import { ExclamationCircleIcon } from '$lib/icons/solid';
 	import Button from '$lib/components/ui/button.svelte';
 	import { enrollmentService, studentService, courseService } from '$lib/services';
 	import type { Enrollment, Student } from '$lib/interfaces';

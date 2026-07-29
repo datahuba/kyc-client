@@ -14,13 +14,34 @@
 		isEditable?: boolean;
 		children?: import('svelte').Snippet;
 		disabled?: boolean;
+		// F-090 (2026-07-29): validación de tamaño de archivo ANTES de subir.
+		// Caso Nelly: imagen muy pesada falla la subida y el usuario pierde
+		// la noción del estado de los demás archivos. Con esta validación
+		// prevenimos el error mostrando un mensaje claro antes de consumir
+		// el ancho de banda. Default: 15MB (cubre comprobantes de pago y
+		// PDFs típicos, evita imágenes de celular de 50MB+).
+		maxSizeMB?: number;
 	}
 
-	let { label, accept = '*', file = null, loading = false, onFileSelect, id, preview = true, initialUrl = null, isEditable = false, children, disabled = false }: Props = $props();
+	let {
+		label,
+		accept = '*',
+		file = null,
+		loading = false,
+		onFileSelect,
+		id,
+		preview = true,
+		initialUrl = null,
+		isEditable = false,
+		children,
+		disabled = false,
+		maxSizeMB = 15
+	}: Props = $props();
 
 	let inputRef: HTMLInputElement;
 	let dragOver = $state(false);
 	let previewUrl: string | null = $state(null);
+	let sizeError = $state('');
 
 	$effect(() => {
 		if (file && preview) {
@@ -32,7 +53,7 @@
 				reader.readAsDataURL(file);
 			} else {
 				// For PDFs/other files, we don't preview inline to avoid auto-downloads
-				previewUrl = null; 
+				previewUrl = null;
 			}
 		} else if (initialUrl && !file) {
 			previewUrl = initialUrl;
@@ -46,6 +67,17 @@
 			URL.revokeObjectURL(previewUrl);
 		}
 	});
+
+	// F-090: helper para validar tamaño
+	function validarTamano(f: File): boolean {
+		sizeError = '';
+		const sizeMB = f.size / 1024 / 1024;
+		if (sizeMB > maxSizeMB) {
+			sizeError = `El archivo pesa ${sizeMB.toFixed(1)} MB y el máximo permitido es ${maxSizeMB} MB. Comprime la imagen o usa un PDF más liviano.`;
+			return false;
+		}
+		return true;
+	}
 
 	function handleDragOver(e: DragEvent) {
 		if (loading || disabled) return;
@@ -63,14 +95,25 @@
 		dragOver = false;
 		if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
 			const droppedFile = e.dataTransfer.files[0];
-			onFileSelect(droppedFile);
+			if (validarTamano(droppedFile)) {
+				onFileSelect(droppedFile);
+			} else {
+				// Reset input para que pueda re-intentar con el mismo archivo
+				if (inputRef) inputRef.value = '';
+			}
 		}
 	}
 
 	function handleChange(e: Event) {
 		const target = e.target as HTMLInputElement;
 		if (target.files && target.files.length > 0) {
-			onFileSelect(target.files[0]);
+			const selected = target.files[0];
+			if (validarTamano(selected)) {
+				onFileSelect(selected);
+			} else {
+				// Reset input para que pueda re-intentar con el mismo archivo
+				target.value = '';
+			}
 		}
 	}
 
@@ -102,6 +145,13 @@
 		onchange={handleChange}
 		disabled={loading || disabled}
 	/>
+
+	{#if sizeError}
+		<p class="mt-2 text-xs text-red-600 dark:text-red-400 flex items-start gap-1" role="alert">
+			<XIcon class="size-3.5 shrink-0 mt-0.5" />
+			<span>{sizeError}</span>
+		</p>
+	{/if}
 
 	{#if children}
 		<div onclick={triggerClick}>
