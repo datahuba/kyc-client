@@ -233,7 +233,7 @@
 			<select
 				id="filtro-year"
 				bind:value={filtroYear}
-				on:change={onFiltroChange}
+				onchange={onFiltroChange}
 				class="text-sm border border-slate-300 rounded px-2 py-1 bg-white"
 			>
 				<option value="">Todos</option>
@@ -248,7 +248,7 @@
 			<select
 				id="filtro-tipo"
 				bind:value={filtroTipo}
-				on:change={onFiltroChange}
+				onchange={onFiltroChange}
 				class="text-sm border border-slate-300 rounded px-2 py-1 bg-white"
 			>
 				{#each TIPOS_CURSO as t}
@@ -262,7 +262,7 @@
 			<select
 				id="filtro-estado"
 				bind:value={filtroEstado}
-				on:change={onFiltroChange}
+				onchange={onFiltroChange}
 				class="text-sm border border-slate-300 rounded px-2 py-1 bg-white"
 			>
 				{#each ESTADOS as e}
@@ -277,7 +277,7 @@
 				class="px-3 py-1 text-xs font-semibold rounded transition {vista === 'lista'
 					? 'bg-white shadow text-slate-800'
 					: 'text-slate-500 hover:text-slate-700'}"
-				on:click={() => (vista = 'lista')}
+				onclick={() => (vista = 'lista')}
 			>
 				📋 Lista
 			</button>
@@ -286,7 +286,7 @@
 				class="px-3 py-1 text-xs font-semibold rounded transition {vista === 'timeline'
 					? 'bg-white shadow text-slate-800'
 					: 'text-slate-500 hover:text-slate-700'}"
-				on:click={() => (vista = 'timeline')}
+				onclick={() => (vista = 'timeline')}
 			>
 				📊 Timeline
 			</button>
