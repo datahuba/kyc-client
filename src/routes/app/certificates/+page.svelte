@@ -175,6 +175,23 @@
 		return n;
 	}
 
+	/**
+	 * F-CERTIFICADOS-UX (2026-07-29): resumen visual del progreso por módulo.
+	 * Devuelve un objeto con la info visual para el badge de cada módulo.
+	 * - Pagado: verde con check
+	 * - Parcial: amarillo con info
+	 * - Pendiente: gris con círculo
+	 */
+	function getModuloBadgeInfo(m: any): { color: string; label: string; icon: string } {
+		if (m.estado === 'Pagado') {
+			return { color: 'bg-light-success/10 text-light-success dark:bg-dark-success/20 dark:text-dark-success', label: 'Pagado', icon: '✓' };
+		}
+		if (m.estado === 'Parcial') {
+			return { color: 'bg-light-warning/10 text-light-warning dark:bg-dark-warning/20 dark:text-dark-warning', label: 'Parcial', icon: '◐' };
+		}
+		return { color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400', label: 'Pendiente', icon: '○' };
+	}
+
 	function getNoDeudorElegibilidad(e: Enrollment, hastaN: number): { ok: boolean; motivo: string | null } {
 		const total = e.modulos?.length ?? 0;
 		if (total === 0) {
@@ -844,6 +861,47 @@
 							</div>
 						{/snippet}
 
+						<!-- F-CERTIFICADOS-UX: Resumen visual del progreso del programa -->
+						{#if totalModulos > 0}
+							<section class="mb-5">
+								<div class="flex items-center justify-between gap-2 mb-2">
+									<p class="text-xs font-semibold uppercase tracking-wider text-light-four dark:text-dark-four">
+										Progreso de pago
+									</p>
+									<p class="text-xs font-bold text-primary-700 dark:text-primary-300 tabular-nums">
+										{ultPagado} / {totalModulos} módulos
+									</p>
+								</div>
+								<!-- Barra de progreso -->
+								<div class="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden mb-3">
+									<div
+										class="h-full rounded-full transition-all duration-500 {ultPagado === totalModulos
+											? 'bg-light-success dark:bg-dark-success'
+											: 'bg-primary-600 dark:bg-primary-500'}"
+										style="width: {Math.min(100, (ultPagado / totalModulos) * 100)}%"
+									></div>
+								</div>
+								<!-- Mini-lista de módulos con badges -->
+								<div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+									{#each enrollment.modulos as m, i (i)}
+										{@const badge = getModuloBadgeInfo(m)}
+										<div class="flex items-center justify-between gap-2 text-xs rounded-md border border-gray-200 dark:border-dark-border bg-light-primary dark:bg-dark-background px-2.5 py-1.5">
+											<div class="flex items-center gap-2 min-w-0">
+												<span class="font-mono font-bold text-light-four dark:text-dark-four shrink-0 w-6">M{i + 1}</span>
+												<span class="truncate text-light-black dark:text-dark-white" title={m.nombre}>
+													{m.nombre || `Módulo ${i + 1}`}
+												</span>
+											</div>
+											<span class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium {badge.color} shrink-0">
+												<span aria-hidden="true">{badge.icon}</span>
+												<span>{badge.label}</span>
+											</span>
+										</div>
+									{/each}
+								</div>
+							</section>
+						{/if}
+
 						<!-- SECCIÓN 1: Certificado de Notas -->
 						<section class="mb-6">
 							<div class="flex items-center gap-2 mb-3">
@@ -897,6 +955,19 @@
 								{#if totalModulos === 0}
 									<p class="text-sm text-light-four dark:text-dark-four italic">Esta inscripción no tiene módulos asociados.</p>
 								{:else}
+									<!-- Hint visual: hasta dónde podés llegar ahora -->
+									<div class="mb-3 flex items-center gap-2 text-xs">
+										<span class="inline-flex items-center gap-1.5 rounded-md bg-light-success/10 dark:bg-dark-success/20 text-light-success dark:text-dark-success px-2 py-1 font-medium">
+											<span aria-hidden="true">✓</span>
+											<span>Hasta Módulo {ultPagado} disponible{ultPagado === 1 ? '' : 's'}</span>
+										</span>
+										{#if ultPagado < totalModulos}
+											<span class="text-light-four dark:text-dark-four">
+												· Pagá los siguientes para ampliar el alcance
+											</span>
+										{/if}
+									</div>
+
 									<label for="modulo-n-{eid}" class="block mb-2 text-sm font-medium text-light-black dark:text-dark-white">¿Hasta qué módulo?</label>
 									<div class="flex flex-col sm:flex-row sm:items-center gap-3">
 										<select
@@ -909,7 +980,10 @@
 											}}
 										>
 											{#each Array.from({ length: totalModulos }, (_, i) => i + 1) as n}
-												<option value={n}>Módulo {n}</option>
+												{@const isPagado = n <= ultPagado}
+												<option value={n}>
+													Módulo {n}{isPagado ? ' ✓' : ''}
+												</option>
 											{/each}
 										</select>
 										<Button variant="primary" size="md" disabled={!elegibleNoDeudor.ok} loading={emittingNoDeudor[eid]} onclick={() => emitirNoDeudor(enrollment)} ariaLabel="Emitir Certificado de No Deudor hasta Módulo {hastaN}">
