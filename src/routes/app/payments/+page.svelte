@@ -47,6 +47,10 @@
 			const saved = localStorage.getItem('payments_view');
 			if (saved === 'matriz' || saved === 'lista' || saved === 'porpago') viewMode = saved;
 		}
+		// FIX (2026-07-28): si la vista restaurada es 'porpago', cargar datos
+		if (viewMode === 'porpago') {
+			loadPorPago();
+		}
 	}
 	function setViewMode(mode: 'lista' | 'matriz' | 'porpago') {
 		if (!isStaff && mode !== 'lista') return; // estudiante solo puede estar en 'lista'
@@ -292,17 +296,36 @@
 	}
 
 	// F-087: cuando cambian los filtros de por-pago, recargar
-	$effect(() => {
+	// FIX (2026-07-28): el $effect con Svelte 5 estaba causando loop infinito
+	// porque re-tracking implícito disparaba loadPorPago múltiples veces.
+	// Solución: NO usar $effect. Cargar manualmente cuando se entra a la vista
+	// (en setViewMode) y en cada onchange de los filtros.
+	// (El watcher implícito que hacía era trampa.)
+
+	// Función pública para recargar la vista por-pago (llamada desde handlers y desde el botón Recargar)
+	function recargarPorPago() {
 		if (isStaff && viewMode === 'porpago') {
-			// Dependencias explícitas
-			porPagoFiltros.curso_id;
-			porPagoFiltros.modulo_index;
-			porPagoFiltros.estado_pago;
-			porPagoFiltros.subido_por;
-			porPagoFiltros.page;
 			loadPorPago();
 		}
-	});
+	}
+
+	// Wrapper para onchange de filtros: setea el valor Y recarga
+	function onPorPagoFiltroChange(key: 'curso_id' | 'estado_pago' | 'subido_por', value: string) {
+		(porPagoFiltros as any)[key] = value;
+		porPagoFiltros.page = 1;
+		recargarPorPago();
+	}
+
+	function onPorPagoModuloChange(v: string) {
+		porPagoFiltros.modulo_index = v === '' ? null : Number(v);
+		porPagoFiltros.page = 1;
+		recargarPorPago();
+	}
+
+	function onPorPagoPageChange(newPage: number) {
+		porPagoFiltros.page = newPage;
+		recargarPorPago();
+	}
 
 	onMount(async () => {
 		initViewMode(); // FIX: restaurar viewMode desde localStorage solo si es staff
@@ -1226,7 +1249,7 @@
 			<select
 				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
 				value={porPagoFiltros.curso_id}
-				onchange={(e) => { porPagoFiltros.curso_id = (e.currentTarget as HTMLSelectElement).value; porPagoFiltros.page = 1; }}
+				onchange={(e) => onPorPagoFiltroChange('curso_id', (e.currentTarget as HTMLSelectElement).value)}
 			>
 				<option value="">Todos</option>
 				{#each coursesListFiltrada as c}
@@ -1239,16 +1262,13 @@
 			<select
 				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
 				value={porPagoFiltros.modulo_index === null || porPagoFiltros.modulo_index === undefined ? '' : String(porPagoFiltros.modulo_index)}
-				onchange={(e) => {
-					const v = (e.currentTarget as HTMLSelectElement).value;
-					porPagoFiltros.modulo_index = v === '' ? null : Number(v);
-					porPagoFiltros.page = 1;
-				}}
+				onchange={(e) => onPorPagoModuloChange((e.currentTarget as HTMLSelectElement).value)}
 			>
 				<option value="">Todos</option>
 				<option value="0">Matrícula</option>
-				{#if porPagoData && porPagoData.items.length > 0}
-					{#each Array.from(new Set(porPagoData.items.filter((i) => (i.modulo_index ?? -1) > 0).map((i) => i.modulo_index))) as mi}
+				{#if porPagoData && porPagoData.estudiantes.length > 0}
+					{@const modulosUnicos = Array.from(new Set(porPagoData.estudiantes.flatMap((e) => e.pagos).filter((p) => (p.modulo_index ?? -1) > 0).map((p) => p.modulo_index)))}
+					{#each modulosUnicos as mi}
 						<option value={String(mi)}>Módulo {mi}</option>
 					{/each}
 				{/if}
@@ -1259,7 +1279,7 @@
 			<select
 				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
 				value={porPagoFiltros.estado_pago}
-				onchange={(e) => { porPagoFiltros.estado_pago = (e.currentTarget as HTMLSelectElement).value; porPagoFiltros.page = 1; }}
+				onchange={(e) => onPorPagoFiltroChange('estado_pago', (e.currentTarget as HTMLSelectElement).value)}
 			>
 				<option value="">Todos</option>
 				<option value="aprobado">Aprobado</option>
@@ -1273,7 +1293,7 @@
 			<select
 				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
 				value={porPagoFiltros.subido_por}
-				onchange={(e) => { porPagoFiltros.subido_por = (e.currentTarget as HTMLSelectElement).value; porPagoFiltros.page = 1; }}
+				onchange={(e) => onPorPagoFiltroChange('subido_por', (e.currentTarget as HTMLSelectElement).value)}
 			>
 				<option value="">Todos</option>
 				<option value="estudiante">Estudiante</option>
@@ -1452,7 +1472,7 @@
 							<button
 								type="button"
 								disabled={porPagoData.page <= 1}
-								onclick={() => { porPagoFiltros.page = Math.max(1, porPagoData!.page - 1); }}
+								onclick={() => onPorPagoPageChange(Math.max(1, porPagoData!.page - 1))}
 								class="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700"
 							>
 								← Anterior
@@ -1460,7 +1480,7 @@
 							<button
 								type="button"
 								disabled={porPagoData.page >= porPagoData.total_pages}
-								onclick={() => { porPagoFiltros.page = porPagoData!.page + 1; }}
+								onclick={() => onPorPagoPageChange(porPagoData!.page + 1)}
 								class="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700"
 							>
 								Siguiente →
