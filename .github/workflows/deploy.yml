@@ -25,6 +25,19 @@ jobs:
             # no puede acceder a /root directamente).
             sudo -n bash << 'REMOTE_EOF'
             set -e
+            # F-ACTIONS-FIX-FLOCK (2026-07-28): lock file para evitar race condition
+            # entre GitHub Actions y deploys manuales. Sin esto, ambos procesos
+            # pelean por el mismo container y se rompen mutuamente. Si hay otro
+            # deploy corriendo, esperamos hasta 5 min; si no termina, abortamos.
+            LOCK="/tmp/deploy-frontend.lock"
+            exec 200>"$LOCK"
+            if ! flock -n 200; then
+              echo "⏳ Otro deploy está corriendo (lock: $LOCK). Esperando hasta 5 min..."
+              if ! flock -w 300 200; then
+                echo "❌ Timeout esperando lock. Abortando."
+                exit 1
+              fi
+            fi
             echo "🧹 1. LIMPIANDO ESTADO LOCAL DEL VPS..."
             # ISSUE-MIGRACION (2026-07-17): movido de /var/www/frontend a /root/postgrado/frontend
             cd /root/postgrado/frontend
