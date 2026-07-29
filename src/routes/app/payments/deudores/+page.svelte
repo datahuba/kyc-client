@@ -336,9 +336,22 @@
 					{/if}
 				</div>
 			{:else}
-				<!-- Tabla con scroll horizontal en mobile -->
+				<!-- F-069 X-COMPACT (2026-07-29): tabla compacta, sin scroll horizontal en PC.
+				     Se eliminó el `min-w-[800px]` forzado. Las celdas se truncan con ellipsis
+				     + tooltip. La columna Estudiante queda sticky para mantener visible el nombre
+				     al scrollear (útil en mobile). El módulo cabe en 72px (icon + monto). -->
 				<div class="overflow-x-auto -mx-4 px-4">
-					<table class="w-full text-xs border-collapse min-w-[800px]">
+					<table class="w-full text-xs border-collapse table-fixed">
+						<colgroup>
+							<col class="w-[180px]" />
+							<col class="w-[80px]" />
+							<col class="w-[95px]" />
+							<col class="w-[95px]" />
+							{#each data.curso.modulos as _m, idx (idx)}
+								<col class="w-[72px]" />
+							{/each}
+							<col class="w-[90px]" />
+						</colgroup>
 						<thead>
 							<tr class="bg-primary-50 dark:bg-primary-900/30 text-primary-900 dark:text-primary-100">
 								<th class="text-left p-2 font-bold sticky left-0 bg-primary-50 dark:bg-primary-900/30 z-10 min-w-[180px]">
@@ -351,8 +364,8 @@
 								     en vez del nombre largo. El nombre del módulo queda
 								     como tooltip en el header (al hacer hover). -->
 								{#each data.curso.modulos as _m, idx (idx)}
-									<th class="text-center p-2 font-bold min-w-[110px]" title={data.curso.modulos[idx]}>
-										Módulo {idx + 1}
+									<th class="text-center px-1 py-1.5 font-bold" title={data.curso.modulos[idx]}>
+										M{idx + 1}
 									</th>
 								{/each}
 								<th class="text-right p-2 font-bold min-w-[110px]">Deuda total</th>
@@ -361,51 +374,51 @@
 						<tbody>
 							{#each estudiantesFiltrados as est (est.estudiante_id)}
 								<tr class="border-t border-gray-200 dark:border-gray-700 {getDeudorRowClass(est)}">
-									<td class="p-2 sticky left-0 bg-white dark:bg-gray-900 z-10">
-										<div class="font-semibold text-gray-900 dark:text-gray-100 truncate max-w-[200px]" title={est.nombre}>
+									<td class="px-2 py-1.5 sticky left-0 bg-white dark:bg-gray-900 z-10">
+										<div class="font-semibold text-gray-900 dark:text-gray-100 truncate" title={est.nombre}>
 											{est.nombre}
 										</div>
-										<div class="text-[10px] text-gray-500">
+										<div class="text-[10px] text-gray-500 truncate" title={est.registro}>
 											{est.registro}
 											{#if est.estado_inscripcion && est.estado_inscripcion !== 'activo'}
 												· <span class="uppercase font-bold">{est.estado_inscripcion}</span>
 											{/if}
 										</div>
 									</td>
-									<td class="p-2 text-gray-700 dark:text-gray-300 font-mono text-[11px]">
+									<td class="px-2 py-1.5 text-gray-700 dark:text-gray-300 font-mono text-[11px] truncate" title={est.ci}>
 										{est.ci || '—'}
 									</td>
-									<td class="p-2 text-gray-700 dark:text-gray-300">
-										<a href={`https://wa.me/${(est.celular || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" class="text-emerald-700 hover:underline">
+									<td class="px-2 py-1.5 text-gray-700 dark:text-gray-300 truncate">
+										<a href={`https://wa.me/${(est.celular || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" class="text-emerald-700 hover:underline" title={`WhatsApp ${est.celular || ''}`}>
 											{est.celular || '—'}
 										</a>
 									</td>
-									<td class="p-2 text-center">
-										<div class={`inline-block rounded border px-1.5 py-0.5 text-[11px] ${getCeldaClass(est.matricula.estado)}`}>
-											<div class="flex items-center gap-1">
-												<span class="text-base leading-none">{getCeldaIcon(est.matricula.estado)}</span>
+									<td class="px-2 py-1.5 text-center">
+										<div class={`inline-block rounded border px-1 py-0.5 text-[10px] ${getCeldaClass(est.matricula.estado)}`} title={`Matrícula: Bs. ${fmt(est.matricula.pagado)} / Bs. ${fmt(est.matricula.costo)}`}>
+											<div class="flex items-center justify-center gap-0.5">
+												<span class="text-sm leading-none">{getCeldaIcon(est.matricula.estado)}</span>
 												{#if est.matricula.estado !== 'no_le_toca'}
-													<span>Bs. {fmt(est.matricula.pagado)} / {fmt(est.matricula.costo)}</span>
+													<span class="tabular-nums">{fmt(est.matricula.pagado)}/{fmt(est.matricula.costo)}</span>
 												{/if}
 											</div>
 										</div>
 									</td>
 									{#each est.modulos as mod (mod.i)}
-										<td class="p-2 text-center">
-											<div class={`inline-block rounded border px-1.5 py-0.5 text-[11px] ${getCeldaClass(mod.estado)}`}>
-												<div class="flex items-center gap-1">
-													<span class="text-base leading-none">{getCeldaIcon(mod.estado)}</span>
+										<td class="px-1 py-1.5 text-center">
+											<div class={`inline-block rounded border px-1 py-0.5 text-[10px] ${getCeldaClass(mod.estado)}`} title={`Módulo ${mod.i + 1}: Bs. ${fmt(mod.pagado)} / Bs. ${fmt(mod.costo)}`}>
+												<div class="flex items-center justify-center gap-0.5">
+													<span class="text-sm leading-none">{getCeldaIcon(mod.estado)}</span>
 													{#if mod.estado !== 'no_le_toca'}
-														<span>Bs. {fmt(mod.pagado)} / {fmt(mod.costo)}</span>
+														<span class="tabular-nums">{fmt(mod.pagado)}/{fmt(mod.costo)}</span>
 													{/if}
 												</div>
 											</div>
 										</td>
 									{/each}
-									<td class="p-2 text-right">
+									<td class="px-2 py-1.5 text-right">
 										{#if est.deuda_total > 0.01}
-											<div class="inline-block rounded border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-800">
-												Bs. {fmt(est.deuda_total)}
+											<div class="inline-block rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[11px] font-bold text-red-800 tabular-nums">
+												{fmt(est.deuda_total)}
 											</div>
 										{:else}
 											<span class="text-gray-400 text-[11px]">—</span>
