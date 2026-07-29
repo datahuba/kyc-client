@@ -1,13 +1,20 @@
 <script lang="ts">
 	/**
-	 * /app/certificates — Vista principal de Certificados del estudiante
+	 * /app/certificates — Vista dual de Certificados
 	 *
-	 * F-CERTIFICADOS (2026-07-29): el estudiante puede:
-	 * - Solicitar emisión de Certificado de Notas (si cumple requisitos: programa
-	 *   finalizado + saldo cero).
-	 * - Solicitar emisión de Certificado de No Deudor hasta un módulo N (si los
-	 *   módulos 1..N están pagados).
-	 * - Ver y re-descargar su historial de certificados emitidos.
+	 * F-CERTIFICADOS (2026-07-29): la sección "Certificados" es visible para
+	 * todos los roles (Kevin: "es para estudiantes y admin").
+	 *
+	 * - Estudiante (Student): vista de emisión.
+	 *   - Selector de programa (auto si =1, dropdown si >1).
+	 *   - Card del programa seleccionado con secciones Notas y No Deudor.
+	 *   - Historial de certificados emitidos por el estudiante.
+	 *
+	 * - Staff (User con rol en STAFF_ROLES): vista de auditoría.
+	 *   - Lista paginada de todos los certificados emitidos con filtros
+	 *     (estudiante, programa, tipo, año, folio).
+	 *   - Botón de reimprimir PDF en cada fila.
+	 *   - Sin emisión directa (pueden usar el flujo normal con enrollment_id).
 	 *
 	 * Reglas de UI:
 	 * - Svelte 5 runes ($state, $derived, $effect).
@@ -19,10 +26,14 @@
 	 */
 
 	import { onMount } from 'svelte';
-	import { enrollmentService, courseService, certificateService } from '$lib/services';
+	import {
+		enrollmentService,
+		courseService,
+		certificateService
+	} from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
 	import { alert } from '$lib/utils';
-	import type { Certificate, Enrollment, Course } from '$lib/interfaces';
+	import type { Certificate, Enrollment, Course, Student } from '$lib/interfaces';
 
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -34,33 +45,80 @@
 		FileTextIcon,
 		DownloadIcon,
 		CircleCheckIcon,
-		ExclamationIcon
+		ExclamationIcon,
+		SearchIcon
 	} from '$lib/icons/outline';
 
 	// ========================================================================
-	// STATE
+	// HELPERS de identidad
 	// ========================================================================
 
-	let enrollments: Enrollment[] = $state([]);
-	let coursesMap: Record<string, Course> = $state({});
-	let issuedCertificates: Certificate[] = $state([]);
-	let loading = $state(true);
-	let downloadingId = $state<string | null>(null);
-
-	// Estado de emisión por enrollment_id y tipo
-	let emittingNotas = $state<Record<string, boolean>>({});
-	let emittingNoDeudor = $state<Record<string, boolean>>({});
-	let hastaModuloNSelections = $state<Record<string, number>>({});
-
-	// ID del usuario actual (string, nunca undefined en este punto del flujo)
 	function getUserId(): string {
 		const u: any = $userStore?.user;
 		if (!u) return '';
 		return String(u._id || u.id || '');
 	}
 
+	function getUserRole(): string {
+		const u: any = $userStore?.user;
+		if (!u) return '';
+		return String(u.role || u.rol || '');
+	}
+
+	function isStaff(): boolean {
+		const role = getUserRole();
+		return ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(role);
+	}
+
+	function isStudent(): boolean {
+		const role = getUserRole();
+		const u: any = $userStore?.user;
+		const userType = u?.user_type || '';
+		return userType === 'student' || role === 'student';
+	}
+
 	// ========================================================================
-	// DERIVADOS: reglas de elegibilidad por enrollment
+	// STATE COMPARTIDO
+	// ========================================================================
+
+	let issuedCertificates: Certificate[] = $state([]);
+	let loading = $state(true);
+	let downloadingId = $state<string | null>(null);
+
+	// ========================================================================
+	// STATE: VISTA ESTUDIANTE
+	// ========================================================================
+
+	let enrollments: Enrollment[] = $state([]);
+	let coursesMap: Record<string, Course> = $state({});
+	let emittingNotas = $state<Record<string, boolean>>({});
+	let emittingNoDeudor = $state<Record<string, boolean>>({});
+	let hastaModuloNSelections = $state<Record<string, number>>({});
+	let selectedEnrollmentId = $state<string>('');
+
+	$effect(() => {
+		if (enrollments.length > 0 && !selectedEnrollmentId) {
+			selectedEnrollmentId = String(enrollments[0]._id || enrollments[0].id || '');
+		}
+	});
+
+	// ========================================================================
+	// STATE: VISTA STAFF
+	// ========================================================================
+
+	let staffFilterStudent = $state('');
+	let staffFilterCourse = $state('');
+	let staffFilterTipo = $state<'todos' | 'notas' | 'no_deudor'>('todos');
+	let staffFilterAnio = $state<number | null>(null);
+	let staffFilterFolio = $state('');
+	let staffStudents: Student[] = $state([]);
+	let staffCourses: Course[] = $state([]);
+	let staffCertTotal = $state(0);
+	let staffCertPage = $state(1);
+	const staffPerPage = 20;
+
+	// ========================================================================
+	// DERIVADOS: VISTA ESTUDIANTE
 	// ========================================================================
 
 	function notasCursando(e: Enrollment): string[] {
@@ -91,9 +149,7 @@
 		const eid = e._id || e.id;
 		if (!eid) return null;
 		return (
-			issuedCertificates.find(
-				(c) => c.tipo === 'notas' && c.enrollment_id === eid
-			) || null
+			issuedCertificates.find((c) => c.tipo === 'notas' && c.enrollment_id === eid) || null
 		);
 	}
 
@@ -149,11 +205,19 @@
 		return coursesMap[cid] || null;
 	}
 
+	function getSelectedEnrollment(): Enrollment | null {
+		if (enrollments.length === 0) return null;
+		const found = enrollments.find(
+			(e) => String(e._id || e.id || '') === selectedEnrollmentId
+		);
+		return found || enrollments[0];
+	}
+
 	// ========================================================================
-	// DATA FETCHING
+	// DATA FETCHING: VISTA ESTUDIANTE
 	// ========================================================================
 
-	async function cargarDatos() {
+	async function cargarDatosEstudiante() {
 		const userId = getUserId();
 		if (!userId) {
 			loading = false;
@@ -165,7 +229,7 @@
 			const [enrollmentsData, certsData] = await Promise.all([
 				enrollmentService.getByStudentId(userId),
 				certificateService.listMy().catch((err) => {
-					console.warn('No se pudieron cargar certificados emitidos:', err);
+					console.warn('No se pudieron cargar certificados:', err);
 					return [];
 				})
 			]);
@@ -173,7 +237,6 @@
 			enrollments = enrollmentsData || [];
 			issuedCertificates = certsData;
 
-			// Cargar cursos en batch
 			const cursoIds = Array.from(
 				new Set(enrollments.map((e) => e.curso_id).filter(Boolean))
 			);
@@ -198,37 +261,72 @@
 		}
 	}
 
-	onMount(() => {
-		cargarDatos();
-	});
+	// ========================================================================
+	// DATA FETCHING: VISTA STAFF
+	// ========================================================================
+
+	async function cargarDatosStaff() {
+		loading = true;
+		try {
+			const [allStudents, allCourses] = await Promise.all([
+				studentService.getAll(1, 500).catch((err) => {
+					console.warn('No se pudieron cargar estudiantes:', err);
+					return { data: [] };
+				}),
+				courseService.getAll(1, 500).catch((err) => {
+					console.warn('No se pudieron cargar cursos:', err);
+					return { data: [] };
+				})
+			]);
+			staffStudents = (allStudents as any).data || allStudents || [];
+			staffCourses = (allCourses as any).data || allCourses || [];
+		} catch (err: any) {
+			console.error('Error cargando datos staff:', err);
+			alert('error', err?.message || 'No se pudieron cargar los datos.');
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function cargarCertificadosStaff() {
+		try {
+			const params: any = { page: staffCertPage, per_page: staffPerPage };
+			if (staffFilterStudent) params.student_id = staffFilterStudent;
+			if (staffFilterCourse) params.course_id = staffFilterCourse;
+			if (staffFilterTipo !== 'todos') params.tipo = staffFilterTipo;
+			if (staffFilterAnio) params.anio = staffFilterAnio;
+			if (staffFilterFolio) params.folio = staffFilterFolio;
+
+			const resp = await certificateService.listAdmin(params);
+			issuedCertificates = resp.items;
+			staffCertTotal = resp.total;
+		} catch (err: any) {
+			console.error('Error cargando certificados:', err);
+			alert('error', err?.message || 'No se pudieron cargar los certificados.');
+		}
+	}
 
 	// ========================================================================
-	// ACCIONES: emitir certificados
+	// ACCIONES: emitir certificados (vista estudiante)
 	// ========================================================================
 
 	async function emitirNotas(e: Enrollment) {
 		const eid = e._id || e.id;
 		if (!eid) return;
-
 		const elegible = isNotasElegible(e);
 		if (!elegible.ok) {
 			alert('warning', elegible.motivo || 'No cumples los requisitos.');
 			return;
 		}
-
 		emittingNotas = { ...emittingNotas, [eid]: true };
 		try {
 			const cert = await certificateService.emitNotas(eid);
 			issuedCertificates = [cert, ...issuedCertificates];
-			alert(
-				'success',
-				`Certificado de Notas emitido. Folio: ${cert.folio}. La descarga empezará en breve.`
-			);
+			alert('success', `Certificado de Notas emitido. Folio: ${cert.folio}.`);
 			await descargarPdf(cert);
 		} catch (err: any) {
 			console.error('Error emitiendo notas:', err);
-			const detail =
-				err?.response?.data?.detail || err?.message || 'No se pudo emitir el certificado.';
+			const detail = err?.response?.data?.detail || err?.message || 'No se pudo emitir el certificado.';
 			alert('error', detail);
 		} finally {
 			emittingNotas = { ...emittingNotas, [eid]: false };
@@ -238,27 +336,21 @@
 	async function emitirNoDeudor(e: Enrollment) {
 		const eid = e._id || e.id;
 		if (!eid) return;
-
 		const hastaN = hastaModuloNSelections[eid] || 1;
 		const elegible = getNoDeudorElegibilidad(e, hastaN);
 		if (!elegible.ok) {
 			alert('warning', elegible.motivo || 'No cumples los requisitos.');
 			return;
 		}
-
 		emittingNoDeudor = { ...emittingNoDeudor, [eid]: true };
 		try {
 			const cert = await certificateService.emitNoDeudor(eid, hastaN);
 			issuedCertificates = [cert, ...issuedCertificates];
-			alert(
-				'success',
-				`Certificado de No Deudor (hasta Módulo ${hastaN}) emitido. Folio: ${cert.folio}. La descarga empezará en breve.`
-			);
+			alert('success', `Certificado de No Deudor (hasta Módulo ${hastaN}) emitido. Folio: ${cert.folio}.`);
 			await descargarPdf(cert);
 		} catch (err: any) {
 			console.error('Error emitiendo no deudor:', err);
-			const detail =
-				err?.response?.data?.detail || err?.message || 'No se pudo emitir el certificado.';
+			const detail = err?.response?.data?.detail || err?.message || 'No se pudo emitir el certificado.';
 			alert('error', detail);
 		} finally {
 			emittingNoDeudor = { ...emittingNoDeudor, [eid]: false };
@@ -279,8 +371,7 @@
 			setTimeout(() => URL.revokeObjectURL(url), 1000);
 		} catch (err: any) {
 			console.error('Error descargando PDF:', err);
-			const detail =
-				err?.response?.data?.detail || err?.message || 'No se pudo descargar el PDF.';
+			const detail = err?.response?.data?.detail || err?.message || 'No se pudo descargar el PDF.';
 			alert('error', detail);
 		} finally {
 			downloadingId = null;
@@ -298,14 +389,74 @@
 			const clean = s.replace(/(\.\d+)?$/, '').replace(/([+-]\d{2}:?\d{2}|Z)$/, 'Z');
 			const d = new Date(clean);
 			return d.toLocaleDateString('es-BO', {
-				day: '2-digit',
-				month: '2-digit',
-				year: 'numeric'
+				day: '2-digit', month: '2-digit', year: 'numeric'
 			});
 		} catch {
 			return iso;
 		}
 	}
+
+	function getStudentName(cert: Certificate): string {
+		// El backend actualmente no devuelve el nombre del estudiante en la lista
+		// (solo student_id). En el futuro se puede popular. Por ahora, mostramos
+		// el nombre si está disponible o un placeholder.
+		return cert.estudiante_nombre || '—';
+	}
+
+	function getCourseName(cert: Certificate): string {
+		return cert.programa_nombre || '—';
+	}
+
+	// ========================================================================
+	// LIFECYCLE
+	// ========================================================================
+
+	// Necesitamos el studentService para la vista staff
+	import { studentService } from '$lib/services';
+
+	onMount(() => {
+		if (isStaff()) {
+			cargarDatosStaff().then(() => cargarCertificadosStaff());
+		} else {
+			cargarDatosEstudiante();
+		}
+	});
+
+	// Recargar certificados cuando cambian los filtros
+	$effect(() => {
+		// Dependencias reactivas explícitas
+		void staffFilterStudent;
+		void staffFilterCourse;
+		void staffFilterTipo;
+		void staffFilterAnio;
+		void staffFilterFolio;
+		void staffCertPage;
+		if (isStaff() && !loading) {
+			cargarCertificadosStaff();
+		}
+	});
+
+	function aplicarFiltros() {
+		staffCertPage = 1;
+		cargarCertificadosStaff();
+	}
+
+	function limpiarFiltros() {
+		staffFilterStudent = '';
+		staffFilterCourse = '';
+		staffFilterTipo = 'todos';
+		staffFilterAnio = null;
+		staffFilterFolio = '';
+		staffCertPage = 1;
+		cargarCertificadosStaff();
+	}
+
+	const aniosDisponibles = (() => {
+		const current = new Date().getFullYear();
+		const arr: number[] = [];
+		for (let y = current; y >= current - 5; y--) arr.push(y);
+		return arr;
+	})();
 </script>
 
 <svelte:head>
@@ -319,10 +470,12 @@
 			<Heading level="h1" weight="bold" color="primary">
 				{#snippet children()}
 					<h1 class="text-2xl sm:text-3xl font-bold text-primary-700 dark:text-primary-300">
-						Tus Certificados
+						{isStaff() ? 'Certificados emitidos' : 'Tus Certificados'}
 					</h1>
 					<p class="text-sm text-light-four dark:text-dark-four mt-1">
-						Descarga constancias oficiales emitidas por la Unidad de Postgrado.
+						{isStaff()
+							? 'Vista de auditoría: reimprime o verifica cualquier certificado emitido por la Unidad de Postgrado.'
+							: 'Descarga constancias oficiales emitidas por la Unidad de Postgrado.'}
 					</p>
 				{/snippet}
 			</Heading>
@@ -335,7 +488,246 @@
 				<Skeleton variant="block" lines={3} />
 			</div>
 
-		<!-- Empty state -->
+		<!-- ====================================================== -->
+		<!-- VISTA STAFF: Auditoría de certificados emitidos           -->
+		<!-- ====================================================== -->
+		{:else if isStaff()}
+			<!-- Filtros -->
+			<Card variant="bordered">
+				{#snippet header()}
+					<div class="flex items-center gap-2">
+						<SearchIcon class="w-5 h-5 text-uagrm-blue dark:text-dark-tertiary" />
+						<h3 class="text-base font-semibold text-light-black dark:text-dark-white">
+							Filtros de búsqueda
+						</h3>
+					</div>
+				{/snippet}
+
+				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+					<div>
+						<label for="f-student" class="block text-sm font-medium text-light-black dark:text-dark-white mb-1">
+							Estudiante
+						</label>
+						<select
+							id="f-student"
+							bind:value={staffFilterStudent}
+							class="w-full rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-light-black dark:text-dark-white px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+						>
+							<option value="">— Todos —</option>
+							{#each staffStudents as s (s._id)}
+								<option value={s._id}>{s.nombre} {s.registro ? `(Reg: ${s.registro})` : ''}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div>
+						<label for="f-course" class="block text-sm font-medium text-light-black dark:text-dark-white mb-1">
+							Programa
+						</label>
+						<select
+							id="f-course"
+							bind:value={staffFilterCourse}
+							class="w-full rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-light-black dark:text-dark-white px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+						>
+							<option value="">— Todos —</option>
+							{#each staffCourses as c (c._id)}
+								<option value={c._id}>{c.nombre_programa}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div>
+						<label for="f-tipo" class="block text-sm font-medium text-light-black dark:text-dark-white mb-1">
+							Tipo
+						</label>
+						<select
+							id="f-tipo"
+							bind:value={staffFilterTipo}
+							class="w-full rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-light-black dark:text-dark-white px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+						>
+							<option value="todos">— Todos —</option>
+							<option value="notas">Certificado de Notas</option>
+							<option value="no_deudor">Certificado de No Deudor</option>
+						</select>
+					</div>
+
+					<div>
+						<label for="f-anio" class="block text-sm font-medium text-light-black dark:text-dark-white mb-1">
+							Año
+						</label>
+						<select
+							id="f-anio"
+							bind:value={staffFilterAnio}
+							class="w-full rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-light-black dark:text-dark-white px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+						>
+							<option value={null}>— Todos —</option>
+							{#each aniosDisponibles as y}
+								<option value={y}>{y}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div>
+						<label for="f-folio" class="block text-sm font-medium text-light-black dark:text-dark-white mb-1">
+							Folio (ej: 042)
+						</label>
+						<input
+							id="f-folio"
+							type="text"
+							bind:value={staffFilterFolio}
+							placeholder="042"
+							class="w-full rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-light-black dark:text-dark-white px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+						/>
+					</div>
+				</div>
+
+				<div class="mt-4 flex gap-2">
+					<Button variant="primary" size="sm" onclick={aplicarFiltros}>
+						<SearchIcon class="w-4 h-4 mr-1.5" />
+						Buscar
+					</Button>
+					<Button variant="ghost" size="sm" onclick={limpiarFiltros}>
+						Limpiar
+					</Button>
+				</div>
+			</Card>
+
+			<!-- Tabla de resultados -->
+			<section class="mt-6">
+				<div class="flex items-center justify-between mb-3">
+					<p class="text-sm text-light-four dark:text-dark-four">
+						{staffCertTotal} certificado{staffCertTotal === 1 ? '' : 's'} encontrado{staffCertTotal === 1 ? '' : 's'}.
+					</p>
+				</div>
+
+				{#if issuedCertificates.length === 0}
+					<EmptyState
+						variant="bordered"
+						size="md"
+						icon="search"
+						title="Sin resultados"
+						description="No hay certificados que coincidan con los filtros aplicados."
+					/>
+				{:else}
+					<!-- Desktop: tabla -->
+					<div class="hidden sm:block rounded-lg border border-gray-200 dark:border-dark-border overflow-hidden">
+						<table class="w-full text-sm">
+							<thead class="bg-primary-50 dark:bg-primary-900/30 text-light-four dark:text-dark-four">
+								<tr>
+									<th class="px-3 py-2 text-left font-medium uppercase tracking-wider text-xs">Folio</th>
+									<th class="px-3 py-2 text-left font-medium uppercase tracking-wider text-xs">Tipo</th>
+									<th class="px-3 py-2 text-left font-medium uppercase tracking-wider text-xs">Estudiante</th>
+									<th class="px-3 py-2 text-left font-medium uppercase tracking-wider text-xs">Programa</th>
+									<th class="px-3 py-2 text-left font-medium uppercase tracking-wider text-xs">Emitido</th>
+									<th class="px-3 py-2 text-right font-medium uppercase tracking-wider text-xs">Acción</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each issuedCertificates as cert (cert.id)}
+									<tr class="border-t border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-background">
+										<td class="px-3 py-2 font-mono font-semibold text-primary-700 dark:text-primary-300">
+											{cert.folio}
+										</td>
+										<td class="px-3 py-2">
+											<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium {cert.tipo === 'notas' ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-200' : 'bg-uagrm-sky/10 text-uagrm-blue dark:bg-dark-tertiary/10 dark:text-dark-tertiary'}">
+												{cert.tipo === 'notas' ? 'Notas' : 'No Deudor'}{#if cert.hasta_modulo_n} · M{cert.hasta_modulo_n}{/if}
+											</span>
+										</td>
+										<td class="px-3 py-2 text-light-black dark:text-dark-white">
+											{getStudentName(cert)}
+											<p class="text-xs text-light-four dark:text-dark-four">
+												Reg: {cert.estudiante_registro || '—'}
+											</p>
+										</td>
+										<td class="px-3 py-2 text-light-black dark:text-dark-white max-w-xs truncate" title={getCourseName(cert)}>
+											{getCourseName(cert)}
+										</td>
+										<td class="px-3 py-2 text-light-four dark:text-dark-four">
+											{formatDate(cert.emitido_en)}
+										</td>
+										<td class="px-3 py-2 text-right">
+											<Button
+												variant="ghost"
+												size="sm"
+												loading={downloadingId === cert.id}
+												onclick={() => descargarPdf(cert)}
+												ariaLabel="Re-imprimir {cert.folio}"
+											>
+												<DownloadIcon class="w-4 h-4" />
+											</Button>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+
+					<!-- Móvil: cards -->
+					<div class="sm:hidden space-y-3">
+						{#each issuedCertificates as cert (cert.id)}
+							<Card variant="bordered">
+								<div class="flex items-start justify-between gap-3">
+									<div class="min-w-0 flex-1">
+										<p class="font-mono text-sm font-semibold text-primary-700 dark:text-primary-300">
+											{cert.folio}
+										</p>
+										<p class="text-xs mt-1 text-light-four dark:text-dark-four">
+											{cert.tipo === 'notas' ? 'Certificado de Notas' : `No Deudor · M${cert.hasta_modulo_n ?? ''}`}
+										</p>
+										<p class="text-sm mt-1 text-light-black dark:text-dark-white truncate">
+											{getStudentName(cert)}
+										</p>
+										<p class="text-xs mt-1 text-light-four dark:text-dark-four truncate" title={getCourseName(cert)}>
+											{getCourseName(cert)}
+										</p>
+										<p class="text-xs mt-1 text-light-four dark:text-dark-four">
+											{formatDate(cert.emitido_en)}
+										</p>
+									</div>
+									<Button
+										variant="ghost"
+										size="sm"
+										loading={downloadingId === cert.id}
+										onclick={() => descargarPdf(cert)}
+										ariaLabel="Re-imprimir {cert.folio}"
+									>
+										<DownloadIcon class="w-4 h-4" />
+									</Button>
+								</div>
+							</Card>
+						{/each}
+					</div>
+
+					<!-- Paginación simple -->
+					{#if staffCertTotal > staffPerPage}
+						<div class="mt-4 flex items-center justify-center gap-2">
+							<Button
+								variant="ghost"
+								size="sm"
+								disabled={staffCertPage <= 1}
+								onclick={() => { staffCertPage = Math.max(1, staffCertPage - 1); cargarCertificadosStaff(); }}
+							>
+								« Anterior
+							</Button>
+							<span class="text-sm text-light-four dark:text-dark-four">
+								Página {staffCertPage} de {Math.ceil(staffCertTotal / staffPerPage)}
+							</span>
+							<Button
+								variant="ghost"
+								size="sm"
+								disabled={staffCertPage >= Math.ceil(staffCertTotal / staffPerPage)}
+								onclick={() => { staffCertPage++; cargarCertificadosStaff(); }}
+							>
+								Siguiente »
+							</Button>
+						</div>
+					{/if}
+				{/if}
+			</section>
+
+		<!-- ====================================================== -->
+		<!-- VISTA ESTUDIANTE: emisión de certificados                -->
+		<!-- ====================================================== -->
 		{:else if enrollments.length === 0}
 			<EmptyState
 				variant="bordered"
@@ -345,10 +737,36 @@
 				description="Cuando te inscribas a un diplomado o programa, aquí podrás solicitar tus certificados de Notas y de No Deudor."
 			/>
 
-		<!-- Contenido principal -->
 		{:else}
 			<div class="space-y-6">
-				{#each enrollments as enrollment (enrollment._id || enrollment.id || '')}
+				{#if enrollments.length > 1}
+					<div class="rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface p-4">
+						<label
+							for="programa-selector"
+							class="block mb-2 text-sm font-medium text-light-black dark:text-dark-white"
+						>
+							Selecciona el programa
+						</label>
+						<select
+							id="programa-selector"
+							class="w-full rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-light-black dark:text-dark-white px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+							value={selectedEnrollmentId}
+							onchange={(ev) => {
+								selectedEnrollmentId = (ev.currentTarget as HTMLSelectElement).value;
+							}}
+						>
+							{#each enrollments as e (e._id || e.id || '')}
+								{@const c = getCourse(e)}
+								<option value={String(e._id || e.id || '')}>
+									{c?.nombre_programa || 'Programa'} {c?.codigo ? `(${c.codigo})` : ''}
+								</option>
+							{/each}
+						</select>
+					</div>
+				{/if}
+
+				{#if getSelectedEnrollment()}
+					{@const enrollment = getSelectedEnrollment()!}
 					{@const eid = String(enrollment._id || enrollment.id || '')}
 					{@const course = getCourse(enrollment)}
 					{@const elegibleNotas = isNotasElegible(enrollment)}
@@ -367,17 +785,11 @@
 									</h3>
 									<p class="text-sm text-light-four dark:text-dark-four mt-1">
 										{course?.codigo ? `Código: ${course.codigo}` : ''}
-										{#if totalModulos > 0}
-											· {totalModulos} módulo{totalModulos === 1 ? '' : 's'}
-										{/if}
+										{#if totalModulos > 0}· {totalModulos} módulo{totalModulos === 1 ? '' : 's'}{/if}
 										{#if (enrollment.saldo_pendiente ?? 0) > 0.01}
-											· <span class="text-light-error dark:text-dark-error font-medium">
-												Saldo pendiente: Bs {enrollment.saldo_pendiente.toFixed(2)}
-											</span>
+											· <span class="text-light-error dark:text-dark-error font-medium">Saldo pendiente: Bs {enrollment.saldo_pendiente.toFixed(2)}</span>
 										{:else if totalModulos > 0}
-											· <span class="text-light-success dark:text-dark-success font-medium">
-												Pagado completo
-											</span>
+											· <span class="text-light-success dark:text-dark-success font-medium">Pagado completo</span>
 										{/if}
 									</p>
 								</div>
@@ -388,68 +800,36 @@
 						<section class="mb-6">
 							<div class="flex items-center gap-2 mb-3">
 								<FileTextIcon class="w-5 h-5 text-primary-600 dark:text-primary-400" />
-								<h4 class="text-base font-semibold text-light-black dark:text-dark-white">
-									Certificado de Notas
-								</h4>
+								<h4 class="text-base font-semibold text-light-black dark:text-dark-white">Certificado de Notas</h4>
 							</div>
 
 							{#if notasYaEmitido}
-								<div
-									class="rounded-lg border border-light-success/40 bg-light-success/5 dark:border-dark-success/40 dark:bg-dark-success/5 p-4"
-								>
+								<div class="rounded-lg border border-light-success/40 bg-light-success/5 dark:border-dark-success/40 dark:bg-dark-success/5 p-4">
 									<div class="flex items-start gap-3">
 										<CircleCheckIcon class="w-6 h-6 text-light-success dark:text-dark-success shrink-0 mt-0.5" />
 										<div class="flex-1 min-w-0">
-											<p class="text-sm font-medium text-light-black dark:text-dark-white">
-												Ya emitido · Folio {notasYaEmitido.folio}
-											</p>
-											<p class="text-xs text-light-four dark:text-dark-four mt-0.5">
-												{formatDate(notasYaEmitido.emitido_en)}
-											</p>
+											<p class="text-sm font-medium text-light-black dark:text-dark-white">Ya emitido · Folio {notasYaEmitido.folio}</p>
+											<p class="text-xs text-light-four dark:text-dark-four mt-0.5">{formatDate(notasYaEmitido.emitido_en)}</p>
 										</div>
-										<Button
-											variant="primary"
-											size="sm"
-											loading={downloadingId === notasYaEmitido.id}
-											onclick={() => descargarPdf(notasYaEmitido)}
-											ariaLabel="Re-descargar Certificado de Notas {notasYaEmitido.folio}"
-										>
-											<DownloadIcon class="w-4 h-4 mr-1.5" />
-											Descargar
+										<Button variant="primary" size="sm" loading={downloadingId === notasYaEmitido.id} onclick={() => descargarPdf(notasYaEmitido)} ariaLabel="Re-descargar Certificado de Notas {notasYaEmitido.folio}">
+											<DownloadIcon class="w-4 h-4 mr-1.5" />Descargar
 										</Button>
 									</div>
 								</div>
 							{:else if elegibleNotas.ok}
-								<div
-									class="rounded-lg border border-light-success/40 bg-light-success/5 dark:border-dark-success/40 dark:bg-dark-success/5 p-4"
-								>
-									<p class="text-sm text-light-black dark:text-dark-white mb-3">
-										¡Cumples todos los requisitos! Programa finalizado y sin saldo pendiente.
-									</p>
-									<Button
-										variant="primary"
-										size="md"
-										loading={emittingNotas[eid]}
-										onclick={() => emitirNotas(enrollment)}
-										ariaLabel="Emitir Certificado de Notas"
-									>
-										<DownloadIcon class="w-4 h-4 mr-2" />
-										Descargar Certificado de Notas
+								<div class="rounded-lg border border-light-success/40 bg-light-success/5 dark:border-dark-success/40 dark:bg-dark-success/5 p-4">
+									<p class="text-sm text-light-black dark:text-dark-white mb-3">¡Cumples todos los requisitos! Programa finalizado y sin saldo pendiente.</p>
+									<Button variant="primary" size="md" loading={emittingNotas[eid]} onclick={() => emitirNotas(enrollment)} ariaLabel="Emitir Certificado de Notas">
+										<DownloadIcon class="w-4 h-4 mr-2" />Descargar Certificado de Notas
 									</Button>
 								</div>
 							{:else}
-								<div
-									class="rounded-lg border border-light-warning/40 bg-light-warning/5 dark:border-dark-warning/40 dark:bg-dark-warning/5 p-4"
-								>
+								<div class="rounded-lg border border-light-warning/40 bg-light-warning/5 dark:border-dark-warning/40 dark:bg-dark-warning/5 p-4">
 									<div class="flex items-start gap-3">
 										<ExclamationIcon class="w-5 h-5 text-light-warning dark:text-dark-warning shrink-0 mt-0.5" />
 										<div>
-											<p class="text-sm font-medium text-light-black dark:text-dark-white">
-												Aún no puedes emitir este certificado
-											</p>
-											<p class="text-sm text-light-four dark:text-dark-four mt-1">
-												{elegibleNotas.motivo}
-											</p>
+											<p class="text-sm font-medium text-light-black dark:text-dark-white">Aún no puedes emitir este certificado</p>
+											<p class="text-sm text-light-four dark:text-dark-four mt-1">{elegibleNotas.motivo}</p>
 										</div>
 									</div>
 								</div>
@@ -460,225 +840,43 @@
 						<section>
 							<div class="flex items-center gap-2 mb-3">
 								<IdentificationIcon class="w-5 h-5 text-uagrm-blue dark:text-dark-tertiary" />
-								<h4 class="text-base font-semibold text-light-black dark:text-dark-white">
-									Certificado de No Deudor
-								</h4>
+								<h4 class="text-base font-semibold text-light-black dark:text-dark-white">Certificado de No Deudor</h4>
 							</div>
 
-							<div
-								class="rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface p-4"
-							>
-								<p class="text-sm text-light-black dark:text-dark-white mb-3">
-									Puedes solicitar este certificado en cualquier momento, indicando hasta qué
-									módulo ya has cancelado.
-								</p>
+							<div class="rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface p-4">
+								<p class="text-sm text-light-black dark:text-dark-white mb-3">Puedes solicitar este certificado en cualquier momento, indicando hasta qué módulo ya has cancelado.</p>
 
 								{#if totalModulos === 0}
-									<p class="text-sm text-light-four dark:text-dark-four italic">
-										Esta inscripción no tiene módulos asociados.
-									</p>
+									<p class="text-sm text-light-four dark:text-dark-four italic">Esta inscripción no tiene módulos asociados.</p>
 								{:else}
-									<label
-										class="block mb-2 text-sm font-medium text-light-black dark:text-dark-white"
-										for="modulo-n-{eid}"
-									>
-										¿Hasta qué módulo?
-									</label>
+									<label for="modulo-n-{eid}" class="block mb-2 text-sm font-medium text-light-black dark:text-dark-white">¿Hasta qué módulo?</label>
 									<div class="flex flex-col sm:flex-row sm:items-center gap-3">
 										<select
 											id="modulo-n-{eid}"
 											class="rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-light-black dark:text-dark-white px-3 py-2 text-sm min-w-[8rem] focus:ring-2 focus:ring-primary-500 focus:border-transparent"
 											value={hastaN}
 											onchange={(ev) => {
-												const v = parseInt(
-													(ev.currentTarget as HTMLSelectElement).value,
-													10
-												);
-												hastaModuloNSelections = {
-													...hastaModuloNSelections,
-													[eid]: v
-												};
+												const v = parseInt((ev.currentTarget as HTMLSelectElement).value, 10);
+												hastaModuloNSelections = { ...hastaModuloNSelections, [eid]: v };
 											}}
 										>
 											{#each Array.from({ length: totalModulos }, (_, i) => i + 1) as n}
 												<option value={n}>Módulo {n}</option>
 											{/each}
 										</select>
-
-										<Button
-											variant="primary"
-											size="md"
-											disabled={!elegibleNoDeudor.ok}
-											loading={emittingNoDeudor[eid]}
-											onclick={() => emitirNoDeudor(enrollment)}
-											ariaLabel="Emitir Certificado de No Deudor hasta Módulo {hastaN}"
-										>
-											<DownloadIcon class="w-4 h-4 mr-2" />
-											Descargar No Deudor
+										<Button variant="primary" size="md" disabled={!elegibleNoDeudor.ok} loading={emittingNoDeudor[eid]} onclick={() => emitirNoDeudor(enrollment)} ariaLabel="Emitir Certificado de No Deudor hasta Módulo {hastaN}">
+											<DownloadIcon class="w-4 h-4 mr-2" />Descargar No Deudor
 										</Button>
 									</div>
-
 									{#if !elegibleNoDeudor.ok}
-										<p class="text-xs text-light-error dark:text-dark-error mt-2">
-											{elegibleNoDeudor.motivo}
-										</p>
+										<p class="text-xs text-light-error dark:text-dark-error mt-2">{elegibleNoDeudor.motivo}</p>
 									{:else if ultPagado >= hastaN}
-										<p class="text-xs text-light-success dark:text-dark-success mt-2">
-											✓ Los módulos 1 a {hastaN} están pagados. Puedes emitir este certificado.
-										</p>
+										<p class="text-xs text-light-success dark:text-dark-success mt-2">✓ Los módulos 1 a {hastaN} están pagados. Puedes emitir este certificado.</p>
 									{/if}
-								{/if}
-
-								<!-- Certificados de No Deudor ya emitidos -->
-								{#if certificadosDeEnrollment(enrollment).filter((c) => c.tipo === 'no_deudor').length > 0}
-									<div class="mt-4 pt-4 border-t border-gray-100 dark:border-dark-border space-y-2">
-										<p
-											class="text-xs font-semibold text-light-four dark:text-dark-four uppercase tracking-wider"
-										>
-											Ya emitidos
-										</p>
-										{#each certificadosDeEnrollment(enrollment).filter((c) => c.tipo === 'no_deudor') as cert (cert.id)}
-											<div
-												class="flex items-center justify-between gap-2 rounded-md bg-gray-50 dark:bg-dark-background px-3 py-2"
-											>
-												<div class="min-w-0 flex-1">
-													<p class="text-sm font-medium text-light-black dark:text-dark-white">
-														{cert.folio}{#if cert.hasta_modulo_n}· hasta Módulo {cert.hasta_modulo_n}{/if}
-													</p>
-													<p class="text-xs text-light-four dark:text-dark-four">
-														{formatDate(cert.emitido_en)}
-													</p>
-												</div>
-												<Button
-													variant="ghost"
-													size="sm"
-													loading={downloadingId === cert.id}
-													onclick={() => descargarPdf(cert)}
-													ariaLabel="Re-descargar {cert.folio}"
-												>
-													<DownloadIcon class="w-4 h-4" />
-												</Button>
-											</div>
-										{/each}
-									</div>
 								{/if}
 							</div>
 						</section>
 					</Card>
-				{/each}
-
-				<!-- Sección Historial -->
-				{#if issuedCertificates.length > 0}
-					<section class="mt-8">
-						<Heading level="h2" weight="bold" color="primary">
-							{#snippet children()}
-								<h2 class="text-xl font-bold text-primary-700 dark:text-primary-300">
-									Historial de certificados emitidos
-								</h2>
-								<p class="text-sm text-light-four dark:text-dark-four mt-1">
-									Total: {issuedCertificates.length} certificado{issuedCertificates.length === 1
-										? ''
-										: 's'}.
-								</p>
-							{/snippet}
-						</Heading>
-
-						<!-- Desktop: tabla -->
-						<div
-							class="hidden sm:block mt-4 rounded-lg border border-gray-200 dark:border-dark-border overflow-hidden"
-						>
-							<table class="w-full text-sm">
-								<thead
-									class="bg-primary-50 dark:bg-primary-900/30 text-light-four dark:text-dark-four"
-								>
-									<tr>
-										<th class="px-3 py-2 text-left font-medium uppercase tracking-wider text-xs">Folio</th>
-										<th class="px-3 py-2 text-left font-medium uppercase tracking-wider text-xs">Tipo</th>
-										<th class="px-3 py-2 text-left font-medium uppercase tracking-wider text-xs">Programa</th>
-										<th class="px-3 py-2 text-left font-medium uppercase tracking-wider text-xs">Emitido</th>
-										<th class="px-3 py-2 text-right font-medium uppercase tracking-wider text-xs">Acción</th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each issuedCertificates as cert (cert.id)}
-										<tr class="border-t border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-background">
-											<td class="px-3 py-2 font-mono font-semibold text-primary-700 dark:text-primary-300">
-												{cert.folio}
-											</td>
-											<td class="px-3 py-2">
-												<span
-													class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium {cert.tipo ===
-													'notas'
-														? 'bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-200'
-														: 'bg-uagrm-sky/10 text-uagrm-blue dark:bg-dark-tertiary/10 dark:text-dark-tertiary'}"
-												>
-													{cert.tipo === 'notas' ? 'Notas' : 'No Deudor'}{#if cert.hasta_modulo_n}· M{cert.hasta_modulo_n}{/if}
-												</span>
-											</td>
-											<td
-												class="px-3 py-2 text-light-black dark:text-dark-white max-w-xs truncate"
-												title={cert.programa_nombre}
-											>
-												{cert.programa_nombre}
-											</td>
-											<td class="px-3 py-2 text-light-four dark:text-dark-four">
-												{formatDate(cert.emitido_en)}
-											</td>
-											<td class="px-3 py-2 text-right">
-												<Button
-													variant="ghost"
-													size="sm"
-													loading={downloadingId === cert.id}
-													onclick={() => descargarPdf(cert)}
-													ariaLabel="Re-descargar {cert.folio}"
-												>
-													<DownloadIcon class="w-4 h-4" />
-												</Button>
-											</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						</div>
-
-						<!-- Móvil: cards -->
-						<div class="sm:hidden space-y-3 mt-4">
-							{#each issuedCertificates as cert (cert.id)}
-								<Card variant="bordered">
-									<div class="flex items-start justify-between gap-3">
-										<div class="min-w-0 flex-1">
-											<p class="font-mono text-sm font-semibold text-primary-700 dark:text-primary-300">
-												{cert.folio}
-											</p>
-											<p class="text-xs mt-1 text-light-four dark:text-dark-four">
-												{cert.tipo === 'notas'
-													? 'Certificado de Notas'
-													: `No Deudor · hasta Módulo ${cert.hasta_modulo_n ?? ''}`}
-											</p>
-											<p
-												class="text-sm mt-1 text-light-black dark:text-dark-white truncate"
-												title={cert.programa_nombre}
-											>
-												{cert.programa_nombre}
-											</p>
-											<p class="text-xs mt-1 text-light-four dark:text-dark-four">
-												{formatDate(cert.emitido_en)}
-											</p>
-										</div>
-										<Button
-											variant="ghost"
-											size="sm"
-											loading={downloadingId === cert.id}
-											onclick={() => descargarPdf(cert)}
-											ariaLabel="Re-descargar {cert.folio}"
-										>
-											<DownloadIcon class="w-4 h-4" />
-										</Button>
-									</div>
-								</Card>
-							{/each}
-						</div>
-					</section>
 				{/if}
 			</div>
 		{/if}

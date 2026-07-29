@@ -69,7 +69,10 @@
 		{ type: 'item', name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 		{ type: 'item', name: 'Mis Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
 		// F-CERTIFICADOS (2026-07-29): emisión de Certificados de Notas y No Deudor.
-		{ type: 'item', name: 'Certificados', href: '/app/certificates', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
+		// FIX 2026-07-29 19:11: Kevin pidió que sea visible para TODOS los roles
+		// (estudiantes y staff/admin), porque es para ambos: el estudiante emite
+		// el suyo, el staff lo ve para auditoría.
+		{ type: 'item', name: 'Certificados', href: '/app/certificates', icon: FileTextIcon, roles: ['student', 'admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['academic', 'admin'] },
 		{ type: 'item', name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ type: 'item', name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
 
