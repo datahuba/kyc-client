@@ -73,6 +73,31 @@
 	const totalNoIniciado = $derived(modulosPendientes.filter((m) => m.estado === 'no_iniciado').length);
 	const totalFinalizado = $derived(modulosPendientes.filter((m) => m.estado === 'finalizado').length);
 
+	// F-DASH-COUNTDOWN (2026-07-30): próximo programa a iniciar (con countdown).
+	// El estudiante ve cuántos días faltan para que arranque su próximo programa.
+	const proximoPrograma = $derived.by(() => {
+		const hoy = new Date();
+		hoy.setHours(0, 0, 0, 0);
+		const candidatos: { nombre: string; codigo: string; fecha: Date; dias: number }[] = [];
+		for (const e of myEnrollments) {
+			const course = coursesById[String(e.curso_id)];
+			if (!course?.fecha_inicio) continue;
+			const inicio = new Date(course.fecha_inicio);
+			inicio.setHours(0, 0, 0, 0);
+			const dias = Math.round((inicio.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+			if (dias >= 0) {
+				candidatos.push({
+					nombre: course.nombre_programa,
+					codigo: course.codigo,
+					fecha: inicio,
+					dias
+				});
+			}
+		}
+		candidatos.sort((a, b) => a.dias - b.dias);
+		return candidatos[0] || null;
+	});
+
 	function setGreeting() {
 		const hour = new Date().getHours();
 		if (hour < 12) greeting = 'Buenos días';
@@ -194,6 +219,40 @@
 		<div>
 			<Heading level="h1">{greeting}, {studentData.nombre.split(' ')[0]}!</Heading>
 			<p class="text-gray-500 dark:text-gray-400 mt-2">Bienvenido a tu panel de estudiante. ¿Qué deseas hacer hoy?</p>
+
+			<!-- F-DASH-COUNTDOWN (2026-07-30): banner con countdown del próximo
+			     programa a iniciar. Muestra cuántos días faltan y CTA al calendario. -->
+			{#if proximoPrograma}
+				<a
+					href="/app/courses/calendario"
+					class="mt-4 block bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-4 hover:shadow-md transition-shadow group"
+				>
+					<div class="flex items-center gap-3">
+						<div class="shrink-0 w-12 h-12 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-purple-600 dark:text-purple-400 shadow-sm">
+							<CalendarIcon class="size-6" />
+						</div>
+						<div class="flex-1 min-w-0">
+							<p class="text-xs text-purple-700 dark:text-purple-300 font-semibold uppercase tracking-wider">
+								Próximo programa
+							</p>
+							<p class="text-sm font-bold text-slate-900 dark:text-white truncate" title={proximoPrograma.nombre}>
+								{proximoPrograma.nombre}
+							</p>
+							<p class="text-[11px] text-slate-500 dark:text-slate-400">
+								Inicia el {proximoPrograma.fecha.toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' })}
+							</p>
+						</div>
+						<div class="shrink-0 text-right">
+							<p class="text-3xl font-black text-purple-600 dark:text-purple-400 leading-none">
+								{proximoPrograma.dias}
+							</p>
+							<p class="text-[10px] text-slate-500 uppercase font-semibold">
+								{proximoPrograma.dias === 1 ? 'día' : 'días'}
+							</p>
+						</div>
+					</div>
+				</a>
+			{/if}
 
 			<!-- F-DASH-ESTUDIANTE: 8 accesos rápidos con descripción y color por tipo -->
 			<div class="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
