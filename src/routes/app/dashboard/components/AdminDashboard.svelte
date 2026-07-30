@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { studentService, courseService, enrollmentService, paymentService, dashboardService } from '$lib/services';
+	import { studentService, courseService, enrollmentService, paymentService, dashboardService, cuentasPorCobrarService } from '$lib/services';
 	import type { ResumenEconomico } from '$lib/services/payment.service';
+	import type { CxCResumenReducido } from '$lib/services/cuentas-por-cobrar.service';
 	import type { Enrollment, Payment } from '$lib/interfaces';
-	import { UsersIcon, ClipboardIcon, TagIcon } from '$lib/icons/outline';
+	import { UsersIcon, ClipboardIcon, TagIcon, ChartBarIcon } from '$lib/icons/outline';
 	// FIX-DASH-001: UsersIcon, TagIcon, ClipboardIcon se mantienen en import
 	// por si se usan en el Resumen Económico (línea ~358 usa ClipboardIcon).
 	import { CreditCardIcon } from '$lib/icons/solid';
@@ -29,6 +30,8 @@
 	const ROLES_ECONOMICOS_BASE = ['superadmin', 'admin', 'cobranza', 'mae'];
 	const ROLES_QUE_VEN_PAGOS = ['superadmin', 'admin', 'mae', 'cobranza', 'cpd'];
 	let resumenEconomico: ResumenEconomico | null = null;
+	// F-CUENTAS-POR-COBRAR (2026-07-29): tarjeta con desglose real vs estimado.
+	let cxcResumen: CxCResumenReducido | null = null;
 	// F-COBRANZA-041: KPI de inscritos (Total Inicial, Activos, Pasivos, Detalle, Completados).
 	let resumenInscritos: EnrollmentResumen | null = null;
 	// ROLES QUE VEN INSCRITOS: todos los administrativos (excluye student).
@@ -249,6 +252,17 @@
 				}
 			}
 
+			// F-CUENTAS-POR-COBRAR (2026-07-29): resumen CxC real vs estimada.
+			// Se muestra a los roles económicos (mismos que el Resumen Económico).
+			// Si falla, no rompe el dashboard.
+			if (ROLES_ECONOMICOS_BASE.includes(roleNow) || (roleNow === 'coordinador' && esCoordFinNow)) {
+				try {
+					cxcResumen = await cuentasPorCobrarService.getResumenReducido();
+				} catch (e) {
+					console.error('Error cargando resumen CxC:', e);
+				}
+			}
+
 		} catch (error) {
 			console.error('Error loading dashboard data:', error);
 		} finally {
@@ -380,9 +394,75 @@
 							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">En tu alcance</p>
 						</div>
 						<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
-							<ClipboardIcon class="size-6 sm:size-8" />
+							<ClipboardIcon class="size-6 sm:text-2xl sm:size-8" />
 						</div>
 					</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- F-CUENTAS-POR-COBRAR (2026-07-29): tarjeta con CxC real vs estimada.
+		     Es la información que la contadora y el consejo facultativo observaron
+		     que faltaba (reunión 2026-07-29): la CxC real (a la fecha) solo suma
+		     los módulos que ya están en curso. La diferencia entre el estimado y
+		     el real se devenga recién cuando Sandra/Rocío inicia un módulo. -->
+		{#if cxcResumen && (verResumenEconomico || (currentRole === 'cobranza') || (currentRole === 'cpd'))}
+			<div class="mt-4">
+				<div class="flex items-center justify-between mb-3">
+					<h2 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+						<ChartBarIcon class="size-5 sm:size-6 text-primary-600 dark:text-primary-400" />
+						Cuentas por Cobrar
+					</h2>
+					<a href="/app/reports/cuentas-por-cobrar" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">
+						Ver reporte completo →
+					</a>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+					<!-- CxC a la Fecha (real) -->
+					<a href="/app/reports/cuentas-por-cobrar" class="block">
+						<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-5 hover:scale-[1.02] transition-transform hover:shadow-lg min-w-0">
+							<p class="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
+								CxC a la Fecha (real)
+							</p>
+							<p class="text-xl sm:text-2xl font-bold text-primary-700 dark:text-primary-300 mt-1 truncate tabular-nums" title={formatCurrency(cxcResumen.total_a_la_fecha)}>
+								{formatCurrency(cxcResumen.total_a_la_fecha)}
+							</p>
+							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">
+								{cxcResumen.total_modulos_iniciados} módulo{cxcResumen.total_modulos_iniciados === 1 ? '' : 's'} en curso
+							</p>
+						</div>
+					</a>
+
+					<!-- CxC Estimada (total) -->
+					<a href="/app/reports/cuentas-por-cobrar" class="block">
+						<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-5 hover:scale-[1.02] transition-transform hover:shadow-lg min-w-0">
+							<p class="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
+								CxC Estimada (total)
+							</p>
+							<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate tabular-nums" title={formatCurrency(cxcResumen.total_estimado)}>
+								{formatCurrency(cxcResumen.total_estimado)}
+							</p>
+							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">
+								{cxcResumen.cantidad_enrollments} inscripciones
+							</p>
+						</div>
+					</a>
+
+					<!-- Por devengar (futuro) -->
+					<a href="/app/reports/cuentas-por-cobrar" class="block">
+						<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-5 hover:scale-[1.02] transition-transform hover:shadow-lg min-w-0">
+							<p class="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
+								Por Devengar (futuro)
+							</p>
+							<p class="text-xl sm:text-2xl font-bold text-light-warning dark:text-dark-warning mt-1 truncate tabular-nums" title={formatCurrency(cxcResumen.diferencia)}>
+								{formatCurrency(cxcResumen.diferencia)}
+							</p>
+							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">
+								{cxcResumen.total_modulos_no_iniciados} módulo{cxcResumen.total_modulos_no_iniciados === 1 ? '' : 's'} sin iniciar
+							</p>
+						</div>
+					</a>
 				</div>
 			</div>
 		{/if}

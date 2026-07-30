@@ -54,6 +54,12 @@ class EnrollmentService {
 		return await apiKyC.get<Enrollment[]>(`/enrollments/student/${studentId}`);
 	}
 
+	// F-CUENTAS-POR-COBRAR (2026-07-29): refrescar un enrollment individual
+	// después de iniciar/deshacer un módulo, sin volver a cargar toda la lista.
+	async getById(enrollmentId: string): Promise<Enrollment> {
+		return await apiKyC.get<Enrollment>(`/enrollments/${enrollmentId}`);
+	}
+
 	// F-087-CAL · Mis cursos activos para el dashboard del estudiante.
 	// Enriquece cada enrollment con metadata del curso + estado calculado del
 	// programa (F-080: programado | en_ejecucion | cerrado) para poder

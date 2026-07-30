@@ -14,3 +14,4 @@ export * from './pre-registration.service';
 export * from './admin.service';  // F-044 (2026-07-22)
 export * from './grade-validation.service';  // F-070 (2026-07-22)
 export * from './certificate.service';       // F-CERTIFICADOS (2026-07-29)
+export * from './cuentas-por-cobrar.service'; // F-CUENTAS-POR-COBRAR (2026-07-29)

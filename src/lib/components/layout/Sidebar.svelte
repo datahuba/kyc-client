@@ -2,7 +2,7 @@
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/userStore';
 	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
-	import { UsersIcon, ClipboardIcon, TagIcon, XIcon, KeyIcon, QrCodeIcon, FileTextIcon, AcademicCapIcon, Menu2Icon } from '$lib/icons/outline'; // IMPORTACIÓN UNIFICADA DE MENU2ICON
+	import { UsersIcon, ClipboardIcon, TagIcon, XIcon, KeyIcon, QrCodeIcon, FileTextIcon, AcademicCapIcon, Menu2Icon, ChartBarIcon } from '$lib/icons/outline'; // F-CUENTAS-POR-COBRAR ChartBarIcon
 	import { slide, fade } from 'svelte/transition';
 	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon, ExclamationCircleIcon, CalendarIcon } from '$lib/icons/solid';  // F-044 (2026-07-22) | F-080 CalendarIcon
 	import { goto } from '$app/navigation';
@@ -102,6 +102,8 @@
 				{ type: 'item', name: 'Deudores', href: '/app/payments/deudores', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'cpd', 'coordinador'], loginTypes: ['admin'] },
 				// F-087: Gestión de Pagos (incluye Por Pago con matriz de auditoría)
 				{ type: 'item', name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
+				// F-CUENTAS-POR-COBRAR (2026-07-29): CxC real vs estimada.
+				{ type: 'item', name: 'Cuentas por Cobrar', href: '/app/reports/cuentas-por-cobrar', icon: ChartBarIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador', 'encargado_curso'], loginTypes: ['admin'] },
 				// F-075: Informes (acta de notas, etc.)
 				{ type: 'item', name: 'Informes', href: '/app/informes', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd', 'coordinador'], loginTypes: ['admin'] },
 				// Reportes de Caja (gestión financiera interna)

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { enrollmentService, studentService, courseService, discountService } from '$lib/services';
+	import { enrollmentService, studentService, courseService, discountService, cuentasPorCobrarService } from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
 	import type { Enrollment, Student, Course, Discount } from '$lib/interfaces';
 	import { goto } from '$app/navigation';
@@ -96,6 +96,11 @@
 	let canManageBecaRespaldo = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
 	// ISSUE-Q-NOTA-BORRADOR: quién puede validar/rechazar el borrador de nota del docente
 	let canValidateNotaBorrador = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
+	// F-CUENTAS-POR-COBRAR (2026-07-29): quién puede iniciar módulos manualmente.
+	// El backend valida que encargado_curso solo lo haga en sus cursos_asignados.
+	let canIniciarModulo = $derived(['admin', 'superadmin', 'encargado_curso'].includes(currentRole));
+	// Estado de loading por módulo al iniciar/deshacer
+	let moduloLoading = $state<Record<string, boolean>>({});
 
 	// ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): quién puede aprobar/rechazar documentos
 	// subidos por el estudiante. Ampliado a Encargado de Curso/Coordinador (el
@@ -308,6 +313,54 @@
 	function handleFormSuccess() {
 		isFormOpen = false;
 		loadData();
+	}
+
+	// F-CUENTAS-POR-COBRAR (2026-07-29): iniciar/deshacer un módulo manualmente.
+	async function handleIniciarModulo(moduleIndex: number) {
+		if (!selectedKardex) return;
+		const key = `${selectedKardex._id}-${moduleIndex}-iniciar`;
+		moduloLoading = { ...moduloLoading, [key]: true };
+		try {
+			await cuentasPorCobrarService.iniciarModulo(String(selectedKardex._id), moduleIndex);
+			alert('success', 'Módulo marcado como "en curso". Ya cuenta en la CxC a la Fecha.');
+			await refreshKardex();
+		} catch (e: any) {
+			const detail = e?.response?.data?.detail || e?.message || 'No se pudo iniciar el módulo.';
+			alert('error', detail);
+		} finally {
+			moduloLoading = { ...moduloLoading, [key]: false };
+		}
+	}
+
+	async function handleDeshacerInicioModulo(moduleIndex: number) {
+		if (!selectedKardex) return;
+		if (!confirm('¿Revertir el inicio de este módulo? Volverá a "no iniciado" y saldrá de la CxC a la Fecha.')) return;
+		const key = `${selectedKardex._id}-${moduleIndex}-deshacer`;
+		moduloLoading = { ...moduloLoading, [key]: true };
+		try {
+			await cuentasPorCobrarService.deshacerInicioModulo(String(selectedKardex._id), moduleIndex);
+			alert('success', 'Inicio del módulo revertido.');
+			await refreshKardex();
+		} catch (e: any) {
+			const detail = e?.response?.data?.detail || e?.message || 'No se pudo revertir el inicio.';
+			alert('error', detail);
+		} finally {
+			moduloLoading = { ...moduloLoading, [key]: false };
+		}
+	}
+
+	async function refreshKardex() {
+		if (!selectedKardex) return;
+		try {
+			const fresh = await enrollmentService.getById(String(selectedKardex._id));
+			if (fresh) {
+				selectedKardex = fresh;
+				// refrescar también el array principal para mantener consistencia
+				enrollments = enrollments.map(e => (e._id === fresh._id ? fresh : e));
+			}
+		} catch (e) {
+			console.error('Error refrescando kardex:', e);
+		}
 	}
 
 	// ISSUE-R-SOLICITUD-PASIVO
@@ -1136,6 +1189,8 @@
 								<th class="px-4 py-3 text-center text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider bg-blue-50/50 dark:bg-blue-900/10">Situación</th>
 								<th class="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Costo (Bs)</th>
 								<th class="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Estado Pago</th>
+								<!-- F-CUENTAS-POR-COBRAR: estado del módulo en la CxC real. -->
+								<th class="px-4 py-3 text-center text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider bg-primary-50/50 dark:bg-primary-900/10">CxC</th>
 							</tr>
 						</thead>
 						<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
@@ -1218,11 +1273,49 @@
 												{mod.estado || 'Pendiente'}
 											</span>
 										</td>
+										<!-- F-CUENTAS-POR-COBRAR: badge + botón "Iniciar" / "Deshacer" (solo staff autorizado). -->
+										<td class="px-4 py-4 text-center">
+											{#if mod.iniciado_en}
+												<div class="flex flex-col items-center gap-1.5">
+													<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300" title={mod.iniciado_en}>
+														✓ En curso
+													</span>
+													{#if canIniciarModulo}
+														<button
+															type="button"
+															onclick={() => handleDeshacerInicioModulo(moduleIndex)}
+															disabled={moduloLoading[`${selectedKardex._id}-${moduleIndex}-deshacer`]}
+															class="text-[10px] text-light-error dark:text-dark-error hover:underline disabled:opacity-50 font-medium"
+															ariaLabel={`Revertir inicio del módulo ${moduleIndex + 1}`}
+														>
+															{moduloLoading[`${selectedKardex._id}-${moduleIndex}-deshacer`] ? 'Revirtiendo…' : '↻ Revertir'}
+														</button>
+													{/if}
+												</div>
+											{:else}
+												<div class="flex flex-col items-center gap-1.5">
+													<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+														○ No iniciado
+													</span>
+													{#if canIniciarModulo}
+														<button
+															type="button"
+															onclick={() => handleIniciarModulo(moduleIndex)}
+															disabled={moduloLoading[`${selectedKardex._id}-${moduleIndex}-iniciar`]}
+															class="text-[10px] text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50 font-bold"
+															ariaLabel={`Iniciar módulo ${moduleIndex + 1}`}
+														>
+															{moduloLoading[`${selectedKardex._id}-${moduleIndex}-iniciar`] ? 'Iniciando…' : '▶ Iniciar'}
+														</button>
+													{/if}
+												</div>
+											{/if}
+										</td>
 									</tr>
 								{/each}
 							{:else}
 								<tr>
-									<td colspan="5" class="px-4 py-8 text-center text-slate-500">
+									<td colspan="6" class="px-4 py-8 text-center text-slate-500">
 										No hay módulos registrados en esta inscripción.
 									</td>
 								</tr>
