@@ -1,0 +1,34 @@
+feat(requests): UI para Convalidacion, Tutoria, Readmision, Titulacion
+
+F-TRAMITES-SOLICITUD (2026-07-29): implementa la UI que el estudiante y el
+staff usan para crear / revisar / aprobar / rechazar las 4 solicitudes
+que Sandra/Rocío pidieron en la reunión 2026-07-29.
+
+Frontend:
+  - interfaces/tramite-solicitud.interface.ts: tipos (TipoTramite, EstadoTramite,
+    TramiteSolicitud, ArchivoAdjunto) + labels/colors/iconos + archivos
+    requeridos por tipo
+  - services/tramite-solicitud.service.ts: 8 métodos HTTP
+    (crear, listarMis, listarTodas, estadisticas, obtener, marcarEnRevision,
+    aprobar, rechazar, cancelar)
+  - routes/app/requests/+page.svelte: página completa con:
+    * Vista estudiante: tabs (Convalidacion/Tutoria/Readmision/Titulacion),
+      formulario dinámico (muestra campos según archivos requeridos), lista
+      de mis solicitudes con acciones (ver detalle, cancelar)
+    * Vista staff: tabs + tabla global con filtros por estado + acciones
+      inline (ver detalle, en revisión, aprobar, rechazar)
+    * Modal de rechazo con motivo
+    * Modal de detalle con archivos, motivo, motivo de rechazo, etc.
+  - components/layout/Sidebar.svelte:
+    * Link 'Mis Solicitudes' para estudiantes
+    * Link 'Solicitudes de Trámite' dentro del grupo 'Solicitudes' para staff
+  - interfaces/index.ts, services/index.ts: barrels
+
+Subida de archivos: el front NO sube directo a Cloudinary; el estudiante
+pega la URL pública del archivo (lo subió aparte). Esto es coherente con
+el patrón del resto de la plataforma (requisitos, certificaciones).
+
+Build: 0 errores (los 11 errores pre-existentes de otros archivos no son
+introducidos por este cambio).
+
+Refs: F-TRAMITES-SOLICITUD backend commit 62c7720

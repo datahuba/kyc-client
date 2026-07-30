@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { studentService, certificateService } from '$lib/services';
-	import type { Student } from '$lib/interfaces';
+	import { studentService, certificateService, enrollmentService, courseService } from '$lib/services';
+	import type { Student, Enrollment, Course } from '$lib/interfaces';
 	import { userStore } from '$lib/stores/userStore';
 	import {
 		ClipboardIcon,
@@ -14,6 +14,7 @@
 	import { CreditCardIcon, ShieldIcon, CalendarIcon } from '$lib/icons/solid';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
+	import Button from '$lib/components/ui/button.svelte';
 	import { goto } from '$app/navigation';
 	import DashboardSkeleton from '$lib/components/skeletons/DashboardSkeleton.svelte';
 
@@ -22,9 +23,55 @@
 	let greeting = '';
 	let interval: any;
 
-	// F-DASH-ESTUDIANTE (2026-07-30): quick stats para que el estudiante
-	// vea de un vistazo qué puede hacer hoy (certificados emitidos, etc).
+	// F-DASH-ESTUDIANTE (2026-07-30): quick stats + módulos pendientes.
 	let cantidadCertificados = $state(0);
+	let myEnrollments = $state<Enrollment[]>([]);
+	let coursesById = $state<Record<string, Course>>({});
+
+	// Lista plana de módulos con su estado "En curso" / "No iniciado"
+	type ModuloEstado = {
+		enrollmentId: string;
+		moduloIndex: number;
+		cursoNombre: string;
+		cursoCodigo: string;
+		nombre: string;
+		estado: 'en_curso' | 'no_iniciado' | 'finalizado';
+		iniciadoEn: string | null;
+	};
+
+	const modulosPendientes = $derived.by(() => {
+		const lista: ModuloEstado[] = [];
+		for (const enr of myEnrollments) {
+			const course = coursesById[String(enr.curso_id)];
+			const cursoNombre = course?.nombre_programa ?? 'Curso';
+			const cursoCodigo = course?.codigo ?? '';
+			if (!enr.modulos) continue;
+			enr.modulos.forEach((m, idx) => {
+				let estado: ModuloEstado['estado'];
+				if (m.iniciado_en && m.estado_academico !== 'Aprobado' && m.estado_academico !== 'Reprobado') {
+					estado = 'en_curso';
+				} else if (m.estado_academico === 'Aprobado' || m.estado_academico === 'Reprobado') {
+					estado = 'finalizado';
+				} else {
+					estado = 'no_iniciado';
+				}
+				lista.push({
+					enrollmentId: String(enr._id),
+					moduloIndex: idx,
+					cursoNombre,
+					cursoCodigo,
+					nombre: m.nombre || `Módulo ${idx + 1}`,
+					estado,
+					iniciadoEn: m.iniciado_en || null
+				});
+			});
+		}
+		return lista;
+	});
+
+	const totalEnCurso = $derived(modulosPendientes.filter((m) => m.estado === 'en_curso').length);
+	const totalNoIniciado = $derived(modulosPendientes.filter((m) => m.estado === 'no_iniciado').length);
+	const totalFinalizado = $derived(modulosPendientes.filter((m) => m.estado === 'finalizado').length);
 
 	function setGreeting() {
 		const hour = new Date().getHours();
@@ -56,6 +103,25 @@
 				const certs = await certificateService.getMy();
 				cantidadCertificados = Array.isArray(certs) ? certs.length : 0;
 			} catch {}
+		})();
+
+		// Cargar mis enrollments con detalle de módulos
+		(async () => {
+			try {
+				const res = await enrollmentService.getMyCoursesResumen();
+				const items = (res as any).items || [];
+				myEnrollments = items;
+				// Cargar info de cursos en batch
+				const courseIds = Array.from(new Set(items.map((e: any) => String(e.curso_id)).filter(Boolean)));
+				for (const cid of courseIds) {
+					try {
+						const c: any = await courseService.getById(cid);
+						coursesById[cid] = c;
+					} catch {}
+				}
+			} catch (e) {
+				console.error('Error loading my enrollments:', e);
+			}
 		})();
 
 		return () => clearInterval(interval);
@@ -149,6 +215,81 @@
 					</button>
 				{/each}
 			</div>
+
+			<!-- F-DASH-MODULOS (2026-07-30): módulos de mis cursos con estado. -->
+			{#if modulosPendientes.length > 0}
+				<div class="mt-8">
+					<Card>
+						<div class="flex items-center justify-between mb-4">
+							<div>
+								<h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+									<AcademicCapIcon class="size-5 text-primary-600" />
+									Mis Módulos
+								</h3>
+								<p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+									Estado de los módulos en tus programas
+								</p>
+							</div>
+							<div class="flex items-center gap-3 text-xs">
+								<span class="flex items-center gap-1.5">
+									<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+									<span class="font-semibold text-slate-700">{totalEnCurso}</span>
+									<span class="text-slate-500">en curso</span>
+								</span>
+								<span class="flex items-center gap-1.5">
+									<span class="w-2 h-2 rounded-full bg-amber-500"></span>
+									<span class="font-semibold text-slate-700">{totalNoIniciado}</span>
+									<span class="text-slate-500">pendiente</span>
+								</span>
+								<span class="flex items-center gap-1.5">
+									<span class="w-2 h-2 rounded-full bg-slate-400"></span>
+									<span class="font-semibold text-slate-700">{totalFinalizado}</span>
+									<span class="text-slate-500">finalizado</span>
+								</span>
+							</div>
+						</div>
+						<div class="space-y-2 max-h-80 overflow-y-auto">
+							{#each modulosPendientes as m, i (i)}
+								<div class="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+									<!-- Indicador de estado -->
+									<div class={`w-2 h-10 rounded-full shrink-0 ${
+										m.estado === 'en_curso' ? 'bg-emerald-500' :
+										m.estado === 'finalizado' ? 'bg-slate-400' : 'bg-amber-500'
+									}`}></div>
+									<div class="min-w-0 flex-1">
+										<p class="text-sm font-semibold text-slate-800 truncate" title={m.nombre}>
+											{m.nombre}
+										</p>
+										<p class="text-[11px] text-slate-500 truncate">
+											<span class="font-mono">{m.cursoCodigo}</span> · {m.cursoNombre}
+										</p>
+									</div>
+									<div class="shrink-0 text-right">
+										{#if m.estado === 'en_curso'}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700">
+												▶ En curso
+											</span>
+										{:else if m.estado === 'finalizado'}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 text-slate-600">
+												✓ Finalizado
+											</span>
+										{:else}
+											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-700">
+												⏸ Pendiente
+											</span>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+						<div class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 text-center">
+							<Button variant="secondary" onclick={() => goto('/app/enrollments')}>
+								Ver libreta completa
+							</Button>
+						</div>
+					</Card>
+				</div>
+			{/if}
 
 			<!-- Quick Info -->
 			<div class="mt-8">

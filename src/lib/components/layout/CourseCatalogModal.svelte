@@ -5,6 +5,7 @@
 	import type { Course } from '$lib/interfaces';
 	import { formatCurrency } from '$lib/utils';
 	import { userStore } from '$lib/stores/userStore';
+	import FormularioInscripcionModal from '$lib/features/enrollments/FormularioInscripcionModal.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -17,16 +18,19 @@
 	let loading = $state(false);
 	let loaded = $state(false);
 	let errorMsg = $state('');
-	let selectedCourse = $state<Course | null>(null);
+
+	// F-CATALOGO-INSCRIPCION (2026-07-30): modal de formulario de inscripción
+	// que se abre cuando el estudiante hace click en "Inscribirme".
+	let inscriptionCourse = $state<Course | null>(null);
+	let inscriptionOpen = $state(false);
 
 	let currentUser: any = $state(null);
 	userStore.subscribe((state) => {
 		currentUser = state.user;
 	});
 
-	// F-CATALOGO-INSCRIPCION (2026-07-30): el botón "Inscribirme" solo
-	// aparece para estudiantes. Staff/admin ven el botón "Ver detalle" o
-	// "Editar" (no se inscribe a sí mismo).
+	// El botón "Inscribirme" solo aparece para estudiantes. Staff/admin no se
+	// inscriben a sí mismos (ellos inscriben a los estudiantes desde el panel).
 	const ROLES_QUE_SE_INSCRIBEN = new Set(['estudiante', 'student']);
 
 	const puedeInscribirse = $derived.by(() => {
@@ -55,10 +59,18 @@
 
 	function handleInscribirme(course: Course, e: MouseEvent) {
 		e.stopPropagation();
-		selectedCourse = course;
-		// TODO (F-INSC-DESDE-CATALOGO): abrir wizard de inscripción
-		alert('info', `Inscripción a "${course.nombre_programa}". Próximamente: wizard de inscripción.`);
-		selectedCourse = null;
+		// F-INSC-DESDE-CATALOGO (2026-07-30): el modal genera el PDF oficial
+		// de inscripción con los datos del estudiante pre-llenados. El
+		// estudiante lo descarga, firma, y lo entrega en secretaría junto
+		// con los requisitos. Luego el equipo de Cobranza/Encargado de
+		// Curso crea la inscripción en el sistema.
+		inscriptionCourse = course;
+		inscriptionOpen = true;
+	}
+
+	function closeInscription() {
+		inscriptionOpen = false;
+		inscriptionCourse = null;
 	}
 </script>
 
@@ -126,3 +138,11 @@
 		{/if}
 	</div>
 </Modal>
+
+<!-- F-CATALOGO-INSCRIPCION: modal de formulario de inscripción oficial -->
+<FormularioInscripcionModal
+	isOpen={inscriptionOpen}
+	onClose={closeInscription}
+	programa={inscriptionCourse?.nombre_programa ?? ''}
+	student={currentUser}
+/>

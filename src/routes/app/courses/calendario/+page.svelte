@@ -4,6 +4,7 @@
 	import { userStore } from '$lib/stores/userStore';
 	import BadgeEstado from '$lib/components/programas/BadgeEstado.svelte';
 	import { alert } from '$lib/utils';
+	import FormularioInscripcionModal from '$lib/features/enrollments/FormularioInscripcionModal.svelte';
 
 	let items = $state<CalendarioItem[]>([]);
 	let loading = $state(true);
@@ -220,12 +221,21 @@
 
 	function cerrarDetalle() {
 		selectedPrograma = null;
+		inscriptionOpen = false;
 	}
+
+	// F-CATALOGO-INSCRIPCION (2026-07-30): abrir el FormularioInscripcionModal
+	// con el programa seleccionado. Es el flujo oficial: el estudiante genera
+	// el PDF, lo firma, y lo entrega en secretaría.
+	let inscriptionOpen = $state(false);
 
 	function handleInscribirme() {
 		if (!selectedPrograma) return;
-		alert('info', `Inscripción a "${selectedPrograma.nombre_programa}". Próximamente: abrir el wizard de inscripción.`);
-		cerrarDetalle();
+		inscriptionOpen = true;
+	}
+
+	function closeInscription() {
+		inscriptionOpen = false;
 	}
 </script>
 
@@ -499,3 +509,11 @@
 		</div>
 	</div>
 {/if}
+
+<!-- F-CATALOGO-INSCRIPCION (2026-07-30): modal de formulario de inscripción oficial -->
+<FormularioInscripcionModal
+	isOpen={inscriptionOpen}
+	onClose={closeInscription}
+	programa={selectedPrograma?.nombre_programa ?? ''}
+	student={currentUser}
+/>
