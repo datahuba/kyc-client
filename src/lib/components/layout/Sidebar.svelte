@@ -2,7 +2,7 @@
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/userStore';
 	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
-	import { UsersIcon, ClipboardIcon, TagIcon, XIcon, KeyIcon, QrCodeIcon, FileTextIcon, AcademicCapIcon, Menu2Icon, ChartBarIcon } from '$lib/icons/outline'; // F-CUENTAS-POR-COBRAR ChartBarIcon
+	import { UsersIcon, ClipboardIcon, TagIcon, XIcon, KeyIcon, QrCodeIcon, FileTextIcon, AcademicCapIcon, Menu2Icon, ChartBarIcon, DocumentAddIcon } from '$lib/icons/outline'; // F-CUENTAS-POR-COBRAR ChartBarIcon; F-TRAMITES-SOLICITUD DocumentAddIcon
 	import { slide, fade } from 'svelte/transition';
 	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon, ExclamationCircleIcon, CalendarIcon } from '$lib/icons/solid';  // F-044 (2026-07-22) | F-080 CalendarIcon
 	import { goto } from '$app/navigation';
@@ -73,6 +73,10 @@
 		// (estudiantes y staff/admin), porque es para ambos: el estudiante emite
 		// el suyo, el staff lo ve para auditoría.
 		{ type: 'item', name: 'Certificados', href: '/app/certificates', icon: FileTextIcon, roles: ['student', 'admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['academic', 'admin'] },
+		// F-TRAMITES-SOLICITUD (2026-07-29): solicitudes de Convalidación,
+		// Tutoría, Readmisión y Titulación. Sandra/Rocío pidieron en la
+		// reunión 2026-07-29 formularios simples con archivos adjuntos.
+		{ type: 'item', name: 'Mis Solicitudes', href: '/app/requests', icon: DocumentAddIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ type: 'item', name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ type: 'item', name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
 
@@ -132,6 +136,10 @@
 				{ type: 'item', name: 'Solicitudes de Cuenta', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
 				// Solicitudes de Inscripción (pre-inscripción a cursos)
 				{ type: 'item', name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+				// F-TRAMITES-SOLICITUD (2026-07-29): Convalidación, Tutoría,
+				// Readmisión y Titulación. Visibilidad amplia para que cualquier
+				// staff que revise pueda acceder.
+				{ type: 'item', name: 'Solicitudes de Trámite', href: '/app/requests', icon: DocumentAddIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 				// Solicitudes de Pasivo (solicitar estado pasivo)
 				{ type: 'item', name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
 			]
