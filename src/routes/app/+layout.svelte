@@ -48,7 +48,15 @@
 					'/app/change-password',
 					'/app/enrollments',
 					'/app/payments',
-					'/app/classroom'
+					'/app/classroom',
+					// F-CERTIFICADOS (2026-07-29): Kevin pidió que Certificados esté
+					// disponible para TODOS los roles (estudiantes y staff). El
+					// estudiante emite el suyo, el staff lo ve para auditoría.
+					'/app/certificates',
+					// F-TRAMITES-SOLICITUD (2026-07-29): solicitudes de
+					// Convalidación, Tutoría, Readmisión y Titulación. El
+					// estudiante crea sus propias solicitudes.
+					'/app/requests'
 				];
 				
 				const isAllowed = allowedStudentPaths.some(allowedPath => path.startsWith(allowedPath));
@@ -64,7 +72,10 @@
 					'/app/dashboard',
 					'/app/profile',
 					'/app/change-password',
-					'/app/classroom'
+					'/app/classroom',
+					// F-CERTIFICADOS (2026-07-29): visible para todos los roles
+					// incluyendo docentes (auditoría de certificados).
+					'/app/certificates'
 				];
 				
 				const isAllowed = allowedDocentePaths.some(allowedPath => path.startsWith(allowedPath));
