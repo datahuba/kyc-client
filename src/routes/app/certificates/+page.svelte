@@ -45,7 +45,6 @@
 		FileTextIcon,
 		DownloadIcon,
 		CircleCheckIcon,
-		ExclamationIcon,
 		SearchIcon
 	} from '$lib/icons/outline';
 
@@ -148,6 +147,24 @@
 		if (!eid) return null;
 		return (
 			issuedCertificates.find((c) => c.tipo === 'notas' && c.enrollment_id === eid) || null
+		);
+	}
+
+	/**
+	 * F-CERT-SIEMPRE-UX (2026-07-30): si el estudiante ya emitió un cert
+	 * No Deudor para este enrollment y mismo `hasta_modulo_n`, mostramos
+	 * el botón "Descargar" en vez de "Emitir" para evitar el 409.
+	 */
+	function isNoDeudorYaEmitido(e: Enrollment, hastaN: number): Certificate | null {
+		const eid = e._id || e.id;
+		if (!eid) return null;
+		return (
+			issuedCertificates.find(
+				(c) =>
+					c.tipo === 'no_deudor' &&
+					c.enrollment_id === eid &&
+					(c.hasta_modulo_n ?? 0) === hastaN
+			) || null
 		);
 	}
 
@@ -832,12 +849,12 @@
 					{@const enrollment = getSelectedEnrollment()!}
 					{@const eid = String(enrollment._id || enrollment.id || '')}
 					{@const course = getCourse(enrollment)}
-					{@const elegibleNotas = isNotasElegible(enrollment)}
 					{@const notasYaEmitido = isNotasYaEmitido(enrollment)}
 					{@const totalModulos = enrollment.modulos?.length ?? 0}
 					{@const ultPagado = ultimoModuloPagado(enrollment)}
 					{@const hastaN = hastaModuloNSelections[eid] || Math.min(ultPagado || 1, Math.max(totalModulos, 1))}
 					{@const elegibleNoDeudor = getNoDeudorElegibilidad(enrollment, hastaN)}
+					{@const noDeudorYaEmitido = isNoDeudorYaEmitido(enrollment, hastaN)}
 
 					<Card variant="bordered">
 						{#snippet header()}
@@ -920,22 +937,15 @@
 										</Button>
 									</div>
 								</div>
-							{:else if elegibleNotas.ok}
+							{:else}
+								<!-- F-CERT-SIEMPRE (2026-07-30): emisión siempre libre.
+								     El backend decide si la emisión es válida; el frontend
+								     solo verifica que la inscripción tenga módulos. -->
 								<div class="rounded-lg border border-light-success/40 bg-light-success/5 dark:border-dark-success/40 dark:bg-dark-success/5 p-4">
-									<p class="text-sm text-light-black dark:text-dark-white mb-3">¡Cumples todos los requisitos! Programa finalizado y sin saldo pendiente.</p>
+									<p class="text-sm text-light-black dark:text-dark-white mb-3">Descarga tu Certificado de Notas cuando quieras. La constancia se genera con el estado actual del programa.</p>
 									<Button variant="primary" size="md" loading={emittingNotas[eid]} onclick={() => emitirNotas(enrollment)} ariaLabel="Emitir Certificado de Notas">
 										<DownloadIcon class="w-4 h-4 mr-2" />Descargar Certificado de Notas
 									</Button>
-								</div>
-							{:else}
-								<div class="rounded-lg border border-light-warning/40 bg-light-warning/5 dark:border-dark-warning/40 dark:bg-dark-warning/5 p-4">
-									<div class="flex items-start gap-3">
-										<ExclamationIcon class="w-5 h-5 text-light-warning dark:text-dark-warning shrink-0 mt-0.5" />
-										<div>
-											<p class="text-sm font-medium text-light-black dark:text-dark-white">Aún no puedes emitir este certificado</p>
-											<p class="text-sm text-light-four dark:text-dark-four mt-1">{elegibleNotas.motivo}</p>
-										</div>
-									</div>
 								</div>
 							{/if}
 						</section>
@@ -984,9 +994,15 @@
 												</option>
 											{/each}
 										</select>
-										<Button variant="primary" size="md" disabled={!elegibleNoDeudor.ok} loading={emittingNoDeudor[eid]} onclick={() => emitirNoDeudor(enrollment)} ariaLabel="Emitir Certificado de No Deudor hasta Módulo {hastaN}">
-											<DownloadIcon class="w-4 h-4 mr-2" />Descargar No Deudor
-										</Button>
+										{#if noDeudorYaEmitido}
+											<Button variant="primary" size="md" loading={downloadingId === noDeudorYaEmitido.id} onclick={() => descargarPdf(noDeudorYaEmitido)} ariaLabel="Descargar Certificado de No Deudor folio {noDeudorYaEmitido.folio}">
+												<DownloadIcon class="w-4 h-4 mr-2" />Descargar No Deudor (Folio {noDeudorYaEmitido.folio})
+											</Button>
+										{:else}
+											<Button variant="primary" size="md" disabled={!elegibleNoDeudor.ok} loading={emittingNoDeudor[eid]} onclick={() => emitirNoDeudor(enrollment)} ariaLabel="Emitir Certificado de No Deudor hasta Módulo {hastaN}">
+												<DownloadIcon class="w-4 h-4 mr-2" />Descargar No Deudor
+											</Button>
+										{/if}
 									</div>
 									{#if !elegibleNoDeudor.ok}
 										<p class="text-xs text-light-error dark:text-dark-error mt-2">{elegibleNoDeudor.motivo}</p>
