@@ -121,6 +121,12 @@
 	// DERIVADOS: VISTA ESTUDIANTE
 	// ========================================================================
 
+	// F-CERT-SIEMPRE (2026-07-30): el certificado de Notas y el de No Deudor
+	// deben poderse sacar SIEMPRE (reunión con Sandra Zabala). La validación
+	// se hace en el backend (single source of truth). El frontend SOLO
+	// muestra el botón "Descargar Notas" si la inscripción tiene al menos
+	// un módulo asociado. Si el backend rechaza, mostramos el error.
+
 	function notasCursando(e: Enrollment): string[] {
 		if (!e.modulos) return [];
 		return e.modulos
@@ -129,18 +135,10 @@
 	}
 
 	function isNotasElegible(e: Enrollment): { ok: boolean; motivo: string | null } {
-		const pendientes = notasCursando(e);
-		if (pendientes.length > 0) {
-			return {
-				ok: false,
-				motivo: `Te faltan ${pendientes.length} módulo(s) por finalizar: ${pendientes.join(', ')}.`
-			};
-		}
-		if ((e.saldo_pendiente ?? 0) > 0.01) {
-			return {
-				ok: false,
-				motivo: `Tienes un saldo pendiente de Bs ${e.saldo_pendiente.toFixed(2)}. Cancélalo para habilitar el certificado.`
-			};
+		// F-CERT-SIEMPRE: solo validamos que tenga módulos. NO exigimos
+		// que estén finalizados ni pagados. La emisión siempre es libre.
+		if (!e.modulos || e.modulos.length === 0) {
+			return { ok: false, motivo: 'Esta inscripción no tiene módulos asociados.' };
 		}
 		return { ok: true, motivo: null };
 	}
@@ -154,12 +152,12 @@
 	}
 
 	function getModuloEstadoPago(e: Enrollment, hastaN: number): { ok: boolean; moduloPendiente: string | null } {
+		// F-CERT-SIEMPRE: ya no exigimos que los módulos anteriores estén
+		// pagados para emitir el cert No Deudor. Solo validamos que N esté
+		// en rango válido. El backend hace la validación final.
 		if (!e.modulos) return { ok: true, moduloPendiente: null };
-		for (let i = 0; i < hastaN && i < e.modulos.length; i++) {
-			const m: any = e.modulos[i];
-			if (m.estado !== 'Pagado') {
-				return { ok: false, moduloPendiente: m.nombre };
-			}
+		if (hastaN < 1 || hastaN > e.modulos.length) {
+			return { ok: false, moduloPendiente: `Módulo ${hastaN} (fuera de rango)` };
 		}
 		return { ok: true, moduloPendiente: null };
 	}

@@ -60,41 +60,30 @@
 	let { isOpen, onClose }: Props = $props();
 	let isCollapsed = $state(false);
 
-	const navigation: NavigationEntry[] = [
+	// F-SIDEBAR-ORDER (2026-07-30): Dashboard primero SOLO, luego el resto
+	// en orden ALFABÉTICO. Los grupos se intercalan alfabéticamente también.
+	// Aplicamos el orden en runtime en lugar de hardcodearlo en el array,
+	// para que sea fácil agregar/quitar items sin romper el orden.
+	const navItems: NavigationEntry[] = [
 		// === Académico (estudiantes y docentes) ===
-		// F-XXX (2026-07-29): Dashboard primero, espacio, resto alfabético
 		{ type: 'item', name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
-		{ type: 'spacer' },
 		{ type: 'item', name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
+		{ type: 'item', name: 'Certificados', href: '/app/certificates', icon: FileTextIcon, roles: ['student', 'admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['academic', 'admin'] },
 		{ type: 'item', name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 		{ type: 'item', name: 'Mis Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
-		// F-CERTIFICADOS (2026-07-29): emisión de Certificados de Notas y No Deudor.
-		// FIX 2026-07-29 19:11: Kevin pidió que sea visible para TODOS los roles
-		// (estudiantes y staff/admin), porque es para ambos: el estudiante emite
-		// el suyo, el staff lo ve para auditoría.
-		{ type: 'item', name: 'Certificados', href: '/app/certificates', icon: FileTextIcon, roles: ['student', 'admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['academic', 'admin'] },
-		// F-TRAMITES-SOLICITUD (2026-07-29): solicitudes de Convalidación,
-		// Tutoría, Readmisión y Titulación. Sandra/Rocío pidieron en la
-		// reunión 2026-07-29 formularios simples con archivos adjuntos.
-		{ type: 'item', name: 'Mis Solicitudes', href: '/app/requests', icon: DocumentAddIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ type: 'item', name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
+		{ type: 'item', name: 'Mis Solicitudes', href: '/app/requests', icon: DocumentAddIcon, roles: ['student'], loginTypes: ['academic'] },
 		{ type: 'item', name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
 
 		// === Staff administrativo ===
-		// F-XXX (2026-07-29): Dashboard primero, espacio, resto alfabético.
-		// Grupos (Financiero, Solicitudes) intercalados alfabéticamente.
 		{ type: 'item', name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ type: 'spacer' },
 		{ type: 'item', name: 'Calendario', href: '/app/courses/calendario', icon: CalendarIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['admin'] },
+		{ type: 'item', name: 'Certificados', href: '/app/certificates', icon: FileTextIcon, roles: ['student', 'admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['academic', 'admin'] },
 		{ type: 'item', name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-
-		// F-074 / F-075 (2026-07-29): GRUPO "Financiero" — Sandra pidió en la
-		// reunión 2026-07-29 que Gestión de Pagos, Reportes de Caja e Informes
-		// estén juntos en un solo menú desplegable ("Dashboard académico y
-		// financiero") para ver todo lo económico a un golpe de vista.
+		// F-074 / F-075: GRUPO "Financiero" (desplegable, posición alfabética)
 		{
 			type: 'group',
 			name: 'Financiero',
@@ -102,29 +91,18 @@
 			roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador'],
 			loginTypes: ['admin'],
 			children: [
-				// F-088 (2026-07-29): Vista "Deudores" unificada para cobranza.
-				{ type: 'item', name: 'Deudores', href: '/app/payments/deudores', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'cpd', 'coordinador'], loginTypes: ['admin'] },
-				// F-087: Gestión de Pagos (incluye Por Pago con matriz de auditoría)
-				{ type: 'item', name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
-				// F-CUENTAS-POR-COBRAR (2026-07-29): CxC real vs estimada.
 				{ type: 'item', name: 'Cuentas por Cobrar', href: '/app/reports/cuentas-por-cobrar', icon: ChartBarIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador', 'encargado_curso'], loginTypes: ['admin'] },
-				// F-075: Informes (acta de notas, etc.)
+				{ type: 'item', name: 'Deudores', href: '/app/payments/deudores', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'cpd', 'coordinador'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
 				{ type: 'item', name: 'Informes', href: '/app/informes', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd', 'coordinador'], loginTypes: ['admin'] },
-				// Reportes de Caja (gestión financiera interna)
 				{ type: 'item', name: 'Reportes de Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'coordinador'], loginTypes: ['admin'] },
 			]
 		},
-
 		{ type: 'item', name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-		// ACCESO DIRECTO A INSCRIPCIONES
 		{ type: 'item', name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Pre-inscripciones', href: '/app/pre-registros', icon: ClipboardIcon, roles: ['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
-
-		// F-XXX (2026-07-29): GRUPO "Solicitudes" — Kevin pidió agrupar las 3
-		// vistas de solicitudes en un solo menú desplegable (Solicitudes,
-		// Solicitudes de Inscripción, Solicitudes de Pasivo). El grupo va
-		// alfabéticamente entre "Programas" y "Usuarios".
+		// F-XXX: GRUPO "Solicitudes" (desplegable, posición alfabética)
 		{
 			type: 'group',
 			name: 'Solicitudes',
@@ -132,27 +110,40 @@
 			roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'],
 			loginTypes: ['admin'],
 			children: [
-				// Solicitudes de creación de cuenta de estudiante
 				{ type: 'item', name: 'Solicitudes de Cuenta', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
-				// Solicitudes de Inscripción (pre-inscripción a cursos)
 				{ type: 'item', name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-				// F-TRAMITES-SOLICITUD (2026-07-29): Convalidación, Tutoría,
-				// Readmisión y Titulación. Visibilidad amplia para que cualquier
-				// staff que revise pueda acceder.
-				{ type: 'item', name: 'Solicitudes de Trámite', href: '/app/requests', icon: DocumentAddIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-				// Solicitudes de Pasivo (solicitar estado pasivo)
 				{ type: 'item', name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Solicitudes de Trámite', href: '/app/requests', icon: DocumentAddIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 			]
 		},
-
 		{ type: 'item', name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
-		// F-070 (2026-07-22): validación de notas (CPD/Admin/Superadmin). Surge del
-		// bug urgente: Miguel (socio de Kevin) tenía 51 notas en pendiente_validacion
-		// y no había forma rápida de aprobarlas. Aquí CPD ve, aprueba, rechaza y edita.
 		{ type: 'item', name: 'Validación de Notas', href: '/app/admin/grade-validation', icon: AcademicCapIcon, roles: ['cpd', 'admin', 'superadmin'], loginTypes: ['admin'] },
-		// F-044 (2026-07-22): visor de errores 500 (solo superadmin/admin)
 		{ type: 'item', name: 'Visor de Errores', href: '/app/admin/errors', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 	];
+
+	// F-SIDEBAR-ORDER: separar Dashboard del resto + ordenar alfabéticamente
+	// cada bloque. Mantenemos el Dashboard como primer item siempre, luego
+	// un spacer, luego el resto en orden alfabético.
+	const navigation = $derived.by(() => {
+		// 1. Identificar el item Dashboard (el primero que coincida)
+		const isStudent = isStudentUser;
+		const dashboardName = isStudent ? 'Mi Dashboard' : 'Dashboard';
+		const dashboardItem = navItems.find(
+			(e) => e.type === 'item' && e.name === dashboardName
+		);
+		const restItems = navItems
+			.filter((e) => e !== dashboardItem)
+			.sort((a, b) => {
+				const nameA = (a.type === 'item' || a.type === 'group') ? a.name : '';
+				const nameB = (b.type === 'item' || b.type === 'group') ? b.name : '';
+				return nameA.localeCompare(nameB, 'es');
+			});
+		const result: NavigationEntry[] = [];
+		if (dashboardItem) result.push(dashboardItem);
+		result.push({ type: 'spacer' });
+		result.push(...restItems);
+		return result;
+	});
 
 	let userRole = $derived($userStore?.role || 'student');
 	let loginType = $derived($userStore?.loginType);
