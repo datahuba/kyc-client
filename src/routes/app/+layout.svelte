@@ -13,6 +13,13 @@
 	let { children } = $props();
 	let sidebarOpen = $state(false);
 
+	// F-LOADING-AUTH (2026-07-30): mientras el userStore se inicializa
+	// (lee localStorage para restaurar sesión), mostramos un loading
+	// spinner en lugar del shell vacío. Sin esto, el SSR renderiza
+	// el shell y el usuario ve una pantalla blanca durante ~500ms
+	// antes de que el JS redirija a /auth/sign-in.
+	let authChecking = $state(true);
+
 	// ISSUE-Q-PRE: bloquea la navegación del usuario hasta que acepte
 	// el reglamento de Posgrado. Aplica a TODO usuario autenticado
 	// (estudiantes + personal admin/docente). El modal se muestra la
@@ -24,13 +31,14 @@
 
 	onMount(() => {
 		// Basic auth check or restore
-		if (!$userStore.isAuthenticated) {
-			// Try to restore or redirect
-			userStore.init();
+		userStore.init();
+		// Pequeño delay para que el spinner sea visible (y no parpadee)
+		setTimeout(() => {
+			authChecking = false;
 			if (!$userStore.isAuthenticated) {
 				goto('/auth/sign-in');
 			}
-		}
+		}, 100);
 	});
 
 	// --- GUARDIÁN DE SEGURIDAD REACTIVO (Issue #7 - Control de Crossover) ---
@@ -107,6 +115,16 @@
   en segundo plano en el mismo instante en que el usuario pase el puntero del mouse sobre 
   cualquier enlace o pestaña de navegación de Posgrado, simulando transiciones de 0ms.
 -->
+
+<!-- F-LOADING-AUTH (2026-07-30): mientras se verifica la sesiÃ³n, mostrar un
+     spinner en lugar del shell vacÃ­o. Visible por ~100ms antes del redirect
+     a /auth/sign-in. Mejora la UX percibida del primer paint. -->
+{#if authChecking}
+	<div class="flex flex-col items-center justify-center h-dvh bg-light-primary dark:bg-dark-background gap-3">
+		<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+		<p class="text-sm text-slate-500 dark:text-slate-400">Verificando sesiÃ³nâ€¦</p>
+	</div>
+{:else}
 <div class="flex h-dvh bg-light-primary dark:bg-dark-background transition-colors" data-sveltekit-preload-data="hover">
 	<Sidebar 
 		isOpen={sidebarOpen} 
@@ -141,5 +159,6 @@
 		<BottomNav />
 	</div>
 </div>
+{/if}
 
 <TermsAcceptanceModal isOpen={showTermsModal} />
