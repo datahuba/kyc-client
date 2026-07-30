@@ -64,8 +64,6 @@
 	// Semana visible como 7 días derivados
 	const semanaActual = $derived.by(() => {
 		const lunes = lunesDeSemana(semanaOffset);
-		// Sincronizar mesFoco con la semana visible (para el mini-calendario)
-		mesFoco = new Date(lunes);
 		const dias: { fecha: Date; key: string; esHoy: boolean; items: CalendarioItem[] }[] = [];
 		const hoy = new Date();
 		hoy.setHours(0, 0, 0, 0);
@@ -109,6 +107,13 @@
 			return `${mesesCortos[lunes.getMonth()]} ${lunes.getDate()} – ${mesesCortos[domingo.getMonth()]} ${domingo.getDate()}, ${domingo.getFullYear()}`;
 		}
 		return `${mesesCortos[lunes.getMonth()]} ${lunes.getDate()}, ${lunes.getFullYear()} – ${mesesCortos[domingo.getMonth()]} ${domingo.getDate()}, ${domingo.getFullYear()}`;
+	});
+
+	// BUG-FIX (2026-07-30): NO mutar mesFoco dentro de un $derived (Svelte 5
+	// lanza `state_unsafe_mutation`). Sincronizamos con un $effect que
+	// escucha cambios de semanaOffset.
+	$effect(() => {
+		mesFoco = new Date(lunesDeSemana(semanaOffset));
 	});
 
 	// Mini-calendario: 6 filas × 7 columnas
