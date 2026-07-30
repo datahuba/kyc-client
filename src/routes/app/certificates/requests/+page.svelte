@@ -34,9 +34,10 @@
 	import {
 		FileTextIcon,
 		IdentificationIcon,
-		ClockIcon,
+		BellIcon,
+		RefreshIcon,
 		CircleCheckIcon,
-		XCircleIcon,
+		XIcon,
 		EyeIcon,
 		DownloadIcon
 	} from '$lib/icons/outline';
@@ -282,7 +283,7 @@
 			</p>
 		</div>
 		<Button variant="secondary" size="sm" onclick={() => { loadRequests(); loadStats(); }}>
-			<ClockIcon class="w-4 h-4 mr-1.5" />Refrescar
+			<RefreshIcon class="w-4 h-4 mr-1.5" />Refrescar
 		</Button>
 	</div>
 
@@ -290,7 +291,7 @@
 	<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
 		<Card padding="sm">
 			<div class="flex items-center gap-2 mb-1">
-				<ClockIcon class="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+				<BellIcon class="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
 				<span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
 					Pendientes
 				</span>
@@ -323,7 +324,7 @@
 		</Card>
 		<Card padding="sm">
 			<div class="flex items-center gap-2 mb-1">
-				<XCircleIcon class="w-4 h-4 text-red-600 dark:text-red-400" />
+				<XIcon class="w-4 h-4 text-red-600 dark:text-red-400" />
 				<span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
 					Rechazadas hoy
 				</span>
@@ -541,7 +542,7 @@
 						onclick={openReject}
 						disabled={actionInProgress}
 					>
-						<XCircleIcon class="w-4 h-4 mr-1.5" />Rechazar
+						<XIcon class="w-4 h-4 mr-1.5" />Rechazar
 					</Button>
 					<Button
 						size="sm"
