@@ -8,13 +8,26 @@
  * - GET  /certificates/by-enrollment/{id}  (auditoría / staff)
  * - GET  /certificates/{id}        (metadatos de un certificado)
  * - GET  /certificates/{id}/pdf    (descarga el PDF)
+ *
+ * F-CERT-APROBACION (2026-07-30): flujo de solicitud + aprobación.
+ * - POST /certificates/requests/   (estudiante crea solicitud)
+ * - GET  /certificates/requests/my (estudiante ve las suyas)
+ * - GET  /certificates/requests/   (staff ve la cola)
+ * - PATCH /certificates/requests/{id}/approve (staff aprueba)
+ * - PATCH /certificates/requests/{id}/reject  (staff rechaza)
+ * - PATCH /certificates/requests/{id}/in-review
+ * - PATCH /certificates/requests/{id}/cancel  (estudiante cancela)
  */
 
 import { apiKyC } from '$lib/config';
 import type {
 	Certificate,
 	CertificateEmitRequest,
-	CertificateListResponse
+	CertificateListResponse,
+	CertificateRequest,
+	CertificateRequestCreate,
+	CertificateRequestListResponse,
+	CertificateRequestStats
 } from '$lib/interfaces';
 
 class CertificateService {
@@ -101,6 +114,92 @@ class CertificateService {
 		const qs = params.toString();
 		const url = `/certificates/admin/list${qs ? `?${qs}` : ''}`;
 		return await apiKyC.get<CertificateListResponse>(url);
+	}
+
+	// ========================================================================
+	// F-CERT-APROBACION (2026-07-30): flujo de solicitud + aprobación
+	// ========================================================================
+
+	/**
+	 * [Estudiante] Crea una solicitud de certificado.
+	 * La solicitud queda en estado 'pendiente' hasta que el encargado del
+	 * programa (o admin/superadmin) la apruebe.
+	 */
+	async createRequest(data: CertificateRequestCreate): Promise<CertificateRequest> {
+		return await apiKyC.post<CertificateRequest>('/certificates/requests/', data);
+	}
+
+	/**
+	 * [Estudiante] Lista mis solicitudes de certificado.
+	 */
+	async listMyRequests(): Promise<CertificateRequest[]> {
+		return await apiKyC.get<CertificateRequest[]>('/certificates/requests/my');
+	}
+
+	/**
+	 * [Estudiante] Cancela mi solicitud (solo si está pendiente o en revisión).
+	 */
+	async cancelMyRequest(requestId: string, motivo_cancelacion?: string): Promise<CertificateRequest> {
+		return await apiKyC.patch<CertificateRequest>(
+			`/certificates/requests/${requestId}/cancel`,
+			{ motivo_cancelacion }
+		);
+	}
+
+	/**
+	 * [Staff] Cola de solicitudes (filtrada automáticamente por cursos_asignados
+	 * del encargado, o todas si es admin/superadmin/CPD/etc).
+	 */
+	async listRequestsQueue(
+		estado?: 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | 'cancelada',
+		page = 1,
+		perPage = 20
+	): Promise<CertificateRequestListResponse> {
+		const params = new URLSearchParams();
+		if (estado) params.append('estado', estado);
+		params.append('page', page.toString());
+		params.append('per_page', perPage.toString());
+		const qs = params.toString();
+		return await apiKyC.get<CertificateRequestListResponse>(
+			`/certificates/requests/${qs ? `?${qs}` : ''}`
+		);
+	}
+
+	/**
+	 * [Staff] Estadísticas de la cola (KPIs del panel del encargado).
+	 */
+	async getRequestsStats(): Promise<CertificateRequestStats> {
+		return await apiKyC.get<CertificateRequestStats>('/certificates/requests/stats');
+	}
+
+	/**
+	 * [Encargado] Marcar solicitud en revisión.
+	 */
+	async markRequestInReview(requestId: string): Promise<CertificateRequest> {
+		return await apiKyC.patch<CertificateRequest>(
+			`/certificates/requests/${requestId}/in-review`,
+			{}
+		);
+	}
+
+	/**
+	 * [Encargado/Admin] Aprobar solicitud. Al aprobar, se emite el Certificate.
+	 */
+	async approveRequest(requestId: string): Promise<CertificateRequest> {
+		return await apiKyC.patch<CertificateRequest>(
+			`/certificates/requests/${requestId}/approve`,
+			{}
+		);
+	}
+
+	/**
+	 * [Encargado/Admin] Rechazar solicitud con motivo.
+	 */
+	async rejectRequest(requestId: string, motivo_rechazo: string): Promise<CertificateRequest> {
+		return await apiKyC.patch<CertificateRequest>(
+			`/certificates/requests/${requestId}/reject`,
+			{ motivo_rechazo }
+		);
 	}
 }
 

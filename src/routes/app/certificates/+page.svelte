@@ -33,7 +33,7 @@
 	} from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
 	import { alert } from '$lib/utils';
-	import type { Certificate, Enrollment, Course, Student } from '$lib/interfaces';
+	import type { Certificate, Enrollment, Course, Student, CertificateRequest } from '$lib/interfaces';
 
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -94,6 +94,9 @@
 	let emittingNoDeudor = $state<Record<string, boolean>>({});
 	let hastaModuloNSelections = $state<Record<string, number>>({});
 	let selectedEnrollmentId = $state<string>('');
+	// F-CERT-APROBACION (2026-07-30): solicitudes de certificado del estudiante
+	let myRequests: CertificateRequest[] = $state([]);
+	let cancellingRequestId = $state<string | null>(null);
 
 	$effect(() => {
 		if (enrollments.length > 0 && !selectedEnrollmentId) {
@@ -148,6 +151,64 @@
 		return (
 			issuedCertificates.find((c) => c.tipo === 'notas' && c.enrollment_id === eid) || null
 		);
+	}
+
+	// F-CERT-APROBACION (2026-07-30): helpers para saber si hay una solicitud
+	// ACTIVA (pendiente o en_revision) para este enrollment y tipo.
+	function getSolicitudActiva(
+		e: Enrollment,
+		tipo: 'notas' | 'no_deudor',
+		hastaN?: number
+	): CertificateRequest | null {
+		const eid = e._id || e.id;
+		if (!eid) return null;
+		return (
+			myRequests.find((r) => {
+				if (r.enrollment_id !== eid) return false;
+				if (r.tipo !== tipo) return false;
+				if (r.estado !== 'pendiente' && r.estado !== 'en_revision') return false;
+				if (tipo === 'no_deudor' && hastaN !== undefined) {
+					if ((r.hasta_modulo_n ?? 0) !== hastaN) return false;
+				}
+				return true;
+			}) || null
+		);
+	}
+
+	function isNotasSolicitudActiva(e: Enrollment): CertificateRequest | null {
+		return getSolicitudActiva(e, 'notas');
+	}
+
+	function isNoDeudorSolicitudActiva(e: Enrollment, hastaN: number): CertificateRequest | null {
+		return getSolicitudActiva(e, 'no_deudor', hastaN);
+	}
+
+	function estadoBadgeClass(estado: string): string {
+		switch (estado) {
+			case 'pendiente':
+				return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
+			case 'en_revision':
+				return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+			case 'aprobada':
+				return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+			case 'rechazada':
+				return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+			case 'cancelada':
+				return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+			default:
+				return 'bg-gray-100 text-gray-800';
+		}
+	}
+
+	function estadoLabel(estado: string): string {
+		switch (estado) {
+			case 'pendiente': return 'Pendiente de revisión';
+			case 'en_revision': return 'En revisión';
+			case 'aprobada': return 'Aprobada';
+			case 'rechazada': return 'Rechazada';
+			case 'cancelada': return 'Cancelada';
+			default: return estado;
+		}
 	}
 
 	/**
@@ -258,16 +319,23 @@
 
 		loading = true;
 		try {
-			const [enrollmentsData, certsData] = await Promise.all([
+			const [enrollmentsData, certsData, requestsData] = await Promise.all([
 				enrollmentService.getByStudentId(userId),
 				certificateService.listMy().catch((err) => {
 					console.warn('No se pudieron cargar certificados:', err);
+					return [];
+				}),
+				// F-CERT-APROBACION (2026-07-30): cargar también las solicitudes
+				// para saber si hay alguna pendiente y mostrar el estado correcto
+				certificateService.listMyRequests().catch((err) => {
+					console.warn('No se pudieron cargar solicitudes de cert:', err);
 					return [];
 				})
 			]);
 
 			enrollments = enrollmentsData || [];
 			issuedCertificates = certsData;
+			myRequests = requestsData;
 
 			const cursoIds = Array.from(
 				new Set(enrollments.map((e) => e.curso_id).filter(Boolean))
@@ -387,10 +455,12 @@
 	}
 
 	// ========================================================================
-	// ACCIONES: emitir certificados (vista estudiante)
+	// ACCIONES: solicitar certificados (vista estudiante)
+	// F-CERT-APROBACION (2026-07-30): el estudiante ya no emite directo,
+	// crea una solicitud que el encargado del programa debe aprobar.
 	// ========================================================================
 
-	async function emitirNotas(e: Enrollment) {
+	async function solicitarNotas(e: Enrollment) {
 		const eid = e._id || e.id;
 		if (!eid) return;
 		const elegible = isNotasElegible(e);
@@ -400,20 +470,27 @@
 		}
 		emittingNotas = { ...emittingNotas, [eid]: true };
 		try {
-			const cert = await certificateService.emitNotas(eid);
-			issuedCertificates = [cert, ...issuedCertificates];
-			alert('success', `Certificado de Notas emitido. Folio: ${cert.folio}.`);
-			await descargarPdf(cert);
+			const req = await certificateService.createRequest({
+				tipo: 'notas',
+				enrollment_id: eid,
+				motivo: 'Solicitud de Certificado de Notas desde el portal del estudiante.'
+			});
+			myRequests = [req, ...myRequests];
+			alert(
+				'success',
+				'Solicitud creada. El encargado del programa la revisará y aprobará. ' +
+				'Te avisaremos cuando esté lista para descargar.'
+			);
 		} catch (err: any) {
-			console.error('Error emitiendo notas:', err);
-			const detail = err?.response?.data?.detail || err?.message || 'No se pudo emitir el certificado.';
+			console.error('Error creando solicitud de notas:', err);
+			const detail = err?.response?.data?.detail || err?.message || 'No se pudo crear la solicitud.';
 			alert('error', detail);
 		} finally {
 			emittingNotas = { ...emittingNotas, [eid]: false };
 		}
 	}
 
-	async function emitirNoDeudor(e: Enrollment) {
+	async function solicitarNoDeudor(e: Enrollment) {
 		const eid = e._id || e.id;
 		if (!eid) return;
 		const hastaN = hastaModuloNSelections[eid] || 1;
@@ -424,16 +501,40 @@
 		}
 		emittingNoDeudor = { ...emittingNoDeudor, [eid]: true };
 		try {
-			const cert = await certificateService.emitNoDeudor(eid, hastaN);
-			issuedCertificates = [cert, ...issuedCertificates];
-			alert('success', `Certificado de No Deudor (hasta Módulo ${hastaN}) emitido. Folio: ${cert.folio}.`);
-			await descargarPdf(cert);
+			const req = await certificateService.createRequest({
+				tipo: 'no_deudor',
+				enrollment_id: eid,
+				hasta_modulo_n: hastaN,
+				motivo: `Solicitud de Certificado de No Deudor hasta Módulo ${hastaN}.`
+			});
+			myRequests = [req, ...myRequests];
+			alert(
+				'success',
+				'Solicitud creada. El encargado del programa la revisará y aprobará. ' +
+				'Te avisaremos cuando esté lista para descargar.'
+			);
 		} catch (err: any) {
-			console.error('Error emitiendo no deudor:', err);
-			const detail = err?.response?.data?.detail || err?.message || 'No se pudo emitir el certificado.';
+			console.error('Error creando solicitud de no deudor:', err);
+			const detail = err?.response?.data?.detail || err?.message || 'No se pudo crear la solicitud.';
 			alert('error', detail);
 		} finally {
 			emittingNoDeudor = { ...emittingNoDeudor, [eid]: false };
+		}
+	}
+
+	async function cancelarMiSolicitud(req: CertificateRequest) {
+		if (!confirm('¿Cancelar esta solicitud? Una vez cancelada, puedes crear una nueva.')) return;
+		cancellingRequestId = req.id;
+		try {
+			const updated = await certificateService.cancelMyRequest(req.id);
+			myRequests = myRequests.map((r) => (r.id === updated.id ? updated : r));
+			alert('success', 'Solicitud cancelada.');
+		} catch (err: any) {
+			console.error('Error cancelando solicitud:', err);
+			const detail = err?.response?.data?.detail || err?.message || 'No se pudo cancelar la solicitud.';
+			alert('error', detail);
+		} finally {
+			cancellingRequestId = null;
 		}
 	}
 
@@ -937,14 +1038,43 @@
 										</Button>
 									</div>
 								</div>
+							{:else if isNotasSolicitudActiva(enrollment)}
+								{@const solNotas = isNotasSolicitudActiva(enrollment)}
+								<div class="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 p-4">
+									<div class="flex items-start gap-3">
+										<div class="flex-1 min-w-0">
+											<div class="flex items-center gap-2 mb-1">
+												<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {estadoBadgeClass(solNotas!.estado)}">
+													{estadoLabel(solNotas!.estado)}
+												</span>
+											</div>
+											<p class="text-sm text-light-black dark:text-dark-white">
+												Solicitud creada el {formatDate(solNotas!.created_at)}.
+											</p>
+											<p class="text-xs text-light-four dark:text-dark-four mt-1">
+												El encargado del programa debe aprobarla antes de que puedas descargar el PDF.
+											</p>
+											{#if solNotas!.estado === 'rechazada' && solNotas!.motivo_rechazo}
+												<p class="text-xs text-red-700 dark:text-red-300 mt-2">
+													<strong>Motivo del rechazo:</strong> {solNotas!.motivo_rechazo}
+												</p>
+											{/if}
+										</div>
+										{#if solNotas!.estado === 'pendiente' || solNotas!.estado === 'en_revision'}
+											<Button variant="ghost" size="sm" loading={cancellingRequestId === solNotas!.id} onclick={() => cancelarMiSolicitud(solNotas!)} ariaLabel="Cancelar solicitud">
+												Cancelar
+											</Button>
+										{/if}
+									</div>
+								</div>
 							{:else}
-								<!-- F-CERT-SIEMPRE (2026-07-30): emisión siempre libre.
-								     El backend decide si la emisión es válida; el frontend
-								     solo verifica que la inscripción tenga módulos. -->
-								<div class="rounded-lg border border-light-success/40 bg-light-success/5 dark:border-dark-success/40 dark:bg-dark-success/5 p-4">
-									<p class="text-sm text-light-black dark:text-dark-white mb-3">Descarga tu Certificado de Notas cuando quieras. La constancia se genera con el estado actual del programa.</p>
-									<Button variant="primary" size="md" loading={emittingNotas[eid]} onclick={() => emitirNotas(enrollment)} ariaLabel="Emitir Certificado de Notas">
-										<DownloadIcon class="w-4 h-4 mr-2" />Descargar Certificado de Notas
+								<!-- F-CERT-APROBACION (2026-07-30): el estudiante crea una
+								     solicitud en vez de descargar directo. El encargado
+								     del programa la aprueba y recien queda disponible. -->
+								<div class="rounded-lg border border-light-info/40 bg-light-info/5 dark:border-dark-info/40 dark:bg-dark-info/5 p-4">
+									<p class="text-sm text-light-black dark:text-dark-white mb-3">Solicita tu Certificado de Notas. El encargado del programa lo revisará y aprobará; una vez aprobado, podrás descargar el PDF.</p>
+									<Button variant="primary" size="md" loading={emittingNotas[eid]} onclick={() => solicitarNotas(enrollment)} ariaLabel="Solicitar Certificado de Notas">
+										<FileTextIcon class="w-4 h-4 mr-2" />Solicitar Certificado de Notas
 									</Button>
 								</div>
 							{/if}
@@ -998,9 +1128,25 @@
 											<Button variant="primary" size="md" loading={downloadingId === noDeudorYaEmitido.id} onclick={() => descargarPdf(noDeudorYaEmitido)} ariaLabel="Descargar Certificado de No Deudor folio {noDeudorYaEmitido.folio}">
 												<DownloadIcon class="w-4 h-4 mr-2" />Descargar No Deudor (Folio {noDeudorYaEmitido.folio})
 											</Button>
+										{:else if isNoDeudorSolicitudActiva(enrollment, hastaN)}
+											{@const solND = isNoDeudorSolicitudActiva(enrollment, hastaN)}
+											<div class="flex flex-col gap-1.5">
+												<span class="inline-flex items-center self-start rounded-full px-2.5 py-0.5 text-xs font-medium {estadoBadgeClass(solND!.estado)}">
+													{estadoLabel(solND!.estado)}
+												</span>
+												{#if solND!.estado === 'rechazada' && solND!.motivo_rechazo}
+													<p class="text-xs text-red-700 dark:text-red-300">
+														<strong>Rechazado:</strong> {solND!.motivo_rechazo}
+													</p>
+												{:else}
+													<p class="text-xs text-light-four dark:text-dark-four">
+														El encargado del programa debe aprobarlo.
+													</p>
+												{/if}
+											</div>
 										{:else}
-											<Button variant="primary" size="md" disabled={!elegibleNoDeudor.ok} loading={emittingNoDeudor[eid]} onclick={() => emitirNoDeudor(enrollment)} ariaLabel="Emitir Certificado de No Deudor hasta Módulo {hastaN}">
-												<DownloadIcon class="w-4 h-4 mr-2" />Descargar No Deudor
+											<Button variant="primary" size="md" disabled={!elegibleNoDeudor.ok} loading={emittingNoDeudor[eid]} onclick={() => solicitarNoDeudor(enrollment)} ariaLabel="Solicitar Certificado de No Deudor hasta Módulo {hastaN}">
+												<FileTextIcon class="w-4 h-4 mr-2" />Solicitar No Deudor
 											</Button>
 										{/if}
 									</div>
