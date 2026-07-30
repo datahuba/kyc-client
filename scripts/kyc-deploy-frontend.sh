@@ -54,8 +54,13 @@ done
 # -----------------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------------
-log()  { echo "[$(date -u +%H:%M:%S)] $*"; }
-log_to_file() { echo "[$(date -u +%H:%M:%S)] $*" >> "$LOG"; }
+# log: escribe a stdout Y al log file persistente.
+# Asi podemos auditar todos los deploys aunque la sesion SSH se cierre.
+log()  {
+  local msg="[$(date -u +%H:%M:%S)] $*"
+  echo "$msg"
+  echo "$msg" >> "$LOG"
+}
 
 # -----------------------------------------------------------------------------
 # Auto-clean locks huerfanos
