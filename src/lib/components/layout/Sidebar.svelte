@@ -113,6 +113,9 @@
 			loginTypes: ['admin'],
 			children: [
 				{ type: 'item', name: 'Solicitudes de Cuenta', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
+				// F-CERT-APROBACION (2026-07-30): cola del encargado para aprobar
+				// solicitudes de certificados. Filtra por cursos_asignados.
+				{ type: 'item', name: 'Solicitudes de Certificados', href: '/app/certificates/requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 				{ type: 'item', name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 				{ type: 'item', name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
 				{ type: 'item', name: 'Solicitudes de Trámite', href: '/app/requests', icon: DocumentAddIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
