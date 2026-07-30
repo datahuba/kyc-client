@@ -4,7 +4,7 @@
 	import BadgeEstado from '$lib/components/programas/BadgeEstado.svelte';
 	import { alert } from '$lib/utils';
 
-	type Vista = 'lista' | 'timeline';
+	type Vista = 'lista' | 'timeline' | 'semana';
 
 	// F-080 FIX (2026-07-27): usar $state (Svelte 5) en vez de let para que
 	// las variables sean reactivas. El bug era que con `let` + `$:` el filtro
@@ -154,6 +154,64 @@
 		return counts;
 	});
 
+	// F-087-CAL · Vista semanal: items agrupados por día de la semana actual
+	// (Lun-Dom), con navegación prev/next/semana-actual. Estilo Google Calendar.
+	let semanaOffset = $state(0); // 0 = semana actual, -1 = anterior, +1 = siguiente
+
+	// Calcula el lunes de la semana (offset=0 → semana actual)
+	function lunesDeSemana(offset: number): Date {
+		const hoy = new Date();
+		hoy.setHours(0, 0, 0, 0);
+		const dow = hoy.getDay(); // 0 = Dom, 1 = Lun, ..., 6 = Sáb
+		const diff = dow === 0 ? -6 : 1 - dow; // ajustar a lunes
+		const lunes = new Date(hoy);
+		lunes.setDate(hoy.getDate() + diff + offset * 7);
+		return lunes;
+	}
+
+	const semanaActual = $derived.by(() => {
+		const lunes = lunesDeSemana(semanaOffset);
+		const dias: { fecha: Date; key: string; label: string; items: CalendarioItem[] }[] = [];
+		const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+		const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+		for (let i = 0; i < 7; i++) {
+			const fecha = new Date(lunes);
+			fecha.setDate(lunes.getDate() + i);
+			const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+			dias.push({
+				fecha,
+				key,
+				label: `${diasSemana[i]} ${fecha.getDate()} ${meses[fecha.getMonth()]}`,
+				items: []
+			});
+		}
+		// Asignar items al día correspondiente
+		for (const it of items) {
+			const ref = it.fecha_inicio || it.fecha_fin;
+			if (!ref) continue;
+			const d = new Date(ref);
+			const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+			const dia = dias.find((x) => x.key === k);
+			if (dia) dia.items.push(it);
+		}
+		return dias;
+	});
+
+	const semanaLabel = $derived.by(() => {
+		const lunes = lunesDeSemana(semanaOffset);
+		const domingo = new Date(lunes);
+		domingo.setDate(lunes.getDate() + 6);
+		const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+		return `${lunes.getDate()} ${meses[lunes.getMonth()]} – ${domingo.getDate()} ${meses[domingo.getMonth()]} ${domingo.getFullYear()}`;
+	});
+
+	function esHoy(fecha: Date): boolean {
+		const h = new Date();
+		return fecha.getFullYear() === h.getFullYear() &&
+			fecha.getMonth() === h.getMonth() &&
+			fecha.getDate() === h.getDate();
+	}
+
 	function setFiltroEstado(estado: string) {
 		// Si ya está activo ese filtro, lo limpiamos (toggle). Si no, lo aplicamos.
 		filtroEstado = filtroEstado === estado ? '' : estado;
@@ -293,6 +351,18 @@
 			>
 				📊 Timeline
 			</button>
+			<button
+				type="button"
+				class="px-3 py-1 text-xs font-semibold rounded transition {vista === 'semana'
+					? 'bg-white shadow text-slate-800'
+					: 'text-slate-500 hover:text-slate-700'}"
+				onclick={() => {
+					vista = 'semana';
+					semanaOffset = 0;
+				}}
+			>
+				🗓️ Semana
+			</button>
 		</div>
 	</div>
 
@@ -401,6 +471,71 @@
 					</div>
 				</section>
 			{/each}
+		</div>
+	{:else if vista === 'semana'}
+		<!-- Vista SEMANA (estilo Google Calendar) -->
+		<div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+			<!-- Header con navegación de semana -->
+			<div class="flex items-center justify-between p-3 border-b border-slate-200 bg-slate-50">
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						class="px-2 py-1 text-sm border border-slate-300 rounded hover:bg-slate-100"
+						onclick={() => (semanaOffset = semanaOffset - 1)}
+						aria-label="Semana anterior"
+					>
+						‹
+					</button>
+					<button
+						type="button"
+						class="px-3 py-1 text-xs font-semibold border border-slate-300 rounded hover:bg-slate-100"
+						class:hidden={semanaOffset === 0}
+						onclick={() => (semanaOffset = 0)}
+					>
+						Hoy
+					</button>
+					<button
+						type="button"
+						class="px-2 py-1 text-sm border border-slate-300 rounded hover:bg-slate-100"
+						onclick={() => (semanaOffset = semanaOffset + 1)}
+						aria-label="Semana siguiente"
+					>
+						›
+					</button>
+				</div>
+				<h2 class="text-sm font-bold text-slate-700">{semanaLabel}</h2>
+				<div class="w-20"></div>
+			</div>
+			<!-- Grid de 7 días -->
+			<div class="grid grid-cols-7 divide-x divide-slate-200">
+				{#each semanaActual as dia (dia.key)}
+					<div class="min-h-[180px] p-2 {esHoy(dia.fecha) ? 'bg-amber-50 dark:bg-amber-900/10' : ''}">
+						<div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1 {esHoy(dia.fecha) ? 'text-amber-700' : ''}">
+							{dia.label}
+							{#if esHoy(dia.fecha)}
+								<span class="ml-1 px-1.5 py-0.5 text-[9px] rounded bg-amber-500 text-white">HOY</span>
+							{/if}
+						</div>
+						{#if dia.items.length === 0}
+							<div class="text-[10px] text-slate-300 italic">—</div>
+						{:else}
+							<div class="space-y-1">
+								{#each dia.items as it (it.id)}
+									<div class="text-[11px] p-1.5 rounded border bg-white border-slate-200 hover:shadow cursor-default">
+										<div class="font-semibold text-slate-800 truncate" title={it.nombre_programa}>
+											{it.nombre_programa}
+										</div>
+										<div class="flex items-center gap-1 mt-0.5">
+											<BadgeEstado estado={it.estado_calculado} size="sm" />
+											<span class="text-[9px] text-slate-500">{it.codigo}</span>
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
 		</div>
 	{/if}
 
