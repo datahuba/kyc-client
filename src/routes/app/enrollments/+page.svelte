@@ -1190,7 +1190,7 @@
 								<th class="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Costo (Bs)</th>
 								<th class="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Estado Pago</th>
 								<!-- F-CUENTAS-POR-COBRAR: estado del módulo en la CxC real. -->
-								<th class="px-4 py-3 text-center text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider bg-primary-50/50 dark:bg-primary-900/10">CxC</th>
+								<th class="px-4 py-3 text-center text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider bg-primary-50/50 dark:bg-primary-900/10">Módulo / CxC</th>
 							</tr>
 						</thead>
 						<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
