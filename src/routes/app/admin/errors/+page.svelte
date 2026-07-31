@@ -6,16 +6,26 @@
 	 * Página que muestra los errores 500 capturados en producción
 	 * (almacenados en MongoDB con TTL 7 días).
 	 *
+	 * F-REFACTOR-ERRORS (2026-07-31): el modal de detalle y los helpers
+	 * de formato se extrajeron a componentes/utils separados:
+	 *   - lib/components/admin/ErrorDetailModal.svelte
+	 *   - lib/utils/errorFormatters.ts
+	 *
 	 * Solo accesible para superadmin/admin.
 	 */
 
-	import { onMount } from 'svelte';
 	import { adminService } from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
 	import { alert } from '$lib/utils';
-	import type { ErrorLogItem, ErrorLogDetail, ErrorLogsListResponse } from '$lib/interfaces';
+	import {
+		formatErrorTimestamp,
+		getMethodBadgeClass,
+		getStatusBadgeClass
+	} from '$lib/utils/errorFormatters';
+	import type { ErrorLogDetail, ErrorLogsListResponse } from '$lib/interfaces';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Button from '$lib/components/ui/button.svelte';
+	import ErrorDetailModal from '$lib/components/admin/ErrorDetailModal.svelte';
 	import { slide } from 'svelte/transition';
 
 	let loading = $state(true);
@@ -142,38 +152,6 @@
 
 	function closeDetail() {
 		selectedError = null;
-	}
-
-	function formatTimestamp(iso: string): string {
-		try {
-			const d = new Date(iso);
-			return d.toLocaleString('es-BO', {
-				year: 'numeric',
-				month: '2-digit',
-				day: '2-digit',
-				hour: '2-digit',
-				minute: '2-digit',
-				second: '2-digit',
-			});
-		} catch {
-			return iso;
-		}
-	}
-
-	function getMethodBadgeClass(method: string): string {
-		const m = method.toUpperCase();
-		if (m === 'GET') return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
-		if (m === 'POST') return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-		if (m === 'PATCH' || m === 'PUT')
-			return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
-		if (m === 'DELETE') return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-		return 'bg-gray-100 text-gray-800';
-	}
-
-	function getStatusBadgeClass(status: number): string {
-		if (status >= 500) return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-		if (status >= 400) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
-		return 'bg-green-100 text-green-800';
 	}
 </script>
 
@@ -333,7 +311,7 @@
 							{#each data.items as err (err.id)}
 								<tr class={`hover:bg-gray-50/50 dark:hover:bg-gray-700/30 ${err.resolved ? 'opacity-60' : ''}`}>
 									<td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
-										{formatTimestamp(err.timestamp)}
+										{formatErrorTimestamp(err.timestamp)}
 									</td>
 									<td class="px-4 py-3">
 										<span class={`inline-flex text-xs font-medium px-2 py-0.5 rounded-full ${getMethodBadgeClass(err.method)}`}>
@@ -363,7 +341,7 @@
 									</td>
 									<td class="px-4 py-3 text-xs">
 										{#if err.resolved}
-											<span class="inline-flex items-center gap-1 text-green-700 dark:text-green-400 font-semibold" title={`Resuelto por ${err.resolved_by || '?'} el ${err.resolved_at ? formatTimestamp(err.resolved_at) : ''}`}>
+											<span class="inline-flex items-center gap-1 text-green-700 dark:text-green-400 font-semibold" title={`Resuelto por ${err.resolved_by || '?'} el ${err.resolved_at ? formatErrorTimestamp(err.resolved_at) : ''}`}>
 												✓ Resuelto
 											</span>
 										{:else}
@@ -434,82 +412,8 @@
 	{/if}
 </div>
 
-<!-- Modal de detalle -->
-{#if selectedError}
-	<div
-		class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-		role="dialog"
-		aria-modal="true"
-	>
-		<div class="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-			<div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-				<h2 class="text-lg font-bold text-gray-900 dark:text-white">
-					Detalle del error {selectedError.error_type}
-				</h2>
-				<button
-					onclick={closeDetail}
-					class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-				>
-					✕
-				</button>
-			</div>
-			<div class="overflow-y-auto p-6 space-y-4">
-				<div class="grid grid-cols-2 gap-4 text-sm">
-					<div>
-						<p class="text-xs text-gray-500 uppercase">Timestamp</p>
-						<p>{formatTimestamp(selectedError.timestamp)}</p>
-					</div>
-					<div>
-						<p class="text-xs text-gray-500 uppercase">Status</p>
-						<p class="font-bold text-red-600">{selectedError.status_code}</p>
-					</div>
-					<div>
-						<p class="text-xs text-gray-500 uppercase">Method</p>
-						<p>{selectedError.method}</p>
-					</div>
-					<div>
-						<p class="text-xs text-gray-500 uppercase">Path</p>
-						<code class="text-xs">{selectedError.path}</code>
-					</div>
-					<div>
-						<p class="text-xs text-gray-500 uppercase">User</p>
-						<p class="text-xs">
-							{selectedError.user_email || '—'}
-							{#if selectedError.user_type}
-								<span class="text-gray-500">({selectedError.user_type})</span>
-							{/if}
-						</p>
-					</div>
-					<div>
-						<p class="text-xs text-gray-500 uppercase">Environment</p>
-						<p>{selectedError.environment}</p>
-					</div>
-				</div>
-
-				<div>
-					<p class="text-xs text-gray-500 uppercase mb-1">Mensaje</p>
-					<pre class="bg-gray-50 dark:bg-gray-900 p-3 rounded text-xs overflow-x-auto">{selectedError.message}</pre>
-				</div>
-
-				{#if selectedError.query_params}
-					<div>
-						<p class="text-xs text-gray-500 uppercase mb-1">Query params</p>
-						<pre class="bg-gray-50 dark:bg-gray-900 p-3 rounded text-xs overflow-x-auto">{selectedError.query_params}</pre>
-					</div>
-				{/if}
-
-				{#if selectedError.request_body}
-					<div>
-						<p class="text-xs text-gray-500 uppercase mb-1">Request body</p>
-						<pre class="bg-gray-50 dark:bg-gray-900 p-3 rounded text-xs overflow-x-auto">{selectedError.request_body}</pre>
-					</div>
-				{/if}
-
-				<div>
-					<p class="text-xs text-gray-500 uppercase mb-1">Stack trace</p>
-					<pre class="bg-gray-900 text-green-300 dark:bg-black p-3 rounded text-xs overflow-x-auto max-h-96">{selectedError.stack_trace || 'No disponible'}</pre>
-				</div>
-			</div>
-		</div>
-	</div>
-{/if}
+<!-- Modal de detalle (F-REFACTOR-ERRORS 2026-07-31: extraido a componente) -->
+<ErrorDetailModal
+	error={selectedError}
+	onClose={closeDetail}
+/>
