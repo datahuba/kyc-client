@@ -2,10 +2,11 @@
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/userStore';
 	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
-	import { UsersIcon, ClipboardIcon, TagIcon, XIcon, KeyIcon, QrCodeIcon, FileTextIcon, AcademicCapIcon, Menu2Icon, ChartBarIcon, DocumentAddIcon, IdentificationIcon, CollectionIcon, LoaderIcon, BellIcon } from '$lib/icons/outline'; // F-SIDEBAR-GROUPS nuevos iconos
+	import { XIcon, Menu2Icon, ChevronRightIcon, ClipboardIcon } from '$lib/icons/outline';
 	import { slide, fade } from 'svelte/transition';
-	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon, ExclamationCircleIcon, CalendarIcon } from '$lib/icons/solid';  // F-044 (2026-07-22) | F-080 CalendarIcon
+	import { LogoutIcon, BookIcon } from '$lib/icons/solid';
 	import { goto } from '$app/navigation';
+	import { getAllNavItems, type NavigationEntry } from '$lib/navigation/sidebarItems';
 	import CourseCatalogModal from './CourseCatalogModal.svelte';
 	import BenefitsModal from './BenefitsModal.svelte';
 	import DocumentValidationTable from '$lib/components/ui/DocumentValidationTable.svelte';
@@ -23,35 +24,6 @@
 		{ id: 'estudiantes',    label: 'Estudiantes' },
 	];
 
-	interface NavigationItem {
-		type: 'item';
-		name: string;
-		href: string;
-		icon: any;
-		roles: string[];
-		loginTypes: ('admin' | 'academic')[];
-		external?: boolean;
-		target?: string;
-		rel?: string;
-	}
-
-	interface NavigationGroup {
-		type: 'group';
-		name: string;
-		icon: any;
-		roles: string[];
-		loginTypes: ('admin' | 'academic')[];
-		children: NavigationItem[];
-	}
-
-	// F-XXX (2026-07-29): spacer visual entre Dashboard y el resto del menú.
-	// Se ignora en el filtrado (entryAllowed retorna true siempre).
-	interface NavigationSpacer {
-		type: 'spacer';
-	}
-
-	type NavigationEntry = NavigationItem | NavigationGroup | NavigationSpacer;
-
 	interface Props {
 		isOpen: boolean;
 		onClose: () => void;
@@ -60,127 +32,14 @@
 	let { isOpen, onClose }: Props = $props();
 	let isCollapsed = $state(false);
 
+	// F-REFACTOR-SIDEBAR (2026-07-31): los items ahora viven en
+	// lib/navigation/sidebarItems.ts. Este componente solo se ocupa
+	// del render + filtrado por rol.
+	const navItems: NavigationEntry[] = getAllNavItems();
+
 	// F-SIDEBAR-ORDER (2026-07-30): Dashboard primero SOLO, luego el resto
 	// en orden ALFABÉTICO. Los grupos se intercalan alfabéticamente también.
-	// Aplicamos el orden en runtime en lugar de hardcodearlo en el array,
-	// para que sea fácil agregar/quitar items sin romper el orden.
-	const navItems: NavigationEntry[] = [
-		// === Académico (estudiantes y docentes) ===
-		{ type: 'item', name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
-		{ type: 'item', name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
-		{ type: 'item', name: 'Certificados', href: '/app/certificates', icon: FileTextIcon, roles: ['student', 'admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['academic', 'admin'] },
-		{ type: 'item', name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
-		{ type: 'item', name: 'Mis Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
-		{ type: 'item', name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
-		{ type: 'item', name: 'Mis Solicitudes', href: '/app/requests', icon: DocumentAddIcon, roles: ['student'], loginTypes: ['academic'] },
-		{ type: 'item', name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
-
-		// === Staff administrativo ===
-		{ type: 'item', name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-
-		// F-SIDEBAR-GROUPS (2026-07-31): reorganizar el menu en grupos
-		// logicos. Antes todos los items estaban sueltos (ordenados
-		// alfabeticamente), pero a Kevin le cuesta encontrarlos.
-		// Nueva distribucion:
-		//   Academico      -> gestion academica (docentes, programas, calendario, notas)
-		//   Financiero     -> modulo economico (CxC, deudores, pagos, informes)
-		//   Inscripciones  -> todo lo relacionado a matricular estudiantes
-		//   Administrativo  -> gestion administrativa (estudiantes, usuarios, config)
-		//   Solicitudes    -> colas de revision (cuenta, certificados, pasivo, tramite)
-
-		// === Academico (desplegable, posicion alfabetica) ===
-		{
-			type: 'group',
-			name: 'Académico',
-			icon: AcademicCapIcon,
-			roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'docente'],
-			loginTypes: ['admin'],
-			children: [
-				{ type: 'item', name: 'Calendario', href: '/app/courses/calendario', icon: CalendarIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Validación de Notas', href: '/app/admin/grade-validation', icon: AcademicCapIcon, roles: ['cpd', 'admin', 'superadmin'], loginTypes: ['admin'] },
-			]
-		},
-
-		// === Financiero (desplegable) ===
-		{
-			type: 'group',
-			name: 'Financiero',
-			icon: CreditCardIcon,
-			roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador'],
-			loginTypes: ['admin'],
-			children: [
-				{ type: 'item', name: 'Cuentas por Cobrar', href: '/app/reports/cuentas-por-cobrar', icon: ChartBarIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador', 'encargado_curso'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Deudores', href: '/app/payments/deudores', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'cpd', 'coordinador'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Informes', href: '/app/informes', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd', 'coordinador'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Reportes de Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'coordinador'], loginTypes: ['admin'] },
-			]
-		},
-
-		// === Inscripciones (desplegable) - F-SIDEBAR-GROUPS ===
-		// Kevin: "inscripciones puede ser un agrupado, luego dentro de ese
-		// grupo tener lista de inscritos, luego tener inscripcion individual,
-		// inscripcion en lote, luego tener otra que diga no se que puede ser
-		// pero que sea relacionado"
-		{
-			type: 'group',
-			name: 'Inscripciones',
-			icon: ClipboardIcon,
-			roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'],
-			loginTypes: ['admin'],
-			children: [
-				{ type: 'item', name: 'Lista de Inscritos', href: '/app/enrollments', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Inscripción Individual', href: '/app/enrollments?new=1', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-				// F-INSCRIPCION-LOTE (2026-07-31): wizard para matricular
-				// varios estudiantes a un mismo programa en una sola operacion.
-				{ type: 'item', name: 'Inscripción en Lote', href: '/app/enrollments/bulk', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'coordinador', 'encargado_curso'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Pre-inscripciones', href: '/app/pre-registros', icon: ClipboardIcon, roles: ['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-			]
-		},
-
-		// === Administrativo (desplegable) - F-SIDEBAR-GROUPS ===
-		{
-			type: 'group',
-			name: 'Administrativo',
-			icon: UsersIcon,
-			roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'coordinador'],
-			loginTypes: ['admin'],
-			children: [
-				{ type: 'item', name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Visor de Errores', href: '/app/admin/errors', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
-			]
-		},
-
-		// === Solicitudes (desplegable) - cola de revision ===
-		{
-			type: 'group',
-			name: 'Solicitudes',
-			icon: ClipboardIcon,
-			roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'],
-			loginTypes: ['admin'],
-			children: [
-				{ type: 'item', name: 'Solicitudes de Cuenta', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
-				// F-CERT-APROBACION (2026-07-30): cola del encargado para aprobar
-				// solicitudes de certificados. Filtra por cursos_asignados.
-				{ type: 'item', name: 'Solicitudes de Certificados', href: '/app/certificates/requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Solicitudes de Trámite', href: '/app/requests', icon: DocumentAddIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-			]
-		},
-	];
-
-	// F-SIDEBAR-ORDER: separar Dashboard del resto + ordenar alfabéticamente
-	// cada bloque. Mantenemos el Dashboard como primer item siempre, luego
-	// un spacer, luego el resto en orden alfabético.
 	const navigation = $derived.by(() => {
-		// 1. Identificar el item Dashboard (el primero que coincida)
 		const isStudent = isStudentUser;
 		const dashboardName = isStudent ? 'Mi Dashboard' : 'Dashboard';
 		const dashboardItem = navItems.find(
@@ -212,17 +71,14 @@
 	const ECONOMIC_HREFS = ['/app/reports', '/app/payments', '/app/payment-config', '/app/bank-statements', '/app/informes'];
 
 	function entryAllowed(entry: NavigationEntry): boolean {
-		// F-XXX (2026-07-29): los spacers se aceptan siempre (no son items).
 		if (entry.type === 'spacer') return true;
 
-		// ISSUE-R-ROLES: encargado_curso y coordinador son staff administrativo también
 		const isStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(userRole);
 		const isTeacher = userRole === 'docente' || academicRole === 'teacher';
 		const isStudent = userRole === 'student' || academicRole === 'student';
 
 		if (isStaff) {
 			if (!(entry.loginTypes.includes('admin') && entry.roles.includes(userRole))) return false;
-			// Coordinador: solo el financiero ve vistas económicas (dentro de items; los grupos los filtra el children-only)
 			if (entry.type === 'item' && userRole === 'coordinador' && ECONOMIC_HREFS.includes(entry.href) && !esCoordinadorFinanciero) return false;
 			return true;
 		}
@@ -237,13 +93,10 @@
 
 	let filteredNavigation = $derived(navigation
 		.map((entry): NavigationEntry | null => {
-			// F-XXX (2026-07-29): spacer siempre pasa, no se filtra.
 			if (entry.type === 'spacer') return entry;
-			// Si es un grupo, filtrar sus hijos. Si no queda ninguno, descartar el grupo.
 			if (entry.type === 'group') {
 				const visibleChildren = entry.children.filter(c => entryAllowed(c));
 				if (visibleChildren.length === 0) return null;
-				// ISSUE-R-PERFIL-GENERICO: si el coordinador no es financiero, no mostrar el grupo Financiero
 				if (entry.name === 'Financiero' && userRole === 'coordinador' && !esCoordinadorFinanciero) return null;
 				return { ...entry, children: visibleChildren };
 			}
@@ -252,9 +105,8 @@
 		.filter((e): e is NavigationEntry => e !== null)
 	);
 
-	// F-074 / F-075 (2026-07-29): auto-expand del grupo Financiero si la ruta
-	// actual está dentro de sus hijos. Da feedback visual sin obligar al user
-	// a hacer click extra.
+	// F-074 / F-075 (2026-07-29): auto-expand del grupo si la ruta
+	// actual está dentro de sus hijos. Generico por nombre de grupo.
 	let expandedGroups = $state<Record<string, boolean>>({});
 	$effect(() => {
 		const path = $page.url.pathname;
@@ -265,10 +117,6 @@
 			}
 		}
 	});
-
-	// F-XXX (2026-07-29): auto-expand del grupo "Solicitudes" si la ruta
-	// actual está dentro de sus hijos. (Patrón equivalente al de Financiero.)
-	// El effect de arriba ya cubre esto (es genérico por nombre de grupo).
 
 	function isCurrent(href: string) {
 		if (href.startsWith('http')) return false;
