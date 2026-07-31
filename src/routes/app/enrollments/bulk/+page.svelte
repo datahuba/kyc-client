@@ -53,6 +53,15 @@
 		coursesListFiltrada.find((c) => c._id === selectedCursoId) || null
 	);
 
+	// F-IMPORT-EXCEL-BULK (2026-07-31): estado para importar Excel.
+	let excelUploading = $state(false);
+	let excelInputEl: HTMLInputElement | null = $state(null);
+	let excelResult: {
+		success: number;
+		enrolled: number;
+		errors: string[];
+	} | null = $state(null);
+
 	onMount(() => {
 		if (!$userStore.isAuthenticated) {
 			userStore.init();
@@ -119,6 +128,58 @@
 
 	function clearSelection() {
 		selectedStudents = new Set();
+	}
+
+	// F-IMPORT-EXCEL-BULK (2026-07-31): subir un Excel con datos de
+	// estudiantes. El backend crea los estudiantes nuevos y los inscribe
+	// automáticamente al curso seleccionado (si se pasa curso_id).
+	// Luego, en el frontend, los estudiantes que se crearon/inscribieron
+	// quedan seleccionados para que el usuario vea qué se procesó.
+	async function handleExcelFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		if (!selectedCursoId) {
+			alert('error', 'Selecciona primero un programa (paso 1) antes de importar el Excel.');
+			input.value = '';
+			return;
+		}
+
+		excelUploading = true;
+		excelResult = null;
+		try {
+			// Reusar el endpoint existente POST /students/import/excel con
+			// curso_id. El backend crea los estudiantes nuevos y los
+			// inscribe automáticamente al programa seleccionado.
+			const res = await studentService.importFromExcel(file, selectedCursoId);
+			excelResult = {
+				success: res.success_count,
+				enrolled: res.enrolled_count,
+				errors: res.errors || []
+			};
+
+			if (res.enrolled_count > 0) {
+				alert('success', `${res.enrolled_count} inscrito(s) automáticamente. ${res.success_count} estudiante(s) procesado(s) en total.`);
+			} else if (res.success_count > 0) {
+				alert('warning', `Se procesaron ${res.success_count} estudiantes pero ninguno fue inscrito. Revisa los errores.`);
+			} else {
+				alert('error', 'No se pudo procesar el Excel. Revisa el formato.');
+			}
+
+			// Recargar la lista de estudiantes para que aparezcan los nuevos
+			await loadAll();
+		} catch (e: any) {
+			const detail = e?.response?.data?.detail || e?.message || 'No se pudo importar el Excel';
+			alert('error', detail);
+		} finally {
+			excelUploading = false;
+			input.value = '';
+		}
+	}
+
+	function triggerExcelUpload() {
+		excelInputEl?.click();
 	}
 
 	async function handleSubmit() {
@@ -296,6 +357,65 @@
 							onInput={() => handleSearchInput()}
 						/>
 					</div>
+				</div>
+
+				<!-- F-IMPORT-EXCEL-BULK (2026-07-31): opcion para subir un
+				     Excel con datos de estudiantes. El backend crea los
+				     nuevos y los inscribe directamente al programa
+				     seleccionado (paso 1). -->
+				<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+						<div class="min-w-0 flex-1">
+							<p class="text-sm font-bold text-blue-900 dark:text-blue-200">
+								¿Tienes una lista de admitidos en Excel?
+							</p>
+							<p class="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
+								Sube el archivo (.xlsx, .xls, .csv) y se crearán los estudiantes nuevos
+								y se inscribirán automáticamente al programa seleccionado.
+							</p>
+						</div>
+						<div class="shrink-0">
+							<input
+								bind:this={excelInputEl}
+								type="file"
+								accept=".xlsx,.xls,.csv"
+								class="hidden"
+								onchange={handleExcelFileChange}
+							/>
+							<Button
+								size="sm"
+								variant="secondary"
+								onclick={triggerExcelUpload}
+								loading={excelUploading}
+								disabled={!selectedCursoId}
+							>
+								Subir Excel
+							</Button>
+						</div>
+					</div>
+					{#if excelResult}
+						<div class="mt-2 pt-2 border-t border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-200 space-y-1">
+							<p>
+								<strong>Procesados:</strong> {excelResult.success} ·
+								<strong>Inscritos:</strong> {excelResult.enrolled}
+							</p>
+							{#if excelResult.errors.length > 0}
+								<details class="text-red-700 dark:text-red-300">
+									<summary class="cursor-pointer font-semibold">
+										{excelResult.errors.length} error(es) - click para ver
+									</summary>
+									<ul class="mt-1 pl-4 list-disc space-y-0.5">
+										{#each excelResult.errors.slice(0, 10) as err}
+											<li>{err}</li>
+										{/each}
+										{#if excelResult.errors.length > 10}
+											<li>... y {excelResult.errors.length - 10} más</li>
+										{/if}
+									</ul>
+								</details>
+							{/if}
+						</div>
+					{/if}
 				</div>
 
 				{#if loading}
