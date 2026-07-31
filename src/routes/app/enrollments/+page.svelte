@@ -10,6 +10,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
+	import ModulosModal from '$lib/components/ui/ModulosModal.svelte';
 	import Select from '$lib/components/ui/select.svelte';
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
 	import Skeleton from '$lib/components/ui/skeleton.svelte';
@@ -51,6 +52,9 @@
 	let showDeleteModal: boolean = $state(false);
 	let enrollmentToDelete: Enrollment | null = $state(null);
 	let deleteLoading: boolean = $state(false);
+	// F-MODULOS-MODAL (2026-07-31): modal centralizado de gestión de módulos
+	// (reemplaza los botones Iniciar/Revertir del kardex).
+	let isModulosModalOpen: boolean = $state(false);
 
 	// F-COBRANZA-041 (2026-07-22): resumen de inscritos (total/activos/pasivos)
 	// se movió al Dashboard. Se eliminó la carga acá. Endpoint sigue existiendo.
@@ -277,6 +281,15 @@
 		openDropdownId = null;
 	}
 
+	// F-MODULOS-MODAL (2026-07-31): abre el modal centralizado de gestión
+	// de módulos. Este modal REEMPLAZA los botones Iniciar/Revertir que
+	// estaban en el kardex. Ahora TODO el ciclo (iniciar, cerrar, revertir)
+	// vive en un solo lugar.
+	function handleOpenModulosModal() {
+		if (!selectedKardex) return;
+		isModulosModalOpen = true;
+	}
+
 	// Atajo directo desde la Libreta: lleva a /app/payments con la
 	// inscripción ya preseleccionada, sin que el estudiante tenga que
 	// volver a buscarla/seleccionarla manualmente.
@@ -315,39 +328,11 @@
 		loadData();
 	}
 
-	// F-CUENTAS-POR-COBRAR (2026-07-29): iniciar/deshacer un módulo manualmente.
-	async function handleIniciarModulo(moduleIndex: number) {
-		if (!selectedKardex) return;
-		const key = `${selectedKardex._id}-${moduleIndex}-iniciar`;
-		moduloLoading = { ...moduloLoading, [key]: true };
-		try {
-			await cuentasPorCobrarService.iniciarModulo(String(selectedKardex._id), moduleIndex);
-			alert('success', 'Módulo marcado como "en curso". Ya cuenta en la CxC a la Fecha.');
-			await refreshKardex();
-		} catch (e: any) {
-			const detail = e?.response?.data?.detail || e?.message || 'No se pudo iniciar el módulo.';
-			alert('error', detail);
-		} finally {
-			moduloLoading = { ...moduloLoading, [key]: false };
-		}
-	}
-
-	async function handleDeshacerInicioModulo(moduleIndex: number) {
-		if (!selectedKardex) return;
-		if (!confirm('¿Revertir el inicio de este módulo? Volverá a "no iniciado" y saldrá de la CxC a la Fecha.')) return;
-		const key = `${selectedKardex._id}-${moduleIndex}-deshacer`;
-		moduloLoading = { ...moduloLoading, [key]: true };
-		try {
-			await cuentasPorCobrarService.deshacerInicioModulo(String(selectedKardex._id), moduleIndex);
-			alert('success', 'Inicio del módulo revertido.');
-			await refreshKardex();
-		} catch (e: any) {
-			const detail = e?.response?.data?.detail || e?.message || 'No se pudo revertir el inicio.';
-			alert('error', detail);
-		} finally {
-			moduloLoading = { ...moduloLoading, [key]: false };
-		}
-	}
+	// F-MODULOS-MODAL (2026-07-31): los handlers handleIniciarModulo y
+	// handleDeshacerInicioModulo ya NO viven aquí. Toda la lógica de
+	// gestión de módulos se centralizó en el componente ModulosModal.svelte
+	// (ver <ModulosModal/> al final del template). El kardex solo muestra
+	// el estado actual de cada módulo.
 
 	async function refreshKardex() {
 		if (!selectedKardex) return;
@@ -1273,42 +1258,33 @@
 												{mod.estado || 'Pendiente'}
 											</span>
 										</td>
-										<!-- F-CUENTAS-POR-COBRAR: badge + botón "Iniciar" / "Deshacer" (solo staff autorizado). -->
+										<!-- F-MODULOS-MODAL (2026-07-31): badge de estado. Los botones
+										     "Iniciar/Revertir/Cerrar" ya NO viven en el kardex.
+										     Se centralizaron en el modal ModulosModal que se abre
+										     desde el botón "Gestionar Módulos" debajo de la tabla. -->
 										<td class="px-4 py-4 text-center">
-											{#if mod.iniciado_en}
-												<div class="flex flex-col items-center gap-1.5">
-													<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300" title={mod.iniciado_en}>
-														✓ En curso
+											{#if mod.finalizado_en}
+												<div class="flex flex-col items-center gap-1">
+													<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" title={mod.finalizado_en}>
+														✓ Finalizado
 													</span>
-													{#if canIniciarModulo}
-														<button
-															type="button"
-															onclick={() => handleDeshacerInicioModulo(moduleIndex)}
-															disabled={moduloLoading[`${selectedKardex._id}-${moduleIndex}-deshacer`]}
-															class="text-[10px] text-light-error dark:text-dark-error hover:underline disabled:opacity-50 font-medium"
-															ariaLabel={`Revertir inicio del módulo ${moduleIndex + 1}`}
-														>
-															{moduloLoading[`${selectedKardex._id}-${moduleIndex}-deshacer`] ? 'Revirtiendo…' : '↻ Revertir'}
-														</button>
-													{/if}
+													<span class="text-[10px] text-gray-500 dark:text-gray-400">
+														{formatDate(mod.finalizado_en)}
+													</span>
+												</div>
+											{:else if mod.iniciado_en}
+												<div class="flex flex-col items-center gap-1">
+													<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300" title={mod.iniciado_en}>
+														◐ En curso
+													</span>
+													<span class="text-[10px] text-gray-500 dark:text-gray-400">
+														{formatDate(mod.iniciado_en)}
+													</span>
 												</div>
 											{:else}
-												<div class="flex flex-col items-center gap-1.5">
-													<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-														○ No iniciado
-													</span>
-													{#if canIniciarModulo}
-														<button
-															type="button"
-															onclick={() => handleIniciarModulo(moduleIndex)}
-															disabled={moduloLoading[`${selectedKardex._id}-${moduleIndex}-iniciar`]}
-															class="text-[10px] text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50 font-bold"
-															ariaLabel={`Iniciar módulo ${moduleIndex + 1}`}
-														>
-															{moduloLoading[`${selectedKardex._id}-${moduleIndex}-iniciar`] ? 'Iniciando…' : '▶ Iniciar'}
-														</button>
-													{/if}
-												</div>
+												<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+													○ No iniciado
+												</span>
 											{/if}
 										</td>
 									</tr>
@@ -1323,6 +1299,21 @@
 						</tbody>
 					</table>
 				</div>
+
+				<!-- F-MODULOS-MODAL (2026-07-31): botón que abre el modal
+				     centralizado de gestión de módulos. Reemplaza los botones
+				     Iniciar/Revertir que estaban antes en cada fila. -->
+				{#if canIniciarModulo}
+					<div class="flex justify-end">
+						<Button
+							size="sm"
+							variant="secondary"
+							onclick={handleOpenModulosModal}
+						>
+							Gestionar Módulos (Iniciar / Cerrar)
+						</Button>
+					</div>
+				{/if}
 
 				<!-- Resumen Financiero de la inscripción (visible para todos los roles).
 				     El SALDO A FAVOR se calcula en el cliente como max(0, total_pagado -
@@ -1457,4 +1448,16 @@
 			</div>
 		</div>
 	</Modal>
+
+	<!-- F-MODULOS-MODAL (2026-07-31): modal centralizado de gestión de módulos
+	     (reemplaza los botones Iniciar/Revertir del kardex). -->
+	<ModulosModal
+		isOpen={isModulosModalOpen}
+		enrollment={selectedKardex}
+		onClose={() => isModulosModalOpen = false}
+		onUpdated={(updated) => {
+			selectedKardex = updated;
+			enrollments = enrollments.map((e) => (e._id === updated._id ? updated : e));
+		}}
+	/>
 </div>

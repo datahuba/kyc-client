@@ -2,7 +2,7 @@
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/userStore';
 	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
-	import { UsersIcon, ClipboardIcon, TagIcon, XIcon, KeyIcon, QrCodeIcon, FileTextIcon, AcademicCapIcon, Menu2Icon, ChartBarIcon, DocumentAddIcon } from '$lib/icons/outline'; // F-CUENTAS-POR-COBRAR ChartBarIcon; F-TRAMITES-SOLICITUD DocumentAddIcon
+	import { UsersIcon, ClipboardIcon, TagIcon, XIcon, KeyIcon, QrCodeIcon, FileTextIcon, AcademicCapIcon, Menu2Icon, ChartBarIcon, DocumentAddIcon, IdentificationIcon, CollectionIcon, LoaderIcon, BellIcon } from '$lib/icons/outline'; // F-SIDEBAR-GROUPS nuevos iconos
 	import { slide, fade } from 'svelte/transition';
 	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon, ExclamationCircleIcon, CalendarIcon } from '$lib/icons/solid';  // F-044 (2026-07-22) | F-080 CalendarIcon
 	import { goto } from '$app/navigation';
@@ -77,15 +77,33 @@
 
 		// === Staff administrativo ===
 		{ type: 'item', name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Calendario', href: '/app/courses/calendario', icon: CalendarIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['admin'] },
-		// F-SIDEBAR-DEDUPE (2026-07-30): 'Certificados' ya esta declarado
-		// arriba (linea 71) con todos los roles. Borrar este duplicado
-		// que causaba que el item apareciera 2 veces para superadmin/staff.
-		{ type: 'item', name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-		// F-074 / F-075: GRUPO "Financiero" (desplegable, posición alfabética)
+
+		// F-SIDEBAR-GROUPS (2026-07-31): reorganizar el menu en grupos
+		// logicos. Antes todos los items estaban sueltos (ordenados
+		// alfabeticamente), pero a Kevin le cuesta encontrarlos.
+		// Nueva distribucion:
+		//   Academico      -> gestion academica (docentes, programas, calendario, notas)
+		//   Financiero     -> modulo economico (CxC, deudores, pagos, informes)
+		//   Inscripciones  -> todo lo relacionado a matricular estudiantes
+		//   Administrativo  -> gestion administrativa (estudiantes, usuarios, config)
+		//   Solicitudes    -> colas de revision (cuenta, certificados, pasivo, tramite)
+
+		// === Academico (desplegable, posicion alfabetica) ===
+		{
+			type: 'group',
+			name: 'Académico',
+			icon: AcademicCapIcon,
+			roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'docente'],
+			loginTypes: ['admin'],
+			children: [
+				{ type: 'item', name: 'Calendario', href: '/app/courses/calendario', icon: CalendarIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Validación de Notas', href: '/app/admin/grade-validation', icon: AcademicCapIcon, roles: ['cpd', 'admin', 'superadmin'], loginTypes: ['admin'] },
+			]
+		},
+
+		// === Financiero (desplegable) ===
 		{
 			type: 'group',
 			name: 'Financiero',
@@ -100,14 +118,47 @@
 				{ type: 'item', name: 'Reportes de Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'coordinador'], loginTypes: ['admin'] },
 			]
 		},
-		{ type: 'item', name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		// F-INSCRIPCION-LOTE (2026-07-31): wizard para matricular varios
-		// estudiantes a un mismo programa en una sola operación.
-		{ type: 'item', name: 'Inscripción en Lote', href: '/app/enrollments/bulk', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'coordinador', 'encargado_curso'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Pre-inscripciones', href: '/app/pre-registros', icon: ClipboardIcon, roles: ['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
-		// F-XXX: GRUPO "Solicitudes" (desplegable, posición alfabética)
+
+		// === Inscripciones (desplegable) - F-SIDEBAR-GROUPS ===
+		// Kevin: "inscripciones puede ser un agrupado, luego dentro de ese
+		// grupo tener lista de inscritos, luego tener inscripcion individual,
+		// inscripcion en lote, luego tener otra que diga no se que puede ser
+		// pero que sea relacionado"
+		{
+			type: 'group',
+			name: 'Inscripciones',
+			icon: ClipboardIcon,
+			roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'],
+			loginTypes: ['admin'],
+			children: [
+				{ type: 'item', name: 'Lista de Inscritos', href: '/app/enrollments', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Inscripción Individual', href: '/app/enrollments?new=1', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+				// F-INSCRIPCION-LOTE (2026-07-31): wizard para matricular
+				// varios estudiantes a un mismo programa en una sola operacion.
+				{ type: 'item', name: 'Inscripción en Lote', href: '/app/enrollments/bulk', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'coordinador', 'encargado_curso'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Pre-inscripciones', href: '/app/pre-registros', icon: ClipboardIcon, roles: ['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+			]
+		},
+
+		// === Administrativo (desplegable) - F-SIDEBAR-GROUPS ===
+		{
+			type: 'group',
+			name: 'Administrativo',
+			icon: UsersIcon,
+			roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'coordinador'],
+			loginTypes: ['admin'],
+			children: [
+				{ type: 'item', name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
+				{ type: 'item', name: 'Visor de Errores', href: '/app/admin/errors', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
+			]
+		},
+
+		// === Solicitudes (desplegable) - cola de revision ===
 		{
 			type: 'group',
 			name: 'Solicitudes',
@@ -119,14 +170,10 @@
 				// F-CERT-APROBACION (2026-07-30): cola del encargado para aprobar
 				// solicitudes de certificados. Filtra por cursos_asignados.
 				{ type: 'item', name: 'Solicitudes de Certificados', href: '/app/certificates/requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-				{ type: 'item', name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 				{ type: 'item', name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
 				{ type: 'item', name: 'Solicitudes de Trámite', href: '/app/requests', icon: DocumentAddIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 			]
 		},
-		{ type: 'item', name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Validación de Notas', href: '/app/admin/grade-validation', icon: AcademicCapIcon, roles: ['cpd', 'admin', 'superadmin'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Visor de Errores', href: '/app/admin/errors', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 	];
 
 	// F-SIDEBAR-ORDER: separar Dashboard del resto + ordenar alfabéticamente

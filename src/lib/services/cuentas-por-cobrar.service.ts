@@ -124,6 +124,28 @@ class CuentasPorCobrarService {
 			{}
 		);
 	}
+
+	/**
+	 * F-MODULOS-MODAL (2026-07-31): marca un módulo como finalizado/cerrado.
+	 * Solo se puede finalizar un módulo que ya está iniciado.
+	 */
+	async finalizarModulo(enrollmentId: string, moduloIndex: number): Promise<unknown> {
+		return await apiKyC.post<unknown>(
+			`/enrollments/${enrollmentId}/modulos/${moduloIndex}/finalizar`,
+			{}
+		);
+	}
+
+	/**
+	 * F-MODULOS-MODAL (2026-07-31): revierte la finalización de un módulo
+	 * (caso de error humano).
+	 */
+	async deshacerFinalizacionModulo(enrollmentId: string, moduloIndex: number): Promise<unknown> {
+		return await apiKyC.post<unknown>(
+			`/enrollments/${enrollmentId}/modulos/${moduloIndex}/deshacer-finalizacion`,
+			{}
+		);
+	}
 }
 
 export const cuentasPorCobrarService = new CuentasPorCobrarService();
