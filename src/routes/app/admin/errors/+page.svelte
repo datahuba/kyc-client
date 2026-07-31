@@ -77,12 +77,14 @@
 	async function resolveError(errorId: string, note: string) {
 		resolvingId = errorId;
 		try {
+			// F-ERROR-VIEWER-FIX (2026-07-31): el endpoint ahora hace
+			// HARD DELETE en lugar de soft delete. Kevin: "cuando se
+			// solucionan eliminarse de la pagina".
 			await adminService.resolveError(errorId, note || undefined);
-			// Re-cargar para refrescar la lista
 			await load();
-			alert('success', 'Error marcado como resuelto.');
+			alert('success', 'Error eliminado de la lista.');
 		} catch (e: any) {
-			alert('error', e?.message || 'No se pudo marcar como resuelto');
+			alert('error', e?.message || 'No se pudo eliminar el error');
 		} finally {
 			resolvingId = null;
 			showResolveInput = null;
@@ -90,18 +92,9 @@
 		}
 	}
 
-	async function unresolveError(errorId: string) {
-		resolvingId = errorId;
-		try {
-			await adminService.unresolveError(errorId);
-			await load();
-			alert('success', 'Error reabierto.');
-		} catch (e: any) {
-			alert('error', e?.message || 'No se pudo reabrir el error');
-		} finally {
-			resolvingId = null;
-		}
-	}
+	// F-ERROR-VIEWER-FIX (2026-07-31): unresolveError eliminado.
+	// El endpoint unresolve ya no existe en el backend (hemos pasado
+	// a hard delete). El boton "Reabrir" del template tambien se quito.
 
 	// F-XXX (2026-07-29): bulk resolve para errores esperados.
 	async function autoResolveErrors() {
@@ -416,14 +409,12 @@
 													✓ Resolver
 												</button>
 											{:else}
-												<button
-													onclick={() => unresolveError(err.id)}
-													disabled={resolvingId === err.id}
-													class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 font-semibold rounded px-2 py-1 disabled:opacity-50"
-													title="Reabrir este error"
-												>
-													↻ Reabrir
-												</button>
+												<!-- F-ERROR-VIEWER-FIX: ya no hay opcion "Reabrir"
+												     porque con hard delete los resueltos se
+												     borran. Si por migracion quedan algunos
+												     con resolved=true, los dejamos como
+												     solo-lectura. -->
+												<span class="text-xs text-gray-500 italic">Resuelto</span>
 											{/if}
 											<button
 												onclick={() => viewDetail(err.id)}
