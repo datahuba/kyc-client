@@ -46,6 +46,37 @@
 	let courseToDelete: Course | null = $state(null);
 	let deleteLoading = $state(false);
 
+	// F-HISTORICO (2026-07-31): modal dedicado para subir la resolución de
+	// respaldo desde el menú desplegable del catálogo (sin abrir el editor
+	// completo). Útil para programas ya creados a los que se les quiere
+	// añadir la resolución más tarde.
+	let showResolucionModal = $state(false);
+	let resolucionCourse: Course | null = $state(null);
+	let resolucionFile: File | null = $state(null);
+	let subiendoResolucion = $state(false);
+	function openResolucionModal(course: Course) {
+		resolucionCourse = course;
+		resolucionFile = null;
+		showResolucionModal = true;
+		openDropdownId = null;
+	}
+	async function handleSubirResolucion() {
+		if (!resolucionCourse || !resolucionFile) return;
+		subiendoResolucion = true;
+		try {
+			const updated = await courseService.subirResolucion(resolucionCourse._id, resolucionFile);
+			alert('success', `Resolución de respaldo subida al programa "${updated.nombre_programa}"`);
+			// Reflejar el cambio en la lista local
+			courses = courses.map((c) => (c._id === updated._id ? { ...c, resolucion_pdf_url: updated.resolucion_pdf_url } : c));
+			showResolucionModal = false;
+			resolucionFile = null;
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo subir la resolución de respaldo');
+		} finally {
+			subiendoResolucion = false;
+		}
+	}
+
 	// Dropdown state
 	let openDropdownId: string | null = $state(null);
 
@@ -224,6 +255,20 @@
 			});
 		}
 
+		// F-HISTORICO (2026-07-31): opción para subir la resolución de respaldo
+		// del programa. Disponible para todos los programas (nuevos, en ejecución,
+		// históricos). El ícono es el mismo de un upload de documento.
+		if (canEditCourse) {
+			options.push({
+				label: (course as any).resolucion_pdf_url
+					? 'Reemplazar Resolución'
+					: 'Subir Resolución',
+				id: 'resolucion',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`,
+				action: () => openResolucionModal(course)
+			});
+		}
+
 		if (canSendComunicado) {
 			options.push({
 				label: 'Enviar Comunicado',
@@ -397,7 +442,14 @@
 					{#each courses as course (course._id)}
 						<tr>
 							<td class="px-3 py-4 whitespace-nowrap">
-								<div class="text-sm font-medium text-gray-900 dark:text-white">{course.codigo}</div>
+								<div class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+									<span>{course.codigo}</span>
+									{#if (course as any).es_historico}
+										<span class="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800 dark:text-amber-200" title="F-HISTORICO: programa pasado o de registro retroactivo">
+											Histórico
+										</span>
+									{/if}
+								</div>
 								<div class="text-xs text-gray-500 dark:text-gray-400 max-w-[150px] truncate" title={course.nombre_programa}>{course.nombre_programa}</div>
 							</td>
 							<td class="px-3 py-4 whitespace-nowrap">
@@ -461,7 +513,14 @@
 				<Card>
 					<div class="flex items-center justify-between mb-4">
 						<div>
-							<h3 class="text-sm font-medium text-gray-900 dark:text-white">{course.nombre_programa}</h3>
+							<h3 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+								<span>{course.nombre_programa}</span>
+								{#if (course as any).es_historico}
+									<span class="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800 dark:text-amber-200" title="F-HISTORICO: programa pasado o de registro retroactivo">
+										Histórico
+									</span>
+								{/if}
+							</h3>
 							<p class="text-xs text-gray-500 dark:text-gray-400">{course.codigo}</p>
 						</div>
 						<div class="relative">
@@ -612,5 +671,69 @@
 				</table>
 			</div>
 		{/if}
+	</Modal>
+
+	<!-- F-HISTORICO (2026-07-31): modal dedicado para subir la resolución de
+	     respaldo desde el menú desplegable del catálogo (sin abrir el editor
+	     completo). Funciona para programas nuevos, en ejecución o históricos. -->
+	<Modal
+		isOpen={showResolucionModal}
+		title="Subir Resolución de Respaldo"
+		onClose={() => { showResolucionModal = false; resolucionFile = null; }}
+		maxWidth="sm:max-w-lg"
+	>
+		<div class="space-y-4">
+			{#if resolucionCourse}
+				<div class="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
+					<div class="text-sm text-gray-600 dark:text-gray-300">Programa:</div>
+					<div class="font-semibold text-gray-900 dark:text-white">{resolucionCourse.nombre_programa}</div>
+					<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+						Código: {resolucionCourse.codigo}
+						{#if (resolucionCourse as any).es_historico}
+							<span class="ml-2 inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800 dark:text-amber-200">
+								Histórico
+							</span>
+						{/if}
+					</div>
+				</div>
+			{/if}
+
+			{#if resolucionCourse && (resolucionCourse as any).resolucion_pdf_url}
+				<div class="rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-3 text-sm text-green-800 dark:text-green-200">
+					<strong>Resolución actual:</strong>
+					<a href={(resolucionCourse as any).resolucion_pdf_url} target="_blank" rel="noopener" class="underline break-all ml-1">
+						Ver PDF
+					</a>
+					<div class="text-xs mt-1">Si subís un nuevo PDF, este será reemplazado.</div>
+				</div>
+			{/if}
+
+			<label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+				Seleccionar PDF
+			</label>
+			<input
+				type="file"
+				accept="application/pdf"
+				class="block w-full text-sm text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md cursor-pointer bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+				onchange={(e) => {
+					const target = e.target as HTMLInputElement;
+					resolucionFile = target.files?.[0] || null;
+				}}
+			/>
+			{#if resolucionFile}
+				<p class="text-xs text-gray-500 dark:text-gray-400">
+					Seleccionado: <strong>{resolucionFile.name}</strong> ({Math.round(resolucionFile.size / 1024)} KB)
+				</p>
+			{/if}
+
+			<div class="flex justify-end gap-3 pt-2">
+				<Button variant="secondary" onclick={() => { showResolucionModal = false; resolucionFile = null; }}>
+					Cancelar
+				</Button>
+				<Button onclick={handleSubirResolucion} loading={subiendoResolucion} disabled={!resolucionFile}>
+					Subir Resolución
+				</Button>
+			</div>
+		</div>
 	</Modal>
 </div>

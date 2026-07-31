@@ -118,11 +118,24 @@ class CourseService {
 
 	/**
 	 * F-080: Sube el PDF de la resolución de respaldo del programa.
+	 *
+	 * FIX 2026-07-31: el backend expone PUT /courses/{id}/resolucion (no POST).
+	 * El cliente debe usar PUT con `file` como multipart/form-data. Devuelve
+	 * el curso actualizado con la URL de la resolución ya persistida.
 	 */
 	async subirResolucion(courseId: string, file: File): Promise<Course> {
 		const form = new FormData();
 		form.append('file', file);
-		return await apiKyC.post<Course>(`/courses/${courseId}/resolucion`, form);
+		return await apiKyC.put<Course>(`/courses/${courseId}/resolucion`, form);
+	}
+
+	/**
+	 * F-HISTORICO (2026-07-31): marca o desmarca un programa como histórico.
+	 * Útil para corregir un flag desde la vista del catálogo o editor sin
+	 * tener que enviar todo el payload de CourseUpdate.
+	 */
+	async setEsHistorico(courseId: string, es_historico: boolean): Promise<Course> {
+		return await apiKyC.put<Course>(`/courses/${courseId}`, { es_historico });
 	}
 }
 

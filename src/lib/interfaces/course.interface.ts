@@ -38,6 +38,13 @@ export interface Course {
 	// estudiante debe subir al inscribirse (ej. CV, fotocopia de CI). Se
 	// copian a Enrollment.requisitos con estado "pendiente" al inscribirse.
 	requisitos?: { descripcion: string }[];
+
+	// F-HISTORICO (2026-07-31): programa histórico = solo datos básicos + resolución.
+	// Si es True, NO requiere docentes/módulos/pagos (son opcionales).
+	es_historico?: boolean;
+
+	// F-080: PDF de la resolución que respalda el programa (opcional).
+	resolucion_pdf_url?: string | null;
 }
 
 export interface CreateCourseRequest {
@@ -57,6 +64,10 @@ export interface CreateCourseRequest {
 	descuento_id?: string | null;
 	modulos?: Modulo[]; // <--- ¡Y aquí también!
 	requisitos?: { descripcion: string }[]; // ISSUE-Q-DOCUMENTOS-KYC
+
+	// F-HISTORICO (2026-07-31): true si es programa histórico.
+	es_historico?: boolean;
+	resolucion_pdf_url?: string | null;
 }
 
 export interface UpdateCourseRequest extends Partial<CreateCourseRequest> {

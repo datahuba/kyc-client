@@ -11,7 +11,7 @@
 	import Toggle from '$lib/components/ui/toggle.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import { alert } from '$lib/utils';
-	import { CheckIcon } from '$lib/icons/outline';
+	import { CheckIcon, DocumentAddIcon } from '$lib/icons/outline';
 	import { onMount } from 'svelte';
 
 	interface Props {
@@ -29,6 +29,10 @@
 	let availableEncargados: User[] = $state([]);
 	let selectedEncargadosIds: string[] = $state([]);
 
+	// F-HISTORICO (2026-07-31): resolución de respaldo (opcional, cualquier programa).
+	let resolucionFile: File | null = $state(null);
+	let subiendoResolucion = $state(false);
+
 	// ISSUE-REFACTOR (UI): validación inline por campo (estilo DiscountForm)
 	// en vez de depender solo de alert() al fallar el submit.
 	let errors: Record<string, string> = $state({});
@@ -38,6 +42,13 @@
 	let activeDiscounts = $derived(
 		discounts.filter((d: any) => d.activo === true || d.estado === 'Activo')
 	);
+
+	// F-HISTORICO (2026-07-31): cuando es_historico = true, el sistema NO exige
+	// estructura operacional (docentes, modulos con notas, pagos, requisitos).
+	// Solo se piden los datos básicos + opcionalmente la resolución de respaldo.
+	// Esto permite cargar rápidamente el catálogo de programas antiguos
+	// (cursos pasados) sin reconstruir toda su estructura académica.
+	let es_historico = $state(false);
 
 	let formData: CreateCourseRequest = $state({
 		codigo: '',
@@ -55,7 +66,8 @@
 		fecha_fin: '',
 		activo: true,
 		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }],
-		requisitos: []
+		requisitos: [],
+		es_historico: false
 	});
 
 	let prevCuotas = $state(1);
@@ -116,8 +128,11 @@
 								costo: 0,
 								docente_id: ''
 							})),
-					requisitos: course.requisitos ? course.requisitos.map((r) => ({ ...r })) : []
+					requisitos: course.requisitos ? course.requisitos.map((r) => ({ ...r })) : [],
+					// F-HISTORICO: persistir el flag al editar
+					es_historico: (course as any).es_historico ?? false
 				};
+				es_historico = (course as any).es_historico ?? false;
 				prevCuotas = course.cantidad_cuotas;
 				prevCostoTotal = course.costo_total_interno;
 
@@ -139,8 +154,10 @@
 					fecha_fin: '',
 					activo: true,
 					modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }],
-					requisitos: []
+					requisitos: [],
+					es_historico: false
 				};
+				es_historico = false;
 				prevCuotas = 1;
 				prevCostoTotal = 0;
 
@@ -210,35 +227,44 @@
 		if (!formData.nombre_programa?.trim() || formData.nombre_programa.trim().length < 3) {
 			nuevosErrores.nombre_programa = 'El nombre del programa debe tener al menos 3 caracteres.';
 		}
-		if (!formData.fecha_inicio) {
-			nuevosErrores.fecha_inicio = 'La fecha de inicio es obligatoria.';
+		// F-HISTORICO: fechas opcionales para historicos (puede no haber registros
+		// exactos de inicio/fin de programas muy antiguos). Para programas en
+		// ejecucion o por ejecutarse, las fechas siguen siendo obligatorias.
+		if (!es_historico) {
+			if (!formData.fecha_inicio) {
+				nuevosErrores.fecha_inicio = 'La fecha de inicio es obligatoria.';
+			}
+			if (!formData.fecha_fin) {
+				nuevosErrores.fecha_fin = 'La fecha de fin es obligatoria.';
+			}
+			if (
+				formData.fecha_inicio &&
+				formData.fecha_fin &&
+				new Date(formData.fecha_fin) < new Date(formData.fecha_inicio)
+			) {
+				nuevosErrores.fecha_fin = 'La fecha de fin no puede ser anterior a la fecha de inicio.';
+			}
 		}
-		if (!formData.fecha_fin) {
-			nuevosErrores.fecha_fin = 'La fecha de fin es obligatoria.';
-		}
-		if (
-			formData.fecha_inicio &&
-			formData.fecha_fin &&
-			new Date(formData.fecha_fin) < new Date(formData.fecha_inicio)
-		) {
-			nuevosErrores.fecha_fin = 'La fecha de fin no puede ser anterior a la fecha de inicio.';
-		}
-		if (!formData.costo_total_interno || formData.costo_total_interno <= 0) {
-			nuevosErrores.costo_total_interno = 'El costo total interno debe ser mayor a 0.';
-		}
-		if (formData.matricula_interno === null || formData.matricula_interno === undefined || formData.matricula_interno < 0) {
-			nuevosErrores.matricula_interno = 'La matrícula interna no puede ser negativa.';
-		}
-		if (!formData.cantidad_cuotas || formData.cantidad_cuotas < 1) {
-			nuevosErrores.cantidad_cuotas = 'Debe haber al menos 1 módulo/cuota.';
-		}
-		if (formData.modulos?.some((m) => !m.nombre?.trim())) {
-			nuevosErrores.modulos = 'Todos los módulos deben tener un nombre.';
-		}
-		// ISSUE-P-CARGO-MULTIITEM: cada ítem de cargo adicional debe tener
-		// nombre (para que el estudiante sepa qué está pagando) y costo >= 0.
-		if (formData.cargo_adicional_items?.some((it) => !it.nombre?.trim())) {
-			nuevosErrores.cargo_adicional_items = 'Todos los ítems de cargo adicional deben tener un nombre.';
+		// F-HISTORICO: costo/matricula/cuotas/modulos son opcionales para historicos.
+		// Para programas en operacion real, se exigen.
+		if (!es_historico) {
+			if (!formData.costo_total_interno || formData.costo_total_interno <= 0) {
+				nuevosErrores.costo_total_interno = 'El costo total interno debe ser mayor a 0.';
+			}
+			if (formData.matricula_interno === null || formData.matricula_interno === undefined || formData.matricula_interno < 0) {
+				nuevosErrores.matricula_interno = 'La matrícula interna no puede ser negativa.';
+			}
+			if (!formData.cantidad_cuotas || formData.cantidad_cuotas < 1) {
+				nuevosErrores.cantidad_cuotas = 'Debe haber al menos 1 módulo/cuota.';
+			}
+			if (formData.modulos?.some((m) => !m.nombre?.trim())) {
+				nuevosErrores.modulos = 'Todos los módulos deben tener un nombre.';
+			}
+			// ISSUE-P-CARGO-MULTIITEM: cada ítem de cargo adicional debe tener
+			// nombre (para que el estudiante sepa qué está pagando) y costo >= 0.
+			if (formData.cargo_adicional_items?.some((it) => !it.nombre?.trim())) {
+				nuevosErrores.cargo_adicional_items = 'Todos los ítems de cargo adicional deben tener un nombre.';
+			}
 		}
 		if (selectedEncargadosIds.length > 0) {
 			// Validar localmente (aunque el backend también lo validará)
@@ -259,6 +285,20 @@
 		saving = true;
 		try {
 			const payload = { ...formData };
+			// F-HISTORICO (2026-07-31): sincronizar el flag desde el state local
+			// y vaciar los campos operacionales (costo, modulos, requisitos) que
+			// no aplican para programas historicos. Asi evitamos que el backend
+			// rechace por validaciones que ya relajamos en el schema.
+			payload.es_historico = es_historico;
+			if (es_historico) {
+				payload.costo_total_interno = 0;
+				payload.matricula_interno = 0;
+				payload.cantidad_cuotas = 0;
+				payload.modulos = [];
+				payload.requisitos = [];
+				payload.cargo_adicional_items = [];
+				payload.activo = false; // un programa historico no acepta inscripciones
+			}
 			if (!payload.descuento_id) {
 				if (isEditMode) {
 					// En edición, enviar null explícito para remover descuento existente
@@ -278,24 +318,30 @@
 			// ISSUE-Q-DOCUMENTOS-KYC: descartar requisitos vacíos (sin descripción)
 			payload.requisitos = (payload.requisitos || []).filter((r) => r.descripcion?.trim());
 
-			payload.modulos = payload.modulos!.map((m) => {
-				const mod = { ...m };
-				if (!mod.docente_id) {
-					// `docente_id` no es opcional en el tipo; se castea para poder
-					// omitirlo del payload cuando está vacío (comportamiento previo).
-					delete (mod as { docente_id?: string }).docente_id;
-				}
-				return mod;
-			});
+			if (!es_historico) {
+				payload.modulos = payload.modulos!.map((m) => {
+					const mod = { ...m };
+					if (!mod.docente_id) {
+						// `docente_id` no es opcional en el tipo; se castea para poder
+						// omitirlo del payload cuando está vacío (comportamiento previo).
+						delete (mod as { docente_id?: string }).docente_id;
+					}
+					return mod;
+				});
+			}
 
 			// ISSUE F: Verificador de congruencia financiera
-			const sumModulos = payload.modulos.reduce((acc, curr) => acc + Number(curr.costo), 0);
-			if (!autoCalculateModules && sumModulos !== payload.costo_total_interno) {
-				discrepancyMessage = `La suma manual de los módulos (Bs. ${sumModulos}) no coincide con el Costo Total (Bs. ${payload.costo_total_interno}). ¿Deseas guardar el programa con esta discrepancia?`;
-				pendingSubmitPayload = payload;
-				showDiscrepancyModal = true;
-				saving = false;
-				return;
+			// (Solo aplica a programas en operacion real; los historicos no
+			// tienen estructura financiera que validar.)
+			if (!es_historico) {
+				const sumModulos = (payload.modulos || []).reduce((acc, curr) => acc + Number(curr.costo), 0);
+				if (!autoCalculateModules && sumModulos !== payload.costo_total_interno) {
+					discrepancyMessage = `La suma manual de los módulos (Bs. ${sumModulos}) no coincide con el Costo Total (Bs. ${payload.costo_total_interno}). ¿Deseas guardar el programa con esta discrepancia?`;
+					pendingSubmitPayload = payload;
+					showDiscrepancyModal = true;
+					saving = false;
+					return;
+				}
 			}
 
 			await guardarCurso(payload);
@@ -320,16 +366,34 @@
 				savedCourse = await courseService.create(payload);
 				alert('success', 'Programa creado correctamente');
 			}
-			
+
+			// F-HISTORICO (2026-07-31): subir la resolución de respaldo si el
+			// usuario adjuntó un PDF en este submit. Lo hacemos DESPUÉS de
+			// guardar el curso porque el endpoint PUT /{id}/resolucion necesita
+			// el id del curso. La subida es opcional y tolerante a fallos
+			// (solo un warning, no rompe el flujo).
+			if (savedCourse && savedCourse._id && resolucionFile) {
+				try {
+					subiendoResolucion = true;
+					await courseService.subirResolucion(savedCourse._id, resolucionFile);
+					alert('success', 'Resolución de respaldo subida correctamente');
+				} catch (resErr: any) {
+					alert('warning', resErr?.message || 'El programa se guardó, pero la resolución no se pudo subir. Puedes reintentarlo desde la opción "Subir Resolución" del menú.');
+				} finally {
+					subiendoResolucion = false;
+					resolucionFile = null;
+				}
+			}
+
 			// Asignar los encargados de curso seleccionados
-			if (savedCourse && savedCourse._id) {
+			if (savedCourse && savedCourse._id && !es_historico) {
 				try {
 					await courseService.assignEncargados(savedCourse._id, selectedEncargadosIds);
 				} catch (err: any) {
 					alert('warning', err.message || 'El curso se guardó, pero hubo un error al asignar los encargados. Revisa el límite de 5 programas por usuario.');
 				}
 			}
-			
+
 			onSuccess();
 		} catch (e: any) {
 			alert('error', e.message || 'Error al guardar el curso');
@@ -355,7 +419,20 @@
 <form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 	<!-- SECCIÓN: Datos básicos -->
 	<Card variant="ghost" padding="none">
-		<Heading level="h4" class="mb-3">Datos Básicos</Heading>
+		<div class="mb-3 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
+			<Heading level="h4">Datos Básicos</Heading>
+
+			<!-- F-HISTORICO (2026-07-31): toggle para registrar programas pasados
+			     sin exigir estructura operacional (docentes, modulos, pagos).
+			     Si esta activo, las secciones operacionales se ocultan y las
+			     validaciones se relajan (fechas, costo, modulos, requisitos). -->
+			<label class="inline-flex items-center gap-2 cursor-pointer select-none">
+				<Toggle bind:checked={es_historico} labelOn="Histórico" labelOff="En operación" />
+				<span class="text-xs text-gray-500 dark:text-gray-400">
+					Marcá si es un programa pasado (curso cerrado) para registrarlo sin estructura completa.
+				</span>
+			</label>
+		</div>
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 			<Input
 				label="Código"
@@ -400,12 +477,13 @@
 				{/each}
 			</Select>
 
+			<!-- F-HISTORICO: fechas opcionales para programas muy antiguos. -->
 			<Input
 				label="Fecha Inicio"
 				id="fecha_inicio"
 				type="date"
 				bind:value={formData.fecha_inicio}
-				required
+				required={!es_historico}
 				error={errors.fecha_inicio}
 			/>
 			<Input
@@ -413,12 +491,24 @@
 				id="fecha_fin"
 				type="date"
 				bind:value={formData.fecha_fin}
-				required
+				required={!es_historico}
 				error={errors.fecha_fin}
 			/>
 		</div>
+
+		<!-- F-HISTORICO: aviso amarillo explicando que el resto de secciones se oculta. -->
+		{#if es_historico}
+			<div class="mt-4 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+				<strong>Modo Histórico activo.</strong> Se omiten los datos operacionales
+				(docentes, módulos, pagos, requisitos, descuentos). Solo se guardan los
+				datos básicos del programa y, opcionalmente, la resolución de respaldo.
+			</div>
+		{/if}
 	</Card>
 
+	<!-- F-HISTORICO: las siguientes secciones se OCULTAN cuando es_historico=True.
+	     Un programa pasado no tiene operacion academica ni financiera que cargar. -->
+	{#if !es_historico}
 	<!-- SECCIÓN: Encargados de Curso -->
 	<Card variant="bordered" padding="md">
 		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">Gestión Académica</Heading>
@@ -723,7 +813,57 @@
 	<!-- SECCIÓN: Observación y estado -->
 	<Card variant="ghost" padding="none">
 		<TextArea label="Observación" id="observacion" bind:value={formData.observacion} rows={3} />
-		<Checkbox class="mt-4" id="activo" label="Curso Activo" bind:checked={formData.activo} />
+		{#if !es_historico}
+			<Checkbox class="mt-4" id="activo" label="Curso Activo" bind:checked={formData.activo} />
+		{/if}
+	</Card>
+	{/if}
+
+	<!-- F-HISTORICO (2026-07-31): Resolución de Respaldo (opcional para todos
+	     los programas, nuevos, en ejecución o históricos). Se sube al crear o
+	     editar; también se puede subir más tarde desde el menú desplegable
+	     del catálogo de programas. -->
+	<Card variant="bordered" padding="md">
+		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">
+			Resolución de Respaldo (Opcional)
+		</Heading>
+		<p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+			PDF de la resolución que respalda este programa (ej. resolución del Comité Académico,
+			resolución del Director, etc). Es <strong>opcional</strong>: podés dejarlo en blanco
+			y subirlo más tarde desde el menú desplegable del programa en el catálogo.
+		</p>
+
+		{#if isEditMode && course && (course as any).resolucion_pdf_url}
+			<div class="mb-3 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20 p-2 text-sm text-green-800 dark:text-green-200">
+				<DocumentAddIcon class="size-5 shrink-0" />
+				<div class="flex-1">
+					<div class="font-semibold">Ya tenés una resolución cargada</div>
+					<a href={(course as any).resolucion_pdf_url} target="_blank" rel="noopener" class="text-xs underline break-all">
+						Ver PDF actual
+					</a>
+				</div>
+			</div>
+		{/if}
+
+		<label for="resolucion-pdf" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+			Subir nuevo PDF (reemplaza el actual)
+		</label>
+		<input
+			id="resolucion-pdf"
+			type="file"
+			accept="application/pdf"
+			class="block w-full text-sm text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md cursor-pointer bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+			onchange={(e) => {
+				const target = e.target as HTMLInputElement;
+				resolucionFile = target.files?.[0] || null;
+			}}
+		/>
+		{#if resolucionFile}
+			<p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+				Seleccionado: <strong>{resolucionFile.name}</strong> ({Math.round(resolucionFile.size / 1024)} KB).
+				Se subirá al guardar el programa.
+			</p>
+		{/if}
 	</Card>
 
 	<div class="flex justify-end gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
