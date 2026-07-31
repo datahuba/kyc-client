@@ -1,5 +1,11 @@
 import { apiKyC } from '$lib/config';
-import type { Enrollment, CreateEnrollmentRequest, UpdateEnrollmentRequest } from '$lib/interfaces';
+import type {
+	Enrollment,
+	CreateEnrollmentRequest,
+	UpdateEnrollmentRequest,
+	BulkEnrollmentRequest,
+	BulkEnrollmentResponse,
+} from '$lib/interfaces';
 
 class EnrollmentService {
 	async getAll(
@@ -35,6 +41,14 @@ class EnrollmentService {
 
 	async create(data: CreateEnrollmentRequest): Promise<Enrollment> {
 		return await apiKyC.post<Enrollment>('/enrollments/', data);
+	}
+
+	// F-INSCRIPCION-LOTE (2026-07-31): inscripción en lote. Hasta 200
+	// estudiantes a un mismo programa en una sola llamada. Devuelve
+	// desglose de éxitos/ya_inscritos/fallidos para que la UI muestre
+	// un resumen accionable.
+	async createBulk(data: BulkEnrollmentRequest): Promise<BulkEnrollmentResponse> {
+		return await apiKyC.post<BulkEnrollmentResponse>('/enrollments/bulk', data);
 	}
 
 	async update(id: string, data: UpdateEnrollmentRequest): Promise<Enrollment> {

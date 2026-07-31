@@ -71,6 +71,30 @@ export interface UpdateEnrollmentRequest {
 	saldo_pendiente?: number;
 }
 
+// F-INSCRIPCION-LOTE (2026-07-31): shape del request y response del
+// endpoint POST /enrollments/bulk. Permite inscribir hasta 200
+// estudiantes a un mismo programa en una sola operación.
+export interface BulkEnrollmentRequest {
+	curso_id: string;
+	estudiantes_ids: string[];
+	descuento_id?: string;
+	descuento_personalizado?: number;
+}
+
+export interface BulkEnrollmentErrorItem {
+	estudiante_id: string;
+	error: string;
+}
+
+export interface BulkEnrollmentResponse {
+	total_solicitados: number;
+	exitosos: number;
+	ya_inscritos: number;
+	fallidos: number;
+	enrollments_creados: Enrollment[];
+	errores: BulkEnrollmentErrorItem[];
+}
+
 // F-COBRANZA-035 (2026-07-22): resumen de inscritos para vista KPI.
 // Pedido Lic. Sandra Zabala: "diferencia del total de inscritos
 // inicialmente, cuantos son los activo y cuantos los pasivos".

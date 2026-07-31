@@ -304,10 +304,11 @@
 			onClose={() => showDocumentModal = false}
 		/>
 
-		<!-- F-DASH-MODULOS-STAFF (2026-07-30): banner de alerta para staff con
-		     permisos de iniciar módulos. Muestra cuántos módulos están sin
-		     iniciar y CTA "Ir a Inscripciones" para que Sandra/Rocío no se
-		     olviden. Visible solo si el rol puede iniciar módulos. -->
+		<!-- F-DASH-MODULOS-STAFF (2026-07-30, fix 2026-07-31): banner de alerta para
+		     staff con permisos de iniciar módulos. Muestra la cantidad de estudiantes
+		     con módulos pendientes (no el total absoluto, que confunde) y CTA
+		     "Ir a Inscripciones" para que Sandra/Rocío no se olviden. Visible solo
+		     si el rol puede iniciar módulos. -->
 		{#if cxcResumen && cxcResumen.total_modulos_no_iniciados > 0 && (verResumenEconomico || currentRole === 'cpd' || currentRole === 'encargado_curso')}
 			<a
 				href="/app/enrollments"
@@ -319,11 +320,10 @@
 					</div>
 					<div class="flex-1 min-w-0">
 						<p class="text-sm font-bold text-amber-900 dark:text-amber-200">
-							Tienes {cxcResumen.total_modulos_no_iniciados} módulo{cxcResumen.total_modulos_no_iniciados === 1 ? '' : 's'} sin iniciar
+							{cxcResumen.cantidad_enrollments} estudiante{cxcResumen.cantidad_enrollments === 1 ? '' : 's'} con módulo{cxcResumen.total_modulos_no_iniciados === 1 ? '' : 's'} pendiente{cxcResumen.total_modulos_no_iniciados === 1 ? '' : 's'} de iniciar
 						</p>
 						<p class="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
-							Estos módulos aún no cuentan en la CxC a la Fecha. Inícialos desde
-							la libreta de cada estudiante para que se registren contablemente.
+							Hay {cxcResumen.total_modulos_no_iniciados} módulo{cxcResumen.total_modulos_no_iniciados === 1 ? '' : 's'} que aún no cuentan en la CxC a la Fecha. Inícialos módulo por módulo desde la libreta de cada estudiante para que se registren contablemente.
 						</p>
 					</div>
 					<div class="shrink-0 text-amber-600 dark:text-amber-400 group-hover:translate-x-1 transition-transform">
