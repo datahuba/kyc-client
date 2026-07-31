@@ -2,6 +2,19 @@
 	import { onMount } from 'svelte';
 	import { enrollmentService, studentService, courseService, discountService, cuentasPorCobrarService } from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
+	import {
+		hasRole,
+		STAFF_INSCRIPCION,
+		STAFF_INSCRIPCION_EDIT,
+		STAFF_INSCRIPCION_DELETE,
+		STAFF_SOLICITUD_PASIVO,
+		STAFF_REACTIVAR,
+		STAFF_BECA_RESPALDO,
+		STAFF_NOTAS_BORRADOR,
+		STAFF_MODULOS,
+		STAFF_REQUISITOS,
+		STAFF_MATRICULA_EXENTA
+	} from '$lib/auth/roles';
 	import type { Enrollment, Student, Course, Discount } from '$lib/interfaces';
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/ui/button.svelte';
@@ -88,21 +101,23 @@
 
 	// ISSUE N: Control de Permisos Visuales (RBAC Frontend)
 	let currentRole = $derived($userStore.role || '');
+	// F-REFACTOR-ROLES (2026-07-31): usar constantes de roles compartidas
+	// en vez de arrays inline duplicados. Source of truth: lib/auth/roles.ts
 	// ISSUE-R-ROLES (2026-07-10): encargado_curso/coordinador pueden crear inscripciones
 	// (el backend valida que el encargado solo inscriba en sus cursos asignados)
-	let canCreateEnrollment = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
-	let canEditEnrollment = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canCreateEnrollment = $derived(hasRole(currentRole, STAFF_INSCRIPCION));
+	let canEditEnrollment = $derived(hasRole(currentRole, STAFF_INSCRIPCION_EDIT));
 	let canDeleteEnrollment = $derived(currentRole === 'superadmin');
 	// ISSUE-R-SOLICITUD-PASIVO: quién puede solicitar/aprobar el pasivo de una inscripción
-	let canRequestPassive = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'student'].includes(currentRole));
-	let canReactivate = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canRequestPassive = $derived(hasRole(currentRole, STAFF_SOLICITUD_PASIVO));
+	let canReactivate = $derived(hasRole(currentRole, STAFF_REACTIVAR));
 	// ISSUE-P-BECA-RESPALDO: quién puede subir/reemplazar el respaldo documental de una beca
-	let canManageBecaRespaldo = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
+	let canManageBecaRespaldo = $derived(hasRole(currentRole, STAFF_BECA_RESPALDO));
 	// ISSUE-Q-NOTA-BORRADOR: quién puede validar/rechazar el borrador de nota del docente
-	let canValidateNotaBorrador = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
+	let canValidateNotaBorrador = $derived(hasRole(currentRole, STAFF_NOTAS_BORRADOR));
 	// F-CUENTAS-POR-COBRAR (2026-07-29): quién puede iniciar módulos manualmente.
 	// El backend valida que encargado_curso solo lo haga en sus cursos_asignados.
-	let canIniciarModulo = $derived(['admin', 'superadmin', 'encargado_curso'].includes(currentRole));
+	let canIniciarModulo = $derived(hasRole(currentRole, STAFF_MODULOS));
 	// Estado de loading por módulo al iniciar/deshacer
 	let moduloLoading = $state<Record<string, boolean>>({});
 
@@ -110,9 +125,7 @@
 	// subidos por el estudiante. Ampliado a Encargado de Curso/Coordinador (el
 	// backend restringe a Encargado de Curso solo sus cursos_asignados) para no
 	// sobrecargar solo a CPD -- explícitamente pedido por el usuario.
-	let canManageRequisitos = $derived(
-		['cpd', 'admin', 'superadmin', 'encargado_curso', 'coordinador'].includes(currentRole)
-	);
+	let canManageRequisitos = $derived(hasRole(currentRole, STAFF_REQUISITOS));
 
 	// ISSUE-R-ROLES (2026-07-10): filtrar cursos disponibles para el formulario
 	// de inscripción -- un Encargado de Curso solo ve sus cursos asignados.
@@ -136,7 +149,7 @@
 		return mod.estado === 'Pagado';
 	}
 	// ISSUE-M-EXENCION: botón exclusivo de MAE (también admin/superadmin, que ya tienen todo)
-	let canManageMatriculaExenta = $derived(['mae', 'admin', 'superadmin'].includes(currentRole));
+	let canManageMatriculaExenta = $derived(hasRole(currentRole, STAFF_MATRICULA_EXENTA));
 	let matriculaExentaLoading: boolean = $state(false);
 
 	// Modal de solicitud de pasivo
