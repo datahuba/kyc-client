@@ -157,6 +157,17 @@
 			userStore.init();
 		}
 		loadData();
+		// F-FIX-SIDEBAR-INDIVIDUAL (2026-07-31): si la URL trae ?new=1
+		// (link "Inscripcion Individual" del sidebar), abrir el modal
+		// automaticamente. Asi la nueva entrada del grupo Inscripciones
+		// llega al formulario de nueva inscripcion en vez de solo a la
+		// lista.
+		const params = new URLSearchParams(window.location.search);
+		if (params.get('new') === '1' && canCreateEnrollment) {
+			// esperar a que carguen los estudiantes/cursos para que el form
+			// tenga las opciones listas
+			setTimeout(() => handleCreate(), 200);
+		}
 	});
 
 	async function loadData() {

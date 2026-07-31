@@ -359,19 +359,34 @@
 					</div>
 				</div>
 
-				<!-- F-IMPORT-EXCEL-BULK (2026-07-31): opcion para subir un
-				     Excel con datos de estudiantes. El backend crea los
-				     nuevos y los inscribe directamente al programa
-				     seleccionado (paso 1). -->
-				<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+				<!-- F-IMPORT-EXCEL-BULK (2026-07-31, fix 2026-07-31):
+				     opcion para subir un Excel con datos de estudiantes.
+				     El backend crea los nuevos y los inscribe directamente
+				     al programa seleccionado (paso 1).
+				     FIX: antes estaba disabled si no habia programa. Ahora
+				     el boton siempre esta disponible -- si no hay programa
+				     seleccionado, la funcion handleExcelFileChange avisa al
+				     usuario. Asi Kevin puede subir el Excel desde esta
+				     pantalla sin tener que ir y volver entre el paso 1. -->
+				<div class="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-4">
 					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 						<div class="min-w-0 flex-1">
-							<p class="text-sm font-bold text-blue-900 dark:text-blue-200">
-								¿Tienes una lista de admitidos en Excel?
-							</p>
-							<p class="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
-								Sube el archivo (.xlsx, .xls, .csv) y se crearán los estudiantes nuevos
-								y se inscribirán automáticamente al programa seleccionado.
+							<div class="flex items-center gap-2">
+								<svg class="size-5 text-blue-600 dark:text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+								</svg>
+								<p class="text-sm font-bold text-blue-900 dark:text-blue-200">
+									Importar estudiantes desde Excel
+								</p>
+							</div>
+							<p class="text-xs text-blue-700 dark:text-blue-300 mt-1">
+								{#if selectedCursoId}
+									Sube el archivo (.xlsx, .xls, .csv) y se crearán los estudiantes nuevos
+									y se inscribirán automáticamente al programa seleccionado.
+								{:else}
+									<span class="font-semibold">⚠ Selecciona primero un programa en el paso 1</span>
+									para que los estudiantes importados se inscriban automáticamente.
+								{/if}
 							</p>
 						</div>
 						<div class="shrink-0">
@@ -387,7 +402,6 @@
 								variant="secondary"
 								onclick={triggerExcelUpload}
 								loading={excelUploading}
-								disabled={!selectedCursoId}
 							>
 								Subir Excel
 							</Button>
