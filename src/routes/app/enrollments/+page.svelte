@@ -23,7 +23,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
-	import ModulosModal from '$lib/components/ui/ModulosModal.svelte';
+	import GestionModulosModal from '$lib/components/ui/GestionModulosModal.svelte';
 	import Select from '$lib/components/ui/select.svelte';
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
 	import Skeleton from '$lib/components/ui/skeleton.svelte';
@@ -1473,9 +1473,10 @@
 		</div>
 	</Modal>
 
-	<!-- F-MODULOS-MODAL (2026-07-31): modal centralizado de gestión de módulos
-	     (reemplaza los botones Iniciar/Revertir del kardex). -->
-	<ModulosModal
+	<!-- F-MODAL-GESTION-MODULOS (2026-08-03, Kevin): modal centralizado de gestión
+	     de módulos (reemplaza al antiguo ModulosModal). Accesible también desde
+	     Cuentas por Cobrar y ficha del estudiante. -->
+	<GestionModulosModal
 		isOpen={isModulosModalOpen}
 		enrollment={selectedKardex}
 		onClose={() => isModulosModalOpen = false}

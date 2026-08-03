@@ -2,6 +2,7 @@
 	import type { Student, Enrollment } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
+	import GestionModulosModal from '$lib/components/ui/GestionModulosModal.svelte';
 	import { formatCurrency } from '$lib/utils';
 	import { userStore } from '$lib/stores/userStore';
 	import { apiKyC } from '$lib/config/apiKyC.config'; // IMPORTACIÓN DEL CLIENTE ESTÁNDAR
@@ -44,6 +45,11 @@
 
 	// F-049: enrollment seleccionado para ver el resumen enriquecido de pagos
 	let selectedEnrollmentIdForResumen = $state<string | null>(null);
+
+	// F-MODAL-GESTION-MODULOS (2026-08-03, Kevin): modal centralizado de gestión
+	// de módulos, accesible también desde la ficha del estudiante.
+	let modulosModalOpen = $state(false);
+	let modulosModalEnrollment: Enrollment | null = $state(null);
 
 	// Obtener ID resiliente para MongoDB
 	const studentId = $derived(student?._id || student?.id);
@@ -253,6 +259,7 @@
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montos</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+							<th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Módulos</th>
 							{#if isFinanciero}
 								<th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones de Caja</th>
 							{/if}
@@ -277,6 +284,19 @@
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : enrollment.estado === 'retirado' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800'}`}>{enrollment.estado}</span>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-center">
+									<button
+										type="button"
+										onclick={(e) => {
+											e.stopPropagation();
+											modulosModalEnrollment = enrollment;
+											modulosModalOpen = true;
+										}}
+										class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded transition-colors"
+									>
+										📚 Módulos
+									</button>
 								</td>
 								{#if isFinanciero}
 									<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
@@ -330,3 +350,14 @@
 		<div class="mt-6 flex justify-end"><Button variant="secondary" onclick={onClose}>Cerrar</Button></div>
 	</div>
 </Modal>
+
+<!-- F-MODAL-GESTION-MODULOS (2026-08-03, Kevin): modal de gestión de módulos,
+     accesible también desde la ficha del estudiante. -->
+<GestionModulosModal
+	isOpen={modulosModalOpen}
+	enrollment={modulosModalEnrollment}
+	onClose={() => {
+		modulosModalOpen = false;
+		modulosModalEnrollment = null;
+	}}
+/>

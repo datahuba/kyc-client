@@ -12,7 +12,7 @@
 	 */
 
 	import { onMount } from 'svelte';
-	import { cuentasPorCobrarService } from '$lib/services';
+	import { cuentasPorCobrarService, enrollmentService } from '$lib/services';
 	import type { CxCResumen, CxCResumenReducido } from '$lib/services/cuentas-por-cobrar.service';
 	import { userStore } from '$lib/stores/userStore';
 	import { alert } from '$lib/utils';
@@ -22,7 +22,8 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import Skeleton from '$lib/components/ui/skeleton.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
-	import { DownloadIcon, ChartBarIcon } from '$lib/icons/outline';
+	import GestionModulosModal from '$lib/components/ui/GestionModulosModal.svelte';
+	import { DownloadIcon, ChartBarIcon, ClipboardIcon } from '$lib/icons/outline';
 	import { formatCurrency } from '$lib/utils';
 
 	// ========================================================================
@@ -32,6 +33,11 @@
 	let resumen: CxCResumen | null = $state(null);
 	let loading = $state(true);
 	let expandedCursos = $state<Set<string>>(new Set());
+
+	// Estado del modal de gestión de módulos (F-MODAL-GESTION-MODULOS 2026-08-03)
+	let modulosModalOpen = $state(false);
+	let modulosModalEnrollment: any = $state(null);
+	let modulosModalLoading = $state(false);
 
 	function getApiBase(): string {
 		// apiKyC ya normaliza las URLs; aquí solo queremos el prefijo del backend
@@ -106,6 +112,26 @@
 		if (next.has(cursoId)) next.delete(cursoId);
 		else next.add(cursoId);
 		expandedCursos = next;
+	}
+
+	// Abre el modal de gestión de módulos cargando el enrollment fresco
+	async function abrirGestionModulos(d: any) {
+		modulosModalLoading = true;
+		modulosModalOpen = true;
+		try {
+			const fresh = await enrollmentService.getById(d.enrollment_id);
+			modulosModalEnrollment = fresh;
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo cargar la inscripción');
+			modulosModalOpen = false;
+		} finally {
+			modulosModalLoading = false;
+		}
+	}
+
+	function cerrarGestionModulos() {
+		modulosModalOpen = false;
+		modulosModalEnrollment = null;
 	}
 
 	function getRole(): string {
@@ -272,11 +298,12 @@
 													<th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">Estado</th>
 													<th class="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider">CxC Estimada</th>
 													<th class="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider">CxC a la Fecha</th>
+													<th class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider">Acciones</th>
 												</tr>
 											</thead>
 											<tbody>
 												{#each detalleCurso as d (d.enrollment_id)}
-													<tr class="border-t border-gray-100 dark:border-dark-border">
+													<tr class="border-t border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-background/30">
 														<td class="px-3 py-2 text-light-black dark:text-dark-white">
 															{d.estudiante_nombre}
 															<p class="text-[10px] text-light-four dark:text-dark-four">
@@ -292,6 +319,17 @@
 														<td class="px-3 py-2 text-right tabular-nums font-semibold text-primary-700 dark:text-primary-300">
 															{formatCurrency(d.saldo_a_la_fecha)}
 														</td>
+														<td class="px-3 py-2 text-center">
+															<Button
+																size="sm"
+																variant="secondary"
+																onclick={() => abrirGestionModulos(d)}
+																ariaLabel="Gestionar módulos de {d.estudiante_nombre}"
+															>
+																{#snippet leftIcon()}<ClipboardIcon class="size-4" />{/snippet}
+																Módulos
+															</Button>
+														</td>
 													</tr>
 												{/each}
 											</tbody>
@@ -305,4 +343,20 @@
 			</section>
 		{/if}
 	</div>
+
+	<!-- F-MODAL-GESTION-MODULOS (2026-08-03, Kevin): modal centralizado de gestión
+	     de módulos, accesible desde esta vista de CxC. -->
+	<GestionModulosModal
+		isOpen={modulosModalOpen}
+		enrollment={modulosModalEnrollment}
+		onClose={cerrarGestionModulos}
+		onUpdated={(updated) => {
+			// refrescar el resumen para reflejar los cambios (ej. nuevo iniciado_en)
+			if (updated) {
+				void cuentasPorCobrarService.getResumen().then((r) => {
+					resumen = r as CxCResumen;
+				});
+			}
+		}}
+	/>
 </div>
