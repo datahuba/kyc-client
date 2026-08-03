@@ -233,35 +233,28 @@
 			// ISSUE-P-DASHBOARD-COBRANZA: resumen económico agregado (incluye
 			// matrícula como ingreso). Solo para roles económicos; no bloquea el
 			// dashboard si el endpoint devuelve 403 o falla.
-			if (ROLES_ECONOMICOS_BASE.includes(roleNow) || (roleNow === 'coordinador' && esCoordFinNow)) {
-				try {
-					resumenEconomico = await paymentService.getResumenEconomico();
-				} catch (e) {
-					console.error('Error cargando resumen económico:', e);
-				}
-			}
+			// US-007 (2026-08-03): paralelizar las 3 queries condicionales
+			// (resumen económico, inscritos, CxC) en un Promise.all para que
+			// corran en paralelo en vez de secuencial. Antes: 3x latencia = ~600ms.
+			// Ahora: 1x latencia = ~200ms.
+			const esRolEconomico = ROLES_ECONOMICOS_BASE.includes(roleNow) || (roleNow === 'coordinador' && esCoordFinNow);
+			const esRolInscritos = ROLES_QUE_VEN_INSCRITOS.includes(roleNow);
 
-			// F-COBRANZA-041 (2026-07-22): KPI de inscritos.
-			// Carga en paralelo con el resto, no bloquea si falla.
-			// Endpoint filtra automáticamente por cursos_asignados si el rol los tiene.
-			if (ROLES_QUE_VEN_INSCRITOS.includes(roleNow)) {
-				try {
-					resumenInscritos = await enrollmentService.getResumenInscritos();
-				} catch (e) {
-					console.error('Error cargando resumen de inscritos:', e);
-				}
-			}
+			const [resEco, resInsc, resCxc] = await Promise.all([
+				esRolEconomico
+					? paymentService.getResumenEconomico().catch((e) => { console.error('Error cargando resumen económico:', e); return null; })
+					: Promise.resolve(null),
+				esRolInscritos
+					? enrollmentService.getResumenInscritos().catch((e) => { console.error('Error cargando resumen de inscritos:', e); return null; })
+					: Promise.resolve(null),
+				esRolEconomico
+					? cuentasPorCobrarService.getResumenReducido().catch((e) => { console.error('Error cargando resumen CxC:', e); return null; })
+					: Promise.resolve(null),
+			]);
 
-			// F-CUENTAS-POR-COBRAR (2026-07-29): resumen CxC real vs estimada.
-			// Se muestra a los roles económicos (mismos que el Resumen Económico).
-			// Si falla, no rompe el dashboard.
-			if (ROLES_ECONOMICOS_BASE.includes(roleNow) || (roleNow === 'coordinador' && esCoordFinNow)) {
-				try {
-					cxcResumen = await cuentasPorCobrarService.getResumenReducido();
-				} catch (e) {
-					console.error('Error cargando resumen CxC:', e);
-				}
-			}
+			resumenEconomico = resEco;
+			resumenInscritos = resInsc;
+			cxcResumen = resCxc;
 
 		} catch (error) {
 			console.error('Error loading dashboard data:', error);
@@ -304,34 +297,14 @@
 			onClose={() => showDocumentModal = false}
 		/>
 
-		<!-- F-DASH-MODULOS-STAFF (2026-07-30, fix 2026-07-31): banner de alerta para
-		     staff con permisos de iniciar módulos. Muestra la cantidad de estudiantes
-		     con módulos pendientes (no el total absoluto, que confunde) y CTA
-		     "Ir a Inscripciones" para que Sandra/Rocío no se olviden. Visible solo
-		     si el rol puede iniciar módulos. -->
-		{#if cxcResumen && cxcResumen.total_modulos_no_iniciados > 0 && (verResumenEconomico || currentRole === 'cpd' || currentRole === 'encargado_curso')}
-			<a
-				href="/app/enrollments"
-				class="block bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl p-4 hover:shadow-md transition-shadow group"
-			>
-				<div class="flex items-start gap-3">
-					<div class="shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-800/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
-						<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-					</div>
-					<div class="flex-1 min-w-0">
-						<p class="text-sm font-bold text-amber-900 dark:text-amber-200">
-							{cxcResumen.cantidad_enrollments} estudiante{cxcResumen.cantidad_enrollments === 1 ? '' : 's'} con módulo{cxcResumen.total_modulos_no_iniciados === 1 ? '' : 's'} pendiente{cxcResumen.total_modulos_no_iniciados === 1 ? '' : 's'} de iniciar
-						</p>
-						<p class="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
-							Hay {cxcResumen.total_modulos_no_iniciados} módulo{cxcResumen.total_modulos_no_iniciados === 1 ? '' : 's'} que aún no cuentan en la CxC a la Fecha. Inícialos módulo por módulo desde la libreta de cada estudiante para que se registren contablemente.
-						</p>
-					</div>
-					<div class="shrink-0 text-amber-600 dark:text-amber-400 group-hover:translate-x-1 transition-transform">
-						→
-					</div>
-				</div>
-			</a>
-		{/if}
+		<!-- US-007 (2026-08-03): banner de alerta "X estudiantes con módulos
+		     pendiente(s) de iniciar" eliminado. Kevin: "eliminar mensaje amarillo".
+		     Razón: al inicio del ciclo, TODOS los estudiantes están en
+		     "Pendiente de iniciar" (es el estado por defecto de un módulo
+		     recién creado), así que el banner siempre mostraba el total absoluto
+		     sin aportar señal accionable. Si en el futuro se quiere alertar
+		     sobre módulos ATRASADOS (fecha_inicio vencida sin iniciado), que
+		     sea un banner DIFERENTE y basado en una fecha, no en el conteo. -->
 
 		<!-- ISSUE-P-DASHBOARD-COBRANZA: Resumen Económico (Cobranza / Coordinador Financiero / MAE / Admin).
 		     Incluye la matrícula como ingreso contable aunque Cobranza no la apruebe. -->
