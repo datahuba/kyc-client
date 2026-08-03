@@ -29,8 +29,8 @@
 		SearchIcon,
 		ExclamationIcon,
 		CheckIcon,
-		BookIcon
 	} from '$lib/icons/outline';
+	import { BookIcon } from '$lib/icons/solid';
 	import { formatCurrency, formatDate } from '$lib/utils';
 
 	// ========================================================================
