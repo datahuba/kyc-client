@@ -16,6 +16,7 @@
 	import { onMount } from 'svelte';
 	import { enrollmentService, courseService } from '$lib/services';
 	import type { Enrollment, Course } from '$lib/interfaces';
+	import type { PaginatedResponse } from '$lib/interfaces/response.interface';
 	import { userStore } from '$lib/stores/userStore';
 	import { alert } from '$lib/utils';
 
@@ -62,12 +63,19 @@
 		loading = true;
 		try {
 			// Cargar cursos y enrollments en paralelo
-			const [coursesData, enrollmentsData] = await Promise.all([
-				courseService.getAll().catch(() => []),
-				enrollmentService.getAll().catch(() => []),
+			// NOTA: ambos endpoints devuelven PaginatedResponse<{data: T[], meta: ...}>
+			// así que extraemos .data para obtener el array.
+			// per_page grande para traer todos los enrollments activos de un saque.
+			const [coursesResp, enrollmentsResp] = await Promise.all([
+				courseService
+					.getAll(1, 1000)
+					.catch(() => ({ data: [], meta: { page: 1, limit: 0, totalItems: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false } })),
+				enrollmentService
+					.getAll(1, 1000, { estado: 'activo' })
+					.catch(() => ({ data: [], meta: { page: 1, limit: 0, totalItems: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false } })),
 			]);
-			courses = coursesData as Course[];
-			enrollments = enrollmentsData as Enrollment[];
+			courses = (coursesResp as PaginatedResponse<Course>).data || [];
+			enrollments = (enrollmentsResp as PaginatedResponse<Enrollment>).data || [];
 
 			// Mapa de cursos para lookup rápido
 			const map: Record<string, string> = {};
@@ -103,9 +111,10 @@
 	}
 
 	const filtered = $derived.by(() => {
+		// El backend ya filtra por estado=activo, pero por si acaso filtramos
+		// también del lado del cliente (defense in depth).
 		return enrollments.filter((e) => {
-			// Excluir estados que no se gestionan aquí
-			if (e.estado !== 'activo') return false;
+			if (e.estado && e.estado !== 'activo') return false;
 			// Filtro por curso
 			if (filterCurso && String(e.curso_id) !== String(filterCurso)) return false;
 			// Filtro por estado de módulos
@@ -132,7 +141,8 @@
 
 	// Estadísticas globales
 	const stats = $derived.by(() => {
-		const activos = enrollments.filter((e) => e.estado === 'activo');
+		// El backend ya filtra por estado=activo.
+		const activos = enrollments.filter((e) => !e.estado || e.estado === 'activo');
 		let conModulosEnCurso = 0;
 		let conModulosCompletados = 0;
 		let totalModulos = 0;
@@ -276,7 +286,7 @@
 			</div>
 		</div>
 		<div class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-			Mostrando <strong>{filtered.length}</strong> de {enrollments.filter((e) => e.estado === 'activo').length} inscripciones activas
+			Mostrando <strong>{filtered.length}</strong> de {enrollments.length} inscripciones activas
 		</div>
 	</Card>
 
