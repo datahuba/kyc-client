@@ -8,6 +8,7 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
 	import DashboardSkeleton from '$lib/components/skeletons/DashboardSkeleton.svelte';
+	import ComunicadoPopup from '$lib/components/comunicados/ComunicadoPopup.svelte';  // US-003 (2026-08-03)
 	import { formatCurrency, formatDate, alert } from '$lib/utils';
 	import { apiKyC } from '$lib/config/apiKyC.config';
 
@@ -453,3 +454,7 @@
 		{/if}
 	</div>
 </Modal>
+
+<!-- US-003 (2026-08-03): Pop-up de comunicados pendientes. Solo se muestra
+     si hay comunicados sin ver; al montarlo, consulta /comunicados/pending/me. -->
+<ComunicadoPopup />

@@ -137,6 +137,10 @@ const staffAdminGroup: NavigationGroup = {
 	roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'coordinador'],
 	loginTypes: ['admin'],
 	children: [
+		// US-003 (2026-08-03): Comunicados. Anuncios oficiales a estudiantes
+		// con pop-up al primer login. Crear/editar/eliminar: solo superadmin,
+		// encargado de curso y cobranzas. (Kevin 2026-08-03)
+		{ type: 'item', name: 'Comunicados', href: '/app/comunicados', icon: BellIcon, roles: ['superadmin', 'encargado_curso', 'cobranza'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
