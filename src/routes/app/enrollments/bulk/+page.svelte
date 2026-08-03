@@ -152,6 +152,8 @@
 			// Reusar el endpoint existente POST /students/import/excel con
 			// curso_id. El backend crea los estudiantes nuevos y los
 			// inscribe automáticamente al programa seleccionado.
+			// F-EXCEL-IMPORT-MIXED (2026-08-03, Kevin): si hay emails mal,
+			// se reportan en errors[] PERO se importan los válidos.
 			const res = await studentService.importFromExcel(file, selectedCursoId);
 			excelResult = {
 				success: res.success_count,
@@ -159,10 +161,24 @@
 				errors: res.errors || []
 			};
 
-			if (res.enrolled_count > 0) {
-				alert('success', `${res.enrolled_count} inscrito(s) automáticamente. ${res.success_count} estudiante(s) procesado(s) en total.`);
+			const errCount = (res.errors || []).length;
+			if (res.enrolled_count > 0 && errCount > 0) {
+				alert('warning',
+					`Se importaron ${res.enrolled_count} estudiante(s) y se inscribieron al curso. ` +
+					`${errCount} fila(s) con errores (ver abajo).`
+				);
+			} else if (res.enrolled_count > 0) {
+				alert('success',
+					`${res.enrolled_count} estudiante(s) inscrito(s) automáticamente al curso.`
+				);
 			} else if (res.success_count > 0) {
-				alert('warning', `Se procesaron ${res.success_count} estudiantes pero ninguno fue inscrito. Revisa los errores.`);
+				alert('warning',
+					`Se procesaron ${res.success_count} estudiantes pero ninguno fue inscrito. Revisa los errores.`
+				);
+			} else if (errCount > 0) {
+				alert('error',
+					`No se pudo importar ningún estudiante. ${errCount} error(es) detectado(s). Ver abajo.`
+				);
 			} else {
 				alert('error', 'No se pudo procesar el Excel. Revisa el formato.');
 			}
