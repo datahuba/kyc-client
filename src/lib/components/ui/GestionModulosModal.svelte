@@ -250,6 +250,10 @@
 		const progreso = total > 0 ? Math.round((finalizados / total) * 100) : 0;
 		return { modulosFinalizados: finalizados, modulosEnCurso: enCurso, modulosPendientes: pendientes, modulosBloqueados: bloqueados, progreso };
 	}
+
+	// Resúmenes reactivos (Svelte 5 runes)
+	const resumenFinanciero = $derived(getResumenFinanciero());
+	const resumenAcademico = $derived(getResumenAcademico());
 </script>
 
 <Modal
@@ -280,33 +284,31 @@
 			</div>
 
 			<!-- ============ RESUMEN RÁPIDO: PROGRESO + FINANZAS ============ -->
-			{@const resumenAcad = getResumenAcademico()}
-			{@const resumenFin = getResumenFinanciero()}
 			<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
 				<!-- Progreso académico -->
 				<div class="bg-white dark:bg-dark-surface p-3 rounded-lg border border-gray-200 dark:border-dark-border">
 					<p class="text-xs text-gray-500 dark:text-gray-400 font-medium">Progreso</p>
-					<p class="text-2xl font-bold text-primary-600 dark:text-primary-400">{resumenAcad.progreso}%</p>
+					<p class="text-2xl font-bold text-primary-600 dark:text-primary-400">{resumenAcademico.progreso}%</p>
 					<p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
-						{resumenAcad.modulosFinalizados}/{enrollment.modulos.length} finalizados
+						{resumenAcademico.modulosFinalizados}/{enrollment.modulos.length} finalizados
 					</p>
 				</div>
 				<!-- Módulos en curso -->
 				<div class="bg-white dark:bg-dark-surface p-3 rounded-lg border border-gray-200 dark:border-dark-border">
 					<p class="text-xs text-gray-500 dark:text-gray-400 font-medium">En curso</p>
-					<p class="text-2xl font-bold text-amber-600 dark:text-amber-400">{resumenAcad.modulosEnCurso}</p>
+					<p class="text-2xl font-bold text-amber-600 dark:text-amber-400">{resumenAcademico.modulosEnCurso}</p>
 					<p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">módulos activos</p>
 				</div>
 				<!-- Pagado -->
 				<div class="bg-white dark:bg-dark-surface p-3 rounded-lg border border-gray-200 dark:border-dark-border">
 					<p class="text-xs text-gray-500 dark:text-gray-400 font-medium">Pagado</p>
-					<p class="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(resumenFin.totalPagado)}</p>
-					<p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">de {formatCurrency(resumenFin.totalCosto)}</p>
+					<p class="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(resumenFinanciero.totalPagado)}</p>
+					<p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">de {formatCurrency(resumenFinanciero.totalCosto)}</p>
 				</div>
 				<!-- Saldo pendiente -->
 				<div class="bg-white dark:bg-dark-surface p-3 rounded-lg border border-gray-200 dark:border-dark-border">
 					<p class="text-xs text-gray-500 dark:text-gray-400 font-medium">Saldo</p>
-					<p class="text-lg font-bold text-red-600 dark:text-red-400">{formatCurrency(resumenFin.totalSaldo)}</p>
+					<p class="text-lg font-bold text-red-600 dark:text-red-400">{formatCurrency(resumenFinanciero.totalSaldo)}</p>
 					<p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">por pagar</p>
 				</div>
 			</div>
