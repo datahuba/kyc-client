@@ -108,23 +108,19 @@ export const comunicadosService = {
 		if (limit) params.set('limit', String(limit));
 		if (soloMios) params.set('solo_mios', 'true');
 		const qs = params.toString();
-		const res = await apiKyC.get(`/comunicados${qs ? '?' + qs : ''}`);
-		return res.data;
+		return await apiKyC.get<ComunicadosListResponse>(`/comunicados${qs ? '?' + qs : ''}`);
 	},
 
 	async crear(data: ComunicadoCreateInput): Promise<ComunicadoResponse> {
-		const res = await apiKyC.post('/comunicados', data);
-		return res.data;
+		return await apiKyC.post<ComunicadoResponse>('/comunicados', data);
 	},
 
 	async obtener(id: string): Promise<ComunicadoResponse> {
-		const res = await apiKyC.get(`/comunicados/${id}`);
-		return res.data;
+		return await apiKyC.get<ComunicadoResponse>(`/comunicados/${id}`);
 	},
 
 	async editar(id: string, data: ComunicadoUpdateInput): Promise<ComunicadoResponse> {
-		const res = await apiKyC.patch(`/comunicados/${id}`, data);
-		return res.data;
+		return await apiKyC.patch<ComunicadoResponse>(`/comunicados/${id}`, data);
 	},
 
 	async eliminar(id: string): Promise<void> {
@@ -134,12 +130,10 @@ export const comunicadosService = {
 	// === Estudiante ===
 
 	async pendientes(): Promise<ComunicadosPendientes> {
-		const res = await apiKyC.get('/comunicados/pending/me');
-		return res.data;
+		return await apiKyC.get<ComunicadosPendientes>('/comunicados/pending/me');
 	},
 
 	async marcarVisto(id: string): Promise<{ ok: boolean; comunicado_id: string; visto_en: string }> {
-		const res = await apiKyC.post(`/comunicados/${id}/mark-as-seen`);
-		return res.data;
+		return await apiKyC.post(`/comunicados/${id}/mark-as-seen`);
 	},
 };
