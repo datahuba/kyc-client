@@ -65,13 +65,14 @@
 			// Cargar cursos y enrollments en paralelo
 			// NOTA: ambos endpoints devuelven PaginatedResponse<{data: T[], meta: ...}>
 			// así que extraemos .data para obtener el array.
-			// per_page grande para traer todos los enrollments activos de un saque.
+			// LIMITES del backend: enrollments per_page<=500, courses per_page<=100.
+			// Pedimos los topes para traer todos los registros en una sola llamada.
 			const [coursesResp, enrollmentsResp] = await Promise.all([
 				courseService
-					.getAll(1, 1000)
+					.getAll(1, 100)
 					.catch(() => ({ data: [], meta: { page: 1, limit: 0, totalItems: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false } })),
 				enrollmentService
-					.getAll(1, 1000, { estado: 'activo' })
+					.getAll(1, 500, { estado: 'activo' })
 					.catch(() => ({ data: [], meta: { page: 1, limit: 0, totalItems: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false } })),
 			]);
 			courses = (coursesResp as PaginatedResponse<Course>).data || [];
