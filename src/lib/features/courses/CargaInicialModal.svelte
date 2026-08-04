@@ -3,7 +3,13 @@
 	// para programas en_ejecucion o historicos. El admin/encargado pega los
 	// carnets de los estudiantes que ya estaban/estan en el programa y el
 	// sistema los inscribe con el flag es_carga_inicial=True.
+	//
+	// F-HISTORICO-AUTOSERVICIO-EXCEL (2026-08-04): agregada la opcion de subir
+	// un Excel con carnet + nombre + email + pagos. El sistema detecta si los
+	// estudiantes ya existen (por CI) y permite editar/agregar/eliminar filas
+	// antes de confirmar. Los estudiantes nuevos se crean en el mismo submit.
 	import { onMount } from 'svelte';
+	import * as XLSX from 'xlsx';
 	import Modal from '$lib/components/ui/modal.svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
@@ -11,7 +17,7 @@
 	import { apiKyC } from '$lib/config';
 	import { alert } from '$lib/utils';
 	import type { Course } from '$lib/interfaces';
-	import { UsersIcon, CheckIcon } from '$lib/icons/outline';
+	import { UsersIcon, CheckIcon, DocumentAddIcon, TrashIcon, PlusIcon } from '$lib/icons/outline';
 
 	interface Props {
 		isOpen: boolean;
@@ -22,16 +28,44 @@
 
 	let { isOpen, onClose, course, onSuccess }: Props = $props();
 
-	// Carnets pegados (uno por linea o separados por coma/espacio)
+	// Pestana activa: 'carnets' o 'excel'
+	let tabActiva: 'carnets' | 'excel' = $state('carnets');
+
+	// === MODO CARNETS (existente) ===
 	let carnetsText = $state('');
 	let moduloInicialIndex = $state<number | null>(null);
 	let matriculaPagada = $state(true);
 	let cargando = $state(false);
 
-	// Estudiantes resueltos (de carnet a {id, nombre, carnet})
 	let estudiantesResueltos = $state<{ id: string; nombre: string; carnet: string; encontrado: boolean }[]>([]);
 	let etapa = $state<'input' | 'preview' | 'result'>('input');
 	let resultado = $state<{ exitosos: number; ya_inscritos: number; fallidos: number; detalles: any[] } | null>(null);
+
+	// === MODO EXCEL (nuevo) ===
+
+	// Fila del Excel parseado: editable por el usuario
+	interface FilaEstudiante {
+		// Datos originales del Excel (pueden estar vacios)
+		carnet: string;
+		nombre: string;
+		email: string;
+		celular: string;
+		// Estado de la fila
+		estado: 'nuevo' | 'existe' | 'duplicado' | 'error';
+		// Si existe, ID del estudiante en la BD
+		estudiante_id?: string;
+		// Mensaje de error o info
+		mensaje?: string;
+		// Pagos del Excel (opcional, mostrados al usuario)
+		pagos: { modulo: string; monto: number }[];
+		total_pagado?: number;
+	}
+
+	let filasExcel = $state<FilaEstudiante[]>([]);
+	let excelFileName = $state('');
+	let parseandoExcel = $state(false);
+	let etapaExcel: 'subir' | 'preview' | 'procesando' | 'resultado' = $state('subir');
+	let resultadoExcel = $state<{ creados: number; inscritos: number; fallidos: number; detalles: any[] } | null>(null);
 
 	// Reset al abrir/cerrar
 	$effect(() => {
@@ -42,6 +76,12 @@
 			estudiantesResueltos = [];
 			etapa = 'input';
 			resultado = null;
+			tabActiva = 'carnets';
+			filasExcel = [];
+			excelFileName = '';
+			parseandoExcel = false;
+			etapaExcel = 'subir';
+			resultadoExcel = null;
 		}
 	});
 
@@ -51,6 +91,10 @@
 			.map((s) => s.trim())
 			.filter((s) => s.length > 0);
 	}
+
+	// ========================================================================
+	// MODO CARNETS (existente, sin cambios)
+	// ========================================================================
 
 	async function resolverCarnets() {
 		const carnets = parseCarnets(carnetsText);
@@ -65,8 +109,6 @@
 
 		cargando = true;
 		try {
-			// Buscar cada carnet (puede ser lento si son 200, pero OK)
-			// Optimizacion: si el backend permite busqueda multiple, usar eso
 			const promesas = carnets.map(async (carnet) => {
 				try {
 					const resp = await studentService.getAll(1, 5, { q: carnet });
@@ -127,6 +169,292 @@
 		}
 	}
 
+	// ========================================================================
+	// MODO EXCEL (nuevo)
+	// ========================================================================
+
+	/**
+	 * Detecta el nombre de una columna ignorando mayusculas, tildes y espacios extras.
+	 * Devuelve el valor de la primera columna que matchee, o '' si no hay match.
+	 */
+	function pickColumn(row: Record<string, any>, ...candidatos: string[]): string {
+		const keys = Object.keys(row);
+		for (const candidato of candidatos) {
+			const norm = candidato.toLowerCase().replace(/[\s_-]+/g, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+			const match = keys.find((k) => {
+				const kNorm = k.toLowerCase().replace(/[\s_-]+/g, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+				return kNorm === norm;
+			});
+			if (match && row[match] != null) {
+				return String(row[match]).trim();
+			}
+		}
+		return '';
+	}
+
+	/**
+	 * Parsea un numero que puede venir como string "294" o 294 o "294.0".
+	 */
+	function parseNumero(v: any): number {
+		if (v == null) return 0;
+		if (typeof v === 'number') return v;
+		const s = String(v).replace(/[^\d.-]/g, '');
+		const n = parseFloat(s);
+		return isNaN(n) ? 0 : n;
+	}
+
+	/**
+	 * Parsea un Excel cargado como File.
+	 * Detecta las columnas dinamicamente (carnet, nombre, email, celular, pagos).
+	 */
+	async function parsearExcel(file: File) {
+		parseandoExcel = true;
+		try {
+			const buffer = await file.arrayBuffer();
+			const workbook = XLSX.read(buffer, { type: 'array' });
+			const sheetName = workbook.SheetNames[0];
+			const sheet = workbook.Sheets[sheetName];
+			const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
+
+			if (rows.length === 0) {
+				alert('error', 'El Excel esta vacio o no tiene datos legibles');
+				return;
+			}
+
+			// Parsear cada fila
+			const filas: FilaEstudiante[] = [];
+			for (const row of rows) {
+				const carnet = pickColumn(row, 'ci', 'carnet', 'cedula', 'documento');
+				const nombre = pickColumn(row, 'nombre', 'nombrecompleto', 'alumno');
+				const email = pickColumn(row, 'email', 'correo', 'mail', 'direcciondecorreo');
+				const celular = pickColumn(row, 'celular', 'telefono', 'f', 'phone');
+
+				if (!carnet) {
+					filas.push({
+						carnet: '',
+						nombre,
+						email,
+						celular,
+						estado: 'error',
+						mensaje: 'Sin CI/carnet',
+						pagos: [],
+					});
+					continue;
+				}
+
+				// Detectar pagos por modulo (columnas que empiezan con "Pago Modulo" o "MODULO")
+				const pagos: { modulo: string; monto: number }[] = [];
+				for (const key of Object.keys(row)) {
+					const kLower = key.toLowerCase();
+					if ((kLower.startsWith('pago') && kLower.includes('modulo')) ||
+						(kLower.startsWith('modulo') && !kLower.includes('total'))) {
+						const monto = parseNumero(row[key]);
+						if (monto > 0) {
+							pagos.push({ modulo: key, monto });
+						}
+					}
+				}
+
+				filas.push({
+					carnet,
+					nombre,
+					email,
+					celular,
+					estado: 'nuevo', // se actualiza despues del lookup
+					pagos,
+					total_pagado: pagos.reduce((acc, p) => acc + p.monto, 0),
+				});
+			}
+
+			filasExcel = filas;
+			excelFileName = file.name;
+			etapaExcel = 'preview';
+			await verificarEstudiantesEnBD();
+		} catch (e: any) {
+			console.error('Error parseando Excel', e);
+			alert('error', `Error al parsear el Excel: ${e?.message || 'desconocido'}`);
+		} finally {
+			parseandoExcel = false;
+		}
+	}
+
+	/**
+	 * Verifica cada fila contra la BD: si el CI existe, marca como 'existe'.
+	 * Si hay duplicados dentro del mismo Excel, marca como 'duplicado'.
+	 */
+	async function verificarEstudiantesEnBD() {
+		// Detectar duplicados primero
+		const carnetCount = new Map<string, number>();
+		for (const fila of filasExcel) {
+			if (fila.carnet) {
+				carnetCount.set(fila.carnet, (carnetCount.get(fila.carnet) || 0) + 1);
+			}
+		}
+
+		// Marcar duplicados y consultar la BD para los unicos
+		const carnetsUnicos = new Set<string>();
+		for (const fila of filasExcel) {
+			if (!fila.carnet) continue;
+			if (carnetCount.get(fila.carnet)! > 1) {
+				fila.estado = 'duplicado';
+				fila.mensaje = `CI aparece ${carnetCount.get(fila.carnet)} veces en el Excel`;
+			} else {
+				carnetsUnicos.add(fila.carnet);
+			}
+		}
+
+		// Consultar la BD en paralelo (con rate limiting implicito)
+		const promesas = Array.from(carnetsUnicos).map(async (carnet) => {
+			try {
+				const resp = await studentService.getAll(1, 5, { q: carnet });
+				const match = resp.data.find((s: any) => s.carnet === carnet);
+				return { carnet, match: match || null };
+			} catch {
+				return { carnet, match: null };
+			}
+		});
+
+		const results = await Promise.all(promesas);
+		const map = new Map(results.map((r) => [r.carnet, r.match]));
+
+		for (const fila of filasExcel) {
+			if (fila.estado === 'duplicado' || !fila.carnet) continue;
+			const match = map.get(fila.carnet);
+			if (match) {
+				fila.estado = 'existe';
+				fila.estudiante_id = match._id;
+				fila.mensaje = `Ya existe: ${match.nombre || '(sin nombre)'}`;
+				// Completar datos faltantes con los del Excel
+				if (!fila.nombre && match.nombre) fila.nombre = match.nombre;
+				if (!fila.email && match.email) fila.email = match.email;
+				if (!fila.celular && match.celular) fila.celular = match.celular;
+			}
+			// Si no existe, ya esta marcado como 'nuevo' (default)
+		}
+	}
+
+	/**
+	 * Remueve una fila del Excel.
+	 */
+	function eliminarFila(index: number) {
+		filasExcel = filasExcel.filter((_, i) => i !== index);
+	}
+
+	/**
+	 * Agrega una fila vacia al Excel.
+	 */
+	function agregarFilaVacia() {
+		filasExcel = [
+			...filasExcel,
+			{
+				carnet: '',
+				nombre: '',
+				email: '',
+				celular: '',
+				estado: 'nuevo',
+				pagos: [],
+			},
+		];
+	}
+
+	/**
+	 * Confirma la carga: para cada fila nueva, crea el estudiante via API.
+	 * Para las existentes, solo las inscribe.
+	 */
+	async function confirmarCargaExcel() {
+		if (!course) return;
+		const filasValidas = filasExcel.filter((f) => f.carnet && f.estado !== 'duplicado' && f.estado !== 'error');
+		if (filasValidas.length === 0) {
+			alert('error', 'No hay estudiantes validos para cargar');
+			return;
+		}
+
+		cargando = true;
+		etapaExcel = 'procesando';
+		const detalles: any[] = [];
+		let creados = 0;
+		let inscritos = 0;
+		let fallidos = 0;
+
+		try {
+			// Paso 1: crear estudiantes nuevos
+			for (const fila of filasValidas.filter((f) => f.estado === 'nuevo')) {
+				try {
+					const nuevo = await crearEstudianteDesdeFila(fila);
+					fila.estudiante_id = nuevo._id;
+					fila.estado = 'existe'; // ahora existe
+					creados++;
+				} catch (e: any) {
+					fila.estado = 'error';
+					fila.mensaje = e?.response?.data?.detail || e?.message || 'Error creando';
+					fallidos++;
+				}
+			}
+
+			// Paso 2: inscribir a todos los que quedaron con ID
+			const idsParaInscribir = filasValidas
+				.filter((f) => f.estudiante_id)
+				.map((f) => f.estudiante_id!);
+			if (idsParaInscribir.length > 0) {
+				try {
+					const payload = {
+						estudiantes: idsParaInscribir.map((id) => ({
+							estudiante_id: id,
+							modulo_inicial_index: moduloInicialIndex !== null ? moduloInicialIndex : undefined,
+							matricula_pagada: matriculaPagada,
+						})),
+					};
+					const resp = await apiKyC.post<any>(`/courses/${course._id}/initial-enrollments`, payload);
+					inscritos = resp.exitosos || 0;
+					fallidos += resp.fallidos || 0;
+				} catch (e: any) {
+					console.error('Error en inscripcion batch', e);
+					fallidos += idsParaInscribir.length;
+				}
+			}
+
+			resultadoExcel = { creados, inscritos, fallidos, detalles };
+			etapaExcel = 'resultado';
+
+			if (inscritos > 0 || creados > 0) {
+				alert('success', `${creados} creado(s), ${inscritos} inscrito(s)`);
+				if (onSuccess) onSuccess();
+			}
+		} catch (e: any) {
+			console.error('Error en confirmacion Excel', e);
+			alert('error', e?.message || 'Error al procesar el Excel');
+		} finally {
+			cargando = false;
+		}
+	}
+
+	/**
+	 * Crea un estudiante en la BD con los datos minimos requeridos
+	 * (los del Excel + defaults para campos faltantes).
+	 */
+	async function crearEstudianteDesdeFila(fila: FilaEstudiante): Promise<any> {
+		// Campos requeridos por CreateStudentRequest:
+		// - registro, carnet, course_id, nombre, extension, fecha_nacimiento, celular, email, domicilio
+		const payload: any = {
+			registro: fila.carnet, // usar CI como registro
+			carnet: fila.carnet,
+			complemento_carnet: '',
+			course_id: course!._id,
+			nombre: fila.nombre || `Sin nombre (${fila.carnet})`,
+			extension: '',
+			fecha_nacimiento: '1990-01-01', // default razonable
+			celular: fila.celular || '',
+			email: fila.email || `${fila.carnet}@sin-email.local`,
+			domicilio: 'Sin registrar',
+			activo: true,
+		};
+		return await studentService.create(payload);
+	}
+
+	// ========================================================================
+	// COMMON
+	// ========================================================================
+
 	function cerrar() {
 		onClose();
 	}
@@ -136,6 +464,13 @@
 	let noEncontradosCount = $derived(estudiantesResueltos.filter((e) => !e.encontrado).length);
 	let esEnEjecucion = $derived(course?.estado_calculado === 'en_ejecucion');
 	let modulosDelCurso = $derived((course as any)?.modulos || []);
+
+	// Conteos para el modo Excel
+	let excelNuevos = $derived(filasExcel.filter((f) => f.estado === 'nuevo').length);
+	let excelExisten = $derived(filasExcel.filter((f) => f.estado === 'existe').length);
+	let excelDuplicados = $derived(filasExcel.filter((f) => f.estado === 'duplicado').length);
+	let excelErrores = $derived(filasExcel.filter((f) => f.estado === 'error').length);
+	let excelValidos = $derived(filasExcel.filter((f) => f.estado === 'nuevo' || f.estado === 'existe').length);
 </script>
 
 <Modal {isOpen} onClose={cerrar} title="Carga Inicial de Estudiantes" size="lg">
@@ -163,8 +498,36 @@
 				</div>
 			</div>
 
-			{#if etapa === 'input'}
-				<!-- Etapa 1: ingreso de carnets -->
+			<!-- TABS: Carnets | Excel -->
+			{#if etapa === 'input' && etapaExcel === 'subir'}
+				<div class="border-b border-gray-200 dark:border-gray-700">
+					<div class="flex gap-1">
+						<button
+							type="button"
+							class="px-4 py-2 text-sm font-medium border-b-2 transition-colors
+								{tabActiva === 'carnets'
+									? 'border-primary-600 text-primary-700 dark:text-primary-400'
+									: 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
+							onclick={() => (tabActiva = 'carnets')}
+						>
+							📋 Pegar carnets
+						</button>
+						<button
+							type="button"
+							class="px-4 py-2 text-sm font-medium border-b-2 transition-colors
+								{tabActiva === 'excel'
+									? 'border-primary-600 text-primary-700 dark:text-primary-400'
+									: 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
+							onclick={() => (tabActiva = 'excel')}
+						>
+							📊 Subir Excel
+						</button>
+					</div>
+				</div>
+			{/if}
+
+			<!-- ============== MODO CARNETS ============== -->
+			{#if tabActiva === 'carnets' && etapa === 'input'}
 				<div class="space-y-3">
 					<div>
 						<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -218,14 +581,239 @@
 				<div class="flex justify-end gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
 					<Button type="button" variant="secondary" onclick={cerrar}>Cancelar</Button>
 					<Button type="button" loading={cargando} disabled={totalCarnets === 0} onclick={resolverCarnets}>
-						{#snippet leftIcon()}
-							<UsersIcon class="size-4" />
-						{/snippet}
+						<UsersIcon class="size-4" />
 						Buscar estudiantes
 					</Button>
 				</div>
-			{:else if etapa === 'preview'}
-				<!-- Etapa 2: preview de estudiantes encontrados -->
+
+			<!-- ============== MODO EXCEL: SUBIR ============== -->
+			{:else if tabActiva === 'excel' && etapaExcel === 'subir'}
+				<div class="space-y-3">
+					<div class="rounded-md border-2 border-dashed border-gray-300 p-6 text-center dark:border-gray-600">
+						<DocumentAddIcon class="mx-auto size-8 text-gray-400" />
+						<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+							Subi un Excel (.xlsx) con los estudiantes. Columnas esperadas:
+						</p>
+						<p class="mt-1 text-xs text-gray-500 dark:text-gray-500">
+							<strong>CI</strong> (obligatorio), <strong>Nombre</strong>, <strong>Email</strong>, <strong>Celular</strong>, <strong>Pago Modulo 1</strong>, ...
+						</p>
+						<p class="mt-1 text-xs text-gray-500 dark:text-gray-500">
+							El sistema detecta automaticamente las columnas aunque tengan nombres distintos (carnet/cedula/documento, telefono/f, etc.)
+						</p>
+						<label class="mt-4 inline-block cursor-pointer rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700">
+							Seleccionar archivo
+							<input
+								type="file"
+								accept=".xlsx,.xls"
+								class="hidden"
+								onchange={(e) => {
+									const file = (e.target as HTMLInputElement).files?.[0];
+									if (file) parsearExcel(file);
+								}}
+							/>
+						</label>
+					</div>
+				</div>
+
+			<!-- ============== MODO EXCEL: PREVIEW ============== -->
+			{:else if tabActiva === 'excel' && etapaExcel === 'preview'}
+				<div class="space-y-3">
+					<div class="flex items-center justify-between">
+						<p class="text-xs text-gray-600 dark:text-gray-400">
+							<strong>{excelFileName}</strong> - {filasExcel.length} filas detectadas
+						</p>
+						<button
+							type="button"
+							class="text-xs text-primary-600 hover:underline"
+							onclick={() => {
+								etapaExcel = 'subir';
+								filasExcel = [];
+								excelFileName = '';
+							}}
+						>
+							← Subir otro archivo
+						</button>
+					</div>
+
+					<div class="grid grid-cols-4 gap-2 text-center">
+						<div class="rounded-md bg-green-50 p-2 dark:bg-green-900/20">
+							<div class="text-2xl font-bold text-green-700 dark:text-green-300">{excelExisten}</div>
+							<div class="text-xs text-green-600 dark:text-green-400">Ya existen</div>
+						</div>
+						<div class="rounded-md bg-blue-50 p-2 dark:bg-blue-900/20">
+							<div class="text-2xl font-bold text-blue-700 dark:text-blue-300">{excelNuevos}</div>
+							<div class="text-xs text-blue-600 dark:text-blue-400">Nuevos</div>
+						</div>
+						<div class="rounded-md bg-amber-50 p-2 dark:bg-amber-900/20">
+							<div class="text-2xl font-bold text-amber-700 dark:text-amber-300">{excelDuplicados}</div>
+							<div class="text-xs text-amber-600 dark:text-amber-400">Duplicados</div>
+						</div>
+						<div class="rounded-md bg-red-50 p-2 dark:bg-red-900/20">
+							<div class="text-2xl font-bold text-red-700 dark:text-red-300">{excelErrores}</div>
+							<div class="text-xs text-red-600 dark:text-red-400">Errores</div>
+						</div>
+					</div>
+
+					<div class="max-h-72 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700">
+						<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+							<thead class="bg-gray-50 dark:bg-gray-900 sticky top-0">
+								<tr>
+									<th class="px-2 py-1.5 text-left text-xs font-medium text-gray-500">CI</th>
+									<th class="px-2 py-1.5 text-left text-xs font-medium text-gray-500">Nombre</th>
+									<th class="px-2 py-1.5 text-left text-xs font-medium text-gray-500">Email</th>
+									<th class="px-2 py-1.5 text-left text-xs font-medium text-gray-500">Celular</th>
+									<th class="px-2 py-1.5 text-left text-xs font-medium text-gray-500">Pagos</th>
+									<th class="px-2 py-1.5 text-center text-xs font-medium text-gray-500">Estado</th>
+									<th class="px-2 py-1.5 text-center text-xs font-medium text-gray-500"></th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+								{#each filasExcel as fila, i (i)}
+									<tr
+										class="{fila.estado === 'duplicado' ? 'bg-amber-50 dark:bg-amber-900/10' : ''} {fila.estado === 'error' ? 'bg-red-50 dark:bg-red-900/10' : ''}"
+									>
+										<td class="px-2 py-1 text-xs font-mono">
+											<input
+												type="text"
+												bind:value={fila.carnet}
+												class="w-24 bg-transparent text-xs font-mono focus:outline-none focus:bg-white focus:dark:bg-gray-800 rounded px-1"
+											/>
+										</td>
+										<td class="px-2 py-1 text-xs">
+											<input
+												type="text"
+												bind:value={fila.nombre}
+												class="w-full bg-transparent text-xs focus:outline-none focus:bg-white focus:dark:bg-gray-800 rounded px-1"
+											/>
+										</td>
+										<td class="px-2 py-1 text-xs">
+											<input
+												type="email"
+												bind:value={fila.email}
+												class="w-32 bg-transparent text-xs focus:outline-none focus:bg-white focus:dark:bg-gray-800 rounded px-1"
+											/>
+										</td>
+										<td class="px-2 py-1 text-xs">
+											<input
+												type="text"
+												bind:value={fila.celular}
+												class="w-20 bg-transparent text-xs focus:outline-none focus:bg-white focus:dark:bg-gray-800 rounded px-1"
+											/>
+										</td>
+										<td class="px-2 py-1 text-xs">
+											{#if fila.total_pagado && fila.total_pagado > 0}
+												<span class="font-mono">Bs {fila.total_pagado.toFixed(2)}</span>
+												<span class="text-gray-400"> ({fila.pagos.length} pagos)</span>
+											{:else}
+												<span class="text-gray-400">-</span>
+											{/if}
+										</td>
+										<td class="px-2 py-1 text-center">
+											{#if fila.estado === 'existe'}
+												<span class="inline-flex items-center rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-800">
+													EXISTE
+												</span>
+											{:else if fila.estado === 'nuevo'}
+												<span class="inline-flex items-center rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800">
+													NUEVO
+												</span>
+											{:else if fila.estado === 'duplicado'}
+												<span class="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+													DUPLICADO
+												</span>
+											{:else}
+												<span class="inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-800" title={fila.mensaje}>
+													ERROR
+												</span>
+											{/if}
+										</td>
+										<td class="px-2 py-1 text-center">
+											<button
+												type="button"
+												class="text-red-500 hover:text-red-700"
+												onclick={() => eliminarFila(i)}
+												title="Eliminar fila"
+											>
+												<TrashIcon class="size-4" />
+											</button>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+
+					<div class="flex items-center justify-between">
+						<button
+							type="button"
+							class="text-xs text-primary-600 hover:underline flex items-center gap-1"
+							onclick={agregarFilaVacia}
+						>
+							<PlusIcon class="size-3" /> Agregar fila manual
+						</button>
+						<p class="text-xs text-gray-500">
+							{excelValidos} estudiante{excelValidos === 1 ? '' : 's'} a inscribir
+						</p>
+					</div>
+
+					<label class="flex items-center gap-2">
+						<input
+							type="checkbox"
+							bind:checked={matriculaPagada}
+							class="rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:border-gray-600 dark:bg-gray-700"
+						/>
+						<span class="text-sm text-gray-700 dark:text-gray-300">
+							Marcar matricula como pagada
+						</span>
+					</label>
+				</div>
+
+				<div class="flex justify-end gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+					<Button type="button" variant="secondary" onclick={cerrar}>Cancelar</Button>
+					<Button
+						type="button"
+						loading={cargando}
+						disabled={excelValidos === 0}
+						onclick={confirmarCargaExcel}
+					>
+						<CheckIcon class="size-4" />
+						Crear {excelNuevos > 0 ? excelNuevos + ' + ' : ''}e inscribir {excelValidos} estudiante{excelValidos === 1 ? '' : 's'}
+					</Button>
+				</div>
+
+			<!-- ============== MODO EXCEL: PROCESANDO ============== -->
+			{:else if tabActiva === 'excel' && etapaExcel === 'procesando'}
+				<div class="py-8 text-center">
+					<div class="mx-auto size-12 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600"></div>
+					<p class="mt-4 text-sm text-gray-600 dark:text-gray-400">
+						Procesando {filasExcel.length} estudiantes...
+					</p>
+				</div>
+
+			<!-- ============== MODO EXCEL: RESULTADO ============== -->
+			{:else if tabActiva === 'excel' && etapaExcel === 'resultado' && resultadoExcel}
+				<div class="space-y-4 py-4">
+					<div class="grid grid-cols-3 gap-3 text-center">
+						<div class="rounded-md bg-blue-50 p-3 dark:bg-blue-900/20">
+							<div class="text-3xl font-bold text-blue-700 dark:text-blue-300">{resultadoExcel.creados}</div>
+							<div class="text-xs text-blue-600 dark:text-blue-400">Creados</div>
+						</div>
+						<div class="rounded-md bg-green-50 p-3 dark:bg-green-900/20">
+							<div class="text-3xl font-bold text-green-700 dark:text-green-300">{resultadoExcel.inscritos}</div>
+							<div class="text-xs text-green-600 dark:text-green-400">Inscritos</div>
+						</div>
+						<div class="rounded-md bg-red-50 p-3 dark:bg-red-900/20">
+							<div class="text-3xl font-bold text-red-700 dark:text-red-300">{resultadoExcel.fallidos}</div>
+							<div class="text-xs text-red-600 dark:text-red-400">Fallidos</div>
+						</div>
+					</div>
+				</div>
+				<div class="flex justify-end gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+					<Button type="button" variant="primary" onclick={cerrar}>Cerrar</Button>
+				</div>
+
+			<!-- ============== MODO CARNETS: PREVIEW (existente) ============== -->
+			{:else if tabActiva === 'carnets' && etapa === 'preview'}
 				<div class="space-y-3">
 					<div class="grid grid-cols-3 gap-2 text-center">
 						<div class="rounded-md bg-green-50 p-2 dark:bg-green-900/20">
@@ -289,44 +877,31 @@
 						disabled={encontradosCount === 0}
 						onclick={confirmarCarga}
 					>
-						{#snippet leftIcon()}
-							<CheckIcon class="size-4" />
-						{/snippet}
-						Cargar {encontradosCount} estudiante{encontradosCount === 1 ? '' : 's'}
+						<CheckIcon class="size-4" />
+						Inscribir {encontradosCount} estudiante{encontradosCount === 1 ? '' : 's'}
 					</Button>
 				</div>
-			{:else if etapa === 'result' && resultado}
-				<!-- Etapa 3: resultado -->
-				<div class="space-y-3">
-					<div class="grid grid-cols-3 gap-2 text-center">
+
+			<!-- ============== MODO CARNETS: RESULT (existente) ============== -->
+			{:else if tabActiva === 'carnets' && etapa === 'result' && resultado}
+				<div class="space-y-4 py-4">
+					<div class="grid grid-cols-3 gap-3 text-center">
 						<div class="rounded-md bg-green-50 p-3 dark:bg-green-900/20">
-							<div class="text-2xl font-bold text-green-700 dark:text-green-300">{resultado.exitosos}</div>
-							<div class="text-xs text-green-600 dark:text-green-400">Inscritos</div>
+							<div class="text-3xl font-bold text-green-700 dark:text-green-300">{resultado.exitosos}</div>
+							<div class="text-xs text-green-600 dark:text-green-400">Exitosos</div>
 						</div>
 						<div class="rounded-md bg-amber-50 p-3 dark:bg-amber-900/20">
-							<div class="text-2xl font-bold text-amber-700 dark:text-amber-300">{resultado.ya_inscritos}</div>
+							<div class="text-3xl font-bold text-amber-700 dark:text-amber-300">{resultado.ya_inscritos}</div>
 							<div class="text-xs text-amber-600 dark:text-amber-400">Ya inscritos</div>
 						</div>
 						<div class="rounded-md bg-red-50 p-3 dark:bg-red-900/20">
-							<div class="text-2xl font-bold text-red-700 dark:text-red-300">{resultado.fallidos}</div>
+							<div class="text-3xl font-bold text-red-700 dark:text-red-300">{resultado.fallidos}</div>
 							<div class="text-xs text-red-600 dark:text-red-400">Fallidos</div>
 						</div>
 					</div>
-
-					{#if resultado.fallidos > 0}
-						<div class="max-h-40 overflow-y-auto rounded-md border border-red-200 bg-red-50 p-2 dark:border-red-800 dark:bg-red-900/20">
-							<p class="text-xs font-semibold text-red-800 dark:text-red-200">Errores:</p>
-							<ul class="mt-1 space-y-0.5 text-xs text-red-700 dark:text-red-300">
-								{#each resultado.detalles.filter((d: any) => !d.success && d.message !== 'Ya esta inscrito en este curso') as d}
-									<li>• {d.estudiante_id}: {d.message}</li>
-								{/each}
-							</ul>
-						</div>
-					{/if}
 				</div>
-
 				<div class="flex justify-end gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
-					<Button type="button" onclick={cerrar}>Cerrar</Button>
+					<Button type="button" variant="primary" onclick={cerrar}>Cerrar</Button>
 				</div>
 			{/if}
 		</div>
