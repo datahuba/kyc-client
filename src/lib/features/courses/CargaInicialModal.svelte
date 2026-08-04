@@ -174,21 +174,56 @@
 	// ========================================================================
 
 	/**
-	 * Detecta el nombre de una columna ignorando mayusculas, tildes y espacios extras.
-	 * Devuelve el valor de la primera columna que matchee, o '' si no hay match.
+	 * Normaliza un string para comparacion flexible de nombres de columna:
+	 * lowercase, sin acentos, sin espacios/underscores/guiones/parentesis/signos.
+	 * Sirve para que "Nombre(s) y Apellido(s)" matchee con "nombre" o "nombresyapellidos".
+	 */
+	function normColName(s: string): string {
+		return s
+			.toLowerCase()
+			.normalize('NFD')
+			.replace(/[\u0300-\u036f]/g, '') // quitar diacriticos
+			.replace(/[^a-z0-9]/g, ''); // quitar TODO lo no alfanumerico
+	}
+
+	/**
+	 * Detecta el nombre de una columna. Estrategia:
+	 * 1. Match EXACTO (normalizado) - el mas confiable.
+	 * 2. Match por substring SOLO en una direccion: si el nombre de la columna
+	 *    INCLUYE al candidato (kNorm.includes(norm)), nunca al reves.
+	 *    Esto evita que "carnet" (norm) matchee con "N" (kNorm) porque
+	 *    "carnet".includes("n") = true.
+	 * 3. Solo aplica substring si ambos (norm y kNorm) tienen >= 4 chars
+	 *    normalizados.
+	 *
+	 * Si la columna no se detecta, devuelve ''.
 	 */
 	function pickColumn(row: Record<string, any>, ...candidatos: string[]): string {
 		const keys = Object.keys(row);
+		const normKeys = new Map(keys.map((k) => [k, normColName(k)]));
+
+		// Fase 1: match exacto (mas confiable)
 		for (const candidato of candidatos) {
-			const norm = candidato.toLowerCase().replace(/[\s_-]+/g, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-			const match = keys.find((k) => {
-				const kNorm = k.toLowerCase().replace(/[\s_-]+/g, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-				return kNorm === norm;
-			});
-			if (match && row[match] != null) {
-				return String(row[match]).trim();
+			const norm = normColName(candidato);
+			for (const [key, kNorm] of normKeys.entries()) {
+				if (kNorm === norm && row[key] != null && String(row[key]).trim() !== '') {
+					return String(row[key]).trim();
+				}
 			}
 		}
+
+		// Fase 2: substring match (kNorm incluye a norm) - solo si ambos >= 4
+		for (const candidato of candidatos) {
+			const norm = normColName(candidato);
+			if (norm.length < 4) continue;
+			for (const [key, kNorm] of normKeys.entries()) {
+				if (kNorm.length < 4) continue; // evitar match con headers cortos tipo "N", "f", etc.
+				if (kNorm.includes(norm) && row[key] != null && String(row[key]).trim() !== '') {
+					return String(row[key]).trim();
+				}
+			}
+		}
+
 		return '';
 	}
 
@@ -224,10 +259,44 @@
 			// Parsear cada fila
 			const filas: FilaEstudiante[] = [];
 			for (const row of rows) {
-				const carnet = pickColumn(row, 'ci', 'carnet', 'cedula', 'documento');
-				const nombre = pickColumn(row, 'nombre', 'nombrecompleto', 'alumno');
-				const email = pickColumn(row, 'email', 'correo', 'mail', 'direcciondecorreo');
-				const celular = pickColumn(row, 'celular', 'telefono', 'f', 'phone');
+				const carnet = pickColumn(
+					row,
+					'ci',
+					'cisinextension',
+					'carnet',
+					'cedula',
+					'documento',
+					'identidad',
+					'documentoidentidad'
+				);
+				const nombre = pickColumn(
+					row,
+					'nombresyapellidos',
+					'nombrecompleto',
+					'nombreyapellido',
+					'nombre',
+					'alumno',
+					'estudiante',
+					'fullname'
+				);
+				const email = pickColumn(
+					row,
+					'direcciondecorreoelectronico',
+					'direcciondecorreo',
+					'correoelectronico',
+					'email',
+					'correo',
+					'mail'
+				);
+				const celular = pickColumn(
+					row,
+					'celular',
+					'telefono',
+					'phone',
+					'movil',
+					'f',
+					'ndetelefonocelular'
+				);
 
 				if (!carnet) {
 					filas.push({
@@ -245,9 +314,9 @@
 				// Detectar pagos por modulo (columnas que empiezan con "Pago Modulo" o "MODULO")
 				const pagos: { modulo: string; monto: number }[] = [];
 				for (const key of Object.keys(row)) {
-					const kLower = key.toLowerCase();
-					if ((kLower.startsWith('pago') && kLower.includes('modulo')) ||
-						(kLower.startsWith('modulo') && !kLower.includes('total'))) {
+					const kNorm = normColName(key);
+					if ((kNorm.startsWith('pago') && kNorm.includes('modulo')) ||
+						(kNorm.startsWith('modulo') && !kNorm.includes('total'))) {
 						const monto = parseNumero(row[key]);
 						if (monto > 0) {
 							pagos.push({ modulo: key, monto });
