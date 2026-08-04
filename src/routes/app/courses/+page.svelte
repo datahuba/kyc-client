@@ -10,6 +10,7 @@
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
 	import ComunicadoModal from '$lib/features/courses/ComunicadoModal.svelte';
+	import CargaInicialModal from '$lib/features/courses/CargaInicialModal.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
@@ -103,6 +104,16 @@
 		comunicadoCourseId = course._id;
 		comunicadoPrograma = course.nombre_programa;
 		comunicadoOpen = true;
+		openDropdownId = null;
+	}
+
+	// F-US-006-3TIPOS-3A-FE (2026-08-04): modal de carga inicial de
+	// estudiantes para programas en_ejecucion o historicos.
+	let cargaInicialOpen = $state(false);
+	let cargaInicialCourse: Course | null = $state(null);
+	function openCargaInicial(course: Course) {
+		cargaInicialCourse = course;
+		cargaInicialOpen = true;
 		openDropdownId = null;
 	}
 
@@ -275,6 +286,21 @@
 				id: 'comunicado',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>`,
 				action: () => openComunicado(course)
+			});
+		}
+
+		// F-US-006-3TIPOS-3A-FE: opcion para carga inicial de estudiantes.
+		// Solo aparece si el curso esta en_ejecucion o historico (los
+		// programados usan el flujo normal de inscripcion). El admin o
+		// encargado carga los carnets de los estudiantes que ya estaban
+		// en el programa.
+		const estadoCalc = (course as any).estado_calculado || (course as any).estado;
+		if (canEditCourse && (estadoCalc === 'en_ejecucion' || estadoCalc === 'cerrado' || (course as any).es_historico)) {
+			options.push({
+				label: 'Carga Inicial de Estudiantes',
+				id: 'carga-inicial',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>`,
+				action: () => openCargaInicial(course)
 			});
 		}
 
@@ -591,6 +617,15 @@
 		courseId={comunicadoCourseId}
 		programa={comunicadoPrograma}
 		onClose={() => (comunicadoOpen = false)}
+	/>
+
+	<!-- F-US-006-3TIPOS-3A-FE: carga inicial de estudiantes para
+	     programas en_ejecucion o historicos -->
+	<CargaInicialModal
+		isOpen={cargaInicialOpen}
+		course={cargaInicialCourse}
+		onClose={() => (cargaInicialOpen = false)}
+		onSuccess={() => loadCourses()}
 	/>
 
 	<!-- Course Students Modal -->
