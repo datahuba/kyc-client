@@ -189,7 +189,7 @@
 <div class="space-y-5 p-2 max-h-[70vh] overflow-y-auto">
 	<!-- Header con botón de volver -->
 	<div class="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-		<Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
+		<Button variant="ghost" size="sm" onclick={onCancel} disabled={saving}>
 			<ChevronLeftIcon class="w-4 h-4 mr-1" />
 			Cambiar tipo
 		</Button>
@@ -375,10 +375,10 @@
 
 	<!-- Botones -->
 	<div class="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
-		<Button variant="ghost" onClick={onCancel} disabled={saving}>
+		<Button variant="ghost" onclick={onCancel} disabled={saving}>
 			Cancelar
 		</Button>
-		<Button variant="primary" onClick={handleSubmit} disabled={saving}>
+		<Button variant="primary" onclick={handleSubmit} disabled={saving}>
 			{#if saving}
 				Creando...
 			{:else}
