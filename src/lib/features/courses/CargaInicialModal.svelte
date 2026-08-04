@@ -239,6 +239,27 @@
 	}
 
 	/**
+	 * Limpia un email que puede venir con multiples valores separados por
+	 * espacio, coma, punto-y-coma o barra. Toma el primer valor valido.
+	 * "padillaalberto2026@gmail.com  otro@gmail.com" → "padillaalberto2026@gmail.com"
+	 * Si no hay ninguno valido, devuelve ''.
+	 */
+	function cleanEmail(raw: string): string {
+		if (!raw) return '';
+		const parts = String(raw)
+			.split(/[\s,;|/]+/)
+			.map((p) => p.trim())
+			.filter((p) => p.length > 0);
+		for (const p of parts) {
+			// validacion basica: tiene @ y un punto despues
+			if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p)) {
+				return p;
+			}
+		}
+		return '';
+	}
+
+	/**
 	 * Parsea un Excel cargado como File.
 	 * Detecta las columnas dinamicamente (carnet, nombre, email, celular, pagos).
 	 */
@@ -462,16 +483,37 @@
 
 			// Paso 2: inscribir a todos los que quedaron con ID
 			const idsParaInscribir = filasValidas
-				.filter((f) => f.estudiante_id)
-				.map((f) => f.estudiante_id!);
+				.filter((f) => f.estudiante_id);
 			if (idsParaInscribir.length > 0) {
 				try {
 					const payload = {
-						estudiantes: idsParaInscribir.map((id) => ({
-							estudiante_id: id,
-							modulo_inicial_index: moduloInicialIndex !== null ? moduloInicialIndex : undefined,
-							matricula_pagada: matriculaPagada,
-						})),
+						estudiantes: idsParaInscribir.map((f) => {
+							// Mapear pagos del Excel a indices de modulo del curso.
+							// El Excel tiene columnas "Pago Módulo1" ... "Pago Módulo5"
+							// y el curso tiene modulos[0..N-1]. Asumimos que el orden
+							// de las columnas Pago MóduloN corresponde al modulo N-1
+							// del curso (1-indexed en Excel, 0-indexed en array).
+							const pagosModulos: Record<string, number> = {};
+							const modulosCurso: any[] = (course as any)?.modulos || [];
+							for (const pago of f.pagos || []) {
+								// Detectar el numero de modulo en el nombre original
+								// "Pago M\u00f3dulo1" o "Pago Modulo1" o "MODULO 1"
+								const m = String(pago.modulo).match(/(\d+)\s*$/);
+								if (m) {
+									const excelIdx = parseInt(m[1], 10); // 1-based
+									const cursoIdx = excelIdx - 1; // 0-based
+									if (cursoIdx >= 0 && cursoIdx < modulosCurso.length) {
+										pagosModulos[String(cursoIdx)] = pago.monto;
+									}
+								}
+							}
+							return {
+								estudiante_id: f.estudiante_id,
+								modulo_inicial_index: moduloInicialIndex !== null ? moduloInicialIndex : undefined,
+								matricula_pagada: matriculaPagada,
+								pagos_modulos: Object.keys(pagosModulos).length > 0 ? pagosModulos : undefined,
+							};
+						}),
 					};
 					const resp = await apiKyC.post<any>(`/courses/${course._id}/initial-enrollments`, payload);
 					inscritos = resp.exitosos || 0;
@@ -504,6 +546,7 @@
 	async function crearEstudianteDesdeFila(fila: FilaEstudiante): Promise<any> {
 		// Campos requeridos por CreateStudentRequest:
 		// - registro, carnet, course_id, nombre, extension, fecha_nacimiento, celular, email, domicilio
+		const emailLimpio = cleanEmail(fila.email) || `${fila.carnet}@sin-email.local`;
 		const payload: any = {
 			registro: fila.carnet, // usar CI como registro
 			carnet: fila.carnet,
@@ -513,7 +556,7 @@
 			extension: '',
 			fecha_nacimiento: '1990-01-01', // default razonable
 			celular: fila.celular || '',
-			email: fila.email || `${fila.carnet}@sin-email.local`,
+			email: emailLimpio,
 			domicilio: 'Sin registrar',
 			activo: true,
 		};
