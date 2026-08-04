@@ -408,66 +408,9 @@
 		     que faltaba (reunión 2026-07-29): la CxC real (a la fecha) solo suma
 		     los módulos que ya están en curso. La diferencia entre el estimado y
 		     el real se devenga recién cuando Sandra/Rocío inicia un módulo. -->
-		{#if cxcResumen && (verResumenEconomico || (currentRole === 'cobranza') || (currentRole === 'cpd'))}
-			<div class="mt-4">
-				<div class="flex items-center justify-between mb-3">
-					<h2 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-						<ChartBarIcon class="size-5 sm:size-6 text-primary-600 dark:text-primary-400" />
-						Cuentas por Cobrar
-					</h2>
-					<a href="/app/reports/cuentas-por-cobrar" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">
-						Ver reporte completo →
-					</a>
-				</div>
-
-				<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-					<!-- CxC a la Fecha (real) -->
-					<a href="/app/reports/cuentas-por-cobrar" class="block">
-						<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-5 hover:scale-[1.02] transition-transform hover:shadow-lg min-w-0">
-							<p class="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
-								CxC a la Fecha (real)
-							</p>
-							<p class="text-xl sm:text-2xl font-bold text-primary-700 dark:text-primary-300 mt-1 truncate tabular-nums" title={formatCurrency(cxcResumen.total_a_la_fecha)}>
-								{formatCurrency(cxcResumen.total_a_la_fecha)}
-							</p>
-							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">
-								{cxcResumen.total_modulos_iniciados} módulo{cxcResumen.total_modulos_iniciados === 1 ? '' : 's'} en curso
-							</p>
-						</div>
-					</a>
-
-					<!-- CxC Estimada (total) -->
-					<a href="/app/reports/cuentas-por-cobrar" class="block">
-						<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-5 hover:scale-[1.02] transition-transform hover:shadow-lg min-w-0">
-							<p class="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
-								CxC Estimada (total)
-							</p>
-							<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate tabular-nums" title={formatCurrency(cxcResumen.total_estimado)}>
-								{formatCurrency(cxcResumen.total_estimado)}
-							</p>
-							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">
-								{cxcResumen.cantidad_enrollments} inscripciones
-							</p>
-						</div>
-					</a>
-
-					<!-- Por devengar (futuro) -->
-					<a href="/app/reports/cuentas-por-cobrar" class="block">
-						<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-5 hover:scale-[1.02] transition-transform hover:shadow-lg min-w-0">
-							<p class="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
-								Por Devengar (futuro)
-							</p>
-							<p class="text-xl sm:text-2xl font-bold text-light-warning dark:text-dark-warning mt-1 truncate tabular-nums" title={formatCurrency(cxcResumen.diferencia)}>
-								{formatCurrency(cxcResumen.diferencia)}
-							</p>
-							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">
-								{cxcResumen.total_modulos_no_iniciados} módulo{cxcResumen.total_modulos_no_iniciados === 1 ? '' : 's'} sin iniciar
-							</p>
-						</div>
-					</a>
-				</div>
-			</div>
-		{/if}
+		<!-- US-004 v5 (2026-08-04): sección de Cuentas por Cobrar ELIMINADA del
+		     dashboard por orden de Kevin. Sigue disponible en /app/reports/cuentas-por-cobrar
+		     (el modal completo con desglose por programa). -->
 
 		<!-- F-COBRANZA-041 (2026-07-22): KPI de inscritos movido de /app/enrollments al Dashboard.
 		     Visible para roles administrativos. Refleja el endpoint /enrollments/stats/resumen. -->
