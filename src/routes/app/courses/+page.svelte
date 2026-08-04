@@ -14,6 +14,7 @@
 	import AgregarEstudianteModal from '$lib/features/courses/AgregarEstudianteModal.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
+	import CourseWizard from '$lib/features/courses/CourseWizard.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import { exportToExcel } from '$lib/utils/excelExport';
 	import SearchInput from '$lib/components/ui/searchInput.svelte';
@@ -43,6 +44,7 @@
 
 	// Modal state
 	let isFormOpen = $state(false);
+	let isWizardOpen = $state(false); // F-HISTORICO-AUTOSERVICIO: wizard nuevo
 	let selectedCourse: Course | null = $state(null);
 	let showDeleteModal = $state(false);
 	let courseToDelete: Course | null = $state(null);
@@ -210,8 +212,9 @@
 	);
 
 	function handleCreate() {
-		selectedCourse = null;
-		isFormOpen = true;
+		// F-HISTORICO-AUTOSERVICIO (2026-08-04): ahora abre el wizard de 3 tipos
+		// en vez del CourseForm monolítico. El usuario elige el tipo primero.
+		isWizardOpen = true;
 	}
 
 	function handleEdit(course: Course) {
@@ -611,7 +614,7 @@
 		</div>
 	{/if}
 
-	<!-- Create/Edit Modal -->
+	<!-- Create/Edit Modal (legacy: usado para editar) -->
 	<Modal
 		isOpen={isFormOpen}
 		title={selectedCourse ? 'Editar Programa' : 'Nuevo Programa'}
@@ -624,6 +627,13 @@
 			onCancel={() => isFormOpen = false}
 		/>
 	</Modal>
+
+	<!-- F-HISTORICO-AUTOSERVICIO (2026-08-04): wizard de creación con 3 tipos -->
+	<CourseWizard
+		isOpen={isWizardOpen}
+		onClose={() => isWizardOpen = false}
+		onSuccess={handleFormSuccess}
+	/>
 
 	<ModalConfirm
 		isOpen={showDeleteModal}
