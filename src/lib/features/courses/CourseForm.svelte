@@ -8,6 +8,7 @@
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
+	import Toggle from '$lib/components/ui/toggle.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import { alert } from '$lib/utils';
 	import { CheckIcon, DocumentAddIcon } from '$lib/icons/outline';
