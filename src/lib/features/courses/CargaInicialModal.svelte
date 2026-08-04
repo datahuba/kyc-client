@@ -544,14 +544,15 @@
 	 * (los del Excel + defaults para campos faltantes).
 	 */
 	async function crearEstudianteDesdeFila(fila: FilaEstudiante): Promise<any> {
-		// Campos requeridos por CreateStudentRequest:
-		// - registro, carnet, course_id, nombre, extension, fecha_nacimiento, celular, email, domicilio
+		// NO enviar course_id: el endpoint POST /students/ con course_id
+		// auto-inscribe al estudiante, lo que hace que initial-enrollments
+		// falle por duplicado. La inscripcion + pagos se hace en el paso 2
+		// via /courses/{id}/initial-enrollments con pagos_modulos.
 		const emailLimpio = cleanEmail(fila.email) || `${fila.carnet}@sin-email.local`;
 		const payload: any = {
 			registro: fila.carnet, // usar CI como registro
 			carnet: fila.carnet,
 			complemento_carnet: '',
-			course_id: course!._id,
 			nombre: fila.nombre || `Sin nombre (${fila.carnet})`,
 			extension: '',
 			fecha_nacimiento: '1990-01-01', // default razonable
