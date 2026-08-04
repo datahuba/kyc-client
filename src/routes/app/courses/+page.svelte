@@ -11,6 +11,7 @@
 	import Modal from '$lib/components/ui/modal.svelte';
 	import ComunicadoModal from '$lib/features/courses/ComunicadoModal.svelte';
 	import CargaInicialModal from '$lib/features/courses/CargaInicialModal.svelte';
+	import AgregarEstudianteModal from '$lib/features/courses/AgregarEstudianteModal.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
@@ -114,6 +115,17 @@
 	function openCargaInicial(course: Course) {
 		cargaInicialCourse = course;
 		cargaInicialOpen = true;
+		openDropdownId = null;
+	}
+
+	// F-US-006-3TIPOS-3B (2026-08-04): modal para agregar 1 estudiante a
+	// un programa en_ejecucion (lo incorpora a un modulo futuro). Caso:
+	// el estudiante llega tarde y el admin/encargado lo mete manualmente.
+	let agregarEstudianteOpen = $state(false);
+	let agregarEstudianteCourse: Course | null = $state(null);
+	function openAgregarEstudiante(course: Course) {
+		agregarEstudianteCourse = course;
+		agregarEstudianteOpen = true;
 		openDropdownId = null;
 	}
 
@@ -301,6 +313,19 @@
 				id: 'carga-inicial',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>`,
 				action: () => openCargaInicial(course)
+			});
+		}
+
+		// F-US-006-3TIPOS-3B: agregar 1 estudiante a un modulo futuro del
+		// programa en_ejecucion. Caso: el estudiante llega tarde y el
+		// admin/encargado lo mete manualmente a un modulo donde todavia
+		// alcanza a cursar. Solo aplica a programas en_ejecucion.
+		if (canEditCourse && estadoCalc === 'en_ejecucion') {
+			options.push({
+				label: 'Agregar Estudiante',
+				id: 'agregar-estudiante',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>`,
+				action: () => openAgregarEstudiante(course)
 			});
 		}
 
@@ -625,6 +650,14 @@
 		isOpen={cargaInicialOpen}
 		course={cargaInicialCourse}
 		onClose={() => (cargaInicialOpen = false)}
+		onSuccess={() => loadCourses()}
+	/>
+
+	<!-- F-US-006-3TIPOS-3B: agregar 1 estudiante a un modulo futuro -->
+	<AgregarEstudianteModal
+		isOpen={agregarEstudianteOpen}
+		course={agregarEstudianteCourse}
+		onClose={() => (agregarEstudianteOpen = false)}
 		onSuccess={() => loadCourses()}
 	/>
 
