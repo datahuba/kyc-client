@@ -47,26 +47,37 @@
 		cantidadModulos > 0 ? Math.round((costoTotal / cantidadModulos) * 100) / 100 : 0
 	);
 
-	// Módulos (generados automáticamente al cambiar cantidad)
-	let modulos = $state<{ nombre: string; costo: number }[]>([]);
+	// Módulos: se inicializan con la cantidad default y se sincronizan con handlers explícitos.
+	// NO usamos $effect para evitar loops infinitos (Svelte detecta cuando un effect escribe
+	// a una variable que lee). Ver: https://svelte.dev/e/effect_update_depth_exceeded
+	let modulos = $state<{ nombre: string; costo: number }[]>(
+		Array.from({ length: 5 }, (_, i) => ({ nombre: `Módulo ${i + 1}`, costo: 0 }))
+	);
 
-	$effect(() => {
-		// Auto-generar módulos cuando cambia la cantidad
+	// Handler explícito: ajustar cantidad de módulos (reemplaza el effect)
+	function ajustarCantidadModulos(target: number) {
+		target = Math.max(1, Math.min(20, target));
+		cantidadModulos = target;
 		const current = modulos.length;
-		const target = cantidadModulos;
 		if (target > current) {
-			for (let i = current; i < target; i++) {
-				modulos.push({ nombre: `Módulo ${i + 1}`, costo: costoPorModulo });
-			}
+			// agregar nuevos modulos con costoPorModulo actual
+			const nuevos = Array.from({ length: target - current }, (_, i) => ({
+				nombre: `Módulo ${current + i + 1}`,
+				costo: costoPorModulo
+			}));
+			modulos = [...modulos, ...nuevos];
 		} else if (target < current) {
-			modulos.splice(target);
+			modulos = modulos.slice(0, target);
 		}
-		// Si el costo total cambia, redistribuir (mantener proporciones si las hay)
-		// Por ahora: todos los módulos toman el mismo costo (costoPorModulo)
+	}
+
+	// Handler: cuando cambia el costo total, redistribuir entre los modulos
+	// (se llama desde el onchange del input de costo, NO en $effect)
+	function redistribuirCosto() {
 		if (costoPorModulo > 0) {
 			modulos = modulos.map((m) => ({ ...m, costo: costoPorModulo }));
 		}
-	});
+	}
 
 	// Fechas (opcionales)
 	let fechaInicio = $state('');
@@ -126,15 +137,18 @@
 				matricula_interno: 0, // historicos: sin matricula
 				cantidad_cuotas: cantidadModulos,
 				descuento_curso: 0,
-				modulos: modulos.map((m) => ({ nombre: m.nombre.trim(), costo: m.costo, docente_id: '' })),
-				observacion: descripcion.trim() || '',
+				modulos: modulos.map((m) => ({ nombre: m.nombre.trim(), costo: m.costo, docente_id: null })),
+				observacion: descripcion.trim() || undefined,
 				fecha_inicio: fechaInicio || null, // null si vacío (Pydantic rechaza '')
 				fecha_fin: fechaFin || null,
 				activo: false, // historico no acepta inscripciones
 				es_historico: true
 			};
 
+			console.log('[HistoricalCourseForm] Enviando payload:', JSON.stringify(payload, null, 2));
+
 			const course = await courseService.create(payload);
+			console.log('[HistoricalCourseForm] Programa creado:', course);
 
 			// 2. Subir la resolución si hay (tolerante a fallos)
 			if (resolucionFile && course._id) {
@@ -153,7 +167,18 @@
 			onSuccess();
 		} catch (e: any) {
 			console.error('Error creando programa histórico', e);
-			const msg = e?.response?.data?.detail || e?.message || 'Error desconocido';
+			console.error('Response data:', e?.response?.data);
+			console.error('Response status:', e?.response?.status);
+			const detail = e?.response?.data?.detail;
+			let msg: string;
+			if (Array.isArray(detail)) {
+				// Errores 422 de validación de Pydantic vienen como array
+				msg = detail.map((d: any) => `${d.loc?.join('.') || '?'}: ${d.msg}`).join('; ');
+			} else if (typeof detail === 'string') {
+				msg = detail;
+			} else {
+				msg = e?.message || 'Error desconocido';
+			}
 			alert('error', `Error al crear el programa: ${msg}`);
 		} finally {
 			saving = false;
@@ -238,6 +263,7 @@
 				label="Costo total del programa (Bs) *"
 				type="number"
 				bind:value={costoTotal}
+				oninput={() => redistribuirCosto()}
 				error={errors.costoTotal}
 				min="0"
 				step="0.01"
@@ -246,7 +272,8 @@
 			<Input
 				label="Cantidad de módulos *"
 				type="number"
-				bind:value={cantidadModulos}
+				value={cantidadModulos}
+				oninput={(e) => ajustarCantidadModulos(parseInt((e.target as HTMLInputElement).value) || 1)}
 				error={errors.cantidadModulos}
 				min="1"
 				max="20"
