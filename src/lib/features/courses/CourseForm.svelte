@@ -8,11 +8,23 @@
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
-	import Toggle from '$lib/components/ui/toggle.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import { alert } from '$lib/utils';
 	import { CheckIcon, DocumentAddIcon } from '$lib/icons/outline';
 	import { onMount } from 'svelte';
+
+	// F-US-006-3TIPOS (2026-08-04): el tipo de programa define comportamiento,
+	// validaciones y visibilidad. Hay 3 tipos: proximo (próximo a iniciar),
+	// en_ejecucion (ya empezó) e historico (cerrado, solo archivo).
+	// Reemplaza el antiguo toggle binario Histórico/En-operación.
+	// NOTA: 'proximo' y 'en_ejecucion' comparten estructura operacional; lo
+	// que cambia entre ellos es el comportamiento de inscripciones (solo
+	// 'proximo' acepta nuevas inscripciones de estudiantes). El flag
+	// `es_historico` se deriva para mantener retrocompat con la lógica
+	// existente del form (validaciones, secciones condicionales).
+	type TipoPrograma = 'proximo' | 'en_ejecucion' | 'historico';
+	let tipo_programa: TipoPrograma = $state('proximo');
+	let es_historico = $derived(tipo_programa === 'historico');
 
 	interface Props {
 		course?: Course | null;
@@ -42,13 +54,6 @@
 	let activeDiscounts = $derived(
 		discounts.filter((d: any) => d.activo === true || d.estado === 'Activo')
 	);
-
-	// F-HISTORICO (2026-07-31): cuando es_historico = true, el sistema NO exige
-	// estructura operacional (docentes, modulos con notas, pagos, requisitos).
-	// Solo se piden los datos básicos + opcionalmente la resolución de respaldo.
-	// Esto permite cargar rápidamente el catálogo de programas antiguos
-	// (cursos pasados) sin reconstruir toda su estructura académica.
-	let es_historico = $state(false);
 
 	let formData: CreateCourseRequest = $state({
 		codigo: '',
@@ -133,6 +138,28 @@
 					es_historico: (course as any).es_historico ?? false
 				};
 				es_historico = (course as any).es_historico ?? false;
+				// F-US-006-3TIPOS (2026-08-04): preseleccionar el tipo de
+				// programa según el estado del curso. Prioridad: si
+				// es_historico=True → histórico. Si no, calculamos por
+				// estado_calculado o estado persistido.
+				if ((course as any).es_historico) {
+					tipo_programa = 'historico';
+				} else {
+					const estadoCalc = (course as any).estado_calculado
+						|| (course as any).estado
+						|| 'en_ejecucion';
+					if (estadoCalc === 'programado') {
+						tipo_programa = 'proximo';
+					} else if (estadoCalc === 'en_ejecucion') {
+						tipo_programa = 'en_ejecucion';
+					} else if (estadoCalc === 'cerrado') {
+						// Cerrado que NO es histórico → lo mapeamos a
+						// histórico para reflejar la realidad operacional.
+						tipo_programa = 'historico';
+					} else {
+						tipo_programa = 'proximo';
+					}
+				}
 				prevCuotas = course.cantidad_cuotas;
 				prevCostoTotal = course.costo_total_interno;
 
@@ -158,6 +185,10 @@
 					es_historico: false
 				};
 				es_historico = false;
+				// F-US-006-3TIPOS (2026-08-04): al crear un programa nuevo,
+				// el default es 'proximo' (cambia el comportamiento default
+				// del antiguo form que empezaba como "En operación").
+				tipo_programa = 'proximo';
 				prevCuotas = 1;
 				prevCostoTotal = 0;
 
@@ -422,16 +453,22 @@
 		<div class="mb-3 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
 			<Heading level="h4">Datos Básicos</Heading>
 
-			<!-- F-HISTORICO (2026-07-31): toggle para registrar programas pasados
-			     sin exigir estructura operacional (docentes, modulos, pagos).
-			     Si esta activo, las secciones operacionales se ocultan y las
-			     validaciones se relajan (fechas, costo, modulos, requisitos). -->
-			<label class="inline-flex items-center gap-2 cursor-pointer select-none">
-				<Toggle bind:checked={es_historico} labelOn="Histórico" labelOff="En operación" />
-				<span class="text-xs text-gray-500 dark:text-gray-400">
-					Marcá si es un programa pasado (curso cerrado) para registrarlo sin estructura completa.
-				</span>
-			</label>
+			<!-- F-US-006-3TIPOS (2026-08-04): selector de tipo de programa
+			     (reemplaza el antiguo toggle binario Historico/En-operacion).
+			     Hay 3 tipos con comportamiento y validaciones distintas:
+			       - Proximo/Programado: aun no inicia, acepta inscripciones.
+			       - En ejecucion: ya empezo, NO acepta nuevas inscripciones
+			         de estudiantes. Admin/encargado anade rezagados.
+			       - Historico/Cerrado: solo archivo, todos los datos opcionales. -->
+			<Select
+				label="Tipo de Programa"
+				id="tipo_programa"
+				bind:value={tipo_programa}
+			>
+				<option value="proximo">Proximo / Programado (acepta inscripciones)</option>
+				<option value="en_ejecucion">En ejecucion (NO acepta nuevas inscripciones)</option>
+				<option value="historico">Historico / Cerrado (solo archivo, datos opcionales)</option>
+			</Select>
 		</div>
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 			<Input
