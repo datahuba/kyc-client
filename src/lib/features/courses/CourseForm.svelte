@@ -89,7 +89,10 @@
 		fecha_inicio: '',
 		fecha_fin: '',
 		activo: true,
-		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }],
+		// F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): cada modulo lleva su
+		// estado_operacional (Pendiente/En Ejecucion/Ejecutado). Default
+		// 'Pendiente'. El usuario lo cambia manualmente con radio buttons.
+		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '', estado_operacional: 'Pendiente' }],
 		requisitos: [],
 		es_historico: false
 	});
@@ -867,6 +870,29 @@
 								{/each}
 							</Select>
 						</div>
+						<!-- F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): selector manual
+						     de estado operacional del modulo. Solo visible para
+						     programas en ejecucion (no para proximos ni historicos).
+						     Default 'Pendiente' si el modulo no se ha marcado. -->
+						{#if tipo_programa === 'en_ejecucion'}
+							<div class="w-full xl:w-3/5">
+								<label
+									for={`modulo_estado_op_${i}`}
+									class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200"
+								>
+									Estado del módulo en el cronograma
+								</label>
+								<select
+									id={`modulo_estado_op_${i}`}
+									bind:value={formData.modulos[i].estado_operacional}
+									class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+								>
+									<option value="Pendiente">⏳ Pendiente (aún no se inicia)</option>
+									<option value="En Ejecucion">🟡 En Ejecución (corriendo ahora)</option>
+									<option value="Ejecutado">✅ Ejecutado (ya finalizado)</option>
+								</select>
+							</div>
+						{/if}
 					</div>
 				{/each}
 			</div>
