@@ -969,20 +969,48 @@
 											{/if}
 										</td>
 										<!-- F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): descuento
-										     detectado del Excel, mapeado a descuento_id. Si el
-										     porcentaje no matchea ninguno institucional, se
-										     marca como 'manual_requerido' (badge amarillo). -->
-										<td class="px-2 py-1 text-xs">
+										     detectado del Excel, mapeado a descuento_id.
+										     - Si matchea uno institucional: badge verde.
+										     - Si no matchea (ej. 70%): select para asignar manual.
+										     - Si no hay descuento en el Excel: select vacio.
+										     Kevin: "si no estuviera que pregunte si tenia
+										     descuentos a de manera manual se ponga". -->
+										<td class="px-2 py-1 text-xs" style="min-width: 140px">
 											{#if fila.descuento_origen === 'institucional' && fila.descuento_pct !== undefined}
 												<span class="inline-flex items-center gap-0.5 rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-800">
-													{fila.descuento_pct}%
-												</span>
-											{:else if fila.descuento_origen === 'manual_requerido' && fila.descuento_pct !== undefined}
-												<span class="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800" title="Descuento no encontrado en catalogo institucional. Asignar manualmente.">
-													{fila.descuento_pct}% ⚠
+													{fila.descuento_pct}% ✓
 												</span>
 											{:else}
-												<span class="text-gray-400">-</span>
+												<!-- Si el descuento es manual_requerido o sin_descuento,
+												     mostramos un select para que el usuario lo asigne. -->
+												<select
+													class="block w-full rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[11px] text-gray-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+													value={fila.descuento_id || ''}
+													onchange={(e) => {
+														const val = (e.currentTarget as HTMLSelectElement).value;
+														fila.descuento_id = val || undefined;
+														if (val) {
+															const sel = catalogoDescuentos.find((d) => d._id === val);
+															fila.descuento_pct = sel ? sel.porcentaje : undefined;
+															fila.descuento_origen = sel?.es_institucional ? 'institucional' : 'sin_descuento';
+														} else {
+															fila.descuento_origen = fila.descuento_pct !== undefined ? 'manual_requerido' : 'sin_descuento';
+														}
+														filasExcel = [...filasExcel]; // trigger reactivity
+													}}
+												>
+													<option value="">
+														{fila.descuento_pct !== undefined
+															? `${fila.descuento_pct}% ⚠ manual`
+															: 'Sin descuento'}
+													</option>
+													{#each catalogoDescuentos as d}
+														<option value={d._id}>
+															{d.nombre} ({d.porcentaje}%)
+															{d.es_institucional ? ' ★' : ''}
+														</option>
+													{/each}
+												</select>
 											{/if}
 										</td>
 										<td class="px-2 py-1 text-center">
