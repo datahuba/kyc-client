@@ -221,7 +221,16 @@
 
 	function handleFilterChange() {
 		page = 1;
-		loadPayments();
+		// F-CXC-FILTRO-PROGRAMA (2026-08-04, Kevin): recargar la vista que esta
+		// activa. Antes SOLO llamaba loadPayments() y si estabas en Matriz o
+		// Por Pago la pantalla no se actualizaba al cambiar el programa.
+		if (viewMode === 'matriz') {
+			loadMatriz();
+		} else if (viewMode === 'porpago') {
+			loadPorPago();
+		} else {
+			loadPayments();
+		}
 	}
 
 	function handleSearchInput() {
@@ -244,13 +253,17 @@
 	}
 
 	// F-074 (2026-07-23): Carga la matriz de pagos desde el backend.
+	// F-CXC-FILTRO-PROGRAMA (2026-08-04, Kevin): ahora respeta el filtro
+	// filters.curso_id (selector de programa arriba) para que cambiar de
+	// programa recargue la matriz y las KPI cards.
 	async function loadMatriz() {
 		matrizLoading = true;
 		try {
 			const moduloIdx = matrizFiltroModulo === '' ? null : (matrizFiltroModulo as number);
+			const cursoId = filters.curso_id || null;
 			const [mat, res] = await Promise.all([
-				paymentService.getMatriz(moduloIdx),
-				paymentService.getResumenModulos(),
+				paymentService.getMatriz(moduloIdx, cursoId),
+				paymentService.getResumenModulos(cursoId),
 			]);
 			matrizData = mat;
 			matrizResumen = res;
@@ -264,12 +277,15 @@
 		}
 	}
 
-	// F-074: cuando cambia el filtro de módulo, recargar
+	// F-074: cuando cambia el filtro de módulo O el filtro de programa, recargar
 	// FIX: solo staff puede usar la vista matriz (estudiantes obtendrían 403)
+	// F-CXC-FILTRO-PROGRAMA (2026-08-04): agregamos filters.curso_id a las
+	// dependencias del effect para que cambiar el programa recargue la matriz.
 	$effect(() => {
 		if (isStaff && viewMode === 'matriz') {
-			// Dependencia explícita: matrizFiltroModulo
+			// Dependencias explicitas: tanto el filtro de modulo como el de programa
 			matrizFiltroModulo;
+			filters.curso_id;
 			loadMatriz();
 		}
 	});
@@ -385,7 +401,18 @@
 			isCreateModalOpen = true;
 		}
 
-		loadPayments();
+		// F-CXC-FILTRO-PROGRAMA (2026-08-04, Kevin): cargar la vista que el
+		// usuario dejó activa (matriz/porpago/lista). Antes SIEMPRE llamaba
+		// loadPayments() y si estabas en Matriz veias la vista lista unos ms.
+		if (viewMode === 'matriz') {
+			await tick(); // asegurar que el effect ya seteo matrizFiltroModulo
+			loadMatriz();
+		} else if (viewMode === 'porpago') {
+			await tick();
+			loadPorPago();
+		} else {
+			loadPayments();
+		}
 	});
 
 	function toggleDropdown(id: string) {
@@ -747,7 +774,7 @@
 			<!-- ISSUE-P-SEGMENTACION: aviso visible de por qué solo se ven ciertos cursos -->
 			{#if isCobranza && cursosAsignadosUsuario.length > 0}
 				<p class="mt-1 text-xs font-medium text-uagrm-sky">
-					Vista segmentada: solo se muestran pagos de los {cursosAsignadosUsuario.length} curso(s) asignado(s) a tu cuenta.
+					Vista segmentada: solo se muestran pagos de los {cursosAsignadosUsuario.length} programa(s) asignado(s) a tu cuenta.
 				</p>
 			{/if}
 		</div>
@@ -858,7 +885,7 @@
 								? 'ring-2 ring-inset ring-primary-500 bg-primary-50 font-medium text-primary-900 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500'
 								: 'ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-white dark:ring-gray-600'}"
 					>
-						<option value="">Todos los cursos</option>
+						<option value="">Todos los programas</option>
 						{#each coursesListFiltrada as course (course._id)}
 							<option value={course._id}>{course.nombre_programa}</option>
 						{/each}
@@ -868,7 +895,7 @@
 							type="button"
 							onclick={() => { filters.curso_id = ''; page = 1; handleFilterChange(); }}
 							class="absolute right-7 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors z-10"
-							title="Quitar filtro de curso"
+							title="Quitar filtro de programa"
 						>
 							<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
 						</button>
@@ -905,7 +932,7 @@
 					<tr>
 						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transacción</th>
 						<th scope="col" class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
-						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
+						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Programa</th>
 						<th scope="col" class="w-[14%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
 						<th scope="col" class="w-[16%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto / Fecha</th>
 						<th scope="col" class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
@@ -940,7 +967,7 @@
 										type="button"
 										onclick={() => { filters.curso_id = payment.curso_id; page = 1; handleFilterChange(); }}
 										class="text-left group w-full"
-										title="Filtrar por este curso"
+										title="Filtrar por este programa"
 									>
 										<span class="block text-gray-900 dark:text-white font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight line-clamp-2">{coursesMap[payment.curso_id].nombre_programa}</span>
 										<span class="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">{coursesMap[payment.curso_id].codigo}</span>
@@ -1279,8 +1306,8 @@
 	{#if viewMode === 'porpago' && isStaff}
 		<!-- Filtros de la vista Por Pago -->
 		<div class="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
-			<!-- Curso -->
-			<label class="text-xs text-gray-600 dark:text-gray-400">Curso:</label>
+			<!-- Programa -->
+			<label class="text-xs text-gray-600 dark:text-gray-400">Programa:</label>
 			<select
 				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
 				value={porPagoFiltros.curso_id}
@@ -1381,7 +1408,7 @@
 						<tr>
 							<th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap sticky left-0 bg-gray-50 dark:bg-gray-900/40 z-10">Estudiante</th>
 							<th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap sticky left-[180px] bg-gray-50 dark:bg-gray-900/40 z-10">CI</th>
-							<th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Curso</th>
+							<th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Programa</th>
 							{#each Array(maxCols) as _, i}
 								<th class="px-2 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap min-w-[110px]">
 									Pago {i + 1}

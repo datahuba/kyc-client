@@ -245,18 +245,29 @@ class PaymentService {
 
 	// F-074 (2026-07-23): Vista Matricial de Pagos (estilo Excel de Sandra)
 	// Filas = estudiantes, columnas = MATRÍCULA | MODULO 1..N | TOTAL INGRESOS | POR COBRAR
-	async getMatriz(moduloIndex?: number | null): Promise<MatrizPagosResponse> {
+	// F-CXC-FILTRO-PROGRAMA (2026-08-04, Kevin): ahora acepta `cursoId` para
+	// que cambiar el filtro de programa en /app/payments recargue la matriz.
+	// Antes: solo aceptaba moduloIndex, por eso al cambiar el programa la
+	// pantalla NO se actualizaba (se veian los datos del programa anterior).
+	async getMatriz(moduloIndex?: number | null, cursoId?: string | null): Promise<MatrizPagosResponse> {
 		const params = new URLSearchParams();
 		if (moduloIndex !== null && moduloIndex !== undefined) {
 			params.append('modulo_index', String(moduloIndex));
+		}
+		if (cursoId) {
+			params.append('curso_id', cursoId);
 		}
 		const qs = params.toString();
 		const url = qs ? `/payments/matriz?${qs}` : '/payments/matriz';
 		return await apiKyC.get<MatrizPagosResponse>(url);
 	}
 
-	async getResumenModulos(): Promise<ResumenModulosResponse> {
-		return await apiKyC.get<ResumenModulosResponse>('/payments/resumen-modulos');
+	// F-CXC-FILTRO-PROGRAMA (2026-08-04, Kevin): mismo cambio, getResumenModulos
+	// ahora acepta `cursoId` para que las tarjetas de resumen (matricula, modulos,
+	// por cobrar, etc.) reflejen el programa actualmente filtrado.
+	async getResumenModulos(cursoId?: string | null): Promise<ResumenModulosResponse> {
+		const qs = cursoId ? `?curso_id=${encodeURIComponent(cursoId)}` : '';
+		return await apiKyC.get<ResumenModulosResponse>(`/payments/resumen-modulos${qs}`);
 	}
 
 	// F-088 (2026-07-29): Vista "Deudores" unificada para Cobranza.
