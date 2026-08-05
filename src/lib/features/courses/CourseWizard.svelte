@@ -4,9 +4,13 @@
 	// se le muestra el form específico para ese tipo. Reemplaza al CourseForm
 	// monolítico para el caso "crear nuevo programa". El CourseForm original
 	// sigue siendo usado para editar programas existentes.
+	// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): habilita los 3 tipos
+	// (antes solo historico estaba disponible). Los tipos "proximo" y
+	// "en_ejecucion" ahora abren el CourseForm con el tipo preseleccionado.
 	import Modal from '$lib/components/ui/modal.svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import HistoricalCourseForm from './HistoricalCourseForm.svelte';
+	import CourseForm from './CourseForm.svelte';
 	import {
 		ClipboardIcon,
 		ChevronRightIcon,
@@ -37,26 +41,39 @@
 		onClose();
 	}
 
+	function handleActiveSuccess() {
+		// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05): unifica el flujo de
+		// "proximo" y "en_ejecucion" con el de historico. El CourseForm
+		// ya tiene el tipo preseleccionado via prop `initialTipoPrograma`.
+		tipoSeleccionado = null;
+		onSuccess?.();
+		onClose();
+	}
+
+	function handleActiveCancel() {
+		tipoSeleccionado = null;
+	}
+
 	const TIPOS = [
 		{
 			id: 'proximo' as const,
-			titulo: 'Próximo',
+			titulo: 'Próximo / Programado',
 			descripcion: 'Aún no inicia. Estudiantes pueden inscribirse solos desde su dashboard.',
 			icon: ClipboardIcon,
 			color: 'blue',
-			disponible: false
+			disponible: true
 		},
 		{
 			id: 'en_ejecucion' as const,
 			titulo: 'En ejecución',
-			descripcion: 'Ya empezó. Inscripciones solo por admin/encargado (carga inicial).',
+			descripcion: 'Ya empezó. Inscripciones solo por admin/encargado (carga inicial / masiva).',
 			icon: ChevronRightIcon,
 			color: 'green',
-			disponible: false
+			disponible: true
 		},
 		{
 			id: 'historico' as const,
-			titulo: 'Histórico',
+			titulo: 'Histórico / Cerrado',
 			descripcion: 'Ya cerró. Solo archivo. Costo editable, docentes opcionales, fechas opcionales.',
 			icon: FileTextIcon,
 			color: 'amber',
@@ -125,6 +142,17 @@
 		<HistoricalCourseForm
 			onSuccess={handleHistoricalSuccess}
 			onCancel={() => (tipoSeleccionado = null)}
+		/>
+	{:else if tipoSeleccionado === 'proximo' || tipoSeleccionado === 'en_ejecucion'}
+		<!-- F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): para programas
+		     proximos y en ejecucion usamos el CourseForm normal, pasando el
+		     tipo preseleccionado para que el form se inicialice correctamente
+		     y el backend sepa que estado_override aplicar. -->
+		<CourseForm
+			course={null}
+			initialTipoPrograma={tipoSeleccionado}
+			onSuccess={handleActiveSuccess}
+			onCancel={handleActiveCancel}
 		/>
 	{/if}
 </Modal>

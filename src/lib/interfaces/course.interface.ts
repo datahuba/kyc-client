@@ -68,6 +68,11 @@ export interface CreateCourseRequest {
 	// F-HISTORICO (2026-07-31): true si es programa histórico.
 	es_historico?: boolean;
 	resolucion_pdf_url?: string | null;
+
+	// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): override manual del
+	// estado calculado por fechas. Valores: 'programado' | 'en_ejecucion' |
+	// 'cerrado'. Si no se envia, el backend calcula segun fecha_inicio/fin.
+	estado_override?: 'programado' | 'en_ejecucion' | 'cerrado' | null;
 }
 
 export interface UpdateCourseRequest extends Partial<CreateCourseRequest> {

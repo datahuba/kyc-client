@@ -24,16 +24,28 @@
 	// `es_historico` se deriva para mantener retrocompat con la lógica
 	// existente del form (validaciones, secciones condicionales).
 	type TipoPrograma = 'proximo' | 'en_ejecucion' | 'historico';
-	let tipo_programa: TipoPrograma = $state('proximo');
+	// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): si el wizard paso
+	// un initialTipoPrograma, lo respetamos. Si no, default 'proximo'.
+	let tipo_programa: TipoPrograma = $state(initialTipoPrograma);
 	let es_historico = $derived(tipo_programa === 'historico');
 
 	interface Props {
 		course?: Course | null;
+		// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): el wizard pasa el
+		// tipo preseleccionado para que el form se inicialice con el radio
+		// button correcto (proximo / en_ejecucion). Si no se pasa, default
+		// 'proximo' (igual que antes).
+		initialTipoPrograma?: 'proximo' | 'en_ejecucion' | 'historico';
 		onSuccess: () => void;
 		onCancel: () => void;
 	}
 
-	let { course = null, onSuccess, onCancel }: Props = $props();
+	let {
+		course = null,
+		initialTipoPrograma = 'proximo',
+		onSuccess,
+		onCancel
+	}: Props = $props();
 
 	let isEditMode = $derived(!!course);
 	let saving = $state(false);
@@ -333,6 +345,26 @@
 				payload.requisitos = [];
 				payload.cargo_adicional_items = [];
 				payload.activo = false; // un programa historico no acepta inscripciones
+			}
+			// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): enviar
+			// estado_override al backend para que el calculo automatico de
+			// estado (programado/en_ejecucion/cerrado segun fechas) respete
+			// la eleccion del usuario. Sin esto, si el usuario elige
+			// "En ejecucion" pero las fechas dicen "programado", el curso
+			// queda como programado en vez de en_ejecucion.
+			if (!es_historico) {
+				if (tipo_programa === 'en_ejecucion') {
+					payload.estado_override = 'en_ejecucion';
+				} else if (tipo_programa === 'proximo') {
+					// 'proximo' = programado. Si el usuario eligio fechas futuras
+					// el calculo automatico ya dara 'programado'. Pero si eligio
+					// fechas pasadas, forzamos a 'programado' igual.
+					payload.estado_override = 'programado';
+				}
+			} else {
+				// Historico: estado_override = 'cerrado' para que el badge
+				// muestre "cerrado" aunque las fechas sean raras.
+				payload.estado_override = 'cerrado';
 			}
 			if (!payload.descuento_id) {
 				if (isEditMode) {
