@@ -13,7 +13,7 @@
 	import Modal from '$lib/components/ui/modal.svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
-	import { studentService } from '$lib/services';
+	import { studentService, discountService } from '$lib/services';
 	import { apiKyC } from '$lib/config';
 	import { alert } from '$lib/utils';
 	import type { Course } from '$lib/interfaces';
@@ -59,12 +59,24 @@
 		// Pagos del Excel (opcional, mostrados al usuario)
 		pagos: { modulo: string; monto: number }[];
 		total_pagado?: number;
+		// F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): descuento detectado del
+		// Excel (0.5 = 50%, 1 = 100%, etc). Se mapea a un descuento_id real
+		// del catalogo institucional via catalogoDescuentos.
+		descuento_pct?: number;
+		descuento_id?: string;
+		descuento_origen?: string; // 'institucional' | 'manual_requerido' | 'sin_descuento'
 	}
 
 	let filasExcel = $state<FilaEstudiante[]>([]);
 	let excelFileName = $state('');
 	let parseandoExcel = $state(false);
 	let etapaExcel: 'subir' | 'preview' | 'procesando' | 'resultado' = $state('subir');
+
+	// F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): catalogo de descuentos
+	// institucionales del Organo Judicial (50%, 30%, 100%). Se carga
+	// despues de parsear el Excel para mapear los descuentos detectados
+	// (0.5, 1, etc) a descuentos_id reales.
+	let catalogoDescuentos: { _id: string; nombre: string; porcentaje: number; es_institucional?: boolean }[] = $state([]);
 	let resultadoExcel = $state<{ creados: number; inscritos: number; actualizados: number; fallidos: number; detalles: any[] } | null>(null);
 
 	// Reset al abrir/cerrar
@@ -345,6 +357,33 @@
 					}
 				}
 
+				// F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): detectar descuento
+				// del Excel. La columna "DESCUENTOS" tiene un valor que puede ser
+				// 0.5 (50%), 1 (100%), o "BECA 100% POR MERITO". Lo mapeamos a
+				// un descuento_id del catalogo institucional.
+				const descuentoRaw = pickColumn(row, 'descuentos', 'descuento');
+				let descuento_pct: number | undefined;
+				let descuento_id: string | undefined;
+				let descuento_origen: 'institucional' | 'manual_requerido' | 'sin_descuento' = 'sin_descuento';
+				if (descuentoRaw) {
+					const dStr = String(descuentoRaw).trim().toLowerCase();
+					// Detectar "100" o "1" como 100%
+					if (dStr === '100' || dStr === '1' || dStr.includes('beca 100') || dStr.includes('merito')) {
+						descuento_pct = 100;
+					} else {
+						// Parsear como decimal: 0.5, 0.7, etc
+						const d = parseNumero(descuentoRaw);
+						if (d > 0 && d <= 1) {
+							descuento_pct = d * 100;
+						} else if (d === 100) {
+							descuento_pct = 100;
+						} else if (d > 0) {
+							// Numero raro (ej. 754800): ignorar
+							descuento_pct = undefined;
+						}
+					}
+				}
+
 				filas.push({
 					carnet,
 					nombre,
@@ -353,11 +392,19 @@
 					estado: 'nuevo', // se actualiza despues del lookup
 					pagos,
 					total_pagado: pagos.reduce((acc, p) => acc + p.monto, 0),
+					descuento_pct,
+					descuento_id,
+					descuento_origen,
 				});
 			}
 
 			filasExcel = filas;
 			excelFileName = file.name;
+			// F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): cargar el catalogo
+			// de descuentos institucionales y mapear los descuentos detectados
+			// a descuento_id. Si el descuento no matchea ninguno, marcar como
+			// 'manual_requerido' (el usuario lo debe asignar manualmente).
+			await cargarYMappearDescuentos();
 			etapaExcel = 'preview';
 			await verificarEstudiantesEnBD();
 		} catch (e: any) {
@@ -365,6 +412,41 @@
 			alert('error', `Error al parsear el Excel: ${e?.message || 'desconocido'}`);
 		} finally {
 			parseandoExcel = false;
+		}
+	}
+
+	/**
+	 * F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): carga el catalogo de
+	 * descuentos institucionales y mapea los descuentos_pct detectados
+	 * en el Excel a descuento_id reales.
+	 * Si el descuento no matchea ninguno (ej. 0.7 = 70% que no tenemos
+	 * pre-creado), se marca como 'manual_requerido' y el usuario lo
+	 * debe asignar en la UI.
+	 */
+	async function cargarYMappearDescuentos() {
+		try {
+			const resp: any = await discountService.getAll();
+			catalogoDescuentos = Array.isArray(resp) ? resp : (resp.data || []);
+			// Mapear
+			for (const fila of filasExcel) {
+				if (fila.descuento_pct === undefined) {
+					fila.descuento_origen = 'sin_descuento';
+					continue;
+				}
+				// Buscar el descuento que matchee el porcentaje (con tolerancia de 0.1)
+				const match = catalogoDescuentos.find(
+					(d) => Math.abs(d.porcentaje - fila.descuento_pct!) < 0.1
+				);
+				if (match) {
+					fila.descuento_id = match._id;
+					fila.descuento_origen = 'institucional';
+				} else {
+					fila.descuento_origen = 'manual_requerido';
+				}
+			}
+			filasExcel = [...filasExcel]; // trigger reactivity
+		} catch (e) {
+			console.warn('No se pudieron cargar descuentos institucionales:', e);
 		}
 	}
 
@@ -839,6 +921,8 @@
 									<th class="px-2 py-1.5 text-left text-xs font-medium text-gray-500">Email</th>
 									<th class="px-2 py-1.5 text-left text-xs font-medium text-gray-500">Celular</th>
 									<th class="px-2 py-1.5 text-left text-xs font-medium text-gray-500">Pagos</th>
+									<!-- F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): columna de descuento -->
+									<th class="px-2 py-1.5 text-left text-xs font-medium text-gray-500">Desc.</th>
 									<th class="px-2 py-1.5 text-center text-xs font-medium text-gray-500">Estado</th>
 									<th class="px-2 py-1.5 text-center text-xs font-medium text-gray-500"></th>
 								</tr>
@@ -880,6 +964,23 @@
 											{#if fila.total_pagado && fila.total_pagado > 0}
 												<span class="font-mono">Bs {fila.total_pagado.toFixed(2)}</span>
 												<span class="text-gray-400"> ({fila.pagos.length} pagos)</span>
+											{:else}
+												<span class="text-gray-400">-</span>
+											{/if}
+										</td>
+										<!-- F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): descuento
+										     detectado del Excel, mapeado a descuento_id. Si el
+										     porcentaje no matchea ninguno institucional, se
+										     marca como 'manual_requerido' (badge amarillo). -->
+										<td class="px-2 py-1 text-xs">
+											{#if fila.descuento_origen === 'institucional' && fila.descuento_pct !== undefined}
+												<span class="inline-flex items-center gap-0.5 rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-800">
+													{fila.descuento_pct}%
+												</span>
+											{:else if fila.descuento_origen === 'manual_requerido' && fila.descuento_pct !== undefined}
+												<span class="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800" title="Descuento no encontrado en catalogo institucional. Asignar manualmente.">
+													{fila.descuento_pct}% ⚠
+												</span>
 											{:else}
 												<span class="text-gray-400">-</span>
 											{/if}
