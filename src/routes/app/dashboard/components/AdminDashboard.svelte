@@ -328,96 +328,69 @@
 		     Económico General" para diferenciarlo del nuevo "Ingresos por Programa"
 		     agregado debajo. Kevin en reunión: "el resumen tengo que mantenerlo
 		     así como está... voy a cambiar los títulos, por ejemplo poner resumen
-		     económico general". -->
+		     económico general".
+		     F-DASHBOARD-V2 (2026-08-05 17:30, Kevin): cards reducidas a 4 (sin
+		     'Cobros Pendientes' ni 'Total Inscritos') y dispuestas en 1 línea
+		     (xl:grid-cols-4). Kevin: "ya no sería necesario, habría que eliminar
+		     esas dos tarjetas y que queden las cuatro principales más reducidas
+		     de tamaño para que entren en una misma línea". -->
 		{#if verResumenEconomico && resumenEconomico}
 			<div>
-				<div class="flex items-center justify-between mb-4">
-					<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Resumen Económico General</h2>
-					<a href="/app/reports" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">Ver reportes</a>
+				<div class="flex items-center justify-between mb-3">
+					<h2 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Resumen Económico General</h2>
+					<a href="/app/reports" class="text-xs sm:text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">Ver reportes</a>
 				</div>
 
-				<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+				<div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
 					<!-- Ingreso por Matrícula -->
-					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
-						<div class="flex-1 min-w-0 mr-3">
-							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Ingreso por Matrícula</p>
-							<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(resumenEconomico.ingreso_matricula)}>
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 flex items-center justify-between min-w-0">
+						<div class="flex-1 min-w-0 mr-2">
+							<p class="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 truncate">Ingreso por Matrícula</p>
+							<p class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5 truncate" title={formatCurrency(resumenEconomico.ingreso_matricula)}>
 								{formatCurrency(resumenEconomico.ingreso_matricula)}
 							</p>
-							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Pagos aprobados</p>
 						</div>
-						<div class="p-3 bg-uagrm-blue rounded-full text-white shrink-0">
-							<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
+						<div class="p-2 bg-uagrm-blue rounded-full text-white shrink-0">
+							<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
 						</div>
 					</div>
 
 					<!-- Ingreso por Colegiatura -->
-					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
-						<div class="flex-1 min-w-0 mr-3">
-							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Ingreso por Colegiatura</p>
-							<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(resumenEconomico.ingreso_colegiatura)}>
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 flex items-center justify-between min-w-0">
+						<div class="flex-1 min-w-0 mr-2">
+							<p class="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 truncate">Ingreso por Colegiatura</p>
+							<p class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5 truncate" title={formatCurrency(resumenEconomico.ingreso_colegiatura)}>
 								{formatCurrency(resumenEconomico.ingreso_colegiatura)}
 							</p>
-							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Módulos / cuotas</p>
 						</div>
-						<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
-							<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+						<div class="p-2 bg-primary-600 rounded-full text-white shrink-0">
+							<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
 						</div>
 					</div>
 
 					<!-- Total Ingresos -->
-					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
-						<div class="flex-1 min-w-0 mr-3">
-							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Ingresos</p>
-							<p class="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400 mt-1 truncate" title={formatCurrency(resumenEconomico.total_ingresos)}>
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 flex items-center justify-between min-w-0">
+						<div class="flex-1 min-w-0 mr-2">
+							<p class="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 truncate">Total Ingresos</p>
+							<p class="text-base sm:text-lg font-bold text-green-600 dark:text-green-400 mt-0.5 truncate" title={formatCurrency(resumenEconomico.total_ingresos)}>
 								{formatCurrency(resumenEconomico.total_ingresos)}
 							</p>
-							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Matrícula + Colegiatura</p>
 						</div>
-						<div class="p-3 bg-green-600 rounded-full text-white shrink-0">
-							<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+						<div class="p-2 bg-green-600 rounded-full text-white shrink-0">
+							<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 						</div>
 					</div>
 
 					<!-- Por Cobrar -->
-					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
-						<div class="flex-1 min-w-0 mr-3">
-							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Por Cobrar</p>
-							<p class="text-xl sm:text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1 truncate" title={formatCurrency(resumenEconomico.por_cobrar)}>
+					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 flex items-center justify-between min-w-0">
+						<div class="flex-1 min-w-0 mr-2">
+							<p class="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 truncate">Por Cobrar</p>
+							<p class="text-base sm:text-lg font-bold text-orange-600 dark:text-orange-400 mt-0.5 truncate" title={formatCurrency(resumenEconomico.por_cobrar)}>
 								{formatCurrency(resumenEconomico.por_cobrar)}
 							</p>
-							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Saldo pendiente total</p>
 						</div>
-						<div class="p-3 bg-orange-500 rounded-full text-white shrink-0">
-							<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-						</div>
-					</div>
-
-					<!-- Cobros Pendientes (por persona) -->
-					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
-						<div class="flex-1 min-w-0 mr-3">
-							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Cobros Pendientes</p>
-							<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate">
-								{resumenEconomico.cobros_pendientes}
-							</p>
-							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Inscritos con saldo por cobrar</p>
-						</div>
-						<div class="p-3 bg-yellow-500 rounded-full text-white shrink-0">
-							<svg class="size-6 sm:size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-						</div>
-					</div>
-
-					<!-- Total Inscritos -->
-					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between min-w-0">
-						<div class="flex-1 min-w-0 mr-3">
-							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Inscritos</p>
-							<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate">
-								{resumenEconomico.total_inscritos}
-							</p>
-							<p class="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">En tu alcance</p>
-						</div>
-						<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
-							<ClipboardIcon class="size-6 sm:text-2xl sm:size-8" />
+						<div class="p-2 bg-orange-500 rounded-full text-white shrink-0">
+							<svg class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 						</div>
 					</div>
 				</div>
@@ -434,10 +407,8 @@
 		     (el modal completo con desglose por programa). -->
 
 		<!-- F-COBRANZA-041 (2026-07-22): KPI de inscritos movido de /app/enrollments al Dashboard.
-		     Visible para roles administrativos. Refleja el endpoint /enrollments/stats/resumen. -->
-		{#if verKpiInscritos}
-			<KpiInscritosCards resumen={resumenInscritos} loading={loading} />
-		{/if}
+		     F-DASHBOARD-V2 (2026-08-05 17:30, Kevin): seccion KpiInscritosCards
+		     ELIMINADA por completo. Hay una ISU pendiente para cambiar esto. -->
 
 		<!-- Stats Grid -->
 		<!-- FIX-DASH-001: Eliminadas las 3 tarjetas (Estudiantes, Cursos, Inscripciones) que eran redundantes
@@ -465,95 +436,10 @@
 			{/if}
 		</div>
 
-		<!-- Program Breakdown Section (oculto para perfiles segmentados por programa) -->
-		<!-- F-DASHBOARD-POR-PROGRAMA (2026-08-05, Kevin): nueva seccion
-		     "Ingresos por Programa" con 4 cards financieras por cada curso
-		     en alcance. Coincide con los 4 cards del Resumen Economico General
-		     (Matrícula, Colegiatura, Total Ingresos, Por Cobrar) pero por
-		     programa individual. Solo visible para roles que ven el Resumen
-		     Economico General. Para perfiles segmentados (cobranza/
-		     coordinador-financiero con cursos_asignados), solo muestra sus
-		     cursos asignados (respeta la logica del backend). -->
-
-		<!-- F-DASHBOARD-POR-PROGRAMA (2026-08-05, Kevin): Ingresos por Programa -->
-		{#if verResumenEconomico && courseBreakdown.length > 0}
-			<div>
-				<div class="flex items-center justify-between mb-4">
-					<div>
-						<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Ingresos por Programa</h2>
-						<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-							{courseBreakdown.length} {courseBreakdown.length === 1 ? 'programa activo' : 'programas activos'} (excluye históricos y cerrados)
-						</p>
-					</div>
-					<a href="/app/payments" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">Ver gestión de pagos</a>
-				</div>
-
-				<!-- Grid responsive: 1 col mobile, 2 col tablet, 3 col desktop.
-				     En cada card los 4 indicadores financieros del programa. -->
-				<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-					{#each courseBreakdown as cb (cb.id)}
-						{@const style = getTypeStyle(cb.tipo)}
-						<a
-							href={`/app/payments?curso_id=${cb.id}`}
-							class="block bg-white dark:bg-gray-800 rounded-xl border {style.border} shadow-sm hover:shadow-md transition-all active:scale-[0.99] overflow-hidden"
-						>
-							<!-- Header con nombre del programa + badge de tipo -->
-							<div class={`px-4 py-3 ${style.bg} border-b ${style.border}`}>
-								<div class="flex items-center gap-2 mb-1">
-									<span class={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${style.badge}`}>
-										{cb.tipo}
-									</span>
-									<span class="text-[10px] font-mono text-gray-500 dark:text-gray-400 ml-auto">{cb.codigo}</span>
-								</div>
-								<p class="text-sm font-bold text-gray-900 dark:text-white line-clamp-2 leading-tight" title={cb.nombre}>
-									{cb.nombre}
-								</p>
-							</div>
-
-							<!-- 4 indicadores financieros (mismo set que Resumen Economico General) -->
-							<div class="p-4 space-y-3">
-								<!-- Matrícula -->
-								<div class="flex items-center justify-between">
-									<span class="text-xs text-gray-500 dark:text-gray-400">Ingreso Matrícula</span>
-									<span class="text-sm font-semibold text-gray-900 dark:text-white font-mono">
-										{formatCurrency(cb.ingreso_matricula)}
-									</span>
-								</div>
-								<!-- Colegiatura -->
-								<div class="flex items-center justify-between">
-									<span class="text-xs text-gray-500 dark:text-gray-400">Ingreso Colegiatura</span>
-									<span class="text-sm font-semibold text-gray-900 dark:text-white font-mono">
-										{formatCurrency(cb.ingreso_colegiatura)}
-									</span>
-								</div>
-								<!-- Total Ingresos (matrícula + colegiatura) -->
-								<div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-									<span class="text-xs font-semibold text-gray-700 dark:text-gray-300">Total Ingresos</span>
-									<span class="text-base font-bold text-green-600 dark:text-green-400 font-mono">
-										{formatCurrency(cb.total_ingresos)}
-									</span>
-								</div>
-								<!-- Por Cobrar -->
-								<div class="flex items-center justify-between">
-									<span class="text-xs text-gray-500 dark:text-gray-400">Por Cobrar</span>
-									<span class="text-sm font-semibold text-orange-600 dark:text-orange-400 font-mono">
-										{formatCurrency(cb.por_cobrar)}
-									</span>
-								</div>
-							</div>
-
-							<!-- Footer con conteo de inscritos -->
-							<div class="px-4 py-2 bg-gray-50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-700">
-								<p class="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
-									<UsersIcon class="size-3" />
-									{cb.inscritos} {cb.inscritos === 1 ? 'inscrito activo' : 'inscritos activos'}
-								</p>
-							</div>
-						</a>
-					{/each}
-				</div>
-			</div>
-		{/if}
+		<!-- F-DASHBOARD-V2 (2026-08-05 17:30, Kevin): la seccion "Ingresos por
+		     Programa" que estaba aca fue ELIMINADA. Sus 4 cards financieras
+		     (Matrícula, Colegiatura, Total, Por Cobrar) se movieron DENTRO
+		     de cada item del accordion "Desglose por Programa" mas abajo. -->
 
 		<!-- Program Breakdown Section (oculto para perfiles segmentados por programa) -->
 		{#if !esSegmentado}
@@ -611,7 +497,7 @@
 											<div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
 												<div class={`hidden sm:block w-1.5 h-6 rounded-full shrink-0 ${style.accent}`}></div>
 												<p class="text-sm sm:text-base font-bold text-gray-900 dark:text-white line-clamp-2 flex-1">{course.nombre}</p>
-												
+
 												<div class="flex items-center gap-2 shrink-0">
 													<span class="text-xs font-mono text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-600">{course.codigo}</span>
 													<span class={`px-2 py-1 text-[10px] sm:text-xs font-bold rounded-md uppercase tracking-wider ${course.activo ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
@@ -619,6 +505,31 @@
 													</span>
 												</div>
 											</div>
+
+											<!-- F-DASHBOARD-V2 (2026-08-05 17:30, Kevin): 4 cards
+											     financieras (Matrícula, Colegiatura, Total,
+											     Por Cobrar) DENTRO de cada item del accordion.
+											     Solo se muestran para roles económicos. -->
+											{#if verResumenEconomico}
+												<div class="grid grid-cols-2 xl:grid-cols-4 gap-2 mb-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+													<div class="bg-gray-50 dark:bg-gray-900/30 rounded p-2">
+														<p class="text-[9px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">Ingreso Matrícula</p>
+														<p class="text-xs font-bold text-gray-900 dark:text-white font-mono mt-0.5">{formatCurrency(course.ingreso_matricula)}</p>
+													</div>
+													<div class="bg-gray-50 dark:bg-gray-900/30 rounded p-2">
+														<p class="text-[9px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">Ingreso Colegiatura</p>
+														<p class="text-xs font-bold text-gray-900 dark:text-white font-mono mt-0.5">{formatCurrency(course.ingreso_colegiatura)}</p>
+													</div>
+													<div class="bg-gray-50 dark:bg-gray-900/30 rounded p-2">
+														<p class="text-[9px] uppercase tracking-wider text-gray-700 dark:text-gray-300 font-semibold">Total Ingresos</p>
+														<p class="text-xs font-bold text-green-600 dark:text-green-400 font-mono mt-0.5">{formatCurrency(course.total_ingresos)}</p>
+													</div>
+													<div class="bg-gray-50 dark:bg-gray-900/30 rounded p-2">
+														<p class="text-[9px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">Por Cobrar</p>
+														<p class="text-xs font-bold text-orange-600 dark:text-orange-400 font-mono mt-0.5">{formatCurrency(course.por_cobrar)}</p>
+													</div>
+												</div>
+											{/if}
 										</div>
 									{/each}
 								</div>
