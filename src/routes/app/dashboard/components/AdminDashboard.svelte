@@ -68,12 +68,19 @@
 		codigo: string;
 		tipo: string;
 		modalidad: string;
+		estado?: string;
 		activo: boolean;
 		inscritos: number;
 		inscritosActivos: number;
 		ingresos: number;
 		saldoPendiente: number;
 		pagosPendientes: number;
+		// F-DASHBOARD-POR-PROGRAMA (2026-08-05, Kevin): 4 indicadores
+		// financieros por programa, vienen del backend /dashboard/stats.
+		ingreso_matricula: number;
+		ingreso_colegiatura: number;
+		total_ingresos: number;
+		por_cobrar: number;
 	}
 	let courseBreakdown: CourseBreakdown[] = [];
 	let groupedByType: Record<string, CourseBreakdown[]> = {};
@@ -198,34 +205,43 @@
 				console.error("Error al obtener conteo de documentos pendientes", e);
 			}
 
-			courseBreakdown = courses.map(course => {
-				const courseEnrollments = enrollments.filter(e => e.curso_id === course._id);
-				const coursePayments = payments.filter(p => p.curso_id === course._id);
-
-				const inscritos = courseEnrollments.length;
-				const inscritosActivos = courseEnrollments.filter(e => e.estado === 'activo').length;
-				const ingresos = coursePayments
-					.filter(p => p.estado_pago === 'aprobado' || p.estado_pago === 'pagado')
-					.reduce((sum, p) => sum + p.cantidad_pago, 0);
-				const saldoPendiente = courseEnrollments
-					.reduce((sum, e) => sum + (e.saldo_pendiente ?? 0), 0);
-				const pagosPendientes = coursePayments
-					.filter(p => p.estado_pago === 'pendiente').length;
-
-				return {
-					id: course._id,
-					nombre: course.nombre_programa,
-					codigo: course.codigo,
-					tipo: course.tipo_curso,
-					modalidad: course.modalidad,
-					activo: course.activo,
-					inscritos,
-					inscritosActivos,
-					ingresos,
-					saldoPendiente,
-					pagosPendientes
-				};
-			}).sort((a, b) => b.inscritos - a.inscritos);
+			// F-DASHBOARD-POR-PROGRAMA (2026-08-05, Kevin): antes se computaba
+			// el desglose por curso en el cliente (4 queries: courses,
+			// enrollments, payments, stats) y se recalculaba todo en el browser.
+			// Ahora el backend /dashboard/stats devuelve `courseBreakdown` ya
+			// armado con los 4 indicadores financieros por programa
+			// (ingreso_matricula, ingreso_colegiatura, total_ingresos,
+			// por_cobrar) y excluyendo historicos/cerrados. Esto evita
+			// traer TODOS los payments al cliente (que pueden ser miles) y
+			// garantiza que la clasificacion matricula/colegiatura sea
+			// consistente con el Resumen Economico General.
+			if (statsRes && statsRes.courseBreakdown) {
+				courseBreakdown = statsRes.courseBreakdown.map((c: any) => ({
+					id: c.id,
+					nombre: c.nombre,
+					codigo: c.codigo,
+					tipo: c.tipo,
+					modalidad: c.modalidad,
+					estado: c.estado,
+					activo: c.activo,
+					// El backend ya filtra por enrollments activos. Usamos
+					// `inscritos` para `inscritosActivos` y dejamos los 4
+					// indicadores financieros separados para la nueva seccion.
+					inscritos: c.inscritos ?? 0,
+					inscritosActivos: c.inscritos ?? 0,
+					// Aliases para compatibilidad con "Desglose por Programa" existente
+					ingresos: c.total_ingresos ?? 0,
+					saldoPendiente: c.por_cobrar ?? 0,
+					pagosPendientes: 0, // ya no se calcula en el cliente
+					// 4 indicadores financieros por programa (NUEVO)
+					ingreso_matricula: c.ingreso_matricula ?? 0,
+					ingreso_colegiatura: c.ingreso_colegiatura ?? 0,
+					total_ingresos: c.total_ingresos ?? 0,
+					por_cobrar: c.por_cobrar ?? 0,
+				}));
+			} else {
+				courseBreakdown = [];
+			}
 
 			groupedByType = buildGrouped(courseBreakdown);
 			expandedGroups = new Set(Object.keys(groupedByType));
@@ -307,11 +323,16 @@
 		     sea un banner DIFERENTE y basado en una fecha, no en el conteo. -->
 
 		<!-- ISSUE-P-DASHBOARD-COBRANZA: Resumen Económico (Cobranza / Coordinador Financiero / MAE / Admin).
-		     Incluye la matrícula como ingreso contable aunque Cobranza no la apruebe. -->
+		     Incluye la matrícula como ingreso contable aunque Cobranza no la apruebe.
+		     F-DASHBOARD-POR-PROGRAMA (2026-08-05, Kevin): renombrado a "Resumen
+		     Económico General" para diferenciarlo del nuevo "Ingresos por Programa"
+		     agregado debajo. Kevin en reunión: "el resumen tengo que mantenerlo
+		     así como está... voy a cambiar los títulos, por ejemplo poner resumen
+		     económico general". -->
 		{#if verResumenEconomico && resumenEconomico}
 			<div>
 				<div class="flex items-center justify-between mb-4">
-					<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Resumen Económico</h2>
+					<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Resumen Económico General</h2>
 					<a href="/app/reports" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">Ver reportes</a>
 				</div>
 
@@ -443,6 +464,96 @@
 			</a>
 			{/if}
 		</div>
+
+		<!-- Program Breakdown Section (oculto para perfiles segmentados por programa) -->
+		<!-- F-DASHBOARD-POR-PROGRAMA (2026-08-05, Kevin): nueva seccion
+		     "Ingresos por Programa" con 4 cards financieras por cada curso
+		     en alcance. Coincide con los 4 cards del Resumen Economico General
+		     (Matrícula, Colegiatura, Total Ingresos, Por Cobrar) pero por
+		     programa individual. Solo visible para roles que ven el Resumen
+		     Economico General. Para perfiles segmentados (cobranza/
+		     coordinador-financiero con cursos_asignados), solo muestra sus
+		     cursos asignados (respeta la logica del backend). -->
+
+		<!-- F-DASHBOARD-POR-PROGRAMA (2026-08-05, Kevin): Ingresos por Programa -->
+		{#if verResumenEconomico && courseBreakdown.length > 0}
+			<div>
+				<div class="flex items-center justify-between mb-4">
+					<div>
+						<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Ingresos por Programa</h2>
+						<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+							{courseBreakdown.length} {courseBreakdown.length === 1 ? 'programa activo' : 'programas activos'} (excluye históricos y cerrados)
+						</p>
+					</div>
+					<a href="/app/payments" class="text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">Ver gestión de pagos</a>
+				</div>
+
+				<!-- Grid responsive: 1 col mobile, 2 col tablet, 3 col desktop.
+				     En cada card los 4 indicadores financieros del programa. -->
+				<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+					{#each courseBreakdown as cb (cb.id)}
+						{@const style = getTypeStyle(cb.tipo)}
+						<a
+							href={`/app/payments?curso_id=${cb.id}`}
+							class="block bg-white dark:bg-gray-800 rounded-xl border {style.border} shadow-sm hover:shadow-md transition-all active:scale-[0.99] overflow-hidden"
+						>
+							<!-- Header con nombre del programa + badge de tipo -->
+							<div class={`px-4 py-3 ${style.bg} border-b ${style.border}`}>
+								<div class="flex items-center gap-2 mb-1">
+									<span class={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${style.badge}`}>
+										{cb.tipo}
+									</span>
+									<span class="text-[10px] font-mono text-gray-500 dark:text-gray-400 ml-auto">{cb.codigo}</span>
+								</div>
+								<p class="text-sm font-bold text-gray-900 dark:text-white line-clamp-2 leading-tight" title={cb.nombre}>
+									{cb.nombre}
+								</p>
+							</div>
+
+							<!-- 4 indicadores financieros (mismo set que Resumen Economico General) -->
+							<div class="p-4 space-y-3">
+								<!-- Matrícula -->
+								<div class="flex items-center justify-between">
+									<span class="text-xs text-gray-500 dark:text-gray-400">Ingreso Matrícula</span>
+									<span class="text-sm font-semibold text-gray-900 dark:text-white font-mono">
+										{formatCurrency(cb.ingreso_matricula)}
+									</span>
+								</div>
+								<!-- Colegiatura -->
+								<div class="flex items-center justify-between">
+									<span class="text-xs text-gray-500 dark:text-gray-400">Ingreso Colegiatura</span>
+									<span class="text-sm font-semibold text-gray-900 dark:text-white font-mono">
+										{formatCurrency(cb.ingreso_colegiatura)}
+									</span>
+								</div>
+								<!-- Total Ingresos (matrícula + colegiatura) -->
+								<div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+									<span class="text-xs font-semibold text-gray-700 dark:text-gray-300">Total Ingresos</span>
+									<span class="text-base font-bold text-green-600 dark:text-green-400 font-mono">
+										{formatCurrency(cb.total_ingresos)}
+									</span>
+								</div>
+								<!-- Por Cobrar -->
+								<div class="flex items-center justify-between">
+									<span class="text-xs text-gray-500 dark:text-gray-400">Por Cobrar</span>
+									<span class="text-sm font-semibold text-orange-600 dark:text-orange-400 font-mono">
+										{formatCurrency(cb.por_cobrar)}
+									</span>
+								</div>
+							</div>
+
+							<!-- Footer con conteo de inscritos -->
+							<div class="px-4 py-2 bg-gray-50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-700">
+								<p class="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
+									<UsersIcon class="size-3" />
+									{cb.inscritos} {cb.inscritos === 1 ? 'inscrito activo' : 'inscritos activos'}
+								</p>
+							</div>
+						</a>
+					{/each}
+				</div>
+			</div>
+		{/if}
 
 		<!-- Program Breakdown Section (oculto para perfiles segmentados por programa) -->
 		{#if !esSegmentado}
