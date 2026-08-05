@@ -17,7 +17,7 @@
 	import { apiKyC } from '$lib/config';
 	import { alert } from '$lib/utils';
 	import type { Course } from '$lib/interfaces';
-	import { UsersIcon, CheckIcon, DocumentAddIcon, TrashIcon, PlusIcon } from '$lib/icons/outline';
+	import { UsersIcon, CheckIcon, DocumentAddIcon, TrashIcon, PlusIcon, RefreshIcon } from '$lib/icons/outline';
 
 	interface Props {
 		isOpen: boolean;
@@ -78,6 +78,13 @@
 	// (0.5, 1, etc) a descuentos_id reales.
 	let catalogoDescuentos: { _id: string; nombre: string; porcentaje: number; es_institucional?: boolean }[] = $state([]);
 	let resultadoExcel = $state<{ creados: number; inscritos: number; actualizados: number; fallidos: number; detalles: any[] } | null>(null);
+	// F-VER-FALLIDOS (2026-08-05, Kevin): vista expandible de los fallidos
+	// con carnet + razon. El usuario puede ver que fallo y reintentar.
+	let mostrarFallidos = $state(false);
+	// F-VER-FALLIDOS: nombre del filtro activo para los fallidos (todos/creacion/inscripcion)
+	let filtroFallidos = $state<'todos' | 'creacion' | 'inscripcion'>('todos');
+	// F-VER-FALLIDOS: lista de IDs de filas seleccionadas para reintentar
+	let filasSeleccionadasParaReintentar = $state<Set<string>>(new Set());
 
 	// Reset al abrir/cerrar
 	$effect(() => {
@@ -742,9 +749,36 @@
 							} else {
 								itemChunk.fila.estado = 'error';
 								itemChunk.fila.mensaje = r.message || 'Error en inscripcion';
+								// F-VER-FALLIDOS (2026-08-05, Kevin): acumular detalle
+								// del fallo para mostrarlo en la vista de resultado
+								// con carnet + razon. Permite al usuario entender
+								// QUE fallo y corregir el problema.
+								detalles.push({
+									carnet: itemChunk.fila.carnet,
+									nombre: itemChunk.fila.nombre,
+									estudiante_id: r.estudiante_id,
+									razon: r.message || 'Error desconocido',
+									tipo: 'inscripcion',
+									fila: itemChunk.fila,
+								});
 							}
 						}
 					}
+				}
+			}
+
+			// F-VER-FALLIDOS: agregar tambien los fallos del Paso 1 (crear
+			// estudiante). Esos tambien deben verse en la lista de fallidos.
+			for (const fila of filasValidas.filter((f) => f.estado === 'error' && !fila.estudiante_id)) {
+				if (!detalles.find((d) => d.carnet === fila.carnet)) {
+					detalles.push({
+						carnet: fila.carnet,
+						nombre: fila.nombre,
+						estudiante_id: null,
+						razon: fila.mensaje || 'Error creando estudiante',
+						tipo: 'creacion',
+						fila: fila,
+					});
 				}
 			}
 
@@ -764,6 +798,158 @@
 		} finally {
 			cargando = false;
 		}
+	}
+
+	/**
+	 * F-VER-FALLIDOS (2026-08-05, Kevin): reintentar SOLO los estudiantes
+	 * fallidos seleccionados. Reusa la misma logica de confirmacion
+	 * (crear si no existe, inscribir con pagos) pero solo para los
+	 * seleccionados. Si vuelven a fallar, los nuevos errores se acumulan
+	 * en la lista de fallidos.
+	 */
+	async function reintentarFallidos() {
+		if (!course) return;
+		const carnetsSeleccionados = Array.from(filasSeleccionadasParaReintentar);
+		if (carnetsSeleccionados.length === 0) {
+			alert('error', 'No hay estudiantes seleccionados para reintentar');
+			return;
+		}
+
+		cargando = true;
+		let reintentarExitosos = 0;
+		let reintentarFallidos = 0;
+		const nuevosFallidos: any[] = [];
+
+		try {
+			// Iterar solo los seleccionados
+			const filasAReintentar = filasExcel.filter(
+				(f) => carnetsSeleccionados.includes(f.carnet)
+			);
+
+			for (const fila of filasAReintentar) {
+				try {
+					// Si no tiene estudiante_id, primero crearlo
+					if (!fila.estudiante_id) {
+						try {
+							const nuevo = await crearEstudianteDesdeFila(fila);
+							fila.estudiante_id = nuevo._id;
+						} catch (e: any) {
+							fila.estado = 'error';
+							fila.mensaje = e?.response?.data?.detail || e?.message || 'Error creando';
+							reintentarFallidos++;
+							nuevosFallidos.push({
+								carnet: fila.carnet,
+								nombre: fila.nombre,
+								estudiante_id: null,
+								razon: fila.mensaje,
+								tipo: 'creacion',
+								fila: fila,
+							});
+							continue;
+						}
+					}
+
+					// Intentar inscribir (sin pagos_modulos para evitar el error de duplicado
+					// que ya cubrimos; el usuario puede agregar pagos despues si quiere)
+					const modulosCurso: any[] = (course as any)?.modulos || [];
+					const pagosModulos: Record<string, number> = {};
+					for (const pago of fila.pagos || []) {
+						const m = String(pago.modulo).match(/(\d+)\s*$/);
+						if (m) {
+							const excelIdx = parseInt(m[1], 10);
+							const cursoIdx = excelIdx - 1;
+							if (cursoIdx >= 0 && cursoIdx < modulosCurso.length) {
+								pagosModulos[String(cursoIdx)] = pago.modulo ? pago.monto : 0;
+							}
+						}
+					}
+
+					const resp = await apiKyC.post<any>(`/courses/${course._id}/initial-enrollments`, {
+						estudiantes: [
+							{
+								estudiante_id: fila.estudiante_id,
+								modulo_inicial_index: moduloInicialIndex !== null ? moduloInicialIndex : undefined,
+								matricula_pagada: matriculaPagada,
+								pagos_modulos: Object.keys(pagosModulos).length > 0 ? pagosModulos : undefined,
+							},
+						],
+					});
+
+					if (resp.exitosos > 0) {
+						fila.estado = 'existe';
+						fila.mensaje = undefined;
+						reintentarExitosos++;
+					} else {
+						// Fallo nuevamente
+						const fallo = (resp.resultados || []).find((r: any) => !r.success);
+						fila.estado = 'error';
+						fila.mensaje = fallo?.message || 'Error desconocido';
+						reintentarFallidos++;
+						nuevosFallidos.push({
+							carnet: fila.carnet,
+							nombre: fila.nombre,
+							estudiante_id: fila.estudiante_id,
+							razon: fallo?.message || 'Error desconocido',
+							tipo: 'inscripcion',
+							fila: fila,
+						});
+					}
+				} catch (e: any) {
+					fila.estado = 'error';
+					fila.mensaje = e?.response?.data?.detail || e?.message || 'Error en reintento';
+					reintentarFallidos++;
+					nuevosFallidos.push({
+						carnet: fila.carnet,
+						nombre: fila.nombre,
+						estudiante_id: fila.estudiante_id,
+						razon: fila.mensaje,
+						tipo: 'inscripcion',
+						fila: fila,
+					});
+				}
+			}
+
+			// Actualizar la lista de fallidos (mantener los que SIGUEN fallando,
+			// remover los que se corrigieron)
+			if (resultadoExcel) {
+				// Sumar exitosos al resultado
+				resultadoExcel = {
+					...resultadoExcel,
+					exitosos: (resultadoExcel.exitosos || 0) + reintentarExitosos,
+					fallidos: nuevosFallidos.length,
+					detalles: nuevosFallidos,
+				};
+			}
+
+			filasSeleccionadasParaReintentar = new Set();
+			filasExcel = [...filasExcel]; // trigger reactivity
+
+			if (reintentarExitosos > 0) {
+				alert('success', `${reintentarExitosos} estudiante(s) reintentado(s) con exito`);
+				if (onSuccess) onSuccess();
+			}
+			if (reintentarFallidos > 0) {
+				alert('warning', `${reintentarFallidos} estudiante(s) siguen fallando. Revisa las razones abajo.`);
+			}
+		} catch (e: any) {
+			console.error('Error en reintento', e);
+			alert('error', e?.message || 'Error al reintentar');
+		} finally {
+			cargando = false;
+		}
+	}
+
+	/**
+	 * F-VER-FALLIDOS: cerrar la vista de resultado y volver a la vista
+	 * de subir archivo, para cargar otro Excel (ej. solo los que fallaron
+	 * los corrigio en otro archivo y quiere reintentar).
+	 */
+	function reabrirCargaExcel() {
+		resultadoExcel = null;
+		mostrarFallidos = false;
+		filtroFallidos = 'todos';
+		filasSeleccionadasParaReintentar = new Set();
+		etapaExcel = 'subir';
 	}
 
 	/**
@@ -1198,8 +1384,145 @@
 							<div class="text-xs text-red-600 dark:text-red-400">Fallidos</div>
 						</div>
 					</div>
+
+					<!-- F-VER-FALLIDOS (2026-08-05, Kevin): vista expandible de los
+					     fallidos con carnet + razon. Permite al usuario entender
+					     que fallo y reintentar solo los que fallaron. -->
+					{#if resultadoExcel.fallidos > 0 && resultadoExcel.detalles && resultadoExcel.detalles.length > 0}
+						<div class="rounded-md border border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-900/10">
+							<button
+								type="button"
+								class="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-semibold text-red-800 dark:text-red-300"
+								onclick={() => (mostrarFallidos = !mostrarFallidos)}
+							>
+								<span>
+									{mostrarFallidos ? '▼' : '▶'} Ver {resultadoExcel.fallidos} estudiante(s) fallido(s) con razon
+								</span>
+								<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+									><path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"
+									/></svg
+								>
+							</button>
+							{#if mostrarFallidos}
+								<div class="border-t border-red-200 p-2 dark:border-red-800">
+									<!-- Filtros rapidos -->
+									<div class="mb-2 flex gap-2 text-xs">
+										<button
+											type="button"
+											class="rounded px-2 py-1 {filtroFallidos === 'todos' ? 'bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}"
+											onclick={() => (filtroFallidos = 'todos')}
+										>
+											Todos ({resultadoExcel.detalles.length})
+										</button>
+										<button
+											type="button"
+											class="rounded px-2 py-1 {filtroFallidos === 'creacion' ? 'bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}"
+											onclick={() => (filtroFallidos = 'creacion')}
+										>
+											Error creando ({resultadoExcel.detalles.filter((d) => d.tipo === 'creacion').length})
+										</button>
+										<button
+											type="button"
+											class="rounded px-2 py-1 {filtroFallidos === 'inscripcion' ? 'bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}"
+											onclick={() => (filtroFallidos = 'inscripcion')}
+										>
+											Error inscribiendo ({resultadoExcel.detalles.filter((d) => d.tipo === 'inscripcion').length})
+										</button>
+									</div>
+
+									<!-- Tabla de fallidos con scroll -->
+									<div class="max-h-64 overflow-y-auto rounded border border-red-100 bg-white dark:border-red-900 dark:bg-gray-800">
+										<table class="min-w-full divide-y divide-red-100 dark:divide-red-900 text-xs">
+											<thead class="sticky top-0 bg-red-50 dark:bg-red-900/20">
+												<tr>
+													<th class="px-2 py-1 text-left font-medium text-red-700 dark:text-red-300 w-8">
+														<input
+															type="checkbox"
+															checked={filasSeleccionadasParaReintentar.size === resultadoExcel.detalles.filter((d) => filtroFallidos === 'todos' || d.tipo === filtroFallidos).length && resultadoExcel.detalles.filter((d) => filtroFallidos === 'todos' || d.tipo === filtroFallidos).length > 0}
+															onchange={(e) => {
+																const checked = (e.currentTarget as HTMLInputElement).checked;
+																if (checked) {
+																	filasSeleccionadasParaReintentar = new Set(
+																		resultadoExcel!.detalles
+																			.filter((d) => filtroFallidos === 'todos' || d.tipo === filtroFallidos)
+																			.map((d) => d.carnet)
+																	);
+																} else {
+																	filasSeleccionadasParaReintentar = new Set();
+																}
+															}}
+														/>
+													</th>
+													<th class="px-2 py-1 text-left font-medium text-red-700 dark:text-red-300">CI</th>
+													<th class="px-2 py-1 text-left font-medium text-red-700 dark:text-red-300">Nombre</th>
+													<th class="px-2 py-1 text-left font-medium text-red-700 dark:text-red-300">Tipo</th>
+													<th class="px-2 py-1 text-left font-medium text-red-700 dark:text-red-300">Razon del fallo</th>
+												</tr>
+											</thead>
+											<tbody class="divide-y divide-red-50 dark:divide-red-900/50">
+												{#each resultadoExcel.detalles.filter((d) => filtroFallidos === 'todos' || d.tipo === filtroFallidos) as det, i (i)}
+													<tr class="hover:bg-red-50/30">
+														<td class="px-2 py-1 text-center">
+															<input
+																type="checkbox"
+																checked={filasSeleccionadasParaReintentar.has(det.carnet)}
+																onchange={(e) => {
+																	const checked = (e.currentTarget as HTMLInputElement).checked;
+																	if (checked) {
+																		filasSeleccionadasParaReintentar = new Set([...filasSeleccionadasParaReintentar, det.carnet]);
+																	} else {
+																		const nuevo = new Set(filasSeleccionadasParaReintentar);
+																		nuevo.delete(det.carnet);
+																		filasSeleccionadasParaReintentar = nuevo;
+																	}
+																}}
+															/>
+														</td>
+														<td class="px-2 py-1 font-mono text-[11px]">{det.carnet || '-'}</td>
+														<td class="px-2 py-1 max-w-[180px] truncate" title={det.nombre}>{det.nombre || '-'}</td>
+														<td class="px-2 py-1">
+															<span class="inline-flex items-center rounded {det.tipo === 'creacion' ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800'} px-1.5 py-0.5 text-[10px] font-bold">
+																{det.tipo === 'creacion' ? 'CREAR' : 'INSCRIBIR'}
+															</span>
+														</td>
+														<td class="px-2 py-1 text-[11px] text-gray-700 dark:text-gray-300 max-w-[300px]">
+															<span title={det.razon}>{det.razon}</span>
+														</td>
+													</tr>
+												{/each}
+											</tbody>
+										</table>
+									</div>
+
+									<!-- F-VER-FALLIDOS: boton para reintentar SOLO los fallidos seleccionados -->
+									<div class="mt-2 flex items-center justify-between">
+										<p class="text-xs text-gray-600 dark:text-gray-400">
+											Seleccionados: <strong>{filasSeleccionadasParaReintentar.size}</strong> de {resultadoExcel.detalles.length}
+										</p>
+										<Button
+											type="button"
+											variant="primary"
+											disabled={filasSeleccionadasParaReintentar.size === 0 || cargando}
+											loading={cargando}
+											onclick={reintentarFallidos}
+										>
+											<RefreshIcon class="size-4" />
+											Reintentar {filasSeleccionadasParaReintentar.size} seleccionado{filasSeleccionadasParaReintentar.size === 1 ? '' : 's'}
+										</Button>
+									</div>
+								</div>
+							{/if}
+						</div>
+					{/if}
 				</div>
 				<div class="flex justify-end gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+					<Button type="button" variant="secondary" onclick={reabrirCargaExcel}>
+						Cargar otro archivo
+					</Button>
 					<Button type="button" variant="primary" onclick={cerrar}>Cerrar</Button>
 				</div>
 
