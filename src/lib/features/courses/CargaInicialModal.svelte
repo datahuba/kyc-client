@@ -970,7 +970,11 @@
 		// auto-inscribe al estudiante, lo que hace que initial-enrollments
 		// falle por duplicado. La inscripcion + pagos se hace en el paso 2
 		// via /courses/{id}/initial-enrollments con pagos_modulos.
-		const emailLimpio = cleanEmail(fila.email) || `${fila.carnet}@sin-email.local`;
+		// F-FIX-EMAIL-SIN-DOMINIO (2026-08-05, Kevin): el TLD `.local` es
+		// reservado por Pydantic v2 y rechaza el email con 422. Usamos
+		// `.com` (TLD valido) y prefijamos `sin-email-` para que sea
+		// facil de identificar como placeholder en la BD.
+		const emailLimpio = cleanEmail(fila.email) || `${fila.carnet}@sin-email.com`;
 		const payload: any = {
 			registro: fila.carnet, // usar CI como registro
 			carnet: fila.carnet,
