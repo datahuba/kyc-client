@@ -273,7 +273,22 @@
 
 	/**
 	 * Parsea un Excel cargado como File.
-	 * Detecta las columnas dinamicamente (carnet, nombre, email, celular, pagos).
+	 * Detecta automaticamente la fila de headers (puede no ser la fila 1
+	 * si el Excel tiene titulos arriba) y las columnas dinamicamente
+	 * (carnet, nombre, email, celular, descuentos, pagos).
+	 *
+	 * F-HISTORICO-AUTOSERVICIO-EXCEL-FIX2 (2026-08-05, Kevin): el parser
+	 * anterior usaba XLSX.utils.sheet_to_json que asume la fila 1 como
+	 * header. Pero muchos Excels tienen titulos/titulos del programa en
+	 * las primeras filas y los headers reales estan mas abajo (ej.
+	 * LISTA MAESTRIA ORGANO JUDICIAL tenia los headers en la fila 6).
+	 * Eso causaba que 0 columnas se detectaran y todos los estudiantes
+	 * quedaran con "Sin CI/carnet".
+	 *
+	 * Solucion: leer el sheet como matriz de arrays, buscar la primera
+	 * fila que tenga >= 4 celdas de texto corto con >= 2 keywords de
+	 * headers conocidos, y usar esa como header. Luego construir las
+	 * filas a partir de la siguiente.
 	 */
 	async function parsearExcel(file: File) {
 		parseandoExcel = true;
@@ -282,11 +297,78 @@
 			const workbook = XLSX.read(buffer, { type: 'array' });
 			const sheetName = workbook.SheetNames[0];
 			const sheet = workbook.Sheets[sheetName];
-			const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
+			// Leer como matriz de arrays (no objetos) para tener control sobre
+			// cual fila es el header.
+			const rawRows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, defval: '' });
 
-			if (rows.length === 0) {
+			if (rawRows.length === 0) {
 				alert('error', 'El Excel esta vacio o no tiene datos legibles');
 				return;
+			}
+
+			// F-HISTORICO-AUTOSERVICIO-EXCEL-FIX2: buscar la fila de headers
+			// automaticamente. Una fila de headers tiene:
+			// - >= 4 celdas con texto no vacio
+			// - el texto es CORTO (headers son palabras o frases cortas, no titulos)
+			// - contiene >= 2 keywords de headers conocidos
+			const headerKeywords = [
+				'nombre', 'apellido', 'carnet', 'ci', 'cedula', 'identidad',
+				'correo', 'email', 'mail', 'celular', 'telefono', 'phone',
+				'departamento', 'descuento', 'plataforma', 'cargo',
+				'men', 'mensualidad', 'detalle', 'requisito', 'fecha'
+			];
+			let headerRowIdx = -1;
+			for (let i = 0; i < Math.min(20, rawRows.length); i++) {
+				const row = rawRows[i];
+				if (!Array.isArray(row)) continue;
+				const textCells = row.filter(
+					(c) => typeof c === 'string' && c.trim().length > 0 && c.trim().length < 60
+				);
+				if (textCells.length < 4) continue;
+				const allText = textCells.join(' ').toLowerCase();
+				const matchCount = headerKeywords.filter((k) => allText.includes(k)).length;
+				if (matchCount >= 2) {
+					headerRowIdx = i;
+					break;
+				}
+			}
+			if (headerRowIdx === -1) {
+				alert(
+					'error',
+					'No se encontraron los headers del Excel. Asegurate de que tenga columnas como Nombre, CI/Carnet, Email, Celular. Headers esperados: N°, NOMBRE COMPLETO, CORREO ELECTRONICO, CELULAR, CARNET DE IDENTIDAD.'
+				);
+				return;
+			}
+
+			// Construir headers limpios (sin acentos, sin duplicados vacios)
+			const headers: string[] = rawRows[headerRowIdx].map(
+				(h, idx) => String(h || `col_${idx}`).trim() || `col_${idx}`
+			);
+
+			// Saltar sub-headers (fila con palabras como "Hoja de Vida",
+			// "Fotocopia", "Solicitud" pero sin datos numericos/email)
+			const subheaderKeywords = /hoja|fotocopia|solicitud|credencial|fondo|provisi|requisito/i;
+			const rows: Record<string, any>[] = [];
+			for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
+				const row = rawRows[i];
+				if (!Array.isArray(row)) continue;
+				// Saltar filas completamente vacias
+				if (row.every((c) => c === '' || c == null)) continue;
+				// Detectar sub-header: palabras de requisitos sin datos reales
+				const textCells = row.filter((c) => typeof c === 'string' && c.trim().length > 0);
+				if (textCells.length > 0) {
+					const allText = textCells.join(' ');
+					const hasData = row.some(
+						(c) => /^\d{5,}/.test(String(c).trim()) || /@/.test(String(c))
+					);
+					if (subheaderKeywords.test(allText) && !hasData) continue;
+				}
+				// Construir objeto con los headers como keys
+				const obj: Record<string, any> = {};
+				for (let j = 0; j < headers.length; j++) {
+					obj[headers[j]] = row[j];
+				}
+				rows.push(obj);
 			}
 
 			// Parsear cada fila
