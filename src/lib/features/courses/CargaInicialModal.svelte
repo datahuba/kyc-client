@@ -703,6 +703,12 @@
 							modulo_inicial_index: moduloInicialIndex !== null ? moduloInicialIndex : undefined,
 							matricula_pagada: matriculaPagada,
 							pagos_modulos: Object.keys(pagosModulos).length > 0 ? pagosModulos : undefined,
+							// F-FIX-DESCUENTO-ITEM (2026-08-05, Kevin): enviar el descuento
+							// individual del item. Si el item tiene descuento_id (mapeado
+							// del Excel al catalogo), el backend lo aplica. Si NO, el
+							// backend usa el descuento del curso (maximo).
+							descuento_id: f.descuento_id || undefined,
+							descuento_personalizado: f.descuento_pct && !f.descuento_id ? f.descuento_pct : undefined,
 						},
 					};
 				});
@@ -871,6 +877,9 @@
 								modulo_inicial_index: moduloInicialIndex !== null ? moduloInicialIndex : undefined,
 								matricula_pagada: matriculaPagada,
 								pagos_modulos: Object.keys(pagosModulos).length > 0 ? pagosModulos : undefined,
+								// F-FIX-DESCUENTO-ITEM: enviar el descuento individual del item
+								descuento_id: fila.descuento_id || undefined,
+								descuento_personalizado: fila.descuento_pct && !fila.descuento_id ? fila.descuento_pct : undefined,
 							},
 						],
 					});
