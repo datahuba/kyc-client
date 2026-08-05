@@ -74,6 +74,35 @@
 		discounts.filter((d: any) => d.activo === true || d.estado === 'Activo')
 	);
 
+	// F-DESCUENTO-PREVIEW (2026-08-05, Kevin): "% del descuento global aplicado
+	// al programa en tiempo real". Lee el `descuento_id` seleccionado en el Select
+	// y devuelve el porcentaje del catalogo. Si no hay descuento seleccionado,
+	// retorna 0. Se usa para mostrar el costo efectivo de cada modulo
+	// debajo del input de costo original.
+	let descuentoGlobalPct = $derived.by(() => {
+		if (!formData.descuento_id) return 0;
+		const d = activeDiscounts.find((x: any) => x._id === formData.descuento_id);
+		return d?.porcentaje ?? formData.descuento_curso ?? 0;
+	});
+
+	// F-DESCUENTO-PREVIEW: costo efectivo de un modulo con el descuento
+	// global aplicado. Si no hay descuento, retorna el costo original.
+	function costoConDescuento(costo: number | undefined): number {
+		const c = Number(costo) || 0;
+		if (descuentoGlobalPct <= 0) return c;
+		return Math.round(c * (1 - descuentoGlobalPct / 100) * 100) / 100;
+	}
+
+	// F-DESCUENTO-PREVIEW: ahorro total del programa (suma de los ahorros
+	// por modulo). Si no hay descuento, retorna 0.
+	let ahorroTotalPrograma = $derived.by(() => {
+		if (descuentoGlobalPct <= 0) return 0;
+		return (formData.modulos || []).reduce((acc, m) => {
+			const c = Number(m.costo) || 0;
+			return acc + (c - costoConDescuento(c));
+		}, 0);
+	});
+
 	let formData: CreateCourseRequest = $state({
 		codigo: '',
 		nombre_programa: '',
@@ -633,14 +662,22 @@
 			Precio único: aplica por igual a todos los estudiantes, sin importar su lugar de procedencia.
 		</p>
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-			<Input
-				label="Costo Total (Colegiatura)"
-				id="costo_total_interno"
-				type="number"
-				bind:value={formData.costo_total_interno}
-				required
-				error={errors.costo_total_interno}
-			/>
+			<div>
+				<Input
+					label="Costo Total (Colegiatura)"
+					id="costo_total_interno"
+					type="number"
+					bind:value={formData.costo_total_interno}
+					required
+					error={errors.costo_total_interno}
+				/>
+				<!-- F-DESCUENTO-PREVIEW: preview del costo con descuento global -->
+				{#if descuentoGlobalPct > 0 && (formData.costo_total_interno || 0) > 0}
+					<p class="mt-1 text-xs text-green-700 dark:text-green-400">
+						Con {descuentoGlobalPct}% descuento: <strong>Bs {costoConDescuento(formData.costo_total_interno).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+					</p>
+				{/if}
+			</div>
 			<Input
 				label="Matrícula"
 				id="matricula_interno"
@@ -861,6 +898,20 @@
 									? 'bg-gray-100 text-gray-500 border-dashed dark:bg-gray-900'
 									: 'border-primary-300 font-semibold dark:border-primary-700'}
 							/>
+							<!-- F-DESCUENTO-PREVIEW (2026-08-05, Kevin): preview en tiempo
+							     real del costo con el descuento global aplicado. Se actualiza
+							     automaticamente cuando el usuario cambia el Select "Descuento
+							     Global" o el costo del modulo. No es destructivo: el input
+							     sigue mostrando el costo original (el descuento se aplica al
+							     inscribir, no se pisa el costo del modulo). -->
+							{#if descuentoGlobalPct > 0 && !autoCalculateModules}
+								<p class="mt-1 text-xs text-green-700 dark:text-green-400">
+									Con {descuentoGlobalPct}% descuento: <strong>Bs {costoConDescuento(formData.modulos[i].costo).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+									<span class="ml-1 text-gray-500">
+										(ahorro Bs {(Number(formData.modulos[i].costo) - costoConDescuento(formData.modulos[i].costo)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+									</span>
+								</p>
+							{/if}
 						</div>
 						<div class="w-full xl:w-2/5">
 							<Select label="Docente Titular (Opcional)" bind:value={formData.modulos[i].docente_id}>
@@ -911,6 +962,45 @@
 					El sistema está prorrateando el costo equitativamente. Cambia el switch superior a "Edición
 					Manual" para alterar los precios y no perder los cambios.
 				</p>
+			{/if}
+
+			<!-- F-DESCUENTO-PREVIEW (2026-08-05, Kevin): resumen del efecto del
+			     descuento global sobre el costo total del programa. Se muestra
+			     solo si hay descuento seleccionado y NO esta en modo auto-calculo. -->
+			{#if descuentoGlobalPct > 0 && !autoCalculateModules}
+				<div
+					class="mt-3 rounded-md border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+				>
+					<div class="flex items-center gap-2 font-semibold">
+						<svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+							/></svg
+						>
+						Resumen con Descuento Global {descuentoGlobalPct}%
+					</div>
+					<div class="mt-1 grid grid-cols-3 gap-2 text-xs">
+						<div>
+							<div class="text-gray-600 dark:text-gray-400">Costo original</div>
+							<div class="font-semibold">Bs {((formData.modulos || []).reduce((acc, m) => acc + (Number(m.costo) || 0), 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+						</div>
+						<div>
+							<div class="text-gray-600 dark:text-gray-400">Ahorro total</div>
+							<div class="font-semibold text-green-700 dark:text-green-400">Bs {ahorroTotalPrograma.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+						</div>
+						<div>
+							<div class="text-gray-600 dark:text-gray-400">Costo con descuento</div>
+							<div class="font-semibold">Bs {(((formData.modulos || []).reduce((acc, m) => acc + (Number(m.costo) || 0), 0)) - ahorroTotalPrograma).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+						</div>
+					</div>
+					<p class="mt-1 text-xs text-gray-500 dark:text-gray-400 italic">
+						Este descuento se aplica automaticamente al inscribir cada estudiante.
+						El costo de los modulos arriba NO se modifica.
+					</p>
+				</div>
 			{/if}
 		</Card>
 	{/if}
