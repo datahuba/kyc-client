@@ -24,10 +24,6 @@
 	// `es_historico` se deriva para mantener retrocompat con la lógica
 	// existente del form (validaciones, secciones condicionales).
 	type TipoPrograma = 'proximo' | 'en_ejecucion' | 'historico';
-	// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): si el wizard paso
-	// un initialTipoPrograma, lo respetamos. Si no, default 'proximo'.
-	let tipo_programa: TipoPrograma = $state(initialTipoPrograma);
-	let es_historico = $derived(tipo_programa === 'historico');
 
 	interface Props {
 		course?: Course | null;
@@ -40,12 +36,22 @@
 		onCancel: () => void;
 	}
 
+	// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): $props() DEBE ir
+	// ANTES de cualquier uso de las props, sino Svelte 5 produce un
+	// ReferenceError: Cannot access 're' (la prop renombrada) before
+	// initialization. Esto es lo que causaba el error en consola al
+	// intentar elegir un tipo de programa.
 	let {
 		course = null,
 		initialTipoPrograma = 'proximo',
 		onSuccess,
 		onCancel
 	}: Props = $props();
+
+	// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): si el wizard paso
+	// un initialTipoPrograma, lo respetamos. Si no, default 'proximo'.
+	let tipo_programa: TipoPrograma = $state(initialTipoPrograma);
+	let es_historico = $derived(tipo_programa === 'historico');
 
 	let isEditMode = $derived(!!course);
 	let saving = $state(false);
