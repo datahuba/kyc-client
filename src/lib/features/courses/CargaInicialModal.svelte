@@ -65,7 +65,7 @@
 	let excelFileName = $state('');
 	let parseandoExcel = $state(false);
 	let etapaExcel: 'subir' | 'preview' | 'procesando' | 'resultado' = $state('subir');
-	let resultadoExcel = $state<{ creados: number; inscritos: number; fallidos: number; detalles: any[] } | null>(null);
+	let resultadoExcel = $state<{ creados: number; inscritos: number; actualizados: number; fallidos: number; detalles: any[] } | null>(null);
 
 	// Reset al abrir/cerrar
 	$effect(() => {
@@ -464,6 +464,7 @@
 		const detalles: any[] = [];
 		let creados = 0;
 		let inscritos = 0;
+		let actualizados = 0;
 		let fallidos = 0;
 
 		try {
@@ -497,7 +498,7 @@
 							const modulosCurso: any[] = (course as any)?.modulos || [];
 							for (const pago of f.pagos || []) {
 								// Detectar el numero de modulo en el nombre original
-								// "Pago M\u00f3dulo1" o "Pago Modulo1" o "MODULO 1"
+								// "Pago Módulo1" o "Pago Modulo1" o "MODULO 1"
 								const m = String(pago.modulo).match(/(\d+)\s*$/);
 								if (m) {
 									const excelIdx = parseInt(m[1], 10); // 1-based
@@ -516,7 +517,15 @@
 						}),
 					};
 					const resp = await apiKyC.post<any>(`/courses/${course._id}/initial-enrollments`, payload);
+					// F-HISTORICO-AUTOSERVICIO-EXCEL-PAGOS2 (2026-08-04): el backend
+					// ahora puede ACTUALIZAR pagos de estudiantes ya inscritos (no
+					// solo crear). "exitosos" del backend incluye a los actualizados
+					// para reflejar el trabajo realizado. "ya_inscritos" son los que
+					// ya estaban sin cambios.
 					inscritos = resp.exitosos || 0;
+					actualizados = (resp.resultados || []).filter((r: any) =>
+						r.success && r.message && r.message.includes('actualizaron pagos')
+					).length;
 					fallidos += resp.fallidos || 0;
 				} catch (e: any) {
 					console.error('Error en inscripcion batch', e);
@@ -524,11 +533,14 @@
 				}
 			}
 
-			resultadoExcel = { creados, inscritos, fallidos, detalles };
+			resultadoExcel = { creados, inscritos, actualizados, fallidos, detalles };
 			etapaExcel = 'resultado';
 
 			if (inscritos > 0 || creados > 0) {
-				alert('success', `${creados} creado(s), ${inscritos} inscrito(s)`);
+				const msg = actualizados > 0
+					? `${creados} creado(s), ${inscritos} procesado(s) (${actualizados} con pagos actualizados)`
+					: `${creados} creado(s), ${inscritos} inscrito(s)`;
+				alert('success', msg);
 				if (onSuccess) onSuccess();
 			}
 		} catch (e: any) {
@@ -906,14 +918,18 @@
 			<!-- ============== MODO EXCEL: RESULTADO ============== -->
 			{:else if tabActiva === 'excel' && etapaExcel === 'resultado' && resultadoExcel}
 				<div class="space-y-4 py-4">
-					<div class="grid grid-cols-3 gap-3 text-center">
+					<div class="grid grid-cols-4 gap-2 text-center">
 						<div class="rounded-md bg-blue-50 p-3 dark:bg-blue-900/20">
 							<div class="text-3xl font-bold text-blue-700 dark:text-blue-300">{resultadoExcel.creados}</div>
 							<div class="text-xs text-blue-600 dark:text-blue-400">Creados</div>
 						</div>
 						<div class="rounded-md bg-green-50 p-3 dark:bg-green-900/20">
 							<div class="text-3xl font-bold text-green-700 dark:text-green-300">{resultadoExcel.inscritos}</div>
-							<div class="text-xs text-green-600 dark:text-green-400">Inscritos</div>
+							<div class="text-xs text-green-600 dark:text-green-400">Procesados</div>
+						</div>
+						<div class="rounded-md bg-amber-50 p-3 dark:bg-amber-900/20">
+							<div class="text-3xl font-bold text-amber-700 dark:text-amber-300">{resultadoExcel.actualizados || 0}</div>
+							<div class="text-xs text-amber-600 dark:text-amber-400">Actualizados</div>
 						</div>
 						<div class="rounded-md bg-red-50 p-3 dark:bg-red-900/20">
 							<div class="text-3xl font-bold text-red-700 dark:text-red-300">{resultadoExcel.fallidos}</div>
