@@ -124,8 +124,11 @@
 					descuento_curso: course.descuento_curso,
 					descuento_id: (course as any).descuento_id || '',
 					observacion: course.observacion,
-					fecha_inicio: course.fecha_inicio.split('T')[0],
-					fecha_fin: course.fecha_fin.split('T')[0],
+					// F-HISTORICO-AUTOSERVICIO-EXCEL-FIX (2026-08-04): los cursos
+					// historicos pueden no tener fecha_inicio/fin (o ser null).
+					// Proteger el split contra null/undefined para no romper el form.
+					fecha_inicio: course.fecha_inicio ? course.fecha_inicio.split('T')[0] : '',
+					fecha_fin: course.fecha_fin ? course.fecha_fin.split('T')[0] : '',
 					activo: course.activo,
 					modulos: course.modulos
 						? course.modulos.map((m) => ({ ...m, docente_id: m.docente_id || '' }))
