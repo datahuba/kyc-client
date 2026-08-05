@@ -371,6 +371,10 @@
 	/**
 	 * Verifica cada fila contra la BD: si el CI existe, marca como 'existe'.
 	 * Si hay duplicados dentro del mismo Excel, marca como 'duplicado'.
+	 *
+	 * F-HISTORICO-EXCEL-BATCH-LOOKUP (2026-08-04): antes hacia 1 request
+	 * por carnet (~12s c/u, 62 carnets = 12+ min de timeout). Ahora usa
+	 * POST /students/batch-lookup que resuelve todos en 1 sola query MongoDB.
 	 */
 	async function verificarEstudiantesEnBD() {
 		// Detectar duplicados primero
@@ -381,7 +385,7 @@
 			}
 		}
 
-		// Marcar duplicados y consultar la BD para los unicos
+		// Marcar duplicados y juntar carnets unicos
 		const carnetsUnicos = new Set<string>();
 		for (const fila of filasExcel) {
 			if (!fila.carnet) continue;
@@ -393,31 +397,46 @@
 			}
 		}
 
-		// Consultar la BD en paralelo (con rate limiting implicito)
-		const promesas = Array.from(carnetsUnicos).map(async (carnet) => {
-			try {
-				const resp = await studentService.getAll(1, 5, { q: carnet });
-				const match = resp.data.find((s: any) => s.carnet === carnet);
-				return { carnet, match: match || null };
-			} catch {
-				return { carnet, match: null };
-			}
-		});
+		if (carnetsUnicos.size === 0) return;
 
-		const results = await Promise.all(promesas);
-		const map = new Map(results.map((r) => [r.carnet, r.match]));
+		// 1 sola llamada batch en vez de N llamadas individuales
+		let results: any[] = [];
+		try {
+			results = await apiKyC.post<any[]>('/students/batch-lookup', {
+				carnets: Array.from(carnetsUnicos)
+			});
+		} catch (e) {
+			console.error('Error en batch-lookup, fallback a busqueda individual', e);
+			// Fallback: si el endpoint falla, volver al metodo viejo (1 por 1)
+			const promesas = Array.from(carnetsUnicos).map(async (carnet) => {
+				try {
+					const resp = await studentService.getAll(1, 5, { q: carnet });
+					const match = resp.data.find((s: any) => s.carnet === carnet);
+					return { carnet, match: match || null };
+				} catch {
+					return { carnet, match: null };
+				}
+			});
+			const fallback = await Promise.all(promesas);
+			results = fallback.map((r) => ({
+				carnet: r.carnet,
+				estudiante_id: r.match?._id,
+				nombre: r.match?.nombre,
+				existe: !!r.match,
+			}));
+		}
+
+		const map = new Map(results.map((r) => [r.carnet, r]));
 
 		for (const fila of filasExcel) {
 			if (fila.estado === 'duplicado' || !fila.carnet) continue;
 			const match = map.get(fila.carnet);
-			if (match) {
+			if (match && match.existe) {
 				fila.estado = 'existe';
-				fila.estudiante_id = match._id;
+				fila.estudiante_id = match.estudiante_id;
 				fila.mensaje = `Ya existe: ${match.nombre || '(sin nombre)'}`;
 				// Completar datos faltantes con los del Excel
 				if (!fila.nombre && match.nombre) fila.nombre = match.nombre;
-				if (!fila.email && match.email) fila.email = match.email;
-				if (!fila.celular && match.celular) fila.celular = match.celular;
 			}
 			// Si no existe, ya esta marcado como 'nuevo' (default)
 		}
