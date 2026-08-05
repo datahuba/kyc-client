@@ -506,10 +506,11 @@
 				.filter((f) => f.estudiante_id);
 			if (idsParaInscribir.length > 0) {
 				// F-HISTORICO-EXCEL-TIMEOUT (2026-08-04): el backend procesa
-				// cada item serial (~500ms c/u, 62 items = 30s = timeout).
-				// Dividir en chunks de 20 items, en paralelo (max 3 a la vez),
-				// para reducir tiempo total a ~5-7s en vez de 30s+.
-				const CHUNK_SIZE = 20;
+				// cada item serial (~500ms-1.5s c/u, 62 items = 30-90s).
+				// Dividir en chunks PEQUEÑOS (10 items) para que cada request
+				// tarde < 15s (margen del timeout de 30s del cliente).
+				// 3 chunks en paralelo = 30 items en 15s = 62 items en ~30s.
+				const CHUNK_SIZE = 10;
 				const items = idsParaInscribir.map((f) => {
 					const pagosModulos: Record<string, number> = {};
 					const modulosCurso: any[] = (course as any)?.modulos || [];
@@ -546,9 +547,13 @@
 				let chunkIndex = 0;
 				const results: any[] = [];
 				const ejecutarChunk = async (chunk: typeof items) => {
-					const resp = await apiKyC.post<any>(`/courses/${course._id}/initial-enrollments`, {
-						estudiantes: chunk.map((c) => c.item),
-					});
+					// F-HISTORICO-EXCEL-TIMEOUT (2026-08-04): customTimeout=120s
+					// porque cada item tarda 0.5-1.5s serial en el backend.
+					const resp = await apiKyC.post<any>(
+						`/courses/${course._id}/initial-enrollments`,
+						{ estudiantes: chunk.map((c) => c.item) },
+						{ customTimeout: 120000 }
+					);
 					return { chunk, resp };
 				};
 				while (chunkIndex < chunks.length) {
