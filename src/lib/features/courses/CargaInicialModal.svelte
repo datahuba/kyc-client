@@ -486,50 +486,77 @@
 			const idsParaInscribir = filasValidas
 				.filter((f) => f.estudiante_id);
 			if (idsParaInscribir.length > 0) {
-				try {
-					const payload = {
-						estudiantes: idsParaInscribir.map((f) => {
-							// Mapear pagos del Excel a indices de modulo del curso.
-							// El Excel tiene columnas "Pago Módulo1" ... "Pago Módulo5"
-							// y el curso tiene modulos[0..N-1]. Asumimos que el orden
-							// de las columnas Pago MóduloN corresponde al modulo N-1
-							// del curso (1-indexed en Excel, 0-indexed en array).
-							const pagosModulos: Record<string, number> = {};
-							const modulosCurso: any[] = (course as any)?.modulos || [];
-							for (const pago of f.pagos || []) {
-								// Detectar el numero de modulo en el nombre original
-								// "Pago Módulo1" o "Pago Modulo1" o "MODULO 1"
-								const m = String(pago.modulo).match(/(\d+)\s*$/);
-								if (m) {
-									const excelIdx = parseInt(m[1], 10); // 1-based
-									const cursoIdx = excelIdx - 1; // 0-based
-									if (cursoIdx >= 0 && cursoIdx < modulosCurso.length) {
-										pagosModulos[String(cursoIdx)] = pago.monto;
-									}
-								}
+				// F-HISTORICO-EXCEL-TIMEOUT (2026-08-04): el backend procesa
+				// cada item serial (~500ms c/u, 62 items = 30s = timeout).
+				// Dividir en chunks de 20 items, en paralelo (max 3 a la vez),
+				// para reducir tiempo total a ~5-7s en vez de 30s+.
+				const CHUNK_SIZE = 20;
+				const items = idsParaInscribir.map((f) => {
+					const pagosModulos: Record<string, number> = {};
+					const modulosCurso: any[] = (course as any)?.modulos || [];
+					for (const pago of f.pagos || []) {
+						const m = String(pago.modulo).match(/(\d+)\s*$/);
+						if (m) {
+							const excelIdx = parseInt(m[1], 10);
+							const cursoIdx = excelIdx - 1;
+							if (cursoIdx >= 0 && cursoIdx < modulosCurso.length) {
+								pagosModulos[String(cursoIdx)] = pago.monto;
 							}
-							return {
-								estudiante_id: f.estudiante_id,
-								modulo_inicial_index: moduloInicialIndex !== null ? moduloInicialIndex : undefined,
-								matricula_pagada: matriculaPagada,
-								pagos_modulos: Object.keys(pagosModulos).length > 0 ? pagosModulos : undefined,
-							};
-						}),
+						}
+					}
+					return {
+						estudiante_id: f.estudiante_id,
+						fila: f,
+						item: {
+							estudiante_id: f.estudiante_id,
+							modulo_inicial_index: moduloInicialIndex !== null ? moduloInicialIndex : undefined,
+							matricula_pagada: matriculaPagada,
+							pagos_modulos: Object.keys(pagosModulos).length > 0 ? pagosModulos : undefined,
+						},
 					};
-					const resp = await apiKyC.post<any>(`/courses/${course._id}/initial-enrollments`, payload);
-					// F-HISTORICO-AUTOSERVICIO-EXCEL-PAGOS2 (2026-08-04): el backend
-					// ahora puede ACTUALIZAR pagos de estudiantes ya inscritos (no
-					// solo crear). "exitosos" del backend incluye a los actualizados
-					// para reflejar el trabajo realizado. "ya_inscritos" son los que
-					// ya estaban sin cambios.
-					inscritos = resp.exitosos || 0;
-					actualizados = (resp.resultados || []).filter((r: any) =>
-						r.success && r.message && r.message.includes('actualizaron pagos')
-					).length;
+				});
+
+				// Dividir en chunks
+				const chunks: typeof items[] = [];
+				for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+					chunks.push(items.slice(i, i + CHUNK_SIZE));
+				}
+
+				// Procesar chunks en paralelo (max 3 a la vez para no saturar)
+				const PARALLEL = 3;
+				let chunkIndex = 0;
+				const results: any[] = [];
+				const ejecutarChunk = async (chunk: typeof items) => {
+					const resp = await apiKyC.post<any>(`/courses/${course._id}/initial-enrollments`, {
+						estudiantes: chunk.map((c) => c.item),
+					});
+					return { chunk, resp };
+				};
+				while (chunkIndex < chunks.length) {
+					const batch = chunks.slice(chunkIndex, chunkIndex + PARALLEL);
+					const batchResults = await Promise.all(batch.map(ejecutarChunk));
+					results.push(...batchResults);
+					chunkIndex += PARALLEL;
+				}
+
+				// Acumular resultados
+				for (const { chunk, resp } of results) {
+					inscritos += resp.exitosos || 0;
 					fallidos += resp.fallidos || 0;
-				} catch (e: any) {
-					console.error('Error en inscripcion batch', e);
-					fallidos += idsParaInscribir.length;
+					for (const r of resp.resultados || []) {
+						const itemChunk = chunk.find((c) => c.estudiante_id === r.estudiante_id);
+						if (itemChunk) {
+							if (r.success) {
+								itemChunk.fila.estado = 'existe';
+								if (r.message && r.message.includes('actualizaron pagos')) {
+									actualizados++;
+								}
+							} else {
+								itemChunk.fila.estado = 'error';
+								itemChunk.fila.mensaje = r.message || 'Error en inscripcion';
+							}
+						}
+					}
 				}
 			}
 
