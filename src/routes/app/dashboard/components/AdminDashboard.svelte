@@ -509,24 +509,30 @@
 											<!-- F-DASHBOARD-V2 (2026-08-05 17:30, Kevin): 4 cards
 											     financieras (Matrícula, Colegiatura, Total,
 											     Por Cobrar) DENTRO de cada item del accordion.
-											     Solo se muestran para roles económicos. -->
+											     Solo se muestran para roles económicos.
+											     F-DASHBOARD-V3 (2026-08-05 20:05, Kevin): +
+											     card "Estudiantes" + letras más grandes. -->
 											{#if verResumenEconomico}
-												<div class="grid grid-cols-2 xl:grid-cols-4 gap-2 mb-4 pt-3 border-t border-gray-100 dark:border-gray-700">
-													<div class="bg-gray-50 dark:bg-gray-900/30 rounded p-2">
-														<p class="text-[9px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">Ingreso Matrícula</p>
-														<p class="text-xs font-bold text-gray-900 dark:text-white font-mono mt-0.5">{formatCurrency(course.ingreso_matricula)}</p>
+												<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+													<div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-100 dark:border-blue-800">
+														<p class="text-xs uppercase tracking-wider text-blue-700 dark:text-blue-300 font-semibold">Estudiantes</p>
+														<p class="text-lg font-bold text-blue-700 dark:text-blue-300 font-mono mt-1">{course.inscritos}</p>
 													</div>
-													<div class="bg-gray-50 dark:bg-gray-900/30 rounded p-2">
-														<p class="text-[9px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">Ingreso Colegiatura</p>
-														<p class="text-xs font-bold text-gray-900 dark:text-white font-mono mt-0.5">{formatCurrency(course.ingreso_colegiatura)}</p>
+													<div class="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-3">
+														<p class="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">Ingreso Matrícula</p>
+														<p class="text-base font-bold text-gray-900 dark:text-white font-mono mt-1">{formatCurrency(course.ingreso_matricula)}</p>
 													</div>
-													<div class="bg-gray-50 dark:bg-gray-900/30 rounded p-2">
-														<p class="text-[9px] uppercase tracking-wider text-gray-700 dark:text-gray-300 font-semibold">Total Ingresos</p>
-														<p class="text-xs font-bold text-green-600 dark:text-green-400 font-mono mt-0.5">{formatCurrency(course.total_ingresos)}</p>
+													<div class="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-3">
+														<p class="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">Ingreso Colegiatura</p>
+														<p class="text-base font-bold text-gray-900 dark:text-white font-mono mt-1">{formatCurrency(course.ingreso_colegiatura)}</p>
 													</div>
-													<div class="bg-gray-50 dark:bg-gray-900/30 rounded p-2">
-														<p class="text-[9px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">Por Cobrar</p>
-														<p class="text-xs font-bold text-orange-600 dark:text-orange-400 font-mono mt-0.5">{formatCurrency(course.por_cobrar)}</p>
+													<div class="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-3">
+														<p class="text-xs uppercase tracking-wider text-gray-700 dark:text-gray-300 font-semibold">Total Ingresos</p>
+														<p class="text-base font-bold text-green-600 dark:text-green-400 font-mono mt-1">{formatCurrency(course.total_ingresos)}</p>
+													</div>
+													<div class="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-3">
+														<p class="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">Por Cobrar</p>
+														<p class="text-base font-bold text-orange-600 dark:text-orange-400 font-mono mt-1">{formatCurrency(course.por_cobrar)}</p>
 													</div>
 												</div>
 											{/if}
