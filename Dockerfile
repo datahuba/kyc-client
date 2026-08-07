@@ -23,5 +23,6 @@ EXPOSE 3000
 # detalles. Por default 4 workers, configurable con WEB_CONCURRENCY.
 ENV WEB_CONCURRENCY=4
 ENV PORT=3000
-CMD ["node", "server.js"]
+# TEMP: revert to build/index.js para diagnosticar error de bundle
+CMD ["node", "build/index.js"]
 
