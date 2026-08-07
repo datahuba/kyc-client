@@ -1,12 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { studentService, courseService, enrollmentService, paymentService, dashboardService, cuentasPorCobrarService } from '$lib/services';
-	import type { ResumenEconomico } from '$lib/services/payment.service';
-	import type { CxCResumenReducido } from '$lib/services/cuentas-por-cobrar.service';
-	import type { Enrollment, Payment } from '$lib/interfaces';
+	import { dashboardService } from '$lib/services';
+	import type { DashboardStats, DashboardCourseBreakdown } from '$lib/services/dashboard.service';
 	import { UsersIcon, ClipboardIcon, TagIcon, ChartBarIcon } from '$lib/icons/outline';
-	// FIX-DASH-001: UsersIcon, TagIcon, ClipboardIcon se mantienen en import
-	// por si se usan en el Resumen Económico (línea ~358 usa ClipboardIcon).
 	import { CreditCardIcon } from '$lib/icons/solid';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -19,35 +15,31 @@
 	// F-COBRANZA-041 (2026-07-22): tarjetas KPI de inscritos movidas de
 	// /app/enrollments al Dashboard (Kevin: "deberian salir en el dashboard
 	// no en inscripciones").
-	import type { EnrollmentResumen } from '$lib/interfaces';
 	import KpiInscritosCards from '$lib/components/dashboard/KpiInscritosCards.svelte';
 	// F-DASHBOARD-R9 (2026-08-05 20:40, Kevin): KPI por programa con drill-down.
-	// ISSUE R9 reunion 2026-08-04: al hacer click en un programa, mostrar
-	// Inscritos / Activos / Congelados / Completados + lista de estudiantes.
 	import KpiInscritosPorPrograma from '$lib/components/dashboard/KpiInscritosPorPrograma.svelte';
 
-	// ISSUE-P-DASHBOARD-COBRANZA: el resumen económico (con matrícula como
-	// ingreso) solo aplica a los roles que ven finanzas, igual que los reportes.
-	// NOTA: este componente está en modo legacy (Svelte 4, sin runas); se
-	// mantiene ese estilo aquí para no romper la reactividad de `loading`/`stats`.
-	// ISSUE-R-PERFIL-GENERICO: roles económicos base + coordinador SOLO si es financiero.
+	// F-PERF-DASHBOARD-V2 (2026-08-06, Kevin): UN SOLO request al backend.
+	// Antes: 9 llamadas en paralelo (students, courses, enrollments, payments,
+	// dashboard/stats, payments/resumen-economico, enrollments/stats/resumen,
+	// cuentas-por-cobrar/resumen-reducido, pending docs) -> 8.6s cold.
+	// Ahora: 1 sola llamada a /dashboard/v2 -> ~1-2s cold, <50ms hot.
+	// El backend devuelve TODO consolidado:
+	//   stats + courseBreakdown + resumenInscritos + resumenEconomico
+	//   + cxcResumen + recentEnrollments + recentPayments + pendingDocumentsCount
+
+	// ROLES QUE VEN INSCRITOS: todos los administrativos (excluye student).
+	const ROLES_QUE_VEN_INSCRITOS = ['superadmin', 'admin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'];
 	const ROLES_ECONOMICOS_BASE = ['superadmin', 'admin', 'cobranza', 'mae'];
 	const ROLES_QUE_VEN_PAGOS = ['superadmin', 'admin', 'mae', 'cobranza', 'cpd'];
-	let resumenEconomico: ResumenEconomico | null = null;
-	// F-CUENTAS-POR-COBRAR (2026-07-29): tarjeta con desglose real vs estimado.
-	let cxcResumen: CxCResumenReducido | null = null;
-	// F-COBRANZA-041: KPI de inscritos (Total Inicial, Activos, Pasivos, Detalle, Completados).
-	let resumenInscritos: EnrollmentResumen | null = null;
-	// ROLES QUE VEN INSCRITOS: todos los administrativos (excluye student).
-	// Encargado_curso y coordinador también lo ven (es su info operativa).
-	const ROLES_QUE_VEN_INSCRITOS = ['superadmin', 'admin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'];
 
 	$: currentRole = $userStore.role || '';
 	$: esCoordinadorFinanciero = $userStore.user?.subtipo_coordinador === 'financiero';
-	$: verResumenEconomico = ROLES_ECONOMICOS_BASE.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero);
-	$: puedeVerPagos = ROLES_QUE_VEN_PAGOS.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero);
+	// F-PERF-DASHBOARD-V2: resumenEconomico y cxcResumen vienen del response v2.
+	// Si vienen con datos (no null) y el rol es economico, mostrarlos.
+	$: verResumenEconomico = (ROLES_ECONOMICOS_BASE.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero)) && resumenEconomico != null;
 	// F-COBRANZA-041: KPI inscritos visible para roles administrativos.
-	$: verKpiInscritos = ROLES_QUE_VEN_INSCRITOS.includes(currentRole);
+	$: verKpiInscritos = ROLES_QUE_VEN_INSCRITOS.includes(currentRole) && resumenInscritos != null;
 
 	// Perfiles segmentados (cobranza/encargado con cursos_asignados) NO necesitan
 	// el "Desglose por Curso": su vista ya está acotada a sus cursos, así que sería
@@ -56,15 +48,18 @@
 	$: esSegmentado = cursosAsignados.length > 0;
 
 	let loading = true;
-	let stats = {
+	let stats: DashboardStats = {
 		students: { total: 0, active: 0 },
 		courses: { total: 0, active: 0 },
 		enrollments: { total: 0, active: 0 },
 		payments: { total: 0, pending: 0, revenue: 0 }
 	};
-
-	let recentEnrollments: (Enrollment & { studentName?: string, courseName?: string })[] = [];
-	let recentPayments: (Payment & { studentName?: string, courseName?: string })[] = [];
+	let resumenEconomico: any = null;       // viene del v2
+	let cxcResumen: any = null;             // viene del v2
+	let resumenInscritos: any = null;       // viene del v2
+	let recentEnrollments: any[] = [];      // viene del v2
+	let recentPayments: any[] = [];         // viene del v2
+	let pendingDocumentsCount = 0;          // viene del v2
 
 	interface CourseBreakdown {
 		id: string;
@@ -89,8 +84,7 @@
 	let courseBreakdown: CourseBreakdown[] = [];
 	let groupedByType: Record<string, CourseBreakdown[]> = {};
 	let expandedGroups: Set<string> = new Set();
-	
-	let pendingDocumentsCount = 0;
+
 	let showDocumentModal = false;
 
 	const TYPE_ORDER = ['maestría', 'doctorado', 'diplomado', 'curso', 'taller', 'seminario', 'otro'];
@@ -140,141 +134,42 @@
 
 	onMount(async () => {
 		try {
-			const snap = get(userStore);
-			const roleNow = snap.role || snap.user?.rol || '';
-			const esCoordFinNow = snap.user?.subtipo_coordinador === 'financiero';
-			const puedeVerPagosNow = ROLES_QUE_VEN_PAGOS.includes(roleNow) || (roleNow === 'coordinador' && esCoordFinNow);
+			// F-PERF-DASHBOARD-V2 (2026-08-06, Kevin): UNA SOLA LLAMADA al backend.
+			// Antes: 9 requests en paralelo que sumaban ~8.6s en el peor caso.
+			// Ahora: 1 request a /dashboard/v2 que devuelve TODO consolidado.
+			// Cold cache: ~1-2s esperado. Hot cache: <50ms.
+			const v2 = await dashboardService.getV2();
 
-			const [
-				studentsRes,
-				coursesRes,
-				enrollmentsRes,
-				statsRes
-			] = await Promise.all([
-				studentService.getAll(1, 100),
-				courseService.getAll(1, 100),
-				enrollmentService.getAll(1, 100),
-				dashboardService.getStats()
-			]);
-
-			const students = studentsRes.data ?? [];
-			const courses = coursesRes.data ?? [];
-			const enrollments = enrollmentsRes.data ?? [];
-			
-			let payments: Payment[] = [];
-			if (puedeVerPagosNow) {
-				try {
-					const paymentsRes = await paymentService.getAll(1, 100);
-					payments = paymentsRes.data ?? [];
-				} catch (e) {
-					console.error("Error fetching payments for dashboard:", e);
-				}
-			}
-
-			stats = statsRes;
-
-			const studentsMap = students.reduce(
-				(acc, s) => ({ ...acc, [s._id]: s.nombre }),
-				{} as Record<string, string>
-			);
-
-			const coursesMap = courses.reduce(
-				(acc, c) => ({ ...acc, [c._id]: c.nombre_programa }),
-				{} as Record<string, string>
-			);
-
-			recentEnrollments = enrollments
-				.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-				.slice(0, 5)
-				.map(e => ({
-					...e,
-					studentName: studentsMap[e.estudiante_id] || 'Desconocido',
-					courseName: coursesMap[e.curso_id] || 'Desconocido'
-				}));
-
-			recentPayments = payments
-				.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-				.slice(0, 5)
-				.map(p => ({
-					...p,
-					studentName: studentsMap[p.estudiante_id] || 'Desconocido',
-					courseName: coursesMap[p.curso_id] || '—'
-				}));
-				
-			// Cargar conteo de documentos pendientes (solo primer fetch)
-			try {
-				const pendingDocsRes = await enrollmentService.getAll(1, 1, { requiere_accion_documentos: true });
-				pendingDocumentsCount = pendingDocsRes.meta.totalItems;
-			} catch (e) {
-				console.error("Error al obtener conteo de documentos pendientes", e);
-			}
-
-			// F-DASHBOARD-POR-PROGRAMA (2026-08-05, Kevin): antes se computaba
-			// el desglose por curso en el cliente (4 queries: courses,
-			// enrollments, payments, stats) y se recalculaba todo en el browser.
-			// Ahora el backend /dashboard/stats devuelve `courseBreakdown` ya
-			// armado con los 4 indicadores financieros por programa
-			// (ingreso_matricula, ingreso_colegiatura, total_ingresos,
-			// por_cobrar) y excluyendo historicos/cerrados. Esto evita
-			// traer TODOS los payments al cliente (que pueden ser miles) y
-			// garantiza que la clasificacion matricula/colegiatura sea
-			// consistente con el Resumen Economico General.
-			if (statsRes && statsRes.courseBreakdown) {
-				courseBreakdown = statsRes.courseBreakdown.map((c: any) => ({
-					id: c.id,
-					nombre: c.nombre,
-					codigo: c.codigo,
-					tipo: c.tipo,
-					modalidad: c.modalidad,
-					estado: c.estado,
-					activo: c.activo,
-					// El backend ya filtra por enrollments activos. Usamos
-					// `inscritos` para `inscritosActivos` y dejamos los 4
-					// indicadores financieros separados para la nueva seccion.
-					inscritos: c.inscritos ?? 0,
-					inscritosActivos: c.inscritos ?? 0,
-					// Aliases para compatibilidad con "Desglose por Programa" existente
-					ingresos: c.total_ingresos ?? 0,
-					saldoPendiente: c.por_cobrar ?? 0,
-					pagosPendientes: 0, // ya no se calcula en el cliente
-					// 4 indicadores financieros por programa (NUEVO)
-					ingreso_matricula: c.ingreso_matricula ?? 0,
-					ingreso_colegiatura: c.ingreso_colegiatura ?? 0,
-					total_ingresos: c.total_ingresos ?? 0,
-					por_cobrar: c.por_cobrar ?? 0,
-				}));
-			} else {
-				courseBreakdown = [];
-			}
-
+			stats = v2.stats;
+			// F-PERF-DASHBOARD-V2 (2026-08-06, Kevin): el backend v2 ya devuelve
+			// courseBreakdown con los 4 indicadores. Mapeamos al shape local.
+			courseBreakdown = (v2.courseBreakdown ?? []).map((c: any) => ({
+				id: c.id,
+				nombre: c.nombre,
+				codigo: c.codigo,
+				tipo: c.tipo,
+				modalidad: c.modalidad,
+				estado: c.estado,
+				activo: c.activo,
+				inscritos: c.inscritos ?? 0,
+				inscritosActivos: c.inscritos ?? 0,
+				ingresos: c.total_ingresos ?? 0,
+				saldoPendiente: c.por_cobrar ?? 0,
+				pagosPendientes: 0,
+				ingreso_matricula: c.ingreso_matricula ?? 0,
+				ingreso_colegiatura: c.ingreso_colegiatura ?? 0,
+				total_ingresos: c.total_ingresos ?? 0,
+				por_cobrar: c.por_cobrar ?? 0,
+			}));
 			groupedByType = buildGrouped(courseBreakdown);
 			expandedGroups = new Set(Object.keys(groupedByType));
 
-			// ISSUE-P-DASHBOARD-COBRANZA: resumen económico agregado (incluye
-			// matrícula como ingreso). Solo para roles económicos; no bloquea el
-			// dashboard si el endpoint devuelve 403 o falla.
-			// US-007 (2026-08-03): paralelizar las 3 queries condicionales
-			// (resumen económico, inscritos, CxC) en un Promise.all para que
-			// corran en paralelo en vez de secuencial. Antes: 3x latencia = ~600ms.
-			// Ahora: 1x latencia = ~200ms.
-			const esRolEconomico = ROLES_ECONOMICOS_BASE.includes(roleNow) || (roleNow === 'coordinador' && esCoordFinNow);
-			const esRolInscritos = ROLES_QUE_VEN_INSCRITOS.includes(roleNow);
-
-			const [resEco, resInsc, resCxc] = await Promise.all([
-				esRolEconomico
-					? paymentService.getResumenEconomico().catch((e) => { console.error('Error cargando resumen económico:', e); return null; })
-					: Promise.resolve(null),
-				esRolInscritos
-					? enrollmentService.getResumenInscritos().catch((e) => { console.error('Error cargando resumen de inscritos:', e); return null; })
-					: Promise.resolve(null),
-				esRolEconomico
-					? cuentasPorCobrarService.getResumenReducido().catch((e) => { console.error('Error cargando resumen CxC:', e); return null; })
-					: Promise.resolve(null),
-			]);
-
-			resumenEconomico = resEco;
-			resumenInscritos = resInsc;
-			cxcResumen = resCxc;
+			resumenInscritos = v2.resumenInscritos;
+			resumenEconomico = v2.resumenEconomico;
+			cxcResumen = v2.cxcResumen;
+			recentEnrollments = v2.recentEnrollments ?? [];
+			recentPayments = v2.recentPayments ?? [];
+			pendingDocumentsCount = v2.pendingDocumentsCount ?? 0;
 
 		} catch (error) {
 			console.error('Error loading dashboard data:', error);
