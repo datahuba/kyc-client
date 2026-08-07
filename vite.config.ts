@@ -6,50 +6,19 @@ import { sveltekit } from '@sveltejs/kit/vite';
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	build: {
-		// F-LOADING-CHUNKS (2026-08-07, Kevin): dividir el bundle en chunks
-		// mas pequenos y granulares para que el browser haga menos requests
-		// en paralelo. Cuando carga el bundle, hace ~10-20 requests
-		// simultaneas de chunks al server. Si el server (nginx/Hostinger)
-		// tiene worker_connections limitado, satura y devuelve 502 o
-		// corta conexiones con ECONNRESET.
+		// F-LOADING-CHUNKS (2026-08-07, Kevin): manualChunks ELIMINADO porque
+		// causaba "Cannot access 'be' before initialization" en runtime
+		// (imports circulares entre los chunks custom). Vite ahora hace
+		// code splitting por defecto, que es seguro.
 		//
-		// Solucion: agrupar dependencias grandes en chunks dedicados
-		// (vendor) y dejar que las paginas se carguen como chunks pequenos
-		// individuales. Asi el primer load del dashboard hace solo ~5
-		// requests en vez de ~20.
-		rollupOptions: {
-			output: {
-				manualChunks: (id) => {
-					// Dependencias grandes -> chunk vendor dedicado
-					if (id.includes('node_modules')) {
-						if (id.includes('chart.js') || id.includes('chartjs')) {
-							return 'vendor-chart';
-						}
-						if (id.includes('svelte')) {
-							return 'vendor-svelte';
-						}
-						// Resto de deps -> chunk vendor general
-						return 'vendor';
-					}
-					// Componentes compartidos del dashboard
-					if (id.includes('/components/dashboard/')) {
-						return 'dashboard-components';
-					}
-					if (id.includes('/components/ui/')) {
-						return 'ui-components';
-					}
-					// Stores compartidos
-					if (id.includes('/stores/')) {
-						return 'stores';
-					}
-					// Servicios API compartidos
-					if (id.includes('/services/') && !id.includes('/services/payment') && !id.includes('/services/enrollment')) {
-						return 'services-base';
-					}
-					// Páginas: chunks individuales (comportamiento por defecto de SvelteKit)
-				}
-			}
-		},
+		// F-FIX-NGINX-CONCURRENCY (2026-08-07, Kevin): en lugar de
+		// manualChunks, la solucion real es:
+		// - Backend con 4 workers uvicorn (docker-compose)
+		// - Frontend con 4 workers SvelteKit (server.js + cluster + SO_REUSEPORT)
+		// - Nginx con worker_connections 2048 + timeouts en location /
+		// - HTML inicial con modulepreload (SvelteKit lo hace por default)
+		// - Server worker con retry para chunks (F-LOADING-RETRY)
+		//
 		// Target moderno para reducir polyfills
 		target: 'es2022',
 		// Minify con esbuild (mas rapido que terser, output similar)
