@@ -38,6 +38,8 @@
 	// F-PERF-DASHBOARD-V2: resumenEconomico y cxcResumen vienen del response v2.
 	// Si vienen con datos (no null) y el rol es economico, mostrarlos.
 	$: verResumenEconomico = (ROLES_ECONOMICOS_BASE.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero)) && resumenEconomico != null;
+	// F-PERF-DASHBOARD-V2: puedeVerPagos para badges de pagos en listas
+	$: puedeVerPagos = (ROLES_QUE_VEN_PAGOS.includes(currentRole) || (currentRole === 'coordinador' && esCoordinadorFinanciero)) && recentPayments.length >= 0;
 	// F-COBRANZA-041: KPI inscritos visible para roles administrativos.
 	$: verKpiInscritos = ROLES_QUE_VEN_INSCRITOS.includes(currentRole) && resumenInscritos != null;
 
