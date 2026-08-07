@@ -6,8 +6,8 @@
 	// ISSUE R10: eliminar "Abandono" y "Pasivo" del dashboard, solo "Congelado".
 	// Refleja el endpoint GET /enrollments/stats/resumen?curso_id=X.
 	import { onMount } from 'svelte';
-	import { enrollmentService } from '$lib/services';
-	import type { EnrollmentResumen } from '$lib/interfaces';
+	import { enrollmentService, studentService } from '$lib/services';
+	import type { EnrollmentResumen, Student } from '$lib/interfaces';
 
 	interface Props {
 		cursoId: string;
@@ -20,6 +20,9 @@
 	let resumen: EnrollmentResumen | null = $state(null);
 	let loading = $state(true);
 	let error: string | null = $state(null);
+
+	// Cache de estudiantes del curso (id -> Student) para resolver nombres
+	let estudiantesById: Map<string, Student> = $state(new Map());
 
 	// Drill-down: lista de estudiantes por categoria
 	type Categoria = 'congelados' | 'completados' | 'activos' | 'todos';
@@ -59,19 +62,49 @@
 			if (cat === 'todos') {
 				estudiantes = lista;
 			} else if (cat === 'activos') {
-				estudiantes = lista.filter((e: any) => e.estado === 'activo');
+				// F-DASHBOARD-R10-FIX2 (2026-08-06): "completado" se calcula por
+				// modulos aprobados (no por enrollment.estado). Aqui mostramos
+				// los que NO estan suspendidos Y NO completados (no congelados,
+				// no retirados). El backend cuenta activos como activo+pendiente_pago.
+				estudiantes = lista.filter((e: any) =>
+					['activo', 'pendiente_pago'].includes(e.estado)
+				);
 			} else if (cat === 'congelados') {
 				// ISSUE R10: solo congelado (motivo_suspension presente)
 				estudiantes = lista.filter((e: any) =>
 					e.estado === 'suspendido' && e.motivo_suspension === 'congelado'
 				);
 			} else if (cat === 'completados') {
-				estudiantes = lista.filter((e: any) => e.estado === 'completado');
+				// F-DASHBOARD-R10-FIX2: contar los que tienen TODOS los modulos
+				// con estado_academico='Aprobado' (coincide con la logica del
+				// backend del endpoint /stats/resumen).
+				estudiantes = lista.filter((e: any) => {
+					const mods = e.modulos || [];
+					if (mods.length === 0) return false;
+					return mods.every((m: any) => m.estado_academico === 'Aprobado');
+				});
 			}
 		} catch (e: any) {
 			errorEstudiantes = e.message || 'Error al cargar estudiantes';
 		} finally {
 			loadingEstudiantes = false;
+		}
+	}
+
+	async function cargarEstudiantesDelCurso() {
+		try {
+			// Cargar estudiantes del curso (paginado) para resolver nombres
+			const resp = await studentService.getAll(1, 200, { curso_id: cursoId });
+			const lista = resp.data || [];
+			const map = new Map<string, Student>();
+			lista.forEach((s: any) => {
+				const id = s._id || s.id;
+				if (id) map.set(String(id), s as Student);
+			});
+			estudiantesById = map;
+		} catch (e) {
+			console.error('Error cargando estudiantes del curso:', e);
+			estudiantesById = new Map();
 		}
 	}
 
@@ -87,24 +120,47 @@
 	}
 
 	function nombreCompleto(e: any): string {
-		const s = e.student || e.estudiante || {};
-		const n = s.nombre || e.estudiante_nombre || '';
-		const a = s.apellido || e.estudiante_apellido || '';
+		// F-DASHBOARD-R10-FIX2 (2026-08-06): resolver nombre desde el map de
+		// estudiantes del curso (cargado por cargarEstudiantesDelCurso()).
+		// El endpoint /enrollments/course/{id} NO popula el estudiante.
+		const id = e.estudiante_id || e.student?._id || e.student?.id;
+		const s = id ? estudiantesById.get(String(id)) : null;
+		if (s) {
+			// Cast a any porque la interfaz Student en TS no incluye `apellido`
+			// pero el backend SI lo retorna (campos separados en la BD).
+			const sa = s as any;
+			const n = s.nombre || '';
+			const a = sa.apellido || '';
+			const full = `${n} ${a}`.trim();
+			if (full) return full;
+		}
+		// Fallback: si el embed existe (futuro populate del backend)
+		const emb = e.student || e.estudiante || {};
+		const embA = emb as any;
+		const n = emb.nombre || e.estudiante_nombre || '';
+		const a = embA.apellido || e.estudiante_apellido || '';
 		return `${n} ${a}`.trim() || '(sin nombre)';
 	}
 
 	function carnetEstudiante(e: any): string {
-		const s = e.student || e.estudiante || {};
-		return s.carnet || e.estudiante_carnet || '?';
+		const id = e.estudiante_id || e.student?._id || e.student?.id;
+		const s = id ? estudiantesById.get(String(id)) : null;
+		if (s?.carnet) return s.carnet;
+		const emb = e.student || e.estudiante || {};
+		return emb.carnet || e.estudiante_carnet || '?';
 	}
 
 	onMount(() => {
 		cargarResumen();
+		cargarEstudiantesDelCurso();
 	});
 
 	// Recargar si cambia cursoId
 	$effect(() => {
-		if (cursoId) cargarResumen();
+		if (cursoId) {
+			cargarResumen();
+			cargarEstudiantesDelCurso();
+		}
 	});
 </script>
 
