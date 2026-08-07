@@ -1105,14 +1105,22 @@
 						</div>
 					{/if}
 
-					<label class="flex items-center gap-2">
+					<!-- F-FIX-MATRICULA-LABEL (2026-08-06, Kevin): label mas claro
+					     para evitar confusion. Antes decia "Marcar matricula como pagada
+					     (caso retroactivo/historico)" que era ambiguo. Ahora aclara el
+					     efecto exacto: el estudiante pasa a estado ACTIVO si no hay deuda,
+					     y la matricula no aparece como pendiente. -->
+					<label class="flex items-start gap-2">
 						<input
 							type="checkbox"
 							bind:checked={matriculaPagada}
-							class="rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:border-gray-600 dark:bg-gray-700"
+							class="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:border-gray-600 dark:bg-gray-700"
 						/>
 						<span class="text-sm text-gray-700 dark:text-gray-300">
-							Marcar matricula como pagada (caso retroactivo/historico)
+							<strong>Matrícula ya pagada</strong> (caso retroactivo/histórico).<br/>
+							<span class="text-xs text-gray-500 dark:text-gray-400">
+								El estudiante NO aparecerá con matrícula pendiente. Si ya pagó todo el programa, pasa a estado ACTIVO automáticamente.
+							</span>
 						</span>
 					</label>
 				</div>
@@ -1342,14 +1350,19 @@
 						</p>
 					</div>
 
-					<label class="flex items-center gap-2">
+					<!-- F-FIX-MATRICULA-LABEL (2026-08-06, Kevin): label mas claro.
+					     Mismo cambio que arriba, aplicado al modo Excel. -->
+					<label class="flex items-start gap-2">
 						<input
 							type="checkbox"
 							bind:checked={matriculaPagada}
-							class="rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:border-gray-600 dark:bg-gray-700"
+							class="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:border-gray-600 dark:bg-gray-700"
 						/>
 						<span class="text-sm text-gray-700 dark:text-gray-300">
-							Marcar matricula como pagada
+							<strong>Matrícula ya pagada</strong> (caso retroactivo/histórico).<br/>
+							<span class="text-xs text-gray-500 dark:text-gray-400">
+								El estudiante NO aparecerá con matrícula pendiente. Si ya pagó todo el programa, pasa a estado ACTIVO automáticamente.
+							</span>
 						</span>
 					</label>
 				</div>
