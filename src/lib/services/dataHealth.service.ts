@@ -11,13 +11,16 @@ class DataHealthService {
 			});
 		}
 		const qs = queryParams.toString();
-		const url = qs ? `/api/v1/admin/data-health?${qs}` : `/api/v1/admin/data-health`;
+		// R35-FASE-3 FIX: NO incluir /api/v1/ en el path porque apiKyC ya tiene
+		// baseURL=/api/api/v1/. Antes tenia /api/v1/admin/data-health que daba
+		// la URL final /api/api/v1/api/v1/admin/data-health (404 en nginx).
+		const url = qs ? `/admin/data-health?${qs}` : `/admin/data-health`;
 		const res = await apiKyC.get<DataHealthResponse>(url);
 		return res.data;
 	}
 
 	async fixInconsistencia(accion: string, payload: DataHealthFixRequest): Promise<DataHealthFixResponse> {
-		const res = await apiKyC.post<DataHealthFixResponse>(`/api/v1/admin/data-health/fix/${accion}`, payload);
+		const res = await apiKyC.post<DataHealthFixResponse>(`/admin/data-health/fix/${accion}`, payload);
 		return res.data;
 	}
 }
