@@ -19,12 +19,9 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import {
-		AlertCircleIcon,
-		AlertTriangleIcon,
-		BellIcon,
+		ExclamationIcon,
 		CheckIcon,
 		DownloadIcon,
-		FilterIcon,
 		RefreshIcon,
 		SearchIcon,
 		XIcon
@@ -287,7 +284,7 @@
 	{#if !isSuperadmin}
 		<Card>
 			<div class="p-6 text-center">
-				<AlertCircleIcon class="h-12 w-12 text-red-500 mx-auto" />
+				<ExclamationIcon class="h-12 w-12 text-red-500 mx-auto" />
 				<h3 class="mt-2 text-lg font-semibold">Acceso restringido</h3>
 				<p class="text-gray-600">Solo superadmin puede ver el reporte consolidado de inconsistencias.</p>
 			</div>
@@ -295,7 +292,7 @@
 	{:else if error}
 		<Card>
 			<div class="p-6 text-center text-red-600">
-				<AlertCircleIcon class="h-12 w-12 mx-auto" />
+				<ExclamationIcon class="h-12 w-12 mx-auto" />
 				<p class="mt-2">{error}</p>
 				<Button variant="secondary" onclick={loadData} class="mt-3">Reintentar</Button>
 			</div>
