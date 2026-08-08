@@ -56,7 +56,17 @@
 		if (!isStaff && mode !== 'lista') return; // estudiante solo puede estar en 'lista'
 		viewMode = mode;
 		try { localStorage.setItem('payments_view', mode); } catch {}
-		if (mode === 'matriz') loadMatriz();
+		// F-COBRANZA-MATRIZ-POR-PROGRAMA (2026-08-08, Kevin): la vista Matriz
+		// muestra datos de un SOLO programa a la vez. Si el usuario entra a
+		// Matriz sin filtro, auto-seleccionamos el primer programa disponible
+		// (no la opcion "Todos") porque mezclar programas no tiene sentido
+		// (M6-M15 de maestria + M1-M5 de diplomado en la misma tabla).
+		if (mode === 'matriz') {
+			if (!filters.curso_id && coursesListFiltrada.length > 0) {
+				filters.curso_id = coursesListFiltrada[0]._id;
+			}
+			loadMatriz();
+		}
 		if (mode === 'porpago') loadPorPago();
 	}
 
@@ -281,8 +291,17 @@
 	// FIX: solo staff puede usar la vista matriz (estudiantes obtendrían 403)
 	// F-CXC-FILTRO-PROGRAMA (2026-08-04): agregamos filters.curso_id a las
 	// dependencias del effect para que cambiar el programa recargue la matriz.
+	// F-COBRANZA-MATRIZ-POR-PROGRAMA (2026-08-08, Kevin): si viewMode es 'matriz'
+	// y todavia no hay programa seleccionado, auto-seleccionar el primero de
+	// coursesListFiltrada (si ya esta cargada). Asi cuando el usuario entra a
+	// /app/payments con la vista Matriz persistida en localStorage, ve un
+	// programa real, no la mezcla confusa de todos los programas.
 	$effect(() => {
 		if (isStaff && viewMode === 'matriz') {
+			// Auto-seleccionar primer programa si la vista es Matriz y no hay curso
+			if (!filters.curso_id && coursesListFiltrada.length > 0) {
+				filters.curso_id = coursesListFiltrada[0]._id;
+			}
 			// Dependencias explicitas: tanto el filtro de modulo como el de programa
 			matrizFiltroModulo;
 			filters.curso_id;
@@ -885,12 +904,20 @@
 								? 'ring-2 ring-inset ring-primary-500 bg-primary-50 font-medium text-primary-900 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500'
 								: 'ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-white dark:ring-gray-600'}"
 					>
-						<option value="">Todos los programas</option>
+						<!-- F-COBRANZA-MATRIZ-POR-PROGRAMA (2026-08-08, Kevin): en vista Matriz
+							 la opcion "Todos los programas" NO se muestra porque mezclar
+							 modulos de distintos cursos no tiene sentido. -->
+						{#if viewMode !== 'matriz'}
+							<option value="">Todos los programas</option>
+						{/if}
 						{#each coursesListFiltrada as course (course._id)}
 							<option value={course._id}>{course.nombre_programa}</option>
 						{/each}
 						</select>
-					{#if filters.curso_id}
+					<!-- F-COBRANZA-MATRIZ-POR-PROGRAMA (2026-08-08, Kevin): en vista Matriz
+						 el boton "X" de quitar filtro esta oculto. La Matriz SIEMPRE
+						 debe mostrar un programa especifico. -->
+					{#if filters.curso_id && viewMode !== 'matriz'}
 						<button
 							type="button"
 							onclick={() => { filters.curso_id = ''; page = 1; handleFilterChange(); }}
