@@ -99,7 +99,7 @@
 	// METHODS
 	// ========================================================================
 
-	async function loadData() {
+	async function loadData(bypassCache = false) {
 		if (!browser) return;
 		loading = true;
 		error = null;
@@ -108,6 +108,8 @@
 			if (filtroPrograma) params['programa_id'] = filtroPrograma;
 			if (filtroTipo) params['tipo'] = filtroTipo;
 			if (filtroSeveridad) params['severidad'] = filtroSeveridad;
+			// R35-FASE-3: bypass cache de nginx despues de un fix para ver el cambio inmediato
+			if (bypassCache) params['_t'] = Date.now().toString();
 			data = await dataHealthService.getDataHealth(params);
 		} catch (e: any) {
 			error = e?.message || 'Error cargando reporte';
@@ -123,8 +125,8 @@
 			const res = await dataHealthService.fixInconsistencia(accion, payload);
 			if (res.ok) {
 				alert('success', res.message);
-				// Recargar data
-				await loadData();
+				// Recargar data bypassando el cache de nginx para ver el cambio inmediato
+				await loadData(true);
 			} else {
 				alert('error', res.message || 'Error aplicando accion');
 			}
