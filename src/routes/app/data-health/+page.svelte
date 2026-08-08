@@ -110,7 +110,7 @@
 			if (filtroSeveridad) params['severidad'] = filtroSeveridad;
 			console.log('[data-health] loadData START, isSuperadmin=', isSuperadmin);
 			const result = await dataHealthService.getDataHealth(params);
-			console.log('[data-health] loadData GOT result keys=', result ? Object.keys(result) : null, 'inconsistencias count=', result?.inconsistencias?.length);
+			console.log('[data-health] loadData GOT result=', typeof result, 'keys=', result ? Object.keys(result) : 'N/A', 'inconsistencias count=', result?.inconsistencias?.length, 'isNull=', result === null, 'isUndefined=', result === undefined);
 			data = result;
 			console.log('[data-health] loadData DONE, data is now=', data ? 'set with ' + data.inconsistencias?.length : 'null');
 		} catch (e: any) {
