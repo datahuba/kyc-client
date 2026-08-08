@@ -166,6 +166,27 @@ const staffRequestsGroup: NavigationGroup = {
 	]
 };
 
+// R35-FASE-3 (2026-08-07, Kevin): grupo "Calidad de Datos" con el reporte
+// consolidado de inconsistencias. Solo superadmin. Vista unica para
+// auditar problemas de datos en programas en ejecucion.
+const staffDataQualityGroup: NavigationGroup = {
+	type: 'group',
+	name: 'Calidad de Datos',
+	icon: ExclamationIcon,
+	roles: ['superadmin'],
+	loginTypes: ['admin'],
+	children: [
+		{
+			type: 'item',
+			name: 'Reporte de Salud',
+			href: '/app/data-health',
+			icon: ExclamationIcon,
+			roles: ['superadmin'],
+			loginTypes: ['admin']
+		},
+	]
+};
+
 const staffDashboardItem: NavigationItem = {
 	type: 'item',
 	name: 'Dashboard',
@@ -210,5 +231,6 @@ export function getAllNavItems(): NavigationEntry[] {
 		staffEnrollmentsGroup,
 		staffAdminGroup,
 		staffRequestsGroup,
+		staffDataQualityGroup,
 	];
 }
