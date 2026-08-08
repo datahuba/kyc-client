@@ -108,14 +108,10 @@
 			if (filtroPrograma) params['programa_id'] = filtroPrograma;
 			if (filtroTipo) params['tipo'] = filtroTipo;
 			if (filtroSeveridad) params['severidad'] = filtroSeveridad;
-			console.log('[data-health] loadData START, isSuperadmin=', isSuperadmin);
-			const result = await dataHealthService.getDataHealth(params);
-			console.log('[data-health] loadData GOT result=', typeof result, 'keys=', result ? Object.keys(result) : 'N/A', 'inconsistencias count=', result?.inconsistencias?.length, 'isNull=', result === null, 'isUndefined=', result === undefined);
-			data = result;
-			console.log('[data-health] loadData DONE, data is now=', data ? 'set with ' + data.inconsistencias?.length : 'null');
+			data = await dataHealthService.getDataHealth(params);
 		} catch (e: any) {
 			error = e?.message || 'Error cargando reporte';
-			console.error('[data-health] ERROR', e);
+			console.error('[data-health]', e);
 		} finally {
 			loading = false;
 		}
@@ -238,7 +234,6 @@
 	// ========================================================================
 
 	onMount(async () => {
-		console.log('[data-health] onMount, isSuperadmin=', isSuperadmin, 'userStore=', $userStore);
 		if (!isSuperadmin) {
 			error = 'Solo superadmin puede ver este reporte';
 			loading = false;

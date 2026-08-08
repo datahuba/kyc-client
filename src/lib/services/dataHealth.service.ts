@@ -11,19 +11,15 @@ class DataHealthService {
 			});
 		}
 		const qs = queryParams.toString();
-		// R35-FASE-3 FIX: NO incluir /api/v1/ en el path porque apiKyC ya tiene
-		// baseURL=/api/api/v1/. Antes tenia /api/v1/admin/data-health que daba
-		// la URL final /api/api/v1/api/v1/admin/data-health (404 en nginx).
+		// NOTA: NO incluir /api/v1/ en el path. apiKyC ya tiene baseURL con prefijo
+		// y concatena /api/v1. Path final esperado por nginx: /api/api/v1/admin/data-health
 		const url = qs ? `/admin/data-health?${qs}` : `/admin/data-health`;
-		const res = await apiKyC.get<DataHealthResponse>(url);
-		console.log('[data-health.service] apiKyC.get returned', typeof res, 'keys=', res ? Object.keys(res).slice(0, 5) : 'NULL/UNDEFINED', 'is res.data?', res?.data ? 'yes' : 'no');
-		// NOTA: apiKyC.get NO es axios, ya retorna el JSON directo (no res.data)
-		return res as any;
+		// apiKyC.get retorna el JSON directo (NO es axios, no usar res.data)
+		return await apiKyC.get<DataHealthResponse>(url);
 	}
 
 	async fixInconsistencia(accion: string, payload: DataHealthFixRequest): Promise<DataHealthFixResponse> {
-		const res = await apiKyC.post<DataHealthFixResponse>(`/admin/data-health/fix/${accion}`, payload);
-		return res as any;
+		return await apiKyC.post<DataHealthFixResponse>(`/admin/data-health/fix/${accion}`, payload);
 	}
 }
 
