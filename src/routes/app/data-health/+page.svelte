@@ -444,7 +444,7 @@
 
 <!-- MODAL DE DETALLE -->
 {#if detailOpen && selectedItem}
-	<Modal open={detailOpen} onClose={() => detailOpen = false} title="Detalle de inconsistencia">
+	<Modal isOpen={detailOpen} onClose={() => detailOpen = false} title="Detalle de inconsistencia">
 		<div class="p-4 space-y-3">
 			<div class="flex items-center gap-2">
 				<span class="px-3 py-1 rounded font-medium border {getSeverityColor(selectedItem.severidad)}">
@@ -494,7 +494,7 @@
 
 <!-- MODAL DE CONFIRMACION -->
 {#if confirmOpen && selectedItem}
-	<Modal open={confirmOpen} onClose={() => confirmOpen = false} title="Confirmar accion">
+	<Modal isOpen={confirmOpen} onClose={() => confirmOpen = false} title="Confirmar accion">
 		<div class="p-4 space-y-4">
 			<div class="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm whitespace-pre-line">
 				{confirmMessage}
