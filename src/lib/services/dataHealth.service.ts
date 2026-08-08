@@ -16,12 +16,14 @@ class DataHealthService {
 		// la URL final /api/api/v1/api/v1/admin/data-health (404 en nginx).
 		const url = qs ? `/admin/data-health?${qs}` : `/admin/data-health`;
 		const res = await apiKyC.get<DataHealthResponse>(url);
-		return res.data;
+		console.log('[data-health.service] apiKyC.get returned', typeof res, 'keys=', res ? Object.keys(res).slice(0, 5) : 'NULL/UNDEFINED', 'is res.data?', res?.data ? 'yes' : 'no');
+		// NOTA: apiKyC.get NO es axios, ya retorna el JSON directo (no res.data)
+		return res as any;
 	}
 
 	async fixInconsistencia(accion: string, payload: DataHealthFixRequest): Promise<DataHealthFixResponse> {
 		const res = await apiKyC.post<DataHealthFixResponse>(`/admin/data-health/fix/${accion}`, payload);
-		return res.data;
+		return res as any;
 	}
 }
 
