@@ -149,7 +149,9 @@
 			corregir_porcentaje: `Corregir porcentaje del descuento?\n\nDescuento: ${item.programa_codigo}\nPorcentaje actual: ${item.metadata?.porcentaje}% (fuera de 0-100)`,
 			verificar_pagos_beca: `Recalcular saldo del becado?\n\nEstudiante: ${item.estudiante_nombre}\nSaldo actual: Bs ${item.metadata?.saldo}\nEsto recalculara el total_pagado y saldo_pendiente.`,
 			subir_resolucion: 'Use el boton "Subir Resolucion" en la pagina del programa.',
-			reasignar_encargado: 'Use la pagina del programa para reasignar encargados.'
+			reasignar_encargado: 'Use la pagina del programa para reasignar encargados.',
+			retirar: `Retirar este enrollment?\n\nEstudiante: ${item.estudiante_nombre || '?'}\nPrograma: ${item.programa_codigo || 'ORFANO'}\n\nEl enrollment se marca como RETIRADO. Sirve para limpiar\nenrollments de programas historicos/cerrados que ya no aplican.`,
+			revisar_y_asignar: `Retirar este enrollment huerfano?\n\nEl curso asociado no existe o no esta en ejecucion.\nEl enrollment se marca como RETIRADO con motivo claro.\n\nSi querés reasignar el estudiante a otro programa,\nhazelo manualmente desde la pagina del estudiante.`
 		};
 		confirmMessage = mensajes[accion] || 'Aplicar accion?';
 		confirmOpen = true;
