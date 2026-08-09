@@ -34,9 +34,12 @@ export const gradeValidationService = {
      * Aprueba (valida) varias notas pendientes en una sola llamada.
      */
     async bulkValidar(items: BulkValidarItem[]): Promise<BulkValidarResponse> {
+        // F-FIX-TIMEOUT-60S-GRADES (2026-08-09, Kevin): bulk-validar puede
+        // iterar sobre muchos enrollments. customTimeout 60s.
         return await apiKyC.post<BulkValidarResponse>(
             '/enrollments/notas/bulk-validar',
-            { items }
+            { items },
+            { customTimeout: 60000 }
         );
     },
 

@@ -75,7 +75,9 @@ class ClassroomService {
 		const formData = new FormData();
 		formData.append('file', file);
 		formData.append('title', title);
-		const material = await apiKyC.post<ClassroomMaterial & { id?: string }>(`/classroom/${classroomId}/materials`, formData);
+		// F-FIX-TIMEOUT-60S-CLASSROOM (2026-08-09, Kevin): upload de material
+		// (PDF/video) puede tardar >30s. customTimeout 60s.
+		const material = await apiKyC.post<ClassroomMaterial & { id?: string }>(`/classroom/${classroomId}/materials`, formData, { customTimeout: 60000 });
 		return normalizeId(material);
 	}
 

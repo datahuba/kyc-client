@@ -32,7 +32,10 @@ class CourseService {
 	}
 
 	async create(data: CreateCourseRequest): Promise<Course> {
-		return await apiKyC.post<Course>('/courses/', data);
+		// F-FIX-TIMEOUT-60S-CREATE (2026-08-09, Kevin): POST /courses/ puede
+		// tardar >30s cuando se crea con muchos módulos y se persisten todos
+		// los requisitos. customTimeout 60s para evitar cancelación.
+		return await apiKyC.post<Course>('/courses/', data, { customTimeout: 60000 });
 	}
 
 	async update(id: string, data: UpdateCourseRequest): Promise<Course> {
@@ -134,7 +137,10 @@ class CourseService {
 	async subirResolucion(courseId: string, file: File): Promise<Course> {
 		const form = new FormData();
 		form.append('file', file);
-		return await apiKyC.put<Course>(`/courses/${courseId}/resolucion`, form);
+		// F-FIX-TIMEOUT-60S-RESOLUCION (2026-08-09, Kevin): el upload de PDF
+		// puede tardar >30s si el PDF es pesado o el storage remoto (Cloudinary)
+		// está lento. customTimeout 60s.
+		return await apiKyC.put<Course>(`/courses/${courseId}/resolucion`, form, { customTimeout: 60000 });
 	}
 
 	/**

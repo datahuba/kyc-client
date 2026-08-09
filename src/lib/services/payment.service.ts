@@ -53,7 +53,10 @@ class PaymentService {
 			formData.append('file', data.file);
 		}
 
-		return await apiKyC.post<Payment>('/payments/', formData);
+		// F-FIX-TIMEOUT-60S-PAYMENT (2026-08-09, Kevin): POST /payments/ sube
+		// un comprobante (foto/PDF) a Cloudinary. Upload a storage remoto puede
+		// tardar >30s. customTimeout 60s.
+		return await apiKyC.post<Payment>('/payments/', formData, { customTimeout: 60000 });
 	}
 
 	async update(id: string, data: UpdatePaymentRequest): Promise<Payment> {
@@ -91,7 +94,9 @@ class PaymentService {
 		if (opts?.numero_transaccion) formData.append('numero_transaccion', opts.numero_transaccion);
 		if (opts?.remitente) formData.append('remitente', opts.remitente);
 		if (opts?.fecha_comprobante) formData.append('fecha_comprobante', opts.fecha_comprobante);
-		return await apiKyC.post<Payment>(`/payments/${paymentId}/upload-by-encargado`, formData);
+		// F-FIX-TIMEOUT-60S-PAYMENT (2026-08-09, Kevin): upload de comprobante
+		// a Cloudinary. customTimeout 60s.
+		return await apiKyC.post<Payment>(`/payments/${paymentId}/upload-by-encargado`, formData, { customTimeout: 60000 });
 	}
 
 	// F-COBRANZA-017 (2026-07-22): Cobranza REGISTRA un pago COMPLETO en
@@ -127,7 +132,9 @@ class PaymentService {
 		if (data.fecha_comprobante) formData.append('fecha_comprobante', data.fecha_comprobante);
 		if (data.cuenta_destino) formData.append('cuenta_destino', data.cuenta_destino);
 		if (data.file) formData.append('file', data.file);
-		return await apiKyC.post<Payment>('/payments/by-staff', formData);
+		// F-FIX-TIMEOUT-60S-PAYMENT (2026-08-09, Kevin): cobro completo por staff,
+		// incluye upload. customTimeout 60s.
+		return await apiKyC.post<Payment>('/payments/by-staff', formData, { customTimeout: 60000 });
 	}
 
 	// ISSUE-P-DASHBOARD-COBRANZA: resumen económico agregado (incluye matrícula

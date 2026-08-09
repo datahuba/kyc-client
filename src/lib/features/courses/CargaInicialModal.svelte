@@ -167,7 +167,9 @@
 				})),
 			};
 
-			const resp = await apiKyC.post<any>(`/courses/${course._id}/initial-enrollments`, payload);
+			// F-FIX-TIMEOUT-60S-CARGA-INICIAL (2026-08-09, Kevin): carga inicial
+			// puede inscribir 60+ estudiantes. customTimeout 60s.
+			const resp = await apiKyC.post<any>(`/courses/${course._id}/initial-enrollments`, payload, { customTimeout: 60000 });
 
 			resultado = {
 				exitosos: resp.exitosos || 0,
@@ -870,6 +872,9 @@
 						}
 					}
 
+					// F-FIX-TIMEOUT-60S-CARGA-INICIAL (2026-08-09, Kevin): carga
+					// masiva 1-a-1 puede tardar >30s con muchos estudiantes.
+					// customTimeout 60s.
 					const resp = await apiKyC.post<any>(`/courses/${course._id}/initial-enrollments`, {
 						estudiantes: [
 							{

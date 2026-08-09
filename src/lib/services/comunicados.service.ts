@@ -112,7 +112,10 @@ export const comunicadosService = {
 	},
 
 	async crear(data: ComunicadoCreateInput): Promise<ComunicadoResponse> {
-		return await apiKyC.post<ComunicadoResponse>('/comunicados', data);
+		// F-FIX-TIMEOUT-60S-COMUNICADO (2026-08-09, Kevin): POST /comunicados
+		// puede enviar emails a N estudiantes inscritos en el programa. Con
+		// 64 inscritos y SMTP lento, esto puede tardar >30s. customTimeout 60s.
+		return await apiKyC.post<ComunicadoResponse>('/comunicados', data, { customTimeout: 60000 });
 	},
 
 	async obtener(id: string): Promise<ComunicadoResponse> {

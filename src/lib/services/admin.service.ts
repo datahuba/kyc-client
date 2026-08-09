@@ -78,9 +78,12 @@ class AdminService {
 		params.append('pattern', pattern);
 		if (statusCode > 0) params.append('status_code', String(statusCode));
 		params.append('note', note);
+		// F-FIX-TIMEOUT-60S-ADMIN (2026-08-09, Kevin): auto-resolve puede iterar
+		// sobre N errores. customTimeout 60s.
 		return await apiKyC.post<{ resolved_count: number; window_hours: number; pattern: string }>(
 			`/admin/errors/auto-resolve-expired-tokens?${params.toString()}`,
-			{}
+			{},
+			{ customTimeout: 60000 }
 		);
 	}
 

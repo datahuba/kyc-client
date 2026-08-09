@@ -19,7 +19,10 @@ class DataHealthService {
 	}
 
 	async fixInconsistencia(accion: string, payload: DataHealthFixRequest): Promise<DataHealthFixResponse> {
-		return await apiKyC.post<DataHealthFixResponse>(`/admin/data-health/fix/${accion}`, payload);
+		// F-FIX-TIMEOUT-60S-HEALTH (2026-08-09, Kevin): las acciones de fix pueden
+		// hacer N saves en el backend (cambiar_a_activo, reclasificar, etc) y con
+		// muchas inscripciones tardan >30s. customTimeout 60s.
+		return await apiKyC.post<DataHealthFixResponse>(`/admin/data-health/fix/${accion}`, payload, { customTimeout: 60000 });
 	}
 }
 
