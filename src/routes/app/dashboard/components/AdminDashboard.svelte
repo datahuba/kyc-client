@@ -43,9 +43,12 @@
 	// F-COBRANZA-041: KPI inscritos visible para roles administrativos.
 	$: verKpiInscritos = ROLES_QUE_VEN_INSCRITOS.includes(currentRole) && resumenInscritos != null;
 
-	// Perfiles segmentados (cobranza/encargado con cursos_asignados) NO necesitan
-	// el "Desglose por Curso": su vista ya está acotada a sus cursos, así que sería
-	// redundante. Solo los perfiles globales (superadmin/admin/mae sin cursos) lo ven.
+	// Perfiles segmentados: cobranza con cursos_asignados NO ve el desglose
+	// (su vista global ya está acotada y es redundante), pero encargado_curso
+	// SÍ lo ve porque sin este bloque su dashboard queda vacío (no califica
+	// para verResumenEconomico ni puedeVerPagos). El backend ya filtra el
+	// courseBreakdown por cursos_asignados, así que es seguro mostrarlo.
+	// F-DASHBOARD-ENCARGADO (2026-08-09, Kevin).
 	$: cursosAsignados = $userStore.user?.cursos_asignados ?? [];
 	$: esSegmentado = cursosAsignados.length > 0;
 
@@ -342,8 +345,14 @@
 		     (Matrícula, Colegiatura, Total, Por Cobrar) se movieron DENTRO
 		     de cada item del accordion "Desglose por Programa" mas abajo. -->
 
+		<!-- F-DASHBOARD-ENCARGADO (2026-08-09, Kevin): encargado_curso con
+		     cursos_asignados tambien ve el bloque. Antes `!esSegmentado` lo
+		     ocultaba para todos los usuarios segmentados, dejando el dashboard
+		     vacio para encargado_curso (que no califica para resumenEconomico
+		     ni puedeVerPagos). Los cards financieros siguen ocultos para
+		     encargado; el resto (KpiInscritosPorPrograma) si se muestra. -->
 		<!-- Program Breakdown Section (oculto para perfiles segmentados por programa) -->
-		{#if !esSegmentado}
+		{#if !esSegmentado || currentRole === 'encargado_curso'}
 		<div>
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Desglose por Programa</h2>
@@ -413,7 +422,11 @@
 											     Solo se muestran para roles económicos.
 											     F-DASHBOARD-R9 (2026-08-05 20:40, Kevin):
 											     reemplaza el card simple "Estudiantes" por
-											     KpiInscritosPorPrograma con drill-down. -->
+											     KpiInscritosPorPrograma con drill-down.
+											     F-DASHBOARD-ENCARGADO (2026-08-09, Kevin):
+											     separamos KpiInscritosPorPrograma del bloque
+											     verResumenEconomico para que encargado_curso
+											     tambien lo vea (sin las 4 cards financieros). -->
 											{#if verResumenEconomico}
 												<!-- 4 cards financieros -->
 												<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 pt-3 border-t border-gray-100 dark:border-gray-700">
@@ -434,9 +447,12 @@
 														<p class="text-base font-bold text-orange-600 dark:text-orange-400 font-mono mt-1">{formatCurrency(course.por_cobrar)}</p>
 													</div>
 												</div>
+											{/if}
 
-												<!-- F-DASHBOARD-R9: KPI inscritos por programa con drill-down.
-												     Click en una card muestra lista de estudiantes de esa categoria. -->
+											<!-- F-DASHBOARD-R9: KPI inscritos por programa con drill-down.
+											     Visible para TODOS los roles administrativos (incluye
+											     encargado_curso). F-DASHBOARD-ENCARGADO (2026-08-09). -->
+											{#if verKpiInscritos}
 												<KpiInscritosPorPrograma
 													cursoId={course.id}
 													cursoNombre={course.nombre}

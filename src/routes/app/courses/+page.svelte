@@ -145,9 +145,20 @@
 			if (filters.modalidad !== 'all') filterParams.modalidad = filters.modalidad;
 
 			const response = await courseService.getAll(page, limit, filterParams);
-			
+
 			if (response && response.data) {
-				courses = response.data;
+				// F-COURSES-FILTER-ENCARGADO (2026-08-09, Kevin): encargado_curso
+				// con cursos_asignados solo ve los cursos que tiene asignados.
+				// Antes el backend no filtraba y el frontend mostraba todos los
+				// programas del sistema, exponiendo informacion de programas que
+				// el usuario no deberia ver.
+				const cursosAsignados = ($userStore.user?.cursos_asignados ?? []) as string[];
+				if (currentRole === 'encargado_curso' && cursosAsignados.length > 0) {
+					const assignedSet = new Set(cursosAsignados.map(String));
+					courses = response.data.filter((c: Course) => assignedSet.has(String(c._id)));
+				} else {
+					courses = response.data;
+				}
 				totalItems = response.meta.totalItems;
 				totalPages = response.meta.totalPages;
 			} else {

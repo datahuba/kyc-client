@@ -81,7 +81,18 @@ class ApiKyC {
 		const controller = new AbortController();
 		// ISSUE J: Usar timeout customizado si se especifica, de lo contrario usar el por defecto
 		const timeoutDuration = options.customTimeout ?? API_CONFIG.TIMEOUT;
-		const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
+		// F-FIX-TIMEOUT-TOAST (2026-08-09, Kevin): distinguir entre cancelacion
+		// por timeout real vs cancelacion manual (navegacion, componente
+		// desmontado, etc). Antes ambos casos mostraban el mismo toast
+		// "Solicitud cancelada por timeout" que era engañoso: si el browser
+		// cancelaba una request paralela (ej. refresh de lista al cerrar un
+		// modal), el toast parecia un error de la operacion principal cuando
+		// en realidad el PUT/POST si se habia aplicado.
+		let isTimeout = false;
+		const timeoutId = setTimeout(() => {
+			isTimeout = true;
+			controller.abort();
+		}, timeoutDuration);
 
 		try {
 			const isFormData = data instanceof FormData;
@@ -137,7 +148,14 @@ class ApiKyC {
 			clearTimeout(timeoutId);
 
 			if (error instanceof DOMException && error.name === 'AbortError') {
-				throw new AppError('Solicitud cancelada por timeout', ErrorType.NETWORK, 408);
+				// F-FIX-TIMEOUT-TOAST (2026-08-09, Kevin): solo mostrar toast
+				// de timeout si el timer realmente disparo. Si el browser cancelo
+				// la request (navegacion, componente desmontado, race condition
+				// con otra request), mostrar un mensaje neutro sin alarma.
+				if (isTimeout) {
+					throw new AppError('Solicitud cancelada por timeout', ErrorType.NETWORK, 408);
+				}
+				throw new AppError('Solicitud cancelada', ErrorType.NETWORK, 0);
 			}
 
 			if (error instanceof AppError) {
