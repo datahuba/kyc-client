@@ -36,7 +36,15 @@ class CourseService {
 	}
 
 	async update(id: string, data: UpdateCourseRequest): Promise<Course> {
-		return await apiKyC.put<Course>(`/courses/${id}`, data);
+		// F-FIX-PUT-TIMEOUT-60S (2026-08-09, Kevin): el PUT /courses/{id} puede
+		// tardar >30s cuando el backend sincroniza requisitos con N inscripciones
+		// o cuando la latencia a MongoDB Atlas (Brazil, +150ms RTT) se suma a
+		// otras requests lentas del dashboard. El timeout default de 30s del
+		// apiKyC mata la request antes de que el backend responda, haciendo
+		// creer al usuario que la operacion fallo. Subimos a 60s como
+		// mitigacion rapida; la investigacion de la causa real va en
+		// F-INVESTIGAR-LENTITUD-BACKEND. El rollback es trivial: bajar a 30s.
+		return await apiKyC.put<Course>(`/courses/${id}`, data, { customTimeout: 60000 });
 	}
 
 	async delete(id: string): Promise<Course> {
