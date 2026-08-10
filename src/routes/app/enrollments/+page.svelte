@@ -704,14 +704,21 @@
 		return options;
 	}
 
-	function getStudentName(id: string) {
+	// F-FIX-DESCONOCIDO-ENROLLMENTS (2026-08-09, Kevin): el backend ahora
+	// joinea estudiante_nombre y curso_nombre en /enrollments/. Usar esos
+	// campos directamente (con fallback al map local para retrocompat).
+	function getStudentName(id: string, enrollment?: any) {
 		if (currentRole === 'student' && $userStore.user) {
 			return $userStore.user.nombre || $userStore.user.username || $userStore.user.email || 'Mi Usuario';
 		}
+		// F-FIX-DESCONOCIDO-ENROLLMENTS: priorizar el campo joineado del backend
+		if (enrollment?.estudiante_nombre) return enrollment.estudiante_nombre;
 		return studentsMap[id]?.nombre || 'Desconocido';
 	}
-	
-	function getCourseName(id: string) {
+
+	function getCourseName(id: string, enrollment?: any) {
+		// F-FIX-DESCONOCIDO-ENROLLMENTS: priorizar el campo joineado del backend
+		if (enrollment?.curso_nombre) return enrollment.curso_nombre;
 		return coursesMap[id]?.nombre_programa || 'Desconocido';
 	}
 
@@ -852,13 +859,13 @@
 					{#each enrollments as enrollment (enrollment._id)}
 						<tr class="align-top hover:bg-gray-50 dark:hover:bg-dark-background/40 transition-colors">
 							<td class="px-4 py-4">
-								<div class="text-sm font-medium text-gray-900 dark:text-white line-clamp-2" title={getStudentName(enrollment.estudiante_id)}>
-									{getStudentName(enrollment.estudiante_id)}
+								<div class="text-sm font-medium text-gray-900 dark:text-white line-clamp-2" title={getStudentName(enrollment.estudiante_id, enrollment)}>
+									{getStudentName(enrollment.estudiante_id, enrollment)}
 								</div>
 							</td>
 							<td class="px-4 py-4">
-								<div class="text-sm text-gray-900 dark:text-white line-clamp-2" title={getCourseName(enrollment.curso_id)}>
-									{getCourseName(enrollment.curso_id)}
+								<div class="text-sm text-gray-900 dark:text-white line-clamp-2" title={getCourseName(enrollment.curso_id, enrollment)}>
+									{getCourseName(enrollment.curso_id, enrollment)}
 								</div>
 							</td>
 							<td class="px-4 py-4">
@@ -946,8 +953,8 @@
 				<Card>
 					<div class="flex items-center justify-between mb-4">
 						<div>
-							<h3 class="text-sm font-medium text-gray-900 dark:text-white">{getStudentName(enrollment.estudiante_id)}</h3>
-							<p class="text-xs text-gray-500 dark:text-gray-400">{getCourseName(enrollment.curso_id)}</p>
+							<h3 class="text-sm font-medium text-gray-900 dark:text-white">{getStudentName(enrollment.estudiante_id, enrollment)}</h3>
+							<p class="text-xs text-gray-500 dark:text-gray-400">{getCourseName(enrollment.curso_id, enrollment)}</p>
 						</div>
 						
 						<div class="relative">
@@ -1060,9 +1067,9 @@
 				<div class="bg-gray-50 dark:bg-dark-background/40 p-5 rounded-2xl border border-gray-200 dark:border-dark-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 					<div>
 						<p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold mb-1">Programa</p>
-						<p class="text-lg font-bold text-slate-900 dark:text-white leading-tight">{getCourseName(selectedKardex.curso_id)}</p>
+						<p class="text-lg font-bold text-slate-900 dark:text-white leading-tight">{getCourseName(selectedKardex.curso_id, selectedKardex)}</p>
 						{#if currentRole !== 'student'}
-							<p class="text-sm text-blue-600 font-semibold mt-1">Estudiante: {getStudentName(selectedKardex.estudiante_id)}</p>
+							<p class="text-sm text-blue-600 font-semibold mt-1">Estudiante: {getStudentName(selectedKardex.estudiante_id, selectedKardex)}</p>
 						{/if}
 					</div>
 					<div class="text-left md:text-right bg-white dark:bg-dark-surface px-6 py-3 rounded-xl shadow-sm border border-gray-100 dark:border-dark-border">
