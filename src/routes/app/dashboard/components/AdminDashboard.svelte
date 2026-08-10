@@ -317,28 +317,19 @@
 		<!-- Stats Grid -->
 		<!-- FIX-DASH-001: Eliminadas las 3 tarjetas (Estudiantes, Cursos, Inscripciones) que eran redundantes
 		     con el Resumen Económico. Ahora solo queda la tarjeta de Ingresos (condicional) -->
-		<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 gap-4 sm:gap-6">
-			<!-- La tarjeta "Ingresos" es redundante para roles económicos (ya ven
-			     "Total Ingresos" en el Resumen Económico, y esta muestra solo los
-			     pagos filtrados por rol, lo que confunde). Se oculta para ellos.
-				 NOTA: Solo se muestra si el usuario TIENE PERMISOS para ver pagos (ej. CPD) -->
-			{#if !verResumenEconomico && puedeVerPagos}
-			<a href="/app/payments" class="block">
-				<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 flex items-center justify-between hover:scale-105 transition-transform hover:shadow-lg min-w-0">
-					<div class="flex-1 min-w-0 mr-3">
-						<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Ingresos</p>
-						<p class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(stats.payments?.revenue ?? 0)}>
-							{formatCurrency(stats.payments?.revenue ?? 0)}
-						</p>
-						<p class="text-[10px] sm:text-xs text-yellow-600 mt-1 truncate">{stats.payments?.pending ?? 0} Pendientes</p>
-					</div>
-					<div class="p-3 bg-primary-600 rounded-full text-white shrink-0">
-						<CreditCardIcon class="size-6 sm:size-8" />
-					</div>
-				</div>
-			</a>
-			{/if}
-		</div>
+		<!-- F-DASHBOARD-CPD-NO-INGRESOS (2026-08-10, Kevin): la tarjeta "Ingresos"
+		     se elimino del dashboard. Antes se mostraba para roles que NO ven el
+		     resumen economico completo PERO SI ven pagos (ej. CPD). Kevin reporto
+		     que CPD no debe ver tema economico en su dashboard - solo tema
+		     academico (Desglose por Programa) y estudiantes. Los roles economicos
+		     (superadmin/admin/cobranza/mae) siguen viendo el bloque grande
+		     "Resumen Economico General" mas arriba; los demas roles simplemente
+		     no ven nada economico aqui, que es lo correcto.
+
+		     La navegacion a /app/payments sigue funcionando (sidebar) para CPD y
+		     otros roles con puedeVerPagos, pero el dashboard ya no muestra
+		     tarjetas financieras que puedan confundir al usuario. -->
+		<!-- (Tarjeta "Ingresos" removida - ver comentario F-DASHBOARD-CPD-NO-INGRESOS) -->
 
 		<!-- F-DASHBOARD-V2 (2026-08-05 17:30, Kevin): la seccion "Ingresos por
 		     Programa" que estaba aca fue ELIMINADA. Sus 4 cards financieras
