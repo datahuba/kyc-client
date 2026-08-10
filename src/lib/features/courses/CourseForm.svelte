@@ -383,6 +383,11 @@
 				payload.requisitos = [];
 				payload.cargo_adicional_items = [];
 				payload.activo = false; // un programa historico no acepta inscripciones
+				// F-FIX-CREAR-PROGRAMA-422 (2026-08-09, Kevin): borrar fechas
+				// vacias para que el backend no rechace con 422 al validar
+				// "Input should be a valid datetime".
+				delete payload.fecha_inicio;
+				delete payload.fecha_fin;
 			}
 			// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): enviar
 			// estado_override al backend para que el calculo automatico de
