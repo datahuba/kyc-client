@@ -128,11 +128,20 @@ class CuentasPorCobrarService {
 	/**
 	 * F-MODULOS-MODAL (2026-07-31): marca un módulo como finalizado/cerrado.
 	 * Solo se puede finalizar un módulo que ya está iniciado.
+	 *
+	 * F-2026-08-11-MODULOS-EC: asistencia_porcentaje es opcional (0-100). Si
+	 * se pasa y es < 80, el backend fuerza estado_academico='Reprobado'
+	 * (regla de aprobación mínima por asistencia, educación continua UAGRM
+	 * 2026-08-11).
 	 */
-	async finalizarModulo(enrollmentId: string, moduloIndex: number): Promise<unknown> {
+	async finalizarModulo(
+		enrollmentId: string,
+		moduloIndex: number,
+		asistencia_porcentaje?: number | null
+	): Promise<unknown> {
 		return await apiKyC.post<unknown>(
 			`/enrollments/${enrollmentId}/modulos/${moduloIndex}/finalizar`,
-			{}
+			{ asistencia_porcentaje: asistencia_porcentaje ?? null }
 		);
 	}
 

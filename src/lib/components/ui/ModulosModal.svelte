@@ -40,6 +40,11 @@
 	let loading = $state<Record<string, boolean>>({});
 	let refreshing = $state(false);
 
+	// F-2026-08-11-MODULOS-EC: input de asistencia_porcentaje por módulo
+	// (0-100). Se muestra solo cuando se puede cerrar el módulo. Si < 80,
+	// el backend fuerza Reprobado al cerrar.
+	let asistenciaInputs = $state<Record<number, string>>({});
+
 	function getModuloKey(index: number, action: string): string {
 		return `${index}-${action}`;
 	}
@@ -76,9 +81,31 @@
 
 	async function handleFinalizar(index: number) {
 		if (!enrollment) return;
+		// F-2026-08-11-MODULOS-EC: parsear asistencia opcional (0-100)
+		const rawAsist = (asistenciaInputs[index] ?? '').toString().trim();
+		let asistenciaNum: number | null = null;
+		if (rawAsist !== '') {
+			const n = Number(rawAsist);
+			if (Number.isNaN(n) || n < 0 || n > 100) {
+				alert('error', 'La asistencia debe ser un número entre 0 y 100.');
+				return;
+			}
+			asistenciaNum = n;
+			if (n < 80) {
+				const ok = confirm(
+					`Asistencia ${n}% (< 80%). El sistema forzará el módulo como "Reprobado" ` +
+						`por regla de aprobación mínima. ¿Continuar?`
+				);
+				if (!ok) return;
+			}
+		}
 		if (!confirm('¿Cerrar este módulo? Marcará el módulo como "finalizado" y ya no contará como activo.')) return;
 		const updated = await withLoading(getModuloKey(index, 'finalizar'), () =>
-			cuentasPorCobrarService.finalizarModulo(String(enrollment._id), index)
+			cuentasPorCobrarService.finalizarModulo(
+				String(enrollment._id),
+				index,
+				asistenciaNum
+			)
 		);
 		enrollment = updated;
 		onUpdated?.(updated);
@@ -179,6 +206,14 @@
 												Cierre: {formatDate(modulo.finalizado_en)}
 											</span>
 										{/if}
+										{#if modulo.asistencia_porcentaje !== null && modulo.asistencia_porcentaje !== undefined}
+											<span
+												class={`px-2 py-0.5 font-bold rounded-full ${modulo.asistencia_porcentaje < 80 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'}`}
+												title="F-2026-08-11-MODULOS-EC: regla 80% asistencia"
+											>
+												Asist: {modulo.asistencia_porcentaje}%
+											</span>
+										{/if}
 									</div>
 								</div>
 								<div class="text-right text-sm">
@@ -215,6 +250,23 @@
 										{/snippet}
 										Revertir inicio
 									</Button>
+									<!-- F-2026-08-11-MODULOS-EC: input de asistencia opcional al cerrar módulo.
+									     Si < 80%, el backend fuerza Reprobado. Si >= 80% o vacío, no afecta la nota. -->
+									<div class="flex items-center gap-1.5">
+										<label for={`asist-${index}`} class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+											Asistencia %:
+										</label>
+										<input
+											id={`asist-${index}`}
+											type="number"
+											min="0"
+											max="100"
+											step="1"
+											bind:value={asistenciaInputs[index]}
+											placeholder="0-100"
+											class="w-20 rounded-lg border-2 border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface py-1.5 px-2 text-sm text-gray-900 dark:text-white outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10"
+										/>
+									</div>
 									<Button
 										size="sm"
 										onclick={() => handleFinalizar(index)}
