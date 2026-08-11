@@ -14,6 +14,7 @@
 	} from '$lib/services/pre-registration.service';
 	import { courseService } from '$lib/services/course.service';
 	import { userStore } from '$lib/stores/userStore';
+	import { STAFF_EC_FORMS } from '$lib/auth/roles'; // F-2026-08-11-EC-AUTOSERVICIO
 	import { alert } from '$lib/utils';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Button from '$lib/components/ui/button.svelte';
@@ -46,7 +47,9 @@
 	let isSuperAdmin = $derived(currentRole === 'superadmin');
 	let isAdmin = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 	// Para tabs: super admin puede ver todo. CPD/encargado solo ven lo suyo.
-	let canCreate = $derived(isSuperAdmin);
+	// F-2026-08-11-EC-AUTOSERVICIO: encargado_curso y coordinador (educacion
+	// continua) ahora pueden crear/editar/cerrar/reabrir/eliminar formularios.
+	let canCreate = $derived(STAFF_EC_FORMS.includes(currentRole));
 
 	type Tab = 'forms' | 'submissions';
 	let activeTab: Tab = $state('forms');

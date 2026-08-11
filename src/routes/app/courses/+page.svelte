@@ -3,6 +3,7 @@
 	import { courseService } from '$lib/services';
 	import type { Course, CourseStudent } from '$lib/interfaces';
 	import { userStore } from '$lib/stores/userStore'; // <-- Importación del Store
+	import { STAFF_EC_COURSES } from '$lib/auth/roles'; // F-2026-08-11-EC-AUTOSERVICIO
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -92,7 +93,9 @@
 
 	// ISSUE N: Control de Permisos Visuales
 	let currentRole = $derived(($userStore.role || '').toLowerCase());
-	let canCreateCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	// F-2026-08-11-EC-AUTOSERVICIO: encargado_curso/coord pueden intentar
+	// crear programas. El backend rechaza con 403 si NO son historicos.
+	let canCreateCourse = $derived(STAFF_EC_COURSES.includes(currentRole));
 	let canEditCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canDeleteCourse = $derived(currentRole === 'superadmin');
 	// Comunicados: Encargado de Programa / Coordinador / CPD / Admin / Superadmin.
@@ -404,12 +407,21 @@
 		
 		<!-- ISSUE N: Ocultar botón Nuevo Programa si no tiene permisos -->
 		{#if canCreateCourse}
-			<Button onclick={handleCreate}>
-				{#snippet leftIcon()}
-					<PlusIcon class="size-5" />
-				{/snippet}
-				Nuevo Programa
-			</Button>
+			<div class="flex flex-col items-end gap-1">
+				<Button onclick={handleCreate}>
+					{#snippet leftIcon()}
+						<PlusIcon class="size-5" />
+					{/snippet}
+					Nuevo Programa
+				</Button>
+				<!-- F-2026-08-11-EC-AUTOSERVICIO: aviso para encargado/coordinador -->
+				{#if ['encargado_curso', 'coordinador'].includes(currentRole)}
+					<p class="text-[10px] text-amber-700 dark:text-amber-400 max-w-xs text-right">
+						Como encargado de EC, solo puedes crear programas <strong>históricos</strong>
+						(fecha_fin ya pasó). Para programas nuevos consulta con CPD.
+					</p>
+				{/if}
+			</div>
 		{/if}
 	</div>
 

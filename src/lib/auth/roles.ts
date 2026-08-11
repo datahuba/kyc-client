@@ -140,6 +140,38 @@ export const STAFF_REACTIVAR: string[] = [
 export const ONLY_SUPERADMIN: string[] = [ROLE_SUPERADMIN];
 
 // ============================================================
+// F-2026-08-11-EC-AUTOSERVICIO: encargado de educacion continua puede
+// gestionar formularios de preinscripcion y crear programas historicos.
+// ============================================================
+
+/**
+ * Puede gestionar formularios de preinscripcion (crear/editar/cerrar/
+ * reabrir/eliminar). Antes solo superadmin, ahora tambien encargado_curso
+ * y coordinador (educacion continua) gracias a F-2026-08-11-EC-AUTOSERVICIO.
+ */
+export const STAFF_EC_FORMS: string[] = [
+	ROLE_SUPERADMIN,
+	ROLE_ADMIN,
+	ROLE_CPD,
+	ROLE_ENCARGADO_CURSO,
+	ROLE_COORDINADOR,
+];
+
+/**
+ * Puede CREAR programas. Antes solo CPD/SUPERADMIN, ahora tambien
+ * encargado_curso y coordinador, PERO solo para programas HISTORICOS
+ * (fecha_fin ya paso). El backend rechaza con 403 si intentan crear
+ * un programa nuevo o en ejecucion.
+ */
+export const STAFF_EC_COURSES: string[] = [
+	ROLE_SUPERADMIN,
+	ROLE_ADMIN,
+	ROLE_CPD,
+	ROLE_ENCARGADO_CURSO,
+	ROLE_COORDINADOR,
+];
+
+// ============================================================
 // HELPERS
 // ============================================================
 
