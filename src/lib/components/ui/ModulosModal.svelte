@@ -26,7 +26,9 @@
 	import Button from './button.svelte';
 	import { cuentasPorCobrarService } from '$lib/services';
 	import { alert, formatCurrency, formatDate } from '$lib/utils';
-	import { CheckIcon, XIcon, ExclamationIcon } from '$lib/icons/outline';
+	import { CheckIcon, XIcon, ExclamationIcon, ClipboardIcon } from '$lib/icons/outline';
+	// F-2026-08-11-ASISTENCIA: modal para gestionar asistencia por sesiones
+	import AsistenciaModal from './AsistenciaModal.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -44,6 +46,34 @@
 	// (0-100). Se muestra solo cuando se puede cerrar el módulo. Si < 80,
 	// el backend fuerza Reprobado al cerrar.
 	let asistenciaInputs = $state<Record<number, string>>({});
+
+	// F-2026-08-11-ASISTENCIA: estado del modal de asistencia por sesiones
+	let asistenciaModalOpen = $state(false);
+	let asistenciaModuloIndex = $state(0);
+	let asistenciaModuloNombre = $state('');
+
+	function openAsistenciaModal(index: number) {
+		asistenciaModuloIndex = index;
+		asistenciaModuloNombre = enrollment?.modulos?.[index]?.nombre || `Módulo ${index + 1}`;
+		asistenciaModalOpen = true;
+	}
+
+	function closeAsistenciaModal() {
+		asistenciaModalOpen = false;
+	}
+
+	// Estudiantes para el modal de asistencia: en este contexto cada
+	// enrollment = 1 estudiante, pero la UI del modal admite varios.
+	const estudiantesAsistencia = $derived.by(() => {
+		if (!enrollment) return [];
+		return [
+			{
+				_id: String(enrollment.estudiante_id),
+				nombre: enrollment.estudiante_nombre || 'Estudiante',
+				registro: enrollment.estudiante_registro || undefined
+			}
+		];
+	});
 
 	function getModuloKey(index: number, action: string): string {
 		return `${index}-${action}`;
@@ -295,6 +325,20 @@
 										Sin acciones disponibles
 									</span>
 								{/if}
+
+								<!-- F-2026-08-11-ASISTENCIA: boton para abrir el modal de
+								     sesiones y registrar asistencia por clase. Disponible
+								     para cualquier estado del modulo. -->
+								<Button
+									size="sm"
+									variant="secondary"
+									onclick={() => openAsistenciaModal(index)}
+								>
+									{#snippet leftIcon()}
+										<ClipboardIcon class="size-4" />
+									{/snippet}
+									Asistencia
+								</Button>
 							</div>
 						</div>
 					{/each}
@@ -314,3 +358,15 @@
 		</div>
 	{/if}
 </Modal>
+
+<!-- F-2026-08-11-ASISTENCIA: modal para gestionar la asistencia del modulo seleccionado -->
+{#if enrollment}
+	<AsistenciaModal
+		isOpen={asistenciaModalOpen}
+		enrollmentId={String(enrollment._id)}
+		estudiantes={estudiantesAsistencia}
+		moduloIndex={asistenciaModuloIndex}
+		moduloNombre={`#${asistenciaModuloIndex + 1} · ${asistenciaModuloNombre}`}
+		onClose={closeAsistenciaModal}
+	/>
+{/if}
