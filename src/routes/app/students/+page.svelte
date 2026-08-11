@@ -81,7 +81,14 @@
 	let currentRole = $derived($userStore.role || '');
 	let isSuperAdmin = $derived(currentRole === 'superadmin');
 	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
-	let canEditStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	// F-FIX-STUDENT-EDIT-PERMISSIONS (2026-08-11, Kevin): antes canEditStudent
+	// solo permitía ['superadmin', 'admin', 'cpd'] pero el backend (require_cpd)
+	// también solo esos. El problema: Lisa/encargado_curso y coordinadores
+	// tenían que editar datos personales (cumpleaños, celular, domicilio) pero
+	// recibían 403 al guardar. Ahora backend usa require_encargado_curso (5 roles)
+	// y este array se alinea con canCreateStudent/canEnrollStudent. Tambien
+	// handleEdit() chequea este flag antes de abrir el form (defense in depth).
+	let canEditStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 	let canVerifyTitle = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
 	let canEnrollStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 
@@ -234,6 +241,17 @@
 	}
 
 	function handleEdit(student: Student) {
+		// F-FIX-STUDENT-EDIT-PERMISSIONS (2026-08-11, Kevin): defense in depth.
+		// Aunque canEditStudent ya filtra el botón de editar en la UI, esta
+		// validación previene que se abra el form si se invoca handleEdit
+		// desde un deep-link, atajo de teclado, o futuro caller que olvide
+		// el check. Si pasa, el usuario verá el form, llenará datos, y
+		// recibirá 403 al guardar -- antipattern que el bug original demostró.
+		if (!canEditStudent) {
+			alert('error', 'No tienes permisos para editar estudiantes. Consulta con CPD o administración.');
+			openDropdownId = null;
+			return;
+		}
 		selectedStudent = student;
 		isFormOpen = true;
 	}
