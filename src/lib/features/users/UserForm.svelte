@@ -164,7 +164,7 @@ interface Props {
 			if (numCursos === 0) {
 				nuevosErrores.cursos_asignados = 'Selecciona al menos un curso para este Encargado de Curso.';
 			} else if (numCursos > 5) {
-				nuevosErrores.cursos_asignados = 'Un Encargado de Curso puede tener máximo 5 programas asignados.';
+				nuevosErrores.cursos_asignados = 'Un Encargado de Curso puede tener máximo 10 programas asignados.';
 			}
 		}
 		if (requiereSubtipoCoordinador && !formData.subtipo_coordinador) {

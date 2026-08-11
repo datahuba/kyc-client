@@ -500,7 +500,7 @@
 				try {
 					await courseService.assignEncargados(savedCourse._id, selectedEncargadosIds);
 				} catch (err: any) {
-					alert('warning', err.message || 'El curso se guardó, pero hubo un error al asignar los encargados. Revisa el límite de 5 programas por usuario.');
+					alert('warning', err.message || 'El curso se guardó, pero hubo un error al asignar los encargados. Revisa el límite de 10 programas por usuario.');
 				}
 			}
 
@@ -629,7 +629,7 @@
 	<Card variant="bordered" padding="md">
 		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">Gestión Académica</Heading>
 		<p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
-			Selecciona a los Encargados de Curso o Coordinadores que administrarán este programa. Recuerda que cada usuario puede administrar un máximo de 5 programas a la vez.
+			Selecciona a los Encargados de Curso o Coordinadores que administrarán este programa. Recuerda que cada usuario puede administrar un máximo de 10 programas a la vez.
 		</p>
 		
 		{#if availableEncargados.length > 0}
