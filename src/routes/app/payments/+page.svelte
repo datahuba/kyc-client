@@ -296,13 +296,22 @@
 	// coursesListFiltrada (si ya esta cargada). Asi cuando el usuario entra a
 	// /app/payments con la vista Matriz persistida en localStorage, ve un
 	// programa real, no la mezcla confusa de todos los programas.
+	// F-FIX-MATRIZ-RACE-CONDITION (2026-08-11, Kevin): el effect original
+	// MUTABA `filters.curso_id` dentro del effect para auto-seleccionar el
+	// primer programa. Eso causaba 2 problemas:
+	//   1. Svelte 5 lanza TypeError "Cannot read properties of undefined
+	//      (reading 'prev')" en runtime cuando se muta $state dentro de un
+	//      effect derivado (visto en consola del navegador el 2026-08-11).
+	//   2. Race condition: la 1ra request sin filtro (17s) se iniciaba antes
+	//      de que la URL ?curso_id=X se procesara, y al terminar sobrescribía
+	//      la respuesta correcta del filtro.
+	// Fix: la auto-seleccion del primer curso se hace en setViewMode() y en
+	// onMount() (que ya estaba parcial). El effect SOLO reacciona a cambios
+	// de filtros ya seteados y dispara loadMatriz(). Sin mutaciones.
 	$effect(() => {
-		if (isStaff && viewMode === 'matriz') {
-			// Auto-seleccionar primer programa si la vista es Matriz y no hay curso
-			if (!filters.curso_id && coursesListFiltrada.length > 0) {
-				filters.curso_id = coursesListFiltrada[0]._id;
-			}
-			// Dependencias explicitas: tanto el filtro de modulo como el de programa
+		if (isStaff && viewMode === 'matriz' && filters.curso_id) {
+			// Dependencias explicitas: el effect se re-ejecuta si cambia
+			// el modulo o el curso seleccionado
 			matrizFiltroModulo;
 			filters.curso_id;
 			loadMatriz();
@@ -409,6 +418,15 @@
 		const cursoIdParam = $appPage.url.searchParams.get('curso_id');
 		if (cursoIdParam) {
 			filters.curso_id = cursoIdParam;
+		}
+
+		// F-FIX-MATRIZ-RACE-CONDITION (2026-08-11, Kevin): si la vista activa
+		// es Matriz y todavia no hay curso seleccionado (no vino en URL, no
+		// quedo de una sesion previa), auto-seleccionar el primer programa
+		// disponible. Esto se hace ACA (no en el $effect) para evitar la
+		// mutacion de $state dentro de un effect derivado que rompe Svelte 5.
+		if (viewMode === 'matriz' && !filters.curso_id && coursesListFiltrada.length > 0) {
+			filters.curso_id = coursesListFiltrada[0]._id;
 		}
 
 		// Atajo directo desde "Ver Libreta -> Pagar Saldo Pendiente": abre el
