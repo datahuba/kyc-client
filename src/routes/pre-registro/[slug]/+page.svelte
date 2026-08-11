@@ -42,13 +42,23 @@
 	let domicilio = $state('');
 	let mensaje = $state('');
 
+	// F-2026-08-11-CAMPOS-EC: campos opcionales del Diplomado Gestión Tributaria
+	// y demás programas de educación continua (planilla de Lisa). Si el
+	// estudiante NO se inscribe a un diplomado EC, simplemente los deja vacíos.
+	let registroUniversitario = $state('');
+	let avanceAcademicoCodigo = $state('');
+	let formularioDescuentoNumero = $state('');
+	let carreraCodigo = $state('');
+	let descuentoPorcentaje = $state(''); // en %, se convierte a 0-1 al enviar
+
 	let fieldErrors = $state<Record<string, string>>({});
 
 	// Wizard state
 	const STEPS = [
 		{ id: 1, title: 'Identidad', subtitle: '¿Quién eres?', icon: UserIcon, fields: ['nombre', 'email', 'carnet', 'extension'] },
 		{ id: 2, title: 'Contacto', subtitle: '¿Cómo te ubicamos?', icon: IdentificationIcon, fields: ['celular', 'fechaNacimiento', 'sexo', 'domicilio'] },
-		{ id: 3, title: 'Confirmar', subtitle: 'Revisa y envía', icon: CircleCheckIcon, fields: ['mensaje'] }
+		{ id: 3, title: 'Datos EC', subtitle: 'Educación continua (opcional)', icon: IdentificationIcon, fields: ['registroUniversitario', 'avanceAcademicoCodigo', 'formularioDescuentoNumero', 'carreraCodigo', 'descuentoPorcentaje'] },
+		{ id: 4, title: 'Confirmar', subtitle: 'Revisa y envía', icon: CircleCheckIcon, fields: ['mensaje'] }
 	] as const;
 	let currentStep = $state(1);
 	let highestStepReached = $state(1);
@@ -106,7 +116,7 @@
 	function saveAutosave() {
 		if (success) return;
 		try {
-			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, currentStep, savedAt: Date.now() };
+			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, currentStep, savedAt: Date.now() };
 			localStorage.setItem(autosaveKey(), JSON.stringify(data));
 			// indicador "guardado"
 			justSaved = true;
@@ -146,6 +156,11 @@
 			sexo = data.sexo || '';
 			domicilio = data.domicilio || '';
 			mensaje = data.mensaje || '';
+			registroUniversitario = data.registroUniversitario || '';
+			avanceAcademicoCodigo = data.avanceAcademicoCodigo || '';
+			formularioDescuentoNumero = data.formularioDescuentoNumero || '';
+			carreraCodigo = data.carreraCodigo || '';
+			descuentoPorcentaje = data.descuentoPorcentaje || '';
 			if (data.currentStep) {
 				currentStep = data.currentStep;
 				highestStepReached = data.currentStep;
@@ -172,6 +187,11 @@
 				case 'fechaNacimiento': return fechaNacimiento.trim();
 				case 'domicilio': return domicilio.trim();
 				case 'mensaje': return mensaje.trim();
+				case 'registroUniversitario': return registroUniversitario.trim();
+				case 'avanceAcademicoCodigo': return avanceAcademicoCodigo.trim();
+				case 'formularioDescuentoNumero': return formularioDescuentoNumero.trim();
+				case 'carreraCodigo': return carreraCodigo.trim();
+				case 'descuentoPorcentaje': return descuentoPorcentaje.trim();
 				default: return '';
 			}
 		})();
@@ -193,6 +213,19 @@
 		}
 		if (key === 'fechaNacimiento' && v) {
 			if (!/^(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})$/.test(v)) return 'Formato: DD/MM/AAAA o AAAA-MM-DD.';
+		}
+		// F-2026-08-11-CAMPOS-EC: campos opcionales, validar formato solo si se lleno algo
+		if (v && key === 'avanceAcademicoCodigo' && !/^\d+$/.test(v)) {
+			return 'Solo dígitos (código numérico).';
+		}
+		if (v && key === 'formularioDescuentoNumero' && !/^\d+$/.test(v)) {
+			return 'Solo dígitos (número de formulario).';
+		}
+		if (v && key === 'descuentoPorcentaje') {
+			const n = Number(v);
+			if (Number.isNaN(n) || n < 0 || n > 100) {
+				return 'Debe ser un número entre 0 y 100 (porcentaje).';
+			}
 		}
 		return null;
 	}
@@ -270,7 +303,13 @@
 				fecha_nacimiento: fechaNacimiento.trim() || undefined,
 				sexo: (sexo || undefined) as 'masculino' | 'femenino' | undefined,
 				domicilio: domicilio.trim() || undefined,
-				mensaje: mensaje.trim() || undefined
+				mensaje: mensaje.trim() || undefined,
+				// F-2026-08-11-CAMPOS-EC: solo enviar si tienen contenido
+				registro_universitario: registroUniversitario.trim() || undefined,
+				avance_academico_codigo: avanceAcademicoCodigo.trim() ? Number(avanceAcademicoCodigo.trim()) : undefined,
+				formulario_descuento_numero: formularioDescuentoNumero.trim() ? Number(formularioDescuentoNumero.trim()) : undefined,
+				carrera_codigo: carreraCodigo.trim() || undefined,
+				descuento_porcentaje: descuentoPorcentaje.trim() ? Number(descuentoPorcentaje.trim()) / 100 : undefined
 			});
 			// ISSUE-PRE-WIZARD-002: capturar el ID de submission para mostrar al usuario
 			submissionId = (result as any)?.id || (result as any)?._id || '';
@@ -710,8 +749,138 @@
 						</div>
 						{/if}
 
-						<!-- ============== PASO 3: Confirmar ============== -->
+						<!-- ============== PASO 3: Datos EC (opcional) ==============
+						     F-2026-08-11-CAMPOS-EC: campos del Diplomado Gestión Tributaria y demás
+						     programas de educación continua (planilla de Lisa). Si NO es EC, dejar vacíos. -->
 						{#if currentStep === 3}
+						<div in:fly={{ x: 20, duration: 350, easing: cubicOut }} out:fly={{ x: -20, duration: 200, easing: cubicOut }}>
+							<div class="rounded-xl border border-primary-200 bg-primary-50/50 p-3 dark:border-primary-900/50 dark:bg-primary-900/10">
+								<p class="text-xs text-primary-800 dark:text-dark-tertiary">
+									<strong>¿Te inscribes a un diplomado de educación continua?</strong> Si es así, completa estos datos. Si no, déjalos vacíos y continúa.
+								</p>
+							</div>
+
+							<!-- Registro Universitario -->
+							<div>
+								<label for="pr-registro" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+									Registro Universitario <span class="text-xs font-normal text-gray-400">(opcional)</span>
+								</label>
+								<input
+									id="pr-registro"
+									type="text"
+									bind:value={registroUniversitario}
+									oninput={() => { clearError('registroUniversitario'); saveAutosave(); }}
+									class="w-full rounded-xl border-2 border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+									placeholder="Ej: 219012345"
+									maxlength="30"
+									disabled={isExpired}
+									aria-invalid={!!fieldErrors.registroUniversitario}
+									aria-describedby={fieldErrors.registroUniversitario ? 'pr-registro-error' : undefined}
+								/>
+								{#if fieldErrors.registroUniversitario}
+									<p id="pr-registro-error" class="mt-1 text-xs font-medium text-red-600">{fieldErrors.registroUniversitario}</p>
+								{:else}
+									<p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Si ya eres egresado de la UAGRM, ingresa tu número de registro</p>
+								{/if}
+							</div>
+
+							<!-- Avance Académico (código) + Formulario de Descuento (número) -->
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								<div>
+									<label for="pr-avance" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Código de avance académico <span class="text-xs font-normal text-gray-400">(opcional)</span>
+									</label>
+									<input
+										id="pr-avance"
+										type="text"
+										inputmode="numeric"
+										bind:value={avanceAcademicoCodigo}
+										oninput={() => { clearError('avanceAcademicoCodigo'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
+											{fieldErrors.avanceAcademicoCodigo ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
+										placeholder="Solo dígitos"
+										disabled={isExpired}
+										aria-invalid={!!fieldErrors.avanceAcademicoCodigo}
+										aria-describedby={fieldErrors.avanceAcademicoCodigo ? 'pr-avance-error' : undefined}
+									/>
+									{#if fieldErrors.avanceAcademicoCodigo}
+										<p id="pr-avance-error" class="mt-1 text-xs font-medium text-red-600">{fieldErrors.avanceAcademicoCodigo}</p>
+									{/if}
+								</div>
+								<div>
+									<label for="pr-formdesc" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Nº de Formulario de Descuento <span class="text-xs font-normal text-gray-400">(opcional)</span>
+									</label>
+									<input
+										id="pr-formdesc"
+										type="text"
+										inputmode="numeric"
+										bind:value={formularioDescuentoNumero}
+										oninput={() => { clearError('formularioDescuentoNumero'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
+											{fieldErrors.formularioDescuentoNumero ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
+										placeholder="Solo dígitos"
+										disabled={isExpired}
+										aria-invalid={!!fieldErrors.formularioDescuentoNumero}
+										aria-describedby={fieldErrors.formularioDescuentoNumero ? 'pr-formdesc-error' : undefined}
+									/>
+									{#if fieldErrors.formularioDescuentoNumero}
+										<p id="pr-formdesc-error" class="mt-1 text-xs font-medium text-red-600">{fieldErrors.formularioDescuentoNumero}</p>
+									{/if}
+								</div>
+							</div>
+
+							<!-- Carrera (código) + Descuento (%) -->
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								<div>
+									<label for="pr-carrera" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Código de carrera <span class="text-xs font-normal text-gray-400">(opcional)</span>
+									</label>
+									<input
+										id="pr-carrera"
+										type="text"
+										bind:value={carreraCodigo}
+										oninput={() => { clearError('carreraCodigo'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+										placeholder="Ej: CONT-2024"
+										maxlength="20"
+										disabled={isExpired}
+										aria-invalid={!!fieldErrors.carreraCodigo}
+									/>
+									<p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Si vienes de otra carrera, indica el código</p>
+								</div>
+								<div>
+									<label for="pr-descuento" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Descuento <span class="text-xs font-normal text-gray-400">(opcional, 0-100%)</span>
+									</label>
+									<input
+										id="pr-descuento"
+										type="number"
+										inputmode="decimal"
+										step="0.01"
+										min="0"
+										max="100"
+										bind:value={descuentoPorcentaje}
+										oninput={() => { clearError('descuentoPorcentaje'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
+											{fieldErrors.descuentoPorcentaje ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
+										placeholder="Ej: 50"
+										disabled={isExpired}
+										aria-invalid={!!fieldErrors.descuentoPorcentaje}
+										aria-describedby={fieldErrors.descuentoPorcentaje ? 'pr-descuento-error' : undefined}
+									/>
+									{#if fieldErrors.descuentoPorcentaje}
+										<p id="pr-descuento-error" class="mt-1 text-xs font-medium text-red-600">{fieldErrors.descuentoPorcentaje}</p>
+									{:else}
+										<p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Aplica a módulos, no a matrícula</p>
+									{/if}
+								</div>
+							</div>
+						</div>
+						{/if}
+
+						<!-- ============== PASO 4: Confirmar ============== -->
+						{#if currentStep === 4}
 						<div in:fly={{ x: 20, duration: 350, easing: cubicOut }} out:fly={{ x: -20, duration: 200, easing: cubicOut }}>
 							<div class="rounded-xl border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
 								<h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-primary-700 dark:text-dark-tertiary">
@@ -749,6 +918,48 @@
 									</div>
 								</dl>
 							</div>
+
+							<!-- F-2026-08-11-CAMPOS-EC: resumen de datos EC (solo si alguno está lleno) -->
+							{#if registroUniversitario || avanceAcademicoCodigo || formularioDescuentoNumero || carreraCodigo || descuentoPorcentaje}
+								<div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-900/50 dark:bg-indigo-900/10">
+									<h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+										<IdentificationIcon class="size-4" />
+										Datos de educación continua
+									</h3>
+									<dl class="space-y-2 text-sm">
+										{#if registroUniversitario}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Registro Univ.</dt>
+												<dd class="font-mono text-gray-900 dark:text-white text-right">{registroUniversitario}</dd>
+											</div>
+										{/if}
+										{#if avanceAcademicoCodigo}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Avance académico</dt>
+												<dd class="font-mono text-gray-900 dark:text-white text-right">{avanceAcademicoCodigo}</dd>
+											</div>
+										{/if}
+										{#if formularioDescuentoNumero}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Nº Form. Descuento</dt>
+												<dd class="font-mono text-gray-900 dark:text-white text-right">{formularioDescuentoNumero}</dd>
+											</div>
+										{/if}
+										{#if carreraCodigo}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Carrera</dt>
+												<dd class="font-mono text-gray-900 dark:text-white text-right">{carreraCodigo}</dd>
+											</div>
+										{/if}
+										{#if descuentoPorcentaje}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Descuento</dt>
+												<dd class="font-semibold text-gray-900 dark:text-white text-right">{descuentoPorcentaje}%</dd>
+											</div>
+										{/if}
+									</dl>
+								</div>
+							{/if}
 
 							<!-- Mensaje -->
 							<div>

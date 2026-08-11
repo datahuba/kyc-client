@@ -89,6 +89,14 @@ export interface PreRegistrationSubmit {
 	sexo?: 'masculino' | 'femenino';
 	domicilio?: string;
 	mensaje?: string;
+	// F-2026-08-11-CAMPOS-EC: campos opcionales del Diplomado Gestión
+	// Tributaria y demás programas de educación continua. Si el estudiante
+	// se inscribe a un diplomado EC, los llena desde la planilla de Lisa.
+	registro_universitario?: string;
+	avance_academico_codigo?: number;
+	formulario_descuento_numero?: number;
+	carrera_codigo?: string;
+	descuento_porcentaje?: number; // 0.0 - 1.0
 }
 
 export interface PreRegistrationCounters {
