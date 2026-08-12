@@ -1015,8 +1015,32 @@
 						<p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
 							{sub.form_nombre || 'Formulario'} · {fmtDate(sub.created_at)}
 						</p>
+						<!-- F-2026-08-12-DESCUENTO-BECA-FIX-MOBILE-DETAIL: agregar boton
+						     "Ver detalle" en mobile para que el encargado pueda ver la info
+						     completa de la submission (badge primera carrera, foto del titulo,
+						     carta, resolucion) ANTES de aprobar/rechazar. -->
+						<div class="mt-2 flex items-center gap-2">
+							<button
+								type="button"
+								onclick={() => openDetailModal(sub)}
+								class="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-dark-border px-2.5 py-1 text-[11px] font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-dark-border/70"
+							>
+								<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+								Ver detalle
+							</button>
+							{#if sub.estado === 'aprobado' && sub.data?.es_primer_carrera === false && sub.data?.titulo_profesional_url && sub.migrated_to_student_id}
+								<button
+									type="button"
+									onclick={() => openValidateTituloModal(sub)}
+									class="inline-flex items-center gap-1 rounded-lg bg-amber-100 dark:bg-amber-900/30 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-200"
+								>
+									<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+									Validar título
+								</button>
+							{/if}
+						</div>
 						{#if sub.estado === 'pendiente'}
-							<div class="mt-3 flex items-center gap-2 border-t border-gray-100 dark:border-dark-border pt-3">
+							<div class="mt-2 flex items-center gap-2 border-t border-gray-100 dark:border-dark-border pt-3">
 								<Button size="sm" variant="destructive" fullWidth onclick={() => openRejectSubmission(sub)}>Rechazar</Button>
 								<Button size="sm" fullWidth onclick={() => handleApproveSubmission(sub)}>Aprobar</Button>
 							</div>
