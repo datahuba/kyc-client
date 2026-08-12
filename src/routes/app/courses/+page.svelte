@@ -103,6 +103,19 @@
 	let canSendComunicado = $derived(
 		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole)
 	);
+	// F-2026-08-12-EC-CARGA-INICIAL-VISIBILITY (Kevin 2026-08-12 post-reunion):
+	// el EC/COORDINADOR DEBE poder cargar estudiantes en programas historicos
+	// y en ejecucion de SUS cursos asignados. Antes la opcion del menu solo
+	// aparecia para CPD/ADMIN/SUPERADMIN (canEditCourse), lo que dejaba al EC
+	// sin la opcion "Carga Inicial de Estudiantes" en el menu de 3 puntos.
+	// El backend ya valida que el curso sea de los cursos_asignados del EC
+	// (enrollment.py valida curso_id in current_user.cursos_asignados para
+	// encargado_curso y coordinador). Por eso el frontend puede mostrar la
+	// opcion a EC/COORDINADOR sin riesgo: si intenta algo fuera de su
+	// scope, el backend rechaza con 403.
+	let canCargaInicial = $derived(
+		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole)
+	);
 	let comunicadoOpen = $state(false);
 	let comunicadoCourseId = $state('');
 	let comunicadoPrograma = $state('');
@@ -323,8 +336,12 @@
 		// programados usan el flujo normal de inscripcion). El admin o
 		// encargado carga los carnets de los estudiantes que ya estaban
 		// en el programa.
+		// F-2026-08-12-EC-CARGA-INICIAL-VISIBILITY: ahora la opcion tambien
+		// aparece para EC/COORDINADOR (canCargaInicial). Antes solo aparecia
+		// para CPD/ADMIN/SUPERADMIN (canEditCourse), lo que dejaba al EC
+		// sin acceso a la opcion aunque el backend lo permitiera.
 		const estadoCalc = (course as any).estado_calculado || (course as any).estado;
-		if (canEditCourse && (estadoCalc === 'en_ejecucion' || estadoCalc === 'cerrado' || (course as any).es_historico)) {
+		if (canCargaInicial && (estadoCalc === 'en_ejecucion' || estadoCalc === 'cerrado' || (course as any).es_historico)) {
 			options.push({
 				label: 'Carga Inicial de Estudiantes',
 				id: 'carga-inicial',
