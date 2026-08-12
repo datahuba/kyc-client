@@ -128,8 +128,11 @@ test.describe('F-2026-08-11-ASISTENCIA-EC health check', () => {
 		expect(body.detail).toContain('Formulario no encontrado');
 	});
 
-	test('POST upload-resolucion publico sin form existente devuelve 400 (no 500)', async ({ request }) => {
-		const res = await request.post(`${BASE_URL}/api/v1/pre-registrations/public/dipl/upload-resolucion`, {
+	test('POST upload-resolucion-beca publico sin form existente devuelve 400 (no 500)', async ({ request }) => {
+		// F-2026-08-11-EC-FIX-COUNTERS-403 (Kevin 23:36): el endpoint ahora se llama
+		// /upload-resolucion-beca (NO /upload-resolucion) para dejar claro que es
+		// la resolucion de BECA/DESCUENTO de Vicerrectorado, NO la del programa.
+		const res = await request.post(`${BASE_URL}/api/v1/pre-registrations/public/dipl/upload-resolucion-beca`, {
 			multipart: { file: { name: 'test.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test') } },
 		});
 		expect(res.status()).toBe(400);

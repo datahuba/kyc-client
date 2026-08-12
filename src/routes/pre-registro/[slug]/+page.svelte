@@ -1174,7 +1174,7 @@
 							     OPCIONAL. Misma UI que la carta firmada pero sin asterisco rojo (no es obligatoria). -->
 							<div class="mt-4">
 								<label for="pr-resolucion" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-									Resolución del programa <span class="text-xs font-normal text-gray-400">(opcional)</span>
+									Resolución de beca / descuento <span class="text-xs font-normal text-gray-400">(opcional, emitida por Vicerrectorado)</span>
 								</label>
 
 								{#if resolucionUrl}
@@ -1183,7 +1183,7 @@
 											<CheckIcon class="size-5 text-green-600 dark:text-green-400" />
 										</div>
 										<div class="min-w-0 flex-1">
-											<p class="truncate text-sm font-semibold text-gray-900 dark:text-white">{resolucionNombre || 'Resolucion.pdf'}</p>
+											<p class="truncate text-sm font-semibold text-gray-900 dark:text-white">{resolucionNombre || 'Resolucion-de-beca.pdf'}</p>
 											<p class="text-xs text-gray-500 dark:text-gray-400 truncate">{resolucionUrl}</p>
 										</div>
 										<button
@@ -1215,7 +1215,7 @@
 										</div>
 										<div class="min-w-0 flex-1">
 											<p class="text-sm font-semibold text-gray-900 dark:text-white">
-												{resolucionSubiendo ? 'Subiendo...' : 'Subir resolucion (PDF, JPG, PNG)'}
+												{resolucionSubiendo ? 'Subiendo...' : 'Subir resolución de beca (PDF, JPG, PNG)'}
 											</p>
 											<p class="text-xs text-gray-500 dark:text-gray-400">
 												{resolucionSubiendo ? 'Por favor espera unos segundos' : 'Opcional — si ya tenes la resolucion, subila aca (max 20MB)'}
@@ -1337,7 +1337,7 @@
 										{/if}
 										{#if resolucionUrl}
 											<div class="flex justify-between gap-3">
-												<dt class="text-gray-500 dark:text-gray-400">Resolución</dt>
+												<dt class="text-gray-500 dark:text-gray-400">Resolución de beca</dt>
 												<dd class="font-mono text-xs text-gray-900 dark:text-white text-right break-all max-w-[60%]">{resolucionUrl}</dd>
 											</div>
 										{/if}

@@ -244,13 +244,14 @@ export async function uploadCartaFirmada(slug: string, file: File): Promise<Cart
 }
 
 // F-2026-08-11-CAMPOS-EC-RESOLUCION (Kevin 22:37): misma mecanica que la carta
-// firmada pero para la resolucion del programa. Es OPCIONAL: el estudiante
-// puede incluirla si ya la tiene a mano, o el admin la sube despues.
+// firmada pero para la resolucion de BECA/DESCUENTO (NO es la resolucion del
+// programa, eso lo emite el admin). Es OPCIONAL: el estudiante puede incluirla
+// si ya la tiene a mano, o el admin la sube despues.
 export async function uploadResolucion(slug: string, file: File): Promise<CartaFirmadaUploadResult> {
 	const form = new FormData();
 	form.append('file', file);
 	return apiKyC.postFormData<CartaFirmadaUploadResult>(
-		`/pre-registrations/public/${encodeURIComponent(slug)}/upload-resolucion`,
+		`/pre-registrations/public/${encodeURIComponent(slug)}/upload-resolucion-beca`,
 		form,
 		{ requireAuth: false }
 	);

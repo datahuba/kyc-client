@@ -869,9 +869,9 @@
 											</a>
 										{/if}
 										{#if sub.data.resolucion_url}
-											<a href={sub.data.resolucion_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 rounded bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/50" title="Ver resolucion del programa">
+											<a href={sub.data.resolucion_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 rounded bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/50" title="Ver resolucion de beca/descuento">
 												<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-												Resol
+												Beca
 											</a>
 										{/if}
 										<button type="button" onclick={() => openDetailModal(sub)} class="inline-flex items-center gap-1 rounded bg-gray-100 dark:bg-dark-border px-1.5 py-0.5 text-[10px] font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-dark-border/70" title="Ver todos los datos">
@@ -1187,12 +1187,12 @@
 						</dd>
 					</div>
 					<div class="flex items-center justify-between gap-3">
-						<dt class="text-gray-500 dark:text-gray-400 shrink-0">Resolución del programa</dt>
+						<dt class="text-gray-500 dark:text-gray-400 shrink-0">Resolución de beca / descuento</dt>
 						<dd class="text-right">
 							{#if d.resolucion_url}
 								{#if isCloudinaryImage(d.resolucion_url)}
 									<a href={d.resolucion_url} target="_blank" rel="noopener noreferrer" class="inline-block">
-										<img src={d.resolucion_url} alt="Resolución del programa" class="max-h-32 max-w-[200px] rounded border border-gray-200 dark:border-dark-border hover:opacity-80" />
+										<img src={d.resolucion_url} alt="Resolución de beca / descuento" class="max-h-32 max-w-[200px] rounded border border-gray-200 dark:border-dark-border hover:opacity-80" />
 									</a>
 								{:else}
 									<a href={d.resolucion_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200">
@@ -1201,7 +1201,7 @@
 									</a>
 								{/if}
 							{:else}
-								<span class="text-xs text-gray-400">No adjuntó resolución (opcional)</span>
+								<span class="text-xs text-gray-400">No adjuntó resolución de beca (opcional)</span>
 							{/if}
 						</dd>
 					</div>
