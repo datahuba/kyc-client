@@ -46,6 +46,11 @@
 	let currentRole = $derived($userStore.role || '');
 	let isSuperAdmin = $derived(currentRole === 'superadmin');
 	let isAdmin = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
+	// F-2026-08-12-EC-CURSOS-FILTRO (Kevin 2026-08-12): encargado_curso y
+	// coordinador ven SOLO datos de sus cursos asignados. Mostrar un banner
+	// para que sea claro al usuario que el filtrado esta activo.
+	let isEncargadoEC = $derived(['encargado_curso', 'coordinador'].includes(currentRole));
+	let cursosAsignadosCount = $derived(($userStore.user?.cursos_asignados || []).length);
 	// Para tabs: super admin puede ver todo. CPD/encargado solo ven lo suyo.
 	// F-2026-08-11-EC-AUTOSERVICIO: encargado_curso y coordinador (educacion
 	// continua) ahora pueden crear/editar/cerrar/reabrir/eliminar formularios.
@@ -688,6 +693,26 @@
 </script>
 
 <div class="space-y-6">
+	<!-- F-2026-08-12-EC-CURSOS-FILTRO (Kevin 2026-08-12): banner informativo
+	     para encargado_curso y coordinador. Les avisa que solo ven datos
+	     de sus cursos asignados. Si no tienen cursos asignados, se les
+	     indica que pidan a CPD/Admin que les asignen cursos. -->
+	{#if isEncargadoEC}
+		<div class="rounded-lg border border-indigo-200 bg-indigo-50/50 dark:border-indigo-900/50 dark:bg-indigo-900/10 p-3 flex items-start gap-2">
+			<svg class="size-5 text-indigo-600 dark:text-indigo-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+			</svg>
+			<div class="flex-1 text-sm">
+				<strong class="text-indigo-800 dark:text-indigo-300">Vista de encargado de curso.</strong>
+				{#if cursosAsignadosCount === 0}
+					<span class="text-indigo-700 dark:text-indigo-300"> No tienes cursos asignados. Pídele a CPD o Admin que te asignen cursos para poder ver/gestionar pre-inscripciones.</span>
+				{:else}
+					<span class="text-indigo-700 dark:text-indigo-300"> Solo ves datos de tus {cursosAsignadosCount} curso{cursosAsignadosCount === 1 ? '' : 's'} asignado{cursosAsignadosCount === 1 ? '' : 's'}.</span>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<div>
 			<Heading level="h1">Pre-inscripciones</Heading>
