@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
-	import { getPublicForm, submitPublicForm, uploadCartaFirmada, uploadResolucion } from '$lib/services/pre-registration.service';
+	import { getPublicForm, submitPublicForm, uploadCartaFirmada, uploadResolucion, uploadTituloProfesional } from '$lib/services/pre-registration.service';
 	import type { PreRegistrationForm } from '$lib/services/pre-registration.service';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 	import { ExclamationCircleIcon } from '$lib/icons/solid';
@@ -13,7 +13,9 @@
 		IdentificationIcon,
 		StopwatchIcon,
 		CircleCheckIcon,
-		CopyIcon
+		CopyIcon,
+		UploadIcon,
+		XIcon
 	} from '$lib/icons/outline';
 	import { fly, fade, slide, scale } from 'svelte/transition';
 	import { cubicOut, quintOut } from 'svelte/easing';
@@ -77,6 +79,21 @@
 	let resolucionSubiendo = $state(false);
 	let resolucionError = $state('');
 
+	// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+	// Discriminacion PRIMERA CARRERA vs PROFESIONAL CON TITULO.
+	// - esPrimerCarrera=true: cobra matricula primer carrera (default 200 Bs)
+	// - esPrimerCarrera=false: cobra matricula profesional (default 500 Bs)
+	//   Y debe subir foto del titulo profesional (tituloProfesionalUrl).
+	// Default true por seguridad: si el visitante no contesta, cobra menos.
+	let esPrimerCarrera = $state(true);
+
+	// Foto del titulo profesional (PDF/JPG/PNG). OBLIGATORIA si
+	// esPrimerCarrera=false. Misma mecanica de file upload que la carta.
+	let tituloProfesionalUrl = $state('');
+	let tituloProfesionalNombre = $state('');
+	let tituloProfesionalSubiendo = $state(false);
+	let tituloProfesionalError = $state('');
+
 	let fieldErrors = $state<Record<string, string>>({});
 
 	// Wizard state
@@ -84,7 +101,8 @@
 		{ id: 1, title: 'Identidad', subtitle: '¿Quién eres?', icon: UserIcon, fields: ['nombre', 'email', 'carnet', 'extension'] },
 		{ id: 2, title: 'Contacto', subtitle: '¿Cómo te ubicamos?', icon: IdentificationIcon, fields: ['celular', 'fechaNacimiento', 'sexo', 'domicilio'] },
 		{ id: 3, title: 'Datos EC', subtitle: 'Educación continua (opcional)', icon: IdentificationIcon, fields: ['registroUniversitario', 'avanceAcademicoCodigo', 'formularioDescuentoNumero', 'carreraCodigo', 'descuentoPorcentaje', 'procedencia', 'modalidad', 'cartaFirmadaUrl', 'resolucionUrl'] },
-		{ id: 4, title: 'Confirmar', subtitle: 'Revisa y envía', icon: CircleCheckIcon, fields: ['mensaje'] }
+		{ id: 4, title: 'Tipo estudiante', subtitle: '¿Primera carrera o ya profesional?', icon: IdentificationIcon, fields: ['esPrimerCarrera', 'tituloProfesionalUrl'] },
+		{ id: 5, title: 'Confirmar', subtitle: 'Revisa y envía', icon: CircleCheckIcon, fields: ['mensaje'] }
 	] as const;
 	let currentStep = $state(1);
 	let highestStepReached = $state(1);
@@ -142,7 +160,7 @@
 	function saveAutosave() {
 		if (success) return;
 		try {
-			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, procedencia, modalidad, cartaFirmadaUrl, cartaFirmadaNombre, resolucionUrl, resolucionNombre, currentStep, savedAt: Date.now() };
+			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, procedencia, modalidad, cartaFirmadaUrl, cartaFirmadaNombre, resolucionUrl, resolucionNombre, esPrimerCarrera, tituloProfesionalUrl, tituloProfesionalNombre, currentStep, savedAt: Date.now() };
 			localStorage.setItem(autosaveKey(), JSON.stringify(data));
 			// indicador "guardado"
 			justSaved = true;
@@ -193,6 +211,10 @@
 			cartaFirmadaNombre = data.cartaFirmadaNombre || '';
 			resolucionUrl = data.resolucionUrl || '';
 			resolucionNombre = data.resolucionNombre || '';
+			// F-2026-08-12-DESCUENTO-BECA: default true si no estaba en autosave
+			esPrimerCarrera = data.esPrimerCarrera === false ? false : true;
+			tituloProfesionalUrl = data.tituloProfesionalUrl || '';
+			tituloProfesionalNombre = data.tituloProfesionalNombre || '';
 			if (data.currentStep) {
 				currentStep = data.currentStep;
 				highestStepReached = data.currentStep;
@@ -233,6 +255,7 @@
 				case 'modalidad': return modalidad;
 				case 'cartaFirmadaUrl': return cartaFirmadaUrl;
 				case 'resolucionUrl': return resolucionUrl;
+				case 'tituloProfesionalUrl': return tituloProfesionalUrl;
 				default: return '';
 			}
 		})();
@@ -278,6 +301,12 @@
 			if (mod === 'virtual' || (prov && prov !== 'SCZ')) {
 				return 'La carta firmada por el director es obligatoria para estudiantes de provincia o modalidad virtual.';
 			}
+		}
+		// F-2026-08-12-DESCUENTO-BECA: si el estudiante NO es primera carrera
+		// (esPrimerCarrera=false), la foto del titulo profesional es OBLIGATORIA.
+		// El encargado EC lo valida al aprobar la pre-inscripcion.
+		if (key === 'tituloProfesionalUrl' && !v && esPrimerCarrera === false) {
+			return 'Si ya tienes título profesional, debes subir una foto o escaneo del título. El encargado de educación continua lo validará.';
 		}
 		return null;
 	}
@@ -368,7 +397,10 @@
 				modalidad: (String(modalidad ?? '').trim() || undefined) as 'presencial' | 'virtual' | undefined,
 				carta_firmada_url: String(cartaFirmadaUrl ?? '').trim() || undefined,
 				// F-2026-08-11-CAMPOS-EC-RESOLUCION: resolucion del programa (opcional)
-				resolucion_url: String(resolucionUrl ?? '').trim() || undefined
+				resolucion_url: String(resolucionUrl ?? '').trim() || undefined,
+				// F-2026-08-12-DESCUENTO-BECA: discriminacion primera carrera
+				es_primer_carrera: esPrimerCarrera,
+				titulo_profesional_url: String(tituloProfesionalUrl ?? '').trim() || undefined
 			});
 			// ISSUE-PRE-WIZARD-002: capturar el ID de submission para mostrar al usuario
 			submissionId = (result as any)?.id || (result as any)?._id || '';
@@ -497,6 +529,52 @@
 		resolucionUrl = '';
 		resolucionNombre = '';
 		resolucionError = '';
+		saveAutosave();
+	}
+
+	// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+	// handlers para subir la foto del titulo profesional via input file.
+	// Misma mecanica que handleCartaSelected / handleResolucionSelected, pero
+	// se valida que SOLO se suba si esPrimerCarrera=false (es requerido en ese caso).
+	async function handleTituloSelected(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		const MAX_SIZE = 20 * 1024 * 1024;
+		if (file.size > MAX_SIZE) {
+			tituloProfesionalError = 'El archivo es demasiado grande (maximo 20MB).';
+			input.value = '';
+			return;
+		}
+		const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+		if (!allowed.includes(file.type)) {
+			tituloProfesionalError = 'Tipo de archivo no permitido. Usa PDF, JPG o PNG.';
+			input.value = '';
+			return;
+		}
+
+		tituloProfesionalError = '';
+		tituloProfesionalSubiendo = true;
+		try {
+			const result = await uploadTituloProfesional(slug || '', file);
+			tituloProfesionalUrl = result.url;
+			tituloProfesionalNombre = file.name;
+			saveAutosave();
+		} catch (e: any) {
+			tituloProfesionalError = e?.message || 'No se pudo subir el archivo. Intentalo de nuevo.';
+			tituloProfesionalUrl = '';
+			tituloProfesionalNombre = '';
+		} finally {
+			tituloProfesionalSubiendo = false;
+			input.value = '';
+		}
+	}
+
+	function removeTituloProfesional() {
+		tituloProfesionalUrl = '';
+		tituloProfesionalNombre = '';
+		tituloProfesionalError = '';
 		saveAutosave();
 	}
 </script>
@@ -1239,8 +1317,121 @@
 						</div>
 						{/if}
 
-						<!-- ============== PASO 4: Confirmar ============== -->
+						<!-- ============== PASO 4: Tipo de estudiante (F-2026-08-12-DESCUENTO-BECA) ============== -->
 						{#if currentStep === 4}
+						<div in:fly={{ x: 20, duration: 350, easing: cubicOut }} out:fly={{ x: -20, duration: 200, easing: cubicOut }}>
+							<div class="rounded-xl border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
+								<h3 class="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-primary-700 dark:text-dark-tertiary">
+									<IdentificationIcon class="size-4" />
+									¿Primera carrera o ya profesional?
+								</h3>
+								<p class="text-xs text-gray-600 dark:text-gray-400 mb-4">
+									Tu respuesta determina el costo de la matrícula. <strong class="text-primary-700 dark:text-primary-300">Si es tu primera carrera en la UAGRM</strong>, pagas una matrícula menor. Si ya tienes un título profesional, pagas la matrícula completa.
+									{#if descuentoPorcentaje}
+										<br><span class="text-amber-700 dark:text-amber-300">El descuento del {descuentoPorcentaje}% que cargaste se aplica a los módulos, no a la matrícula.</span>
+									{/if}
+								</p>
+
+								<!-- Radio Sí/No -->
+								<div class="space-y-2 mb-4">
+									<label class="flex items-start gap-3 rounded-xl border-2 p-3 cursor-pointer transition-all
+										{esPrimerCarrera ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-border hover:border-primary-300'}"
+									>
+										<input
+											type="radio"
+											name="esPrimerCarrera"
+											value="true"
+											checked={esPrimerCarrera}
+											onchange={() => { esPrimerCarrera = true; tituloProfesionalUrl = ''; tituloProfesionalNombre = ''; tituloProfesionalError = ''; saveAutosave(); }}
+											class="mt-1 size-4 text-primary-600 focus:ring-primary-500"
+										/>
+										<div class="flex-1">
+											<div class="font-semibold text-sm text-gray-900 dark:text-white">Sí, es mi primera carrera en la UAGRM</div>
+											<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Cobro de matrícula reducido (default 200 Bs).</div>
+										</div>
+									</label>
+									<label class="flex items-start gap-3 rounded-xl border-2 p-3 cursor-pointer transition-all
+										{!esPrimerCarrera ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-border hover:border-primary-300'}"
+									>
+										<input
+											type="radio"
+											name="esPrimerCarrera"
+											value="false"
+											checked={!esPrimerCarrera}
+											onchange={() => { esPrimerCarrera = false; saveAutosave(); }}
+											class="mt-1 size-4 text-primary-600 focus:ring-primary-500"
+										/>
+										<div class="flex-1">
+											<div class="font-semibold text-sm text-gray-900 dark:text-white">No, ya tengo título profesional</div>
+											<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Cobro de matrícula completo (default 500 Bs). <strong class="text-red-600 dark:text-red-400">Debes subir foto o escaneo del título.</strong></div>
+										</div>
+									</label>
+								</div>
+
+								<!-- Input de título profesional: SOLO si esPrimerCarrera=false -->
+								{#if !esPrimerCarrera}
+									<div class="rounded-xl border-2 border-amber-300 bg-amber-50/50 dark:border-amber-700/50 dark:bg-amber-900/10 p-3">
+										<label for="pr-titulo" class="block text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2">
+											Foto o escaneo del título profesional <span class="text-red-600">*</span>
+										</label>
+										{#if tituloProfesionalUrl}
+											<div class="flex items-center gap-3 rounded-lg border border-green-300 bg-white dark:bg-dark-surface p-2">
+												<CheckIcon class="size-5 text-green-600 flex-shrink-0" />
+												<div class="flex-1 min-w-0">
+													<p class="text-xs font-semibold text-gray-900 dark:text-white truncate">{tituloProfesionalNombre}</p>
+													<a href={tituloProfesionalUrl} target="_blank" rel="noopener" class="text-[10px] text-primary-600 hover:underline">Ver archivo</a>
+												</div>
+												<button
+													type="button"
+													onclick={removeTituloProfesional}
+													class="flex-shrink-0 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-dark-border"
+													aria-label="Quitar título"
+												>
+													<XIcon class="size-4" />
+												</button>
+											</div>
+										{:else}
+											<label
+												class="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed bg-white dark:bg-dark-surface py-3 px-3 text-base transition-all
+													{tituloProfesionalError ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-amber-400 dark:border-amber-700 hover:border-amber-500 hover:bg-amber-50/30 dark:hover:bg-amber-900/10'}
+													{isExpired || tituloProfesionalSubiendo ? 'cursor-not-allowed opacity-60' : ''}"
+											>
+												<input
+													id="pr-titulo"
+													type="file"
+													accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+													onchange={handleTituloSelected}
+													disabled={isExpired || tituloProfesionalSubiendo}
+													class="sr-only"
+												/>
+												{#if tituloProfesionalSubiendo}
+													<svg class="size-5 animate-spin text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+														<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+														<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+													</svg>
+													<span class="text-sm text-gray-700 dark:text-gray-300">Subiendo…</span>
+												{:else}
+													<UploadIcon class="size-5 text-amber-600" />
+													<span class="text-sm text-gray-700 dark:text-gray-300">Subir foto del título (PDF/JPG/PNG, max 20MB)</span>
+												{/if}
+											</label>
+										{/if}
+										{#if tituloProfesionalError}
+											<p class="mt-1 text-xs font-medium text-red-600">{tituloProfesionalError}</p>
+										{:else if fieldErrors.tituloProfesionalUrl}
+											<p class="mt-1 text-xs font-medium text-red-600">{fieldErrors.tituloProfesionalUrl}</p>
+										{/if}
+										<p class="mt-2 text-[10px] text-amber-800 dark:text-amber-300">
+											💡 El encargado de educación continua validará este documento antes de aprobar tu pre-inscripción.
+										</p>
+									</div>
+								{/if}
+							</div>
+						</div>
+						{/if}
+
+						<!-- ============== PASO 5: Confirmar ============== -->
+						{#if currentStep === 5}
 						<div in:fly={{ x: 20, duration: 350, easing: cubicOut }} out:fly={{ x: -20, duration: 200, easing: cubicOut }}>
 							<div class="rounded-xl border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
 								<h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-primary-700 dark:text-dark-tertiary">

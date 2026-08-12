@@ -98,6 +98,14 @@
 	let rejectMotivo = $state('');
 	let rejectSaving = $state(false);
 
+	// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12): modal para que el
+	// encargado EC valide (o rechace) la foto del titulo profesional
+	// subida por el estudiante. Se usa DESPUES de aprobar la pre-inscripcion.
+	let showValidateTituloModal = $state(false);
+	let validatingTituloFor: { studentId: string; studentName: string; url: string | null } | null = $state(null);
+	let tituloRejectMotivo = $state('');
+	let tituloValidating = $state(false);
+
 	// Modal: confirmar delete form
 	let showDeleteFormModal = $state(false);
 	let formToDelete: PreRegistrationForm | null = $state(null);
@@ -434,6 +442,86 @@
 			alert('error', e?.message || 'No se pudo rechazar.');
 		} finally {
 			rejectSaving = false;
+		}
+	}
+
+	// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12): handlers para
+	// abrir el modal de validación y aprobar/rechazar el titulo
+	// profesional. Se llama DESPUES de aprobar la pre-inscripcion (cuando
+	// ya existe el Student).
+	function openValidateTituloModal(sub: PreRegistration) {
+		const d = sub.data || {};
+		if (!sub.migrated_to_student_id) {
+			alert('warning', 'Primero aprueba la pre-inscripción para crear el estudiante, luego podrás validar el título.');
+			return;
+		}
+		if (!d.titulo_profesional_url) {
+			alert('warning', 'El estudiante no subió foto del título profesional.');
+			return;
+		}
+		validatingTituloFor = {
+			studentId: sub.migrated_to_student_id,
+			studentName: d.nombre || 'Estudiante',
+			url: d.titulo_profesional_url,
+		};
+		tituloRejectMotivo = '';
+		showValidateTituloModal = true;
+	}
+
+	async function approveTituloProfesional() {
+		if (!validatingTituloFor) return;
+		tituloValidating = true;
+		try {
+			const form = new FormData();
+			form.append('aprobado', 'true');
+			const res = await fetch(`/api/v1/students/${validatingTituloFor.studentId}/titulo/validar`, {
+				method: 'PUT',
+				body: form,
+				credentials: 'include',
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				throw new Error(err.detail || 'Error al validar');
+			}
+			alert('success', 'Título profesional verificado.');
+			showValidateTituloModal = false;
+			validatingTituloFor = null;
+			await Promise.all([loadSubmissions(), loadForms(), loadCounters()]);
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo verificar el título.');
+		} finally {
+			tituloValidating = false;
+		}
+	}
+
+	async function rejectTituloProfesional() {
+		if (!validatingTituloFor) return;
+		if (tituloRejectMotivo.trim().length < 3) {
+			alert('warning', 'Indica un motivo de al menos 3 caracteres.');
+			return;
+		}
+		tituloValidating = true;
+		try {
+			const form = new FormData();
+			form.append('aprobado', 'false');
+			form.append('motivo', tituloRejectMotivo.trim());
+			const res = await fetch(`/api/v1/students/${validatingTituloFor.studentId}/titulo/validar`, {
+				method: 'PUT',
+				body: form,
+				credentials: 'include',
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				throw new Error(err.detail || 'Error al rechazar');
+			}
+			alert('success', 'Título profesional rechazado.');
+			showValidateTituloModal = false;
+			validatingTituloFor = null;
+			await Promise.all([loadSubmissions(), loadForms(), loadCounters()]);
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo rechazar el título.');
+		} finally {
+			tituloValidating = false;
 		}
 	}
 
@@ -1101,6 +1189,57 @@
 	loading={deleteSaving}
 />
 
+<!-- F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12): modal para que el
+     encargado EC valide (apruebe o rechace) la foto del titulo profesional
+     subida por el estudiante NO primer carrera. -->
+<Modal
+	isOpen={showValidateTituloModal}
+	title="Validar título profesional"
+	onClose={() => { if (!tituloValidating) { showValidateTituloModal = false; validatingTituloFor = null; } }}
+	maxWidth="sm:max-w-lg"
+>
+	<div class="p-4 space-y-4">
+		<p class="text-sm text-gray-600 dark:text-gray-400">
+			¿El título profesional de <strong class="text-gray-900 dark:text-white">{validatingTituloFor?.studentName}</strong> es válido?
+		</p>
+		{#if validatingTituloFor?.url}
+			{#if isCloudinaryImage(validatingTituloFor.url)}
+				<a href={validatingTituloFor.url} target="_blank" rel="noopener noreferrer" class="block">
+					<img src={validatingTituloFor.url} alt="Título profesional" class="max-h-48 max-w-full mx-auto rounded border border-gray-200 dark:border-dark-border hover:opacity-90" />
+				</a>
+				<p class="text-[10px] text-center text-gray-400">Click para abrir en pestaña nueva</p>
+			{:else}
+				<div class="flex justify-center">
+					<a href={validatingTituloFor.url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 px-4 py-2 text-sm font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200">
+						<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+						Abrir PDF del título
+					</a>
+				</div>
+			{/if}
+		{/if}
+		<div>
+			<label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+				Motivo de rechazo (solo si vas a rechazar)
+			</label>
+			<textarea
+				bind:value={tituloRejectMotivo}
+				rows="2"
+				placeholder="Ej: La foto no es legible / El título no corresponde..."
+				class="w-full rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none"
+			></textarea>
+		</div>
+		<div class="flex justify-end gap-2 border-t border-gray-100 dark:border-dark-border pt-3">
+			<Button variant="secondary" onclick={() => { if (!tituloValidating) { showValidateTituloModal = false; validatingTituloFor = null; } }} disabled={tituloValidating}>Cancelar</Button>
+			<Button variant="destructive" onclick={rejectTituloProfesional} loading={tituloValidating} disabled={tituloRejectMotivo.trim().length < 3}>
+				Rechazar
+			</Button>
+			<Button onclick={approveTituloProfesional} loading={tituloValidating}>
+				<CheckIcon class="size-4 mr-1" />Aprobar
+			</Button>
+		</div>
+	</div>
+</Modal>
+
 <!-- F-2026-08-11-CAMPOS-EC-MODALIDAD-VIEW (Kevin 22:37): modal de detalle
      con TODOS los datos de la submission (identidad, contacto, EC, docs).
      El encargado abre esto para confirmar antes de aprobar: ve la carta
@@ -1148,10 +1287,24 @@
 			</div>
 
 			<!-- Datos EC (solo si hay al menos uno) -->
-			{#if d.procedencia || d.modalidad || d.carta_firmada_url || d.resolucion_url || d.registro_universitario || d.avance_academico_codigo || d.formulario_descuento_numero || d.carrera_codigo || d.descuento_porcentaje}
+			{#if d.procedencia || d.modalidad || d.carta_firmada_url || d.resolucion_url || d.registro_universitario || d.avance_academico_codigo || d.formulario_descuento_numero || d.carrera_codigo || d.descuento_porcentaje || d.es_primer_carrera === false || d.titulo_profesional_url}
 				<div class="rounded-xl border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-900/10 p-4">
 					<h3 class="mb-2 text-xs font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Datos de educación continua</h3>
 					<dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
+						<!-- F-2026-08-12-DESCUENTO-BECA: tipo de estudiante -->
+						<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">¿Primera carrera?</dt>
+							<dd class="text-right">
+								{#if d.es_primer_carrera === false}
+									<span class="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+										No (profesional)
+									</span>
+								{:else}
+									<span class="inline-flex items-center gap-1 rounded bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700 dark:text-green-300">
+										Sí (1ª carrera)
+									</span>
+								{/if}
+							</dd>
+						</div>
 						<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Procedencia</dt><dd class="font-mono text-right text-gray-900 dark:text-white">{d.procedencia || '—'}</dd></div>
 						<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Modalidad</dt><dd class="text-right text-gray-900 dark:text-white capitalize">{d.modalidad || '—'}</dd></div>
 						<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Registro Univ.</dt><dd class="font-mono text-right text-gray-900 dark:text-white">{d.registro_universitario || '—'}</dd></div>
@@ -1205,6 +1358,31 @@
 							{/if}
 						</dd>
 					</div>
+					<!-- F-2026-08-12-DESCUENTO-BECA: foto del titulo profesional (solo si NO es primer carrera) -->
+					{#if d.es_primer_carrera === false}
+						<div class="flex items-center justify-between gap-3">
+							<dt class="text-gray-500 dark:text-gray-400 shrink-0">
+								Título profesional
+								<span class="text-[10px] text-red-600 dark:text-red-400">*</span>
+							</dt>
+							<dd class="text-right">
+								{#if d.titulo_profesional_url}
+									{#if isCloudinaryImage(d.titulo_profesional_url)}
+										<a href={d.titulo_profesional_url} target="_blank" rel="noopener noreferrer" class="inline-block">
+											<img src={d.titulo_profesional_url} alt="Título profesional" class="max-h-32 max-w-[200px] rounded border border-gray-200 dark:border-dark-border hover:opacity-80" />
+										</a>
+									{:else}
+										<a href={d.titulo_profesional_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded bg-indigo-100 dark:bg-indigo-900/30 px-2 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200">
+											<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+											Abrir PDF
+										</a>
+									{/if}
+								{:else}
+									<span class="text-xs text-red-600 dark:text-red-400">No adjuntó el título (requerido)</span>
+								{/if}
+							</dd>
+						</div>
+					{/if}
 				</dl>
 			</div>
 
@@ -1238,6 +1416,23 @@
 						if (sub) { showDetailModal = false; handleApproveSubmission(sub); }
 					}}>
 						Aprobar
+					</Button>
+				</div>
+			{/if}
+
+			<!-- F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12): si la submission
+			     ya fue aprobada y NO es primer carrera, mostrar boton para
+			     validar el titulo profesional. Solo si subio el archivo. -->
+			{#if detailSubmission.estado === 'aprobado' && d.es_primer_carrera === false && d.titulo_profesional_url && detailSubmission.migrated_to_student_id}
+				<div class="flex items-center justify-between gap-2 border-t border-gray-100 dark:border-dark-border pt-4">
+					<span class="text-xs text-gray-500 dark:text-gray-400">
+						Validá el título profesional para confirmar que el estudiante es profesional.
+					</span>
+					<Button onclick={() => {
+						const sub = detailSubmission;
+						if (sub) openValidateTituloModal(sub);
+					}}>
+						<CheckIcon class="size-4 mr-1" />Validar título
 					</Button>
 				</div>
 			{/if}

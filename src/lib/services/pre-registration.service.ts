@@ -108,6 +108,14 @@ export interface PreRegistrationSubmit {
 	// F-2026-08-11-CAMPOS-EC-RESOLUCION (Kevin 22:37): OPCIONAL.
 	// URL de la resolucion del programa que el estudiante subio.
 	resolucion_url?: string;
+	// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+	// discriminacion PRIMERA CARRERA vs PROFESIONAL CON TITULO.
+	// - es_primer_carrera=true: cobra matricula primer carrera (default 200 Bs)
+	// - es_primer_carrera=false: cobra matricula profesional (default 500 Bs)
+	//   Y titulo_profesional_url es OBLIGATORIA (validado por el encargado EC)
+	// Default true por seguridad: si el visitante no contesta, cobra menos.
+	es_primer_carrera?: boolean;
+	titulo_profesional_url?: string;
 }
 
 export interface PreRegistrationCounters {
@@ -252,6 +260,21 @@ export async function uploadResolucion(slug: string, file: File): Promise<CartaF
 	form.append('file', file);
 	return apiKyC.postFormData<CartaFirmadaUploadResult>(
 		`/pre-registrations/public/${encodeURIComponent(slug)}/upload-resolucion-beca`,
+		form,
+		{ requireAuth: false }
+	);
+}
+
+// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+// Foto o escaneo del TITULO PROFESIONAL. Solo se sube si el estudiante
+// respondio que NO es primera carrera (es_primer_carrera=false). El
+// encargado de educacion continua valida este documento desde el modal
+// de detalle de la submission en /app/pre-registros.
+export async function uploadTituloProfesional(slug: string, file: File): Promise<CartaFirmadaUploadResult> {
+	const form = new FormData();
+	form.append('file', file);
+	return apiKyC.postFormData<CartaFirmadaUploadResult>(
+		`/pre-registrations/public/${encodeURIComponent(slug)}/upload-titulo`,
 		form,
 		{ requireAuth: false }
 	);

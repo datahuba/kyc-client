@@ -110,6 +110,8 @@
 		modalidad: 'presencial',
 		costo_total_interno: 0,
 		matricula_interno: 0,
+		matricula_primer_carrera: null as number | null,
+		matricula_profesional: null as number | null,
 		cargo_adicional_items: [],
 		cantidad_cuotas: 1,
 		descuento_curso: 0,
@@ -167,6 +169,8 @@
 					modalidad: course.modalidad,
 					costo_total_interno: course.costo_total_interno,
 					matricula_interno: course.matricula_interno,
+					matricula_primer_carrera: course.matricula_primer_carrera ?? null,
+					matricula_profesional: course.matricula_profesional ?? null,
 					cargo_adicional_items: course.cargo_adicional_items
 						? course.cargo_adicional_items.map((it) => ({ ...it }))
 						: [],
@@ -226,6 +230,8 @@
 					modalidad: 'presencial',
 					costo_total_interno: 0,
 					matricula_interno: 0,
+					matricula_primer_carrera: null,
+					matricula_profesional: null,
 					cargo_adicional_items: [],
 					cantidad_cuotas: 1,
 					descuento_curso: 0,
@@ -370,6 +376,11 @@
 		saving = true;
 		try {
 			const payload = { ...formData };
+			// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12): normalizar las
+			// matriculas diferenciadas. Si el admin dejo el campo vacio, el
+			// override es null → el backend usa el default global (200/500).
+			payload.matricula_primer_carrera = formData.matricula_primer_carrera || null;
+			payload.matricula_profesional = formData.matricula_profesional || null;
 			// F-HISTORICO (2026-07-31): sincronizar el flag desde el state local
 			// y vaciar los campos operacionales (costo, modulos, requisitos) que
 			// no aplican para programas historicos. Asi evitamos que el backend
@@ -378,6 +389,8 @@
 			if (es_historico) {
 				payload.costo_total_interno = 0;
 				payload.matricula_interno = 0;
+				payload.matricula_primer_carrera = null;
+				payload.matricula_profesional = null;
 				payload.cantidad_cuotas = 0;
 				payload.modulos = [];
 				payload.requisitos = [];
@@ -692,6 +705,37 @@
 				required
 				error={errors.matricula_interno}
 			/>
+		</div>
+
+		<!-- F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+		     diferencia la matricula de PRIMERA CARRERA vs PROFESIONAL CON TITULO.
+		     Si ambos quedan vacios, se usan los defaults GLOBALES del sistema
+		     (MATRICULA_PRIMER_CARRERA_DEFAULT=200, MATRICULA_PROFESIONAL_DEFAULT=500).
+		     Tipico en educacion continua: primer carrera paga 200, profesional paga 500. -->
+		<div class="mt-3 rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-900/10 p-3">
+			<p class="mb-2 text-xs font-semibold text-indigo-900 dark:text-indigo-200">
+				Matrícula diferenciada por tipo de estudiante (educación continua)
+			</p>
+			<p class="mb-3 text-[11px] text-indigo-700 dark:text-indigo-300">
+				Opcional. Si los dejas vacíos, se usan los defaults del sistema
+				(primer carrera 200 Bs, profesional 500 Bs).
+			</p>
+			<div class="grid grid-cols-2 gap-3">
+				<Input
+					label="Matrícula primer carrera (override)"
+					id="matricula_primer_carrera"
+					type="number"
+					bind:value={formData.matricula_primer_carrera}
+					placeholder="Default: 200"
+				/>
+				<Input
+					label="Matrícula profesional (override)"
+					id="matricula_profesional"
+					type="number"
+					bind:value={formData.matricula_profesional}
+					placeholder="Default: 500"
+				/>
+			</div>
 		</div>
 	</Card>
 

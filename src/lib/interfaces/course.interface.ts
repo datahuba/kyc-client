@@ -23,6 +23,12 @@ export interface Course {
 	fecha_inicio: string;
 	inscritos: string[];
 	matricula_interno: number;
+	// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+	// override por curso de la matricula diferenciada primer carrera vs
+	// profesional. Si son null, el backend usa los defaults globales
+	// (200 / 500 Bs).
+	matricula_primer_carrera?: number | null;
+	matricula_profesional?: number | null;
 	// ISSUE-P-CARGO-MULTIITEM (2026-07-08): precio único para todos los
 	// estudiantes. cargo_adicional_items es una lista de gastos
 	// complementarios opcionales al programa (ej. varios talleres
@@ -54,6 +60,10 @@ export interface CreateCourseRequest {
 	modalidad: string;
 	costo_total_interno: number;
 	matricula_interno: number;
+	// F-2026-08-12-DESCUENTO-BECA: override de matricula para primer
+	// carrera y profesional. Si es null, el backend usa los defaults globales.
+	matricula_primer_carrera?: number | null;
+	matricula_profesional?: number | null;
 	cargo_adicional_items?: CargoAdicionalItem[];
 	cantidad_cuotas: number;
 	descuento_curso: number;
