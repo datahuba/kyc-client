@@ -214,3 +214,28 @@ export async function getPublicForm(slug: string) {
 export async function submitPublicForm(slug: string, data: PreRegistrationSubmit) {
 	return apiKyC.postPublic<PreRegistration>(`/pre-registrations/public/${slug}`, data);
 }
+
+// F-2026-08-11-CAMPOS-EC-MODALIDAD-FILE (Kevin 22:17): subir la carta firmada
+// directamente desde el wizard en vez de pegar un link externo. UX mejor:
+// el visitante elige el archivo de su maquina, ve el preview, y el sistema
+// lo sube a Cloudinary. Devuelve la URL publica que se guarda en cartaFirmadaUrl.
+export interface CartaFirmadaUploadResult {
+	url: string;
+	public_id: string;
+	resource_type: string;
+	mime_type: string;
+	size_bytes: number;
+}
+
+export async function uploadCartaFirmada(slug: string, file: File): Promise<CartaFirmadaUploadResult> {
+	const form = new FormData();
+	form.append('file', file);
+	// postFormData se encarga de: armar la URL completa, poner el Authorization
+	// si hay token, NO setear Content-Type (browser pone el boundary), y
+	// manejar errores con la misma logica que el resto del sistema.
+	return apiKyC.postFormData<CartaFirmadaUploadResult>(
+		`/pre-registrations/public/${encodeURIComponent(slug)}/upload-carta`,
+		form,
+		{ requireAuth: false }
+	);
+}

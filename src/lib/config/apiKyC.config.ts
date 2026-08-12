@@ -201,6 +201,64 @@ class ApiKyC {
 		return this.post<T>(endpoint, data, { requireAuth: false });
 	}
 
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD-FILE: multipart upload sin Content-Type
+	// (el browser lo setea automaticamente con el boundary). Funciona con
+	// requireAuth: false para endpoints publicos (ej. upload de carta firmada
+	// del wizard) o true para endpoints con auth (ej. subir CV del estudiante).
+	async postFormData<T>(endpoint: string, form: FormData, options: RequestOptions = {}): Promise<T> {
+		const headers = this.buildHeaders(options);
+		// Eliminar Content-Type para que el browser ponga el boundary correcto
+		const headersObj = headers as Record<string, string>;
+		delete headersObj['Content-Type'];
+
+		const controller = new AbortController();
+		const timeoutDuration = options.customTimeout ?? API_CONFIG.TIMEOUT;
+		const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
+
+		try {
+			const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1${endpoint}`, {
+				method: 'POST',
+				headers,
+				body: form,
+				signal: controller.signal
+			});
+
+			clearTimeout(timeoutId);
+
+			if (response.status === 204) {
+				return {} as T;
+			}
+
+			if (!response.ok) {
+				const errorBody = await response.json().catch(() => ({}));
+				const errorType = errorService.mapHttpToErrorType(response.status);
+
+				if (response.status === 401 && browser) {
+					localStorage.removeItem(AUTH_TOKEN_KEY);
+					localStorage.removeItem(USER_DATA_KEY);
+					localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
+					const path = window.location.pathname;
+					if (!path.startsWith('/auth') && path !== '/') {
+						window.location.href = '/auth/sign-in';
+					}
+				}
+
+				throw new AppError(extractErrorMessage(errorBody), errorType, response.status);
+			}
+
+			return response.json();
+		} catch (error) {
+			clearTimeout(timeoutId);
+			if (error instanceof DOMException && error.name === 'AbortError') {
+				throw new AppError('Solicitud cancelada por timeout', ErrorType.NETWORK, 408);
+			}
+			if (error instanceof AppError) {
+				throw error;
+			}
+			throw new AppError('Error de red', ErrorType.NETWORK, undefined, error instanceof Error ? error : undefined);
+		}
+	}
+
 	// ISSUE-P-REPORTE: descarga de archivos binarios autenticados (Excel/PDF).
 	// Los endpoints de descarga requieren el mismo Authorization header que
 	// cualquier otra request, por eso no puede usarse un <a href> directo.

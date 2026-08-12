@@ -1,0 +1,27 @@
+F-FIX-STUDENT-EDIT-PERMISSIONS: alinear canEditStudent con canCreateStudent
+
+Antes: `canEditStudent` solo permitia ['superadmin', 'admin', 'cpd'],
+mientras que `canCreateStudent` y `canEnrollStudent` ya permitian
+['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].
+
+Resultado: encargado_curso y coordinador podian CREAR e INSCRIBIR
+estudiantes pero no podian EDITAR datos personales (cumpleanos, celular,
+domicilio) -- un desbalance de permisos que llevaba a 403 al guardar.
+
+Cambios:
+  1. `canEditStudent` ahora incluye 'encargado_curso' y 'coordinador'
+     (alineado con canCreateStudent y canEnrollStudent).
+  2. `handleEdit()` ahora valida canEditStudent antes de abrir el form.
+     Si no tiene permiso, muestra alert y no abre el modal. Esto es
+     defense in depth: aunque el boton de editar ya esta oculto por
+     `canEditStudent`, handleEdit previene errores si se invoca desde
+     deep-links, atajos de teclado, o futuros callers.
+
+Backend: ver KyC_web_service commit F-FIX-STUDENT-EDIT-PERMISSIONS
+(change require_cpd -> require_encargado_curso en update_student_admin).
+
+Tests: KyC_web_service/tests/test_student_update_permissions.py (11 tests
+cubren backend, helper, frontend, handleEdit, regresion).
+
+Reportado por: Lisa (encargado_curso) - "errores en los perfiles de
+estudiantes con su edicion de datos como cumpleanos y otros"

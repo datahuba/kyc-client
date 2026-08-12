@@ -1,0 +1,28 @@
+F-FIX-MATRIZ-RACE-CONDITION (2026-08-11, Kevin)
+
+Bug reportado por Kevin: en la vista Matriz de /app/payments, el filtro
+de programa no se aplica. Aunque el dropdown muestra "INVESTIGACION
+CIENTIFICA", la tabla muestra 262 estudiantes mezclados de 5 cursos.
+
+Causa raiz: el $effect() que dispara loadMatriz() MUTABA filters.curso_id
+dentro del effect para auto-seleccionar el primer programa. Eso causaba:
+
+1. Svelte 5 TypeError "Cannot read properties of undefined (reading 'prev')"
+   en consola (visto en DevTools el 2026-08-11). Svelte detecta que un effect
+   derivado esta mutando estado y rompe el flush del batch de updates.
+
+2. Race condition: la 1ra request sin filtro (17s) se iniciaba antes de que
+   la URL ?curso_id=X se procesara, y al terminar sobrescribia la respuesta
+   correcta del filtro.
+
+Fix:
+- Mover la auto-seleccion del primer curso de $effect a onMount (lugar
+  donde ya estan cargados coursesList y la URL params).
+- El $effect solo reacciona a cambios de filtros YA seteados y dispara
+  loadMatriz(). Sin mutaciones de estado.
+
+Verificacion:
+- /payments/matriz?curso_id=<INV> ahora muestra 64 estudiantes, total Bs
+  89,180 exacto (cuadre 100% con planilla Excel oficial UAGRM).
+- 6 modulos: 5x Bs 252 + 1x Bs 210 = Bs 1470 por estudiante.
+- Tiempo de carga: ~4.5s (vs 17.3s sin filtro).

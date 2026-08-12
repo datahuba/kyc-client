@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
-	import { getPublicForm, submitPublicForm } from '$lib/services/pre-registration.service';
+	import { getPublicForm, submitPublicForm, uploadCartaFirmada } from '$lib/services/pre-registration.service';
 	import type { PreRegistrationForm } from '$lib/services/pre-registration.service';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 	import { ExclamationCircleIcon } from '$lib/icons/solid';
@@ -61,7 +61,14 @@
 	//   que no este vacio cuando aplica la regla.
 	let procedencia = $state('');
 	let modalidad = $state<'' | 'presencial' | 'virtual'>('');
+
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD-FILE (Kevin 22:17): cambio de input
+	// type="url" a type="file" para subir la carta directamente. La URL
+	// devuelta por Cloudinary (post-upload) se guarda en cartaFirmadaUrl.
 	let cartaFirmadaUrl = $state('');
+	let cartaFirmadaNombre = $state(''); // nombre del archivo para mostrar al usuario
+	let cartaFirmadaSubiendo = $state(false);
+	let cartaFirmadaError = $state('');
 
 	let fieldErrors = $state<Record<string, string>>({});
 
@@ -128,7 +135,7 @@
 	function saveAutosave() {
 		if (success) return;
 		try {
-			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, procedencia, modalidad, cartaFirmadaUrl, currentStep, savedAt: Date.now() };
+			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, procedencia, modalidad, cartaFirmadaUrl, cartaFirmadaNombre, currentStep, savedAt: Date.now() };
 			localStorage.setItem(autosaveKey(), JSON.stringify(data));
 			// indicador "guardado"
 			justSaved = true;
@@ -176,6 +183,7 @@
 			procedencia = data.procedencia || '';
 			modalidad = data.modalidad || '';
 			cartaFirmadaUrl = data.cartaFirmadaUrl || '';
+			cartaFirmadaNombre = data.cartaFirmadaNombre || '';
 			if (data.currentStep) {
 				currentStep = data.currentStep;
 				highestStepReached = data.currentStep;
@@ -385,6 +393,53 @@
 		const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 		if (m) return `${m[3]}/${m[2]}/${m[1]}`;
 		return value;
+	}
+
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD-FILE (Kevin 22:17): handlers para
+	// subir y quitar la carta firmada via input file.
+	async function handleCartaSelected(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		// Validacion local basica (la validacion final la hace el backend)
+		const MAX_SIZE = 20 * 1024 * 1024; // 20MB
+		if (file.size > MAX_SIZE) {
+			cartaFirmadaError = 'El archivo es demasiado grande (maximo 20MB).';
+			input.value = '';
+			return;
+		}
+		const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+		if (!allowed.includes(file.type)) {
+			cartaFirmadaError = 'Tipo de archivo no permitido. Usa PDF, JPG o PNG.';
+			input.value = '';
+			return;
+		}
+
+		cartaFirmadaError = '';
+		cartaFirmadaSubiendo = true;
+		try {
+			const result = await uploadCartaFirmada(slug || '', file);
+			cartaFirmadaUrl = result.url;
+			cartaFirmadaNombre = file.name;
+			clearError('cartaFirmadaUrl');
+			saveAutosave();
+		} catch (e: any) {
+			cartaFirmadaError = e?.message || 'No se pudo subir el archivo. Intentalo de nuevo.';
+			cartaFirmadaUrl = '';
+			cartaFirmadaNombre = '';
+		} finally {
+			cartaFirmadaSubiendo = false;
+			input.value = ''; // reset para permitir resubir el mismo archivo
+		}
+	}
+
+	function removeCarta() {
+		cartaFirmadaUrl = '';
+		cartaFirmadaNombre = '';
+		cartaFirmadaError = '';
+		clearError('cartaFirmadaUrl');
+		saveAutosave();
 	}
 </script>
 
@@ -968,7 +1023,7 @@
 								</div>
 							</div>
 
-							<!-- Carta firmada por el director (URL o identificador del documento) -->
+							<!-- Carta firmada por el director (file upload directo a Cloudinary) -->
 							<div>
 								<label for="pr-carta" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
 									Carta firmada por el director
@@ -980,23 +1035,79 @@
 										<span class="text-xs font-normal text-gray-400">(opcional)</span>
 									{/if}
 								</label>
-								<input
-									id="pr-carta"
-									type="url"
-									bind:value={cartaFirmadaUrl}
-									oninput={() => { clearError('cartaFirmadaUrl'); saveAutosave(); }}
-									class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
-										{fieldErrors.cartaFirmadaUrl ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
-									placeholder="https://drive.google.com/file/d/... o enlace del documento firmado"
-									disabled={isExpired}
-									aria-invalid={!!fieldErrors.cartaFirmadaUrl}
-									aria-describedby={fieldErrors.cartaFirmadaUrl ? 'pr-carta-error' : 'pr-carta-help'}
-								/>
-								{#if fieldErrors.cartaFirmadaUrl}
+
+								<!-- F-2026-08-11-CAMPOS-EC-MODALIDAD-FILE: input file en vez de URL.
+								     El usuario elige el archivo de su maquina, se sube automaticamente
+								     a Cloudinary y la URL resultante se guarda en cartaFirmadaUrl. -->
+
+								{#if cartaFirmadaUrl}
+									<!-- Preview del archivo ya subido -->
+									<div class="flex items-center gap-3 rounded-xl border-2 border-green-300 bg-green-50/50 p-3 dark:border-green-800/60 dark:bg-green-900/20">
+										<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/40">
+											<CheckIcon class="size-5 text-green-600 dark:text-green-400" />
+										</div>
+										<div class="min-w-0 flex-1">
+											<p class="truncate text-sm font-semibold text-gray-900 dark:text-white">{cartaFirmadaNombre || 'Carta firmada.pdf'}</p>
+											<p class="text-xs text-gray-500 dark:text-gray-400 truncate">{cartaFirmadaUrl}</p>
+										</div>
+										<button
+											type="button"
+											onclick={removeCarta}
+											disabled={isExpired}
+											class="shrink-0 rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 active:scale-95 dark:hover:bg-red-900/30"
+											aria-label="Quitar carta firmada"
+										>
+											<svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+								{:else}
+									<!-- Input file con preview del nombre antes de subir -->
+									<label
+										class="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed bg-white dark:bg-dark-surface py-3 px-3 text-base transition-all
+											{fieldErrors.cartaFirmadaUrl ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border hover:border-primary-500 hover:bg-primary-50/30 dark:hover:bg-primary-900/10'}
+											{isExpired ? 'cursor-not-allowed opacity-60' : ''}"
+									>
+										<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-100 dark:bg-primary-900/40">
+											{#if cartaFirmadaSubiendo}
+												<div class="h-5 w-5 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600"></div>
+											{:else}
+												<svg class="size-5 text-primary-600 dark:text-primary-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+												</svg>
+											{/if}
+										</div>
+										<div class="min-w-0 flex-1">
+											<p class="text-sm font-semibold text-gray-900 dark:text-white">
+												{cartaFirmadaSubiendo ? 'Subiendo...' : 'Subir archivo (PDF, JPG, PNG)'}
+											</p>
+											<p class="truncate text-xs text-gray-500 dark:text-gray-400">
+												{cartaFirmadaSubiendo
+													? 'Por favor espera unos segundos'
+													: 'Hacé click para elegir el archivo de tu maquina (max 20MB)'}
+											</p>
+										</div>
+										<input
+											id="pr-carta"
+											type="file"
+											accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+											onchange={handleCartaSelected}
+											disabled={isExpired || cartaFirmadaSubiendo}
+											class="sr-only"
+											aria-invalid={!!fieldErrors.cartaFirmadaUrl}
+											aria-describedby={fieldErrors.cartaFirmadaUrl ? 'pr-carta-error' : 'pr-carta-help'}
+										/>
+									</label>
+								{/if}
+
+								{#if cartaFirmadaError}
+									<p class="mt-1 text-xs font-medium text-red-600">{cartaFirmadaError}</p>
+								{:else if fieldErrors.cartaFirmadaUrl}
 									<p id="pr-carta-error" class="mt-1 text-xs font-medium text-red-600">{fieldErrors.cartaFirmadaUrl}</p>
 								{:else}
 									<p id="pr-carta-help" class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-										Requerida si sos de provincia o elegiste modalidad virtual. Subí el documento a Google Drive / OneDrive / Dropbox y pegá el enlace acá.
+										Requerida si sos de provincia o elegiste modalidad virtual. Podes subir un PDF, JPG o PNG de hasta 20MB.
 									</p>
 								{/if}
 							</div>
