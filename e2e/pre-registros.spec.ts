@@ -140,3 +140,33 @@ test.describe('F-2026-08-11-ASISTENCIA-EC health check', () => {
 		expect(body.detail).toContain('Formulario no encontrado');
 	});
 });
+
+/**
+ * F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+ * - El estudiante que NO es primera carrera sube foto del TITULO
+ *   profesional al wizard (mismo patron que carta/resolucion).
+ * - El encargado EC valida el titulo desde el modal de detalle.
+ */
+test.describe('F-2026-08-12-DESCUENTO-BECA health check', () => {
+	test('POST upload-titulo publico sin form existente devuelve 400 (no 500)', async ({ request }) => {
+		// Smoke test del endpoint publico. Mismo patron que upload-carta y
+		// upload-resolucion-beca: 400 con mensaje claro cuando el form no
+		// existe (validacion robusta, no 500).
+		const res = await request.post(`${BASE_URL}/api/v1/pre-registrations/public/dipl/upload-titulo`, {
+			multipart: { file: { name: 'test.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test') } },
+		});
+		expect(res.status()).toBe(400);
+		const body = await res.json();
+		expect(body.detail).toContain('Formulario no encontrado');
+	});
+
+	test('PUT /students/{id}/titulo/validar sin auth devuelve 401 (protegido)', async ({ request }) => {
+		// El endpoint requiere auth (encargado_curso). Sin auth debe ser 401,
+		// NO 403 ni 200. Verifica que el endpoint NO es público por error.
+		const fakeId = '000000000000000000000000';
+		const res = await request.put(`${BASE_URL}/api/v1/students/${fakeId}/titulo/validar`, {
+			form: { aprobado: 'true' },
+		});
+		expect(res.status()).toBe(401);
+	});
+});
