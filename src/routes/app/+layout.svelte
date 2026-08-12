@@ -153,7 +153,12 @@
 			</div>
 		{/if}
 
-		<main class="relative flex-1 overflow-y-auto p-4 sm:p-6">
+		<!-- F-2026-08-12-DESCUENTO-BECA-FIX-MOBILE-NAV: agregar pb-20 (mobile) y
+		     pb-6 (desktop) para que el contenido del main NO quede tapado por
+		     el BottomNav fixed (z-40, bottom-0, h-16 aprox) en mobile.
+		     En desktop el BottomNav se oculta con md:hidden, pero dejamos
+		     pb-6 para dar aire con el sidebar. -->
+		<main class="relative flex-1 overflow-y-auto p-4 pb-20 sm:p-6 md:pb-6">
 			{@render children?.()}
 		</main>
 		<BottomNav />
