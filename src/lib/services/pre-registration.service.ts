@@ -122,6 +122,10 @@ export interface PreRegistrationCounters {
 	forms_total: number;
 	forms_activos: number;
 	submissions_pendientes: number;
+	// F-2026-08-12-DESCUENTOS-TAB (Kevin 2026-08-12): submissions con
+	// descuento propuesto > 0 que requieren atencion del EC. Usado como
+	// badge de la pestana "Descuentos".
+	descuentos_pendientes: number;
 }
 
 // ============================================================================
@@ -183,13 +187,18 @@ export async function listSubmissions(opts: {
 	perPage?: number;
 	formId?: string;
 	estado?: 'pendiente' | 'aprobado' | 'rechazado';
+	// F-2026-08-12-DESCUENTOS-TAB (Kevin 2026-08-12 post-reunion): si true,
+	// devuelve solo submissions con descuento propuesto > 0. Usado por la
+	// pestana "Descuentos" del panel de pre-registros.
+	conDescuento?: boolean;
 } = {}) {
-	const { page = 1, perPage = 20, formId, estado } = opts;
+	const { page = 1, perPage = 20, formId, estado, conDescuento } = opts;
 	const params = new URLSearchParams();
 	params.set('page', String(page));
 	params.set('per_page', String(perPage));
 	if (formId) params.set('form_id', formId);
 	if (estado) params.set('estado', estado);
+	if (conDescuento) params.set('con_descuento', 'true');
 	return apiKyC.get<PaginatedResponse<PreRegistration>>(
 		`/pre-registrations/submissions?${params.toString()}`
 	);

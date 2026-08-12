@@ -56,7 +56,7 @@
 	// continua) ahora pueden crear/editar/cerrar/reabrir/eliminar formularios.
 	let canCreate = $derived(STAFF_EC_FORMS.includes(currentRole));
 
-	type Tab = 'forms' | 'submissions';
+	type Tab = 'forms' | 'submissions' | 'descuentos';
 	let activeTab: Tab = $state('forms');
 	let loading = $state(false);
 	let copyingLink = $state<string | null>(null);
@@ -77,8 +77,17 @@
 	let subsEstadoFilter = $state<'' | 'pendiente' | 'aprobado' | 'rechazado'>('');
 	let subsFormFilter = $state('');
 
+	// F-2026-08-12-DESCUENTOS-TAB (Kevin 2026-08-12 post-reunion): pestana
+	// dedicada a las pre-inscripciones que propusieron algun descuento de
+	// vicerrectorado. Mismo modelo de paginacion que submissions.
+	let descuentos: PreRegistration[] = $state([]);
+	let descPage = $state(1);
+	let descTotal = $state(0);
+	let descTotalPages = $state(1);
+	let descPerPage = 20;
+
 	// Counters
-	let counters = $state({ forms_total: 0, forms_activos: 0, submissions_pendientes: 0 });
+	let counters = $state({ forms_total: 0, forms_activos: 0, submissions_pendientes: 0, descuentos_pendientes: 0 });
 
 	// Modal: crear/editar form
 	let showFormModal = $state(false);
@@ -164,6 +173,8 @@
 			Promise.all([loadForms(), loadCounters()]);
 			if (activeTab === 'submissions') {
 				loadSubmissions();
+			} else if (activeTab === 'descuentos') {
+				loadDescuentos();
 			}
 		}
 	});
@@ -226,6 +237,29 @@
 			loadForms();
 		} else if (tab === 'submissions' && submissions.length === 0 && !loading) {
 			loadSubmissions();
+		} else if (tab === 'descuentos' && descuentos.length === 0 && !loading) {
+			loadDescuentos();
+		}
+	}
+
+	// F-2026-08-12-DESCUENTOS-TAB: carga la lista de pre-inscripciones con
+	// descuento propuesto > 0. Usa el endpoint listSubmissions con
+	// conDescuento=true (optimizado: el backend filtra antes de paginar).
+	async function loadDescuentos() {
+		loading = true;
+		try {
+			const res = await listSubmissions({
+				page: descPage,
+				perPage: descPerPage,
+				conDescuento: true
+			});
+			descuentos = res.data;
+			descTotal = res.meta.totalItems;
+			descTotalPages = res.meta.totalPages;
+		} catch (e: any) {
+			alert('error', e?.message || 'Error al cargar descuentos');
+		} finally {
+			loading = false;
 		}
 	}
 
@@ -822,6 +856,27 @@
 				{/if}
 			</span>
 		</button>
+		<!-- F-2026-08-12-DESCUENTOS-TAB (Kevin 2026-08-12 post-reunion): pestana
+		     dedicada a pre-inscripciones con descuento de vicerrectorado propuesto.
+		     Mismo patron que la tab de Pre-inscripciones pero con badge indigo
+		     para distinguir visualmente que es un subconjunto especializado. -->
+		<button
+			type="button"
+			onclick={() => switchTab('descuentos')}
+			class={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'descuentos' ? 'border-indigo-600 text-indigo-700 dark:text-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+		>
+			<span class="inline-flex items-center gap-2">
+				<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+				</svg>
+				Descuentos
+				{#if counters.descuentos_pendientes > 0}
+					<span class="ml-1 inline-flex items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/40 px-2 text-xs font-bold text-indigo-700 dark:text-indigo-400">
+						{counters.descuentos_pendientes} por revisar
+					</span>
+				{/if}
+			</span>
+		</button>
 	</div>
 
 	<!-- ========== TAB: Formularios ========== -->
@@ -1216,6 +1271,115 @@
 				limit={subsPerPage}
 				onPageChange={(p) => { subsPage = p; loadSubmissions(); }}
 				onLimitChange={(l) => { subsPerPage = l; subsPage = 1; loadSubmissions(); }}
+			/>
+		{/if}
+	{/if}
+
+	<!-- ========== TAB: Descuentos (F-2026-08-12-DESCUENTOS-TAB) ==========
+	     Pre-inscripciones que propusieron algun descuento de vicerrectorado.
+	     Muestra el % propuesto y el estado de validacion (si la submission
+	     fue aprobada y migrada a Student, se ve el estado del descuento
+	     aprovado/rechazado/pendiente). El EC puede validar/rechazar
+	     desde el modal "Validar descuento" reusado de la tab Pre-inscripciones. -->
+	{#if activeTab === 'descuentos'}
+		{#if loading && descuentos.length === 0}
+			<TableSkeleton columns={5} rows={6} />
+		{:else if descuentos.length === 0}
+			<EmptyState
+				icon="enrollment"
+				title="No hay descuentos de vicerrectorado para revisar"
+				description="Cuando un visitante complete un formulario publico con descuento de vicerrectorado propuesto, aparecera aca para que lo apruebes o rechaces."
+			/>
+		{:else}
+			<div class="hidden md:block bg-white dark:bg-dark-surface rounded-lg shadow border border-gray-200 dark:border-dark-border overflow-hidden">
+				<table class="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
+					<thead class="bg-gray-50 dark:bg-dark-background">
+						<tr>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Programa</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">% Descuento</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado submission</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
+							<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
+						</tr>
+					</thead>
+					<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
+						{#each descuentos as sub (sub._id)}
+							<tr>
+								<td class="px-4 py-3">
+									<p class="text-sm font-medium text-gray-900 dark:text-white">{sub.data.nombre}</p>
+									<p class="text-xs text-gray-500 dark:text-gray-400">{sub.data.email} · CI {sub.data.carnet}</p>
+								</td>
+								<td class="px-4 py-3 text-sm">
+									<div class="text-gray-900 dark:text-white">{sub.form_nombre || '—'}</div>
+									{#if sub.programa_nombre}
+										<div class="text-xs text-gray-500 dark:text-gray-400">{sub.programa_nombre}</div>
+									{/if}
+								</td>
+								<td class="px-4 py-3">
+									<span class="inline-flex items-center rounded-full bg-indigo-100 dark:bg-indigo-900/30 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+										{(sub.data.descuento_porcentaje * 100).toFixed(0)}%
+									</span>
+								</td>
+								<td class="px-4 py-3">
+									<span class={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${estadoBadgeFor(sub.estado)}`}>
+										{sub.estado}
+									</span>
+								</td>
+								<td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
+									{fmtDate(sub.created_at)}
+								</td>
+								<td class="px-4 py-3 text-right">
+									{#if sub.estado === 'pendiente'}
+										<Button size="xs" onclick={() => openDetailModal(sub)}>Ver detalle</Button>
+										<p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Aprobar submission primero</p>
+									{:else if sub.estado === 'aprobado' && sub.migrated_to_student_id}
+										<Button size="xs" variant="indigo" onclick={() => openValidateDescuentoModal(sub)}>Validar descuento</Button>
+									{:else}
+										<Button size="xs" variant="secondary" onclick={() => openDetailModal(sub)}>Ver detalle</Button>
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+
+			<!-- Mobile: cards -->
+			<div class="md:hidden space-y-3">
+				{#each descuentos as sub (sub._id)}
+					<div class="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl p-4 shadow-sm">
+						<div class="flex items-start justify-between gap-3">
+							<div class="min-w-0 flex-1">
+								<p class="text-sm font-medium text-gray-900 dark:text-white truncate">{sub.data.nombre}</p>
+								<p class="text-xs text-gray-500 dark:text-gray-400 truncate">{sub.data.email}</p>
+								<p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub.form_nombre || 'Formulario'}</p>
+							</div>
+							<span class="shrink-0 inline-flex items-center rounded-full bg-indigo-100 dark:bg-indigo-900/30 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+								{(sub.data.descuento_porcentaje * 100).toFixed(0)}%
+							</span>
+						</div>
+						<div class="mt-2 flex items-center gap-2">
+							<span class={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${estadoBadgeFor(sub.estado)}`}>
+								{sub.estado}
+							</span>
+							{#if sub.estado === 'aprobado' && sub.migrated_to_student_id}
+								<Button size="sm" variant="indigo" onclick={() => openValidateDescuentoModal(sub)}>Validar descuento</Button>
+							{:else}
+								<Button size="sm" variant="secondary" onclick={() => openDetailModal(sub)}>Ver detalle</Button>
+							{/if}
+						</div>
+					</div>
+				{/each}
+			</div>
+
+			<Pagination
+				currentPage={descPage}
+				totalPages={descTotalPages}
+				totalItems={descTotal}
+				limit={descPerPage}
+				onPageChange={(p) => { descPage = p; loadDescuentos(); }}
+				onLimitChange={(l) => { descPerPage = l; descPage = 1; loadDescuentos(); }}
 			/>
 		{/if}
 	{/if}
