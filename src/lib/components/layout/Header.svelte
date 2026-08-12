@@ -257,12 +257,14 @@
 		// llega una nueva notificación para este usuario. Reemplaza el
 		// polling cada 45s (50+ requests/hora por sesión).
 		try {
-			// BUG-SSE-001 FIX: usar URL relativa con el prefijo correcto /api/api/v1
-			// (antes se usaba (apiKyC as any).baseURL que no existe, daba '',
-			// y la URL quedaba como /notifications/stream → 404 en nginx)
-			// nginx: location /api/ → proxy_pass http://127.0.0.1:8000/;
-			// por eso el cliente manda doble /api/api/v1/
-			const streamURL = `/api/api/v1/notifications/stream`;
+			// BUG-SSE-002 FIX (2026-08-12, Kevin): la URL debe ser SOLO
+			// /api/v1/notifications/stream. El doble /api/api/v1/ que estaba
+			// antes era incorrecto y daba 404 en nginx. Verificado con curl:
+			//   - /api/v1/notifications/stream → 401 (endpoint existe)
+			//   - /api/api/v1/notifications/stream → 404 (doble prefijo)
+			// El cliente apiKyC usa `${BASE_URL}/api/v1${endpoint}`, aqui
+			// no usamos apiKyC porque EventSource no soporta custom headers.
+			const streamURL = `/api/v1/notifications/stream`;
 			// Para SSE, no podemos usar el cliente HTTP normal (no soporta streaming).
 			// El browser añadirá el header Authorization automáticamente si la cookie
 			// está configurada. Si usamos Bearer token, hay que pasarlo via query.
