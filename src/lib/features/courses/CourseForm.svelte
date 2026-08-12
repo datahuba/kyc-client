@@ -63,6 +63,11 @@
 	// F-HISTORICO (2026-07-31): resolución de respaldo (opcional, cualquier programa).
 	let resolucionFile: File | null = $state(null);
 	let subiendoResolucion = $state(false);
+	// F-2026-08-12-EC-RESOLUCION-OBLIGATORIA (Kevin 2026-08-12): para programas
+	// en ejecucion la resolucion es OBLIGATORIA. El form sube el PDF primero
+	// a POST /upload-resolucion-temp para obtener la URL, y la pasa en el
+	// payload de create_course. Asi el backend puede validar antes de crear.
+	let resolucionPdfUrl: string | null = $state(null);
 
 	// ISSUE-REFACTOR (UI): validación inline por campo (estilo DiscountForm)
 	// en vez de depender solo de alert() al fallar el submit.
@@ -375,7 +380,32 @@
 
 		saving = true;
 		try {
+			// F-2026-08-12-EC-RESOLUCION-OBLIGATORIA (Kevin 2026-08-12 post-reunion):
+			// para programas en ejecucion la resolucion es OBLIGATORIA. Subir
+			// el PDF al endpoint temporal ANTES de crear el curso, obtener la
+			// URL, y pasarla en el payload. Asi el backend puede validar.
+			if (resolucionFile) {
+				try {
+					subiendoResolucion = true;
+					const tempUpload = await courseService.uploadResolucionTemp(resolucionFile);
+					resolucionPdfUrl = tempUpload.url;
+				} catch (uploadErr: any) {
+					alert(
+						'error',
+						`No se pudo subir la resolución: ${uploadErr?.message || 'Error desconocido'}. El programa no se creó.`
+					);
+					subiendoResolucion = false;
+					saving = false;
+					return;
+				} finally {
+					subiendoResolucion = false;
+				}
+			}
+
 			const payload = { ...formData };
+			// F-2026-08-12-EC-RESOLUCION-OBLIGATORIA: pasar la URL de la
+			// resolucion subida (o el valor que ya tenia en edicion).
+			payload.resolucion_pdf_url = resolucionPdfUrl || (formData as any).resolucion_pdf_url || null;
 			// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12): normalizar las
 			// matriculas diferenciadas. Si el admin dejo el campo vacio, el
 			// override es null → el backend usa el default global (200/500).
@@ -1059,18 +1089,25 @@
 	</Card>
 	{/if}
 
-	<!-- F-HISTORICO (2026-07-31): Resolución de Respaldo (opcional para todos
-	     los programas, nuevos, en ejecución o históricos). Se sube al crear o
-	     editar; también se puede subir más tarde desde el menú desplegable
-	     del catálogo de programas. -->
+	<!-- F-HISTORICO (2026-07-31): Resolución de Respaldo.
+	     F-2026-08-12-EC-RESOLUCION-OBLIGATORIA (Kevin 2026-08-12 post-reunion):
+	     - Historico: opcional
+	     - Programado (proximo): opcional
+	     - En ejecucion: OBLIGATORIA (sin esto no se puede crear el programa)
+	     Se sube al crear o editar; tambien se puede subir mas tarde desde el
+	     menu desplegable del catalogo de programas. -->
 	<Card variant="bordered" padding="md">
 		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">
-			Resolución de Respaldo (Opcional)
+			Resolución de Respaldo {tipo_programa === 'en_ejecucion' ? '(Obligatoria)' : '(Opcional)'}
 		</Heading>
 		<p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
 			PDF de la resolución que respalda este programa (ej. resolución del Comité Académico,
-			resolución del Director, etc). Es <strong>opcional</strong>: podés dejarlo en blanco
-			y subirlo más tarde desde el menú desplegable del programa en el catálogo.
+			resolución del Director, etc).
+			{#if tipo_programa === 'en_ejecucion'}
+				<strong class="text-red-600 dark:text-red-400">Es OBLIGATORIA para programas en ejecución.</strong>
+			{:else}
+				Es <strong>opcional</strong>: podés dejarlo en blanco y subirlo más tarde.
+			{/if}
 		</p>
 
 		{#if isEditMode && course && (course as any).resolucion_pdf_url}

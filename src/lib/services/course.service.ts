@@ -144,6 +144,21 @@ class CourseService {
 	}
 
 	/**
+	 * F-2026-08-12-EC-RESOLUCION-OBLIGATORIA (Kevin 2026-08-12 post-reunion):
+	 * sube un PDF de resolucion a cloudinary SIN asociarlo a ningun curso.
+	 * Devuelve la URL temporal. El frontend usa esa URL al crear el curso
+	 * via POST /courses con resolucion_pdf_url=... Asi el backend puede
+	 * validar que para en_ejecucion la resolucion este presente.
+	 *
+	 * Para historicos y programados la resolucion es opcional.
+	 */
+	async uploadResolucionTemp(file: File): Promise<{ url: string }> {
+		const form = new FormData();
+		form.append('file', file);
+		return await apiKyC.post<{ url: string }>(`/courses/upload-resolucion-temp`, form, { customTimeout: 60000 });
+	}
+
+	/**
 	 * F-HISTORICO (2026-07-31): marca o desmarca un programa como histórico.
 	 * Útil para corregir un flag desde la vista del catálogo o editor sin
 	 * tener que enviar todo el payload de CourseUpdate.
