@@ -425,7 +425,15 @@
 				payload.modulos = [];
 				payload.requisitos = [];
 				payload.cargo_adicional_items = [];
-				payload.activo = false; // un programa historico no acepta inscripciones
+				// FIX-F-2026-08-12-EC-ACTIVO-HISTORICO (Kevin 2026-08-12): antes
+				// poniamos `payload.activo = false` para historicos, lo que los
+				// hacia invisibles en el modal de "Editar Usuario" (que filtra
+				// activo=true) y por tanto no se podian re-asignar. Ahora los
+				// historicos quedan `activo=true` y se gestionan via el flag
+				// `es_historico`. El catalogo publico ya excluye historicos del
+				// listado "disponible para inscribirse" (ver
+				// `get_courses_disponibles_para_estudiante` en course_service).
+				payload.activo = true; // historico, pero `activo=true` para que sea visible/gestionable
 				// F-FIX-CREAR-PROGRAMA-422 (2026-08-09, Kevin): borrar fechas
 				// vacias para que el backend no rechace con 422 al validar
 				// "Input should be a valid datetime".
