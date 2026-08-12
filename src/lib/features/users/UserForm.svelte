@@ -69,20 +69,40 @@ interface Props {
 	let cursosDisponibles: Course[] = $state([]);
 
 	$effect(() => {
-		// Cargar cursos activos una sola vez, se usan en el multi-select de
-		// Encargado de Curso. El backend limita per_page a 100 (422 si se
-		// supera), por eso se pagina en silencio si hay más de 100 cursos.
+		// Cargar TODOS los cursos (activos e inactivos, historicos incluidos) para
+		// que el admin pueda asignar/desasignar cualquier programa al EC desde
+		// el modal. Antes se filtraba por activo=true, lo que ocultaba los
+		// historicos recien creados (F-FIX-2026-08-12-EC-USERMODAL-HISTORICOS:
+		// Kevin reporto que el modal "Editar Usuario" no mostraba los programas
+		// historicos creados por el EC, impidiendo re-asignarlos o dejarlos
+		// sin asignar). El backend limita per_page a 100 (422 si se supera),
+		// por eso se pagina en silencio si hay más de 100 cursos.
 		(async () => {
 			try {
 				const todos: Course[] = [];
 				let currentPage = 1;
 				let hasMore = true;
 				while (hasMore) {
-					const res = await courseService.getAll(currentPage, 100, { activo: true });
+					// FIX-F-2026-08-12-EC-USERMODAL-HISTORICOS: SIN filtro activo
+					// para ver historicos e inactivos. El admin los distingue
+					// visualmente con el badge (es_historico / inactivo).
+					const res = await courseService.getAll(currentPage, 100);
 					todos.push(...res.data);
 					hasMore = res.meta.hasNextPage;
 					currentPage += 1;
 				}
+				// Ordenar: activos primero, luego historicos, luego inactivos.
+				// Dentro de cada grupo, alfabetico por nombre.
+				todos.sort((a, b) => {
+					const rank = (c: Course) => {
+						if (!c.activo) return 2;
+						if (c.es_historico) return 1;
+						return 0;
+					};
+					const r = rank(a) - rank(b);
+					if (r !== 0) return r;
+					return (a.nombre_programa || '').localeCompare(b.nombre_programa || '');
+				});
 				cursosDisponibles = todos;
 			} catch {
 				cursosDisponibles = [];
@@ -363,12 +383,34 @@ interface Props {
 							<p class="text-sm text-gray-500 dark:text-gray-400">No hay cursos activos disponibles.</p>
 						{:else}
 							{#each cursosDisponibles as curso (curso._id)}
-								<Checkbox
-									id={`curso_${curso._id}`}
-									label={`${curso.nombre_programa} (${curso.codigo})`}
-									checked={(formData.cursos_asignados ?? []).includes(curso._id)}
-									onchange={() => toggleCurso(curso._id)}
-								/>
+								<div class="flex items-center justify-between gap-2">
+									<Checkbox
+										id={`curso_${curso._id}`}
+										label={`${curso.nombre_programa} (${curso.codigo})`}
+										checked={(formData.cursos_asignados ?? []).includes(curso._id)}
+										onchange={() => toggleCurso(curso._id)}
+									/>
+									<!-- FIX-F-2026-08-12-EC-USERMODAL-HISTORICOS: badges
+									     para que el admin identifique de un vistazo que
+									     el curso es historico o esta inactivo. Sin esto
+									     no se distingue del resto y puede asignar por
+									     error un programa archivado. -->
+									{#if curso.es_historico}
+										<span
+											class="shrink-0 inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300"
+											title="Programa histórico (no acepta nuevas inscripciones)"
+										>
+											Histórico
+										</span>
+									{:else if !curso.activo}
+										<span
+											class="shrink-0 inline-flex items-center rounded-full bg-gray-200 dark:bg-gray-700 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:text-gray-300"
+											title="Programa inactivo"
+										>
+											Inactivo
+										</span>
+									{/if}
+								</div>
 							{/each}
 						{/if}
 					</div>
