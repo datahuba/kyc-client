@@ -44,6 +44,13 @@
 	let domicilio = $state('');
 	let mensaje = $state('');
 
+	// F-2026-08-12-DESCUENTO-BECA-V3 (Kevin 2026-08-12): declaracion jurada
+	// de veracidad. El estudiante debe confirmar explicitamente que los
+	// datos son verdaderos, con enfasis en los relacionados a beca,
+	// descuento y condicion de primera carrera. Si no declara la
+	// veracidad, no puede enviar la pre-inscripcion.
+	let declaracionVeracidad = $state(false);
+
 	// F-2026-08-11-CAMPOS-EC: campos opcionales del Diplomado Gestión Tributaria
 	// y demás programas de educación continua (planilla de Lisa). Si el
 	// estudiante NO se inscribe a un diplomado EC, simplemente los deja vacíos.
@@ -101,7 +108,7 @@
 		{ id: 1, title: 'Identidad', subtitle: '¿Quién eres?', icon: UserIcon, fields: ['nombre', 'email', 'carnet', 'extension'] },
 		{ id: 2, title: 'Contacto', subtitle: '¿Cómo te ubicamos?', icon: IdentificationIcon, fields: ['celular', 'fechaNacimiento', 'sexo', 'domicilio'] },
 		{ id: 3, title: 'Datos EC', subtitle: 'Educación continua (opcional)', icon: IdentificationIcon, fields: ['registroUniversitario', 'avanceAcademicoCodigo', 'formularioDescuentoNumero', 'carreraCodigo', 'descuentoPorcentaje', 'procedencia', 'modalidad', 'cartaFirmadaUrl', 'resolucionUrl'] },
-		{ id: 4, title: 'Tipo estudiante', subtitle: '¿Primera carrera o ya profesional?', icon: IdentificationIcon, fields: ['esPrimerCarrera', 'tituloProfesionalUrl'] },
+		{ id: 4, title: 'Título profesional', subtitle: '¿Tienes título profesional?', icon: IdentificationIcon, fields: ['esPrimerCarrera', 'tituloProfesionalUrl'] },
 		{ id: 5, title: 'Confirmar', subtitle: 'Revisa y envía', icon: CircleCheckIcon, fields: ['mensaje'] }
 	] as const;
 	let currentStep = $state(1);
@@ -160,7 +167,7 @@
 	function saveAutosave() {
 		if (success) return;
 		try {
-			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, procedencia, modalidad, cartaFirmadaUrl, cartaFirmadaNombre, resolucionUrl, resolucionNombre, esPrimerCarrera, tituloProfesionalUrl, tituloProfesionalNombre, currentStep, savedAt: Date.now() };
+			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, procedencia, modalidad, cartaFirmadaUrl, cartaFirmadaNombre, resolucionUrl, resolucionNombre, esPrimerCarrera, tituloProfesionalUrl, tituloProfesionalNombre, declaracionVeracidad, currentStep, savedAt: Date.now() };
 			localStorage.setItem(autosaveKey(), JSON.stringify(data));
 			// indicador "guardado"
 			justSaved = true;
@@ -215,6 +222,8 @@
 			esPrimerCarrera = data.esPrimerCarrera === false ? false : true;
 			tituloProfesionalUrl = data.tituloProfesionalUrl || '';
 			tituloProfesionalNombre = data.tituloProfesionalNombre || '';
+			// F-2026-08-12-DESCUENTO-BECA-V3: declaracion jurada (boolean, default false)
+			declaracionVeracidad = data.declaracionVeracidad === true;
 			if (data.currentStep) {
 				currentStep = data.currentStep;
 				highestStepReached = data.currentStep;
@@ -302,11 +311,11 @@
 				return 'La carta firmada por el director es obligatoria para estudiantes de provincia o modalidad virtual.';
 			}
 		}
-		// F-2026-08-12-DESCUENTO-BECA: si el estudiante NO es primera carrera
-		// (esPrimerCarrera=false), la foto del titulo profesional es OBLIGATORIA.
-		// El encargado EC lo valida al aprobar la pre-inscripcion.
+		// F-2026-08-12-DESCUENTO-BECA: si el estudiante declaro tener
+		// titulo profesional (esPrimerCarrera=false), debe subir el documento.
+		// El equipo de postgrado lo valida al aprobar la pre-inscripcion.
 		if (key === 'tituloProfesionalUrl' && !v && esPrimerCarrera === false) {
-			return 'Si ya tienes título profesional, debes subir una foto o escaneo del título. El encargado de educación continua lo validará.';
+			return 'Indicaste que tienes un título profesional. Sube una foto o escaneo del documento para continuar.';
 		}
 		return null;
 	}
@@ -364,6 +373,12 @@
 		if (!form) return;
 		if (isExpired) {
 			alert('error', 'La fecha límite de este formulario ya pasó.');
+			return;
+		}
+		// F-2026-08-12-DESCUENTO-BECA-V3 (Kevin 2026-08-12): la declaracion
+		// jurada de veracidad es OBLIGATORIA. Sin ella no se puede enviar.
+		if (!declaracionVeracidad) {
+			alert('error', 'Debes confirmar la declaración de veracidad de los datos para enviar la pre-inscripción.');
 			return;
 		}
 		// Validar todos los pasos antes de enviar
@@ -1317,39 +1332,23 @@
 						</div>
 						{/if}
 
-						<!-- ============== PASO 4: Tipo de estudiante (F-2026-08-12-DESCUENTO-BECA) ============== -->
+						<!-- ============== PASO 4: Título profesional (F-2026-08-12-DESCUENTO-BECA-V2) ============== -->
 						{#if currentStep === 4}
 						<div in:fly={{ x: 20, duration: 350, easing: cubicOut }} out:fly={{ x: -20, duration: 200, easing: cubicOut }}>
 							<div class="rounded-xl border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
 								<h3 class="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-primary-700 dark:text-dark-tertiary">
 									<IdentificationIcon class="size-4" />
-									¿Primera carrera o ya profesional?
+									¿Tienes título profesional?
 								</h3>
 								<p class="text-xs text-gray-600 dark:text-gray-400 mb-4">
-									Tu respuesta determina el costo de la matrícula. <strong class="text-primary-700 dark:text-primary-300">Si es tu primera carrera en la UAGRM</strong>, pagas una matrícula menor. Si ya tienes un título profesional, pagas la matrícula completa.
+									Si ya cuentas con un título profesional, adjunta una foto o escaneo. Si aún no lo tienes, deja esta sección en blanco y continúa.
 									{#if descuentoPorcentaje}
 										<br><span class="text-amber-700 dark:text-amber-300">El descuento del {descuentoPorcentaje}% que cargaste se aplica a los módulos, no a la matrícula.</span>
 									{/if}
 								</p>
 
-								<!-- Radio Sí/No -->
+								<!-- Radio Sí/No - wording neutral (no dice "primera carrera" ni "profesional") -->
 								<div class="space-y-2 mb-4">
-									<label class="flex items-start gap-3 rounded-xl border-2 p-3 cursor-pointer transition-all
-										{esPrimerCarrera ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-border hover:border-primary-300'}"
-									>
-										<input
-											type="radio"
-											name="esPrimerCarrera"
-											value="true"
-											checked={esPrimerCarrera}
-											onchange={() => { esPrimerCarrera = true; tituloProfesionalUrl = ''; tituloProfesionalNombre = ''; tituloProfesionalError = ''; saveAutosave(); }}
-											class="mt-1 size-4 text-primary-600 focus:ring-primary-500"
-										/>
-										<div class="flex-1">
-											<div class="font-semibold text-sm text-gray-900 dark:text-white">Sí, es mi primera carrera en la UAGRM</div>
-											<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Cobro de matrícula reducido (default 200 Bs).</div>
-										</div>
-									</label>
 									<label class="flex items-start gap-3 rounded-xl border-2 p-3 cursor-pointer transition-all
 										{!esPrimerCarrera ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-border hover:border-primary-300'}"
 									>
@@ -1362,17 +1361,33 @@
 											class="mt-1 size-4 text-primary-600 focus:ring-primary-500"
 										/>
 										<div class="flex-1">
-											<div class="font-semibold text-sm text-gray-900 dark:text-white">No, ya tengo título profesional</div>
-											<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Cobro de matrícula completo (default 500 Bs). <strong class="text-red-600 dark:text-red-400">Debes subir foto o escaneo del título.</strong></div>
+											<div class="font-semibold text-sm text-gray-900 dark:text-white">Sí, tengo un título profesional</div>
+											<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Lo subiré a continuación.</div>
+										</div>
+									</label>
+									<label class="flex items-start gap-3 rounded-xl border-2 p-3 cursor-pointer transition-all
+										{esPrimerCarrera ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-border hover:border-primary-300'}"
+									>
+										<input
+											type="radio"
+											name="esPrimerCarrera"
+											value="true"
+											checked={esPrimerCarrera}
+											onchange={() => { esPrimerCarrera = true; tituloProfesionalUrl = ''; tituloProfesionalNombre = ''; tituloProfesionalError = ''; saveAutosave(); }}
+											class="mt-1 size-4 text-primary-600 focus:ring-primary-500"
+										/>
+										<div class="flex-1">
+											<div class="font-semibold text-sm text-gray-900 dark:text-white">No, aún no tengo título profesional</div>
+											<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Podrás continuar sin adjuntar ningún documento.</div>
 										</div>
 									</label>
 								</div>
 
-								<!-- Input de título profesional: SOLO si esPrimerCarrera=false -->
+								<!-- Input de título profesional: SOLO si el estudiante dice que SÍ tiene -->
 								{#if !esPrimerCarrera}
 									<div class="rounded-xl border-2 border-amber-300 bg-amber-50/50 dark:border-amber-700/50 dark:bg-amber-900/10 p-3">
 										<label for="pr-titulo" class="block text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2">
-											Foto o escaneo del título profesional <span class="text-red-600">*</span>
+											Sube tu título profesional <span class="text-red-600">*</span>
 										</label>
 										{#if tituloProfesionalUrl}
 											<div class="flex items-center gap-3 rounded-lg border border-green-300 bg-white dark:bg-dark-surface p-2">
@@ -1412,7 +1427,7 @@
 													<span class="text-sm text-gray-700 dark:text-gray-300">Subiendo…</span>
 												{:else}
 													<UploadIcon class="size-5 text-amber-600" />
-													<span class="text-sm text-gray-700 dark:text-gray-300">Subir foto del título (PDF/JPG/PNG, max 20MB)</span>
+													<span class="text-sm text-gray-700 dark:text-gray-300">Subir foto o PDF del título (max 20MB)</span>
 												{/if}
 											</label>
 										{/if}
@@ -1422,7 +1437,7 @@
 											<p class="mt-1 text-xs font-medium text-red-600">{fieldErrors.tituloProfesionalUrl}</p>
 										{/if}
 										<p class="mt-2 text-[10px] text-amber-800 dark:text-amber-300">
-											💡 El encargado de educación continua validará este documento antes de aprobar tu pre-inscripción.
+											💡 El documento será revisado por el equipo de postgrado como parte de tu postulación.
 										</p>
 									</div>
 								{/if}
@@ -1536,39 +1551,41 @@
 								</div>
 							{/if}
 
-							<!-- F-2026-08-12-DESCUENTO-BECA: resumen de tipo estudiante
-							     Muestra si es primer carrera (200 Bs) o profesional con título (500 Bs).
-							     En modo profesional también muestra el archivo del título cargado. -->
+							<!-- F-2026-08-12-DESCUENTO-BECA-V2: resumen neutral (sin mencionar
+							     "primera carrera" ni "profesional con título" al estudiante).
+							     Solo indica si el estudiante declaró tener título y, si lo
+							     subió, muestra el archivo. La categoria real (es_primer_carrera)
+							     la decide el equipo de postgrado internamente. -->
 							<div class="rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-900/10">
 								<h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
 									<IdentificationIcon class="size-4" />
-									Tipo de estudiante
+									Título profesional
 								</h3>
 								<dl class="space-y-2 text-sm">
 									<div class="flex justify-between gap-3">
-										<dt class="text-gray-500 dark:text-gray-400">Modalidad</dt>
+										<dt class="text-gray-500 dark:text-gray-400">¿Tienes título?</dt>
 										<dd class="text-right">
 											{#if esPrimerCarrera}
+												<span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-700/40 dark:text-gray-300">
+													No
+												</span>
+												<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">No se adjuntó documento</p>
+											{:else}
 												<span class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-300">
 													<CheckIcon class="size-3" />
-													Primera carrera
+													Sí
 												</span>
-												<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Matrícula reducida (default 200 Bs)</p>
-											{:else}
-												<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-													Profesional con título
-												</span>
-												<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Matrícula completa (default 500 Bs)</p>
+												<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Documento adjunto</p>
 											{/if}
 										</dd>
 									</div>
 									{#if !esPrimerCarrera && tituloProfesionalNombre}
 										<div class="flex justify-between gap-3">
-											<dt class="text-gray-500 dark:text-gray-400">Título profesional</dt>
+											<dt class="text-gray-500 dark:text-gray-400">Archivo</dt>
 											<dd class="text-right max-w-[60%]">
 												<p class="font-mono text-xs text-gray-900 dark:text-white break-all">{tituloProfesionalNombre}</p>
 												<a href={tituloProfesionalUrl} target="_blank" rel="noopener" class="text-[10px] text-primary-600 hover:underline">Ver archivo</a>
-												<p class="mt-1 text-[10px] italic text-amber-700 dark:text-amber-300">Pendiente de validación por encargado EC</p>
+												<p class="mt-1 text-[10px] italic text-amber-700 dark:text-amber-300">Pendiente de revisión por el equipo de postgrado</p>
 											</dd>
 										</div>
 									{/if}
@@ -1589,6 +1606,31 @@
 									placeholder="Cuéntanos brevemente por qué te interesa el programa..."
 									disabled={isExpired}
 								></textarea>
+							</div>
+
+							<!-- F-2026-08-12-DESCUENTO-BECA-V3 (Kevin 2026-08-12): declaracion
+							     jurada de veracidad. El estudiante debe confirmar que los datos
+							     son verdaderos. En caso de falsedad (sobre todo en beca, descuento
+							     y condicion de primera carrera), el diplomado podria ser anulado.
+							     Sin este checkbox marcado, no se puede enviar. -->
+							<div class="rounded-xl border-2 border-red-200 bg-red-50/40 p-4 dark:border-red-900/50 dark:bg-red-900/10">
+								<label class="flex items-start gap-3 cursor-pointer">
+									<input
+										id="pr-declaracion"
+										type="checkbox"
+										bind:checked={declaracionVeracidad}
+										onchange={saveAutosave}
+										disabled={isExpired}
+										class="mt-1 size-5 rounded border-2 border-gray-300 text-red-600 focus:ring-2 focus:ring-red-500/30 dark:border-dark-border"
+									/>
+									<span class="text-sm text-gray-800 dark:text-gray-200">
+										<strong class="text-red-700 dark:text-red-400">Declaración jurada de veracidad.</strong>
+										Declaro bajo juramento que todos los datos y documentos proporcionados en esta pre-inscripción son verdaderos, especialmente los relacionados con
+										<strong>beca, descuento y mi condición de primera carrera</strong>.
+										Entiendo que la falsedad, omisión o alteración de estos datos puede derivar en la
+										<strong>anulación de mi diplomado</strong> y las sanciones académicas correspondientes.
+									</span>
+								</label>
 							</div>
 
 							<div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200">
@@ -1627,8 +1669,9 @@
 								<button
 									type="button"
 									onclick={handleSubmit}
-									disabled={submitting}
-									class="inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-green-600/20 transition-all hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/30 active:scale-95 disabled:opacity-60"
+									disabled={submitting || !declaracionVeracidad}
+									title={!declaracionVeracidad ? 'Marca la declaración de veracidad para enviar' : ''}
+									class="inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-green-600/20 transition-all hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/30 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
 								>
 									{#if submitting}
 										<span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
