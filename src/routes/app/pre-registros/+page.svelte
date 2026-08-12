@@ -106,6 +106,23 @@
 	let tituloRejectMotivo = $state('');
 	let tituloValidating = $state(false);
 
+	// F-2026-08-12-DESCUENTO-BECA-VALIDACION (Kevin 2026-08-12 post-reunion):
+	// modal para que el encargado EC valide (o rechace) el descuento de
+	// vicerrectorado propuesto por el estudiante. El descuento SOLO aplica
+	// despues de la validacion explicita (mismo patron que "Validar titulo").
+	// estadoActual: 'no_aplica' | 'pendiente' | 'aprobado' | 'rechazado'.
+	let showValidateDescuentoModal = $state(false);
+	let validatingDescuentoFor: {
+		studentId: string;
+		studentName: string;
+		porcentaje: number; // 0-1 (formato DB). ej 0.5 = 50%
+		estadoActual: 'no_aplica' | 'pendiente' | 'aprobado' | 'rechazado';
+		motivoRechazo: string | null;
+	} | null = $state(null);
+	let descuentoRejectMotivo = $state('');
+	let descuentoValidating = $state(false);
+	let loadingDescuentoEstado = $state(false);
+
 	// Modal: confirmar delete form
 	let showDeleteFormModal = $state(false);
 	let formToDelete: PreRegistrationForm | null = $state(null);
@@ -522,6 +539,110 @@
 			alert('error', e?.message || 'No se pudo rechazar el título.');
 		} finally {
 			tituloValidating = false;
+		}
+	}
+
+	// F-2026-08-12-DESCUENTO-BECA-VALIDACION (Kevin 2026-08-12 post-reunion):
+	// abre el modal de validacion del descuento de vicerrectorado. Necesita
+	// cargar el estado actual del descuento desde el Student (porque la
+	// PreRegistration no expone descuento_vicerrectorado_estado).
+	async function openValidateDescuentoModal(sub: PreRegistration) {
+		const d = sub.data || {};
+		if (!sub.migrated_to_student_id) {
+			alert('warning', 'Primero aprueba la pre-inscripción para crear el estudiante, luego podrás validar el descuento.');
+			return;
+		}
+		// El estudiante propuso un descuento (>= 0% lo aceptamos pero el
+		// backend retorna 400 si es 0, asi que validamos >= 0.01 aqui).
+		const porcentaje = d.descuento_porcentaje;
+		if (porcentaje == null || porcentaje <= 0) {
+			alert('warning', 'El estudiante no propuso un descuento de vicerrectorado.');
+			return;
+		}
+		loadingDescuentoEstado = true;
+		validatingDescuentoFor = {
+			studentId: sub.migrated_to_student_id,
+			studentName: d.nombre || 'Estudiante',
+			porcentaje,
+			estadoActual: 'no_aplica',
+			motivoRechazo: null,
+		};
+		showValidateDescuentoModal = true;
+		descuentoRejectMotivo = '';
+		try {
+			// Fetch el student para obtener el estado actual del descuento.
+			const res = await fetch(`/api/v1/students/${sub.migrated_to_student_id}`, {
+				credentials: 'include',
+			});
+			if (res.ok) {
+				const student = await res.json();
+				validatingDescuentoFor = {
+					...validatingDescuentoFor,
+					estadoActual: student.descuento_vicerrectorado_estado || 'no_aplica',
+					motivoRechazo: student.descuento_vicerrectorado_motivo_rechazo || null,
+				};
+			}
+		} catch {
+			// Si falla el fetch, dejamos el estado por default (no_aplica).
+		} finally {
+			loadingDescuentoEstado = false;
+		}
+	}
+
+	async function approveDescuentoVicerrectorado() {
+		if (!validatingDescuentoFor) return;
+		descuentoValidating = true;
+		try {
+			const form = new FormData();
+			form.append('aprobado', 'true');
+			const res = await fetch(`/api/v1/students/${validatingDescuentoFor.studentId}/descuento-vicerrectorado/validar`, {
+				method: 'PUT',
+				body: form,
+				credentials: 'include',
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				throw new Error(err.detail || 'Error al validar el descuento');
+			}
+			alert('success', 'Descuento de vicerrectorado aprobado.');
+			showValidateDescuentoModal = false;
+			validatingDescuentoFor = null;
+			await Promise.all([loadSubmissions(), loadForms(), loadCounters()]);
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo aprobar el descuento.');
+		} finally {
+			descuentoValidating = false;
+		}
+	}
+
+	async function rejectDescuentoVicerrectorado() {
+		if (!validatingDescuentoFor) return;
+		if (descuentoRejectMotivo.trim().length < 3) {
+			alert('warning', 'Indica un motivo de al menos 3 caracteres.');
+			return;
+		}
+		descuentoValidating = true;
+		try {
+			const form = new FormData();
+			form.append('aprobado', 'false');
+			form.append('motivo', descuentoRejectMotivo.trim());
+			const res = await fetch(`/api/v1/students/${validatingDescuentoFor.studentId}/descuento-vicerrectorado/validar`, {
+				method: 'PUT',
+				body: form,
+				credentials: 'include',
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				throw new Error(err.detail || 'Error al rechazar el descuento');
+			}
+			alert('success', 'Descuento de vicerrectorado rechazado. El estudiante sigue matriculado pero se cobra el módulo completo.');
+			showValidateDescuentoModal = false;
+			validatingDescuentoFor = null;
+			await Promise.all([loadSubmissions(), loadForms(), loadCounters()]);
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo rechazar el descuento.');
+		} finally {
+			descuentoValidating = false;
 		}
 	}
 
@@ -1038,6 +1159,20 @@
 									Validar título
 								</button>
 							{/if}
+							<!-- F-2026-08-12-DESCUENTO-BECA-VALIDACION: boton para que
+							     el encargado EC apruebe/rechace el descuento de
+							     vicerrectorado. Solo si submission aprobada + descuento
+							     propuesto > 0 + migrada a Student. -->
+							{#if sub.estado === 'aprobado' && sub.data?.descuento_porcentaje > 0 && sub.migrated_to_student_id}
+								<button
+									type="button"
+									onclick={() => openValidateDescuentoModal(sub)}
+									class="inline-flex items-center gap-1 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200"
+								>
+									<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+									Validar descuento
+								</button>
+							{/if}
 						</div>
 						{#if sub.estado === 'pendiente'}
 							<div class="mt-2 flex items-center gap-2 border-t border-gray-100 dark:border-dark-border pt-3">
@@ -1264,6 +1399,81 @@
 	</div>
 </Modal>
 
+<!-- F-2026-08-12-DESCUENTO-BECA-VALIDACION (Kevin 2026-08-12 post-reunion):
+     modal para que el encargado EC apruebe o rechace el descuento de
+     vicerrectorado propuesto por el estudiante. Mismo patron UX que
+     "Validar titulo profesional". El descuento SOLO aplica despues de la
+     validacion explicita del encargado. -->
+<Modal
+	isOpen={showValidateDescuentoModal}
+	title="Validar descuento de vicerrectorado"
+	onClose={() => { if (!descuentoValidating) { showValidateDescuentoModal = false; validatingDescuentoFor = null; } }}
+	maxWidth="sm:max-w-lg"
+>
+	<div class="p-4 space-y-4">
+		{#if loadingDescuentoEstado}
+			<p class="text-sm text-gray-600 dark:text-gray-400 text-center">Cargando estado del descuento…</p>
+		{:else}
+			<p class="text-sm text-gray-600 dark:text-gray-400">
+				¿Aplicar el descuento de vicerrectorado solicitado por
+				<strong class="text-gray-900 dark:text-white">{validatingDescuentoFor?.studentName}</strong>?
+			</p>
+			<div class="rounded-xl border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-900/10 p-4 text-center">
+				<p class="text-[10px] font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Descuento propuesto</p>
+				<p class="text-3xl font-black text-indigo-700 dark:text-indigo-300 mt-1">
+					{validatingDescuentoFor ? (validatingDescuentoFor.porcentaje * 100).toFixed(0) : '0'}%
+				</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Se aplica a cada módulo del programa</p>
+			</div>
+
+			<!-- Badge estado actual del descuento -->
+			{#if validatingDescuentoFor?.estadoActual === 'aprobado'}
+				<div class="rounded-lg border border-green-200 dark:border-green-900/50 bg-green-50 dark:bg-green-900/20 p-3 text-center">
+					<span class="inline-flex items-center gap-1 rounded bg-green-100 dark:bg-green-900/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700 dark:text-green-300">
+						✓ Ya aprobado
+					</span>
+				</div>
+			{:else if validatingDescuentoFor?.estadoActual === 'rechazado'}
+				<div class="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 p-3">
+					<span class="inline-flex items-center gap-1 rounded bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700 dark:text-red-300">
+						✗ Rechazado
+					</span>
+					{#if validatingDescuentoFor.motivoRechazo}
+						<p class="text-xs text-red-700 dark:text-red-300 mt-2">Motivo: {validatingDescuentoFor.motivoRechazo}</p>
+					{/if}
+				</div>
+			{:else if validatingDescuentoFor?.estadoActual === 'pendiente'}
+				<div class="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/20 p-3 text-center">
+					<span class="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+						⏳ Pendiente de validación
+					</span>
+				</div>
+			{/if}
+
+			<div>
+				<label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+					Motivo de rechazo (solo si vas a rechazar)
+				</label>
+				<textarea
+					bind:value={descuentoRejectMotivo}
+					rows="2"
+					placeholder="Ej: No cumple los requisitos del vicerrectorado..."
+					class="w-full rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none"
+				></textarea>
+			</div>
+		{/if}
+		<div class="flex justify-end gap-2 border-t border-gray-100 dark:border-dark-border pt-3">
+			<Button variant="secondary" onclick={() => { if (!descuentoValidating) { showValidateDescuentoModal = false; validatingDescuentoFor = null; } }} disabled={descuentoValidating}>Cancelar</Button>
+			<Button variant="destructive" onclick={rejectDescuentoVicerrectorado} loading={descuentoValidating} disabled={descuentoRejectMotivo.trim().length < 3 || loadingDescuentoEstado}>
+				Rechazar
+			</Button>
+			<Button onclick={approveDescuentoVicerrectorado} loading={descuentoValidating} disabled={loadingDescuentoEstado}>
+				<CheckIcon class="size-4 mr-1" />Aprobar
+			</Button>
+		</div>
+	</div>
+</Modal>
+
 <!-- F-2026-08-11-CAMPOS-EC-MODALIDAD-VIEW (Kevin 22:37): modal de detalle
      con TODOS los datos de la submission (identidad, contacto, EC, docs).
      El encargado abre esto para confirmar antes de aprobar: ve la carta
@@ -1457,6 +1667,26 @@
 						if (sub) openValidateTituloModal(sub);
 					}}>
 						<CheckIcon class="size-4 mr-1" />Validar título
+					</Button>
+				</div>
+			{/if}
+
+			<!-- F-2026-08-12-DESCUENTO-BECA-VALIDACION (Kevin 2026-08-12
+			     post-reunion): si la submission fue aprobada y propuso un
+			     descuento de vicerrectorado, mostrar boton para que el
+			     encargado EC apruebe o rechace el descuento. -->
+			{#if detailSubmission.estado === 'aprobado' && d.descuento_porcentaje > 0 && detailSubmission.migrated_to_student_id}
+				<div class="flex items-center justify-between gap-2 border-t border-gray-100 dark:border-dark-border pt-4">
+					<span class="text-xs text-gray-500 dark:text-gray-400">
+						Validá el descuento de vicerrectorado de
+						<strong class="text-gray-900 dark:text-white">{(d.descuento_porcentaje * 100).toFixed(0)}%</strong>
+						para que se aplique a cada módulo.
+					</span>
+					<Button onclick={() => {
+						const sub = detailSubmission;
+						if (sub) openValidateDescuentoModal(sub);
+					}}>
+						<CheckIcon class="size-4 mr-1" />Validar descuento
 					</Button>
 				</div>
 			{/if}
