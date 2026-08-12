@@ -1536,6 +1536,45 @@
 								</div>
 							{/if}
 
+							<!-- F-2026-08-12-DESCUENTO-BECA: resumen de tipo estudiante
+							     Muestra si es primer carrera (200 Bs) o profesional con título (500 Bs).
+							     En modo profesional también muestra el archivo del título cargado. -->
+							<div class="rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-900/10">
+								<h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+									<IdentificationIcon class="size-4" />
+									Tipo de estudiante
+								</h3>
+								<dl class="space-y-2 text-sm">
+									<div class="flex justify-between gap-3">
+										<dt class="text-gray-500 dark:text-gray-400">Modalidad</dt>
+										<dd class="text-right">
+											{#if esPrimerCarrera}
+												<span class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-300">
+													<CheckIcon class="size-3" />
+													Primera carrera
+												</span>
+												<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Matrícula reducida (default 200 Bs)</p>
+											{:else}
+												<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+													Profesional con título
+												</span>
+												<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Matrícula completa (default 500 Bs)</p>
+											{/if}
+										</dd>
+									</div>
+									{#if !esPrimerCarrera && tituloProfesionalNombre}
+										<div class="flex justify-between gap-3">
+											<dt class="text-gray-500 dark:text-gray-400">Título profesional</dt>
+											<dd class="text-right max-w-[60%]">
+												<p class="font-mono text-xs text-gray-900 dark:text-white break-all">{tituloProfesionalNombre}</p>
+												<a href={tituloProfesionalUrl} target="_blank" rel="noopener" class="text-[10px] text-primary-600 hover:underline">Ver archivo</a>
+												<p class="mt-1 text-[10px] italic text-amber-700 dark:text-amber-300">Pendiente de validación por encargado EC</p>
+											</dd>
+										</div>
+									{/if}
+								</dl>
+							</div>
+
 							<!-- Mensaje -->
 							<div>
 								<label for="pr-mensaje" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
