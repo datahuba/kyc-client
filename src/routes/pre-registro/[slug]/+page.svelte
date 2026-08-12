@@ -51,13 +51,25 @@
 	let carreraCodigo = $state('');
 	let descuentoPorcentaje = $state(''); // en %, se convierte a 0-1 al enviar
 
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD: campos adicionales requeridos por
+	// la reunión UAGRM 2026-08-11 (sección 4: presencial vs virtual).
+	// - procedencia: departamento de Bolivia (SCZ, LPZ, CBA, TJA, CHS, POT, BEN, ORU, PND).
+	//   Distinto de `departamento` que es texto libre: este es codigo oficial.
+	// - modalidad: presencial o virtual. Si el estudiante es de PROVINCIA
+	//   o elige VIRTUAL, debe subir la carta firmada por el director.
+	// - carta_firmada_url: URL/identificador del documento firmado. Validamos
+	//   que no este vacio cuando aplica la regla.
+	let procedencia = $state('');
+	let modalidad = $state<'' | 'presencial' | 'virtual'>('');
+	let cartaFirmadaUrl = $state('');
+
 	let fieldErrors = $state<Record<string, string>>({});
 
 	// Wizard state
 	const STEPS = [
 		{ id: 1, title: 'Identidad', subtitle: '¿Quién eres?', icon: UserIcon, fields: ['nombre', 'email', 'carnet', 'extension'] },
 		{ id: 2, title: 'Contacto', subtitle: '¿Cómo te ubicamos?', icon: IdentificationIcon, fields: ['celular', 'fechaNacimiento', 'sexo', 'domicilio'] },
-		{ id: 3, title: 'Datos EC', subtitle: 'Educación continua (opcional)', icon: IdentificationIcon, fields: ['registroUniversitario', 'avanceAcademicoCodigo', 'formularioDescuentoNumero', 'carreraCodigo', 'descuentoPorcentaje'] },
+		{ id: 3, title: 'Datos EC', subtitle: 'Educación continua (opcional)', icon: IdentificationIcon, fields: ['registroUniversitario', 'avanceAcademicoCodigo', 'formularioDescuentoNumero', 'carreraCodigo', 'descuentoPorcentaje', 'procedencia', 'modalidad', 'cartaFirmadaUrl'] },
 		{ id: 4, title: 'Confirmar', subtitle: 'Revisa y envía', icon: CircleCheckIcon, fields: ['mensaje'] }
 	] as const;
 	let currentStep = $state(1);
@@ -116,7 +128,7 @@
 	function saveAutosave() {
 		if (success) return;
 		try {
-			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, currentStep, savedAt: Date.now() };
+			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, procedencia, modalidad, cartaFirmadaUrl, currentStep, savedAt: Date.now() };
 			localStorage.setItem(autosaveKey(), JSON.stringify(data));
 			// indicador "guardado"
 			justSaved = true;
@@ -161,6 +173,9 @@
 			formularioDescuentoNumero = data.formularioDescuentoNumero || '';
 			carreraCodigo = data.carreraCodigo || '';
 			descuentoPorcentaje = data.descuentoPorcentaje || '';
+			procedencia = data.procedencia || '';
+			modalidad = data.modalidad || '';
+			cartaFirmadaUrl = data.cartaFirmadaUrl || '';
 			if (data.currentStep) {
 				currentStep = data.currentStep;
 				highestStepReached = data.currentStep;
@@ -176,25 +191,34 @@
 	}
 
 	// ---- Validation ----
+	// F-FIX-TRIM-NUMBER (2026-08-11): bug en consola "r(...).trim is not a function"
+	// cuando el usuario tipeaba en el input de descuentoPorcentaje. Causa raiz:
+	// bind:value en <input type="number"> coerce el state a `number | null`,
+	// y Number.prototype no tiene .trim(). Fix: usar String(v ?? '').trim() en
+	// TODOS los cases (defense in depth, no solo en el que falla).
 	function validateField(key: string): string | null {
-		const v = (() => {
+		const raw = (() => {
 			switch (key) {
-				case 'nombre': return nombre.trim();
-				case 'email': return email.trim();
-				case 'carnet': return carnet.trim();
-				case 'extension': return extension.trim();
-				case 'celular': return celular.trim();
-				case 'fechaNacimiento': return fechaNacimiento.trim();
-				case 'domicilio': return domicilio.trim();
-				case 'mensaje': return mensaje.trim();
-				case 'registroUniversitario': return registroUniversitario.trim();
-				case 'avanceAcademicoCodigo': return avanceAcademicoCodigo.trim();
-				case 'formularioDescuentoNumero': return formularioDescuentoNumero.trim();
-				case 'carreraCodigo': return carreraCodigo.trim();
-				case 'descuentoPorcentaje': return descuentoPorcentaje.trim();
+				case 'nombre': return nombre;
+				case 'email': return email;
+				case 'carnet': return carnet;
+				case 'extension': return extension;
+				case 'celular': return celular;
+				case 'fechaNacimiento': return fechaNacimiento;
+				case 'domicilio': return domicilio;
+				case 'mensaje': return mensaje;
+				case 'registroUniversitario': return registroUniversitario;
+				case 'avanceAcademicoCodigo': return avanceAcademicoCodigo;
+				case 'formularioDescuentoNumero': return formularioDescuentoNumero;
+				case 'carreraCodigo': return carreraCodigo;
+				case 'descuentoPorcentaje': return descuentoPorcentaje;
+				case 'procedencia': return procedencia;
+				case 'modalidad': return modalidad;
+				case 'cartaFirmadaUrl': return cartaFirmadaUrl;
 				default: return '';
 			}
 		})();
+		const v = String(raw ?? '').trim();
 
 		if (key === 'nombre') {
 			if (v.length < 3) return 'Ingresa tu nombre completo (mínimo 3 caracteres).';
@@ -225,6 +249,16 @@
 			const n = Number(v);
 			if (Number.isNaN(n) || n < 0 || n > 100) {
 				return 'Debe ser un número entre 0 y 100 (porcentaje).';
+			}
+		}
+		// F-2026-08-11-CAMPOS-EC-MODALIDAD: la carta firmada es OBLIGATORIA
+		// si el estudiante es de PROVINCIA (procedencia != SCZ) o si eligió
+		// modalidad virtual. Decision reunion UAGRM 2026-08-11.
+		if (key === 'cartaFirmadaUrl' && !v) {
+			const prov = String(procedencia ?? '').trim().toUpperCase();
+			const mod = String(modalidad ?? '').trim();
+			if (mod === 'virtual' || (prov && prov !== 'SCZ')) {
+				return 'La carta firmada por el director es obligatoria para estudiantes de provincia o modalidad virtual.';
 			}
 		}
 		return null;
@@ -305,11 +339,15 @@
 				domicilio: domicilio.trim() || undefined,
 				mensaje: mensaje.trim() || undefined,
 				// F-2026-08-11-CAMPOS-EC: solo enviar si tienen contenido
-				registro_universitario: registroUniversitario.trim() || undefined,
-				avance_academico_codigo: avanceAcademicoCodigo.trim() ? Number(avanceAcademicoCodigo.trim()) : undefined,
-				formulario_descuento_numero: formularioDescuentoNumero.trim() ? Number(formularioDescuentoNumero.trim()) : undefined,
-				carrera_codigo: carreraCodigo.trim() || undefined,
-				descuento_porcentaje: descuentoPorcentaje.trim() ? Number(descuentoPorcentaje.trim()) / 100 : undefined
+				registro_universitario: String(registroUniversitario ?? '').trim() || undefined,
+				avance_academico_codigo: String(avanceAcademicoCodigo ?? '').trim() ? Number(String(avanceAcademicoCodigo ?? '').trim()) : undefined,
+				formulario_descuento_numero: String(formularioDescuentoNumero ?? '').trim() ? Number(String(formularioDescuentoNumero ?? '').trim()) : undefined,
+				carrera_codigo: String(carreraCodigo ?? '').trim() || undefined,
+				descuento_porcentaje: String(descuentoPorcentaje ?? '').trim() ? Number(String(descuentoPorcentaje ?? '').trim()) / 100 : undefined,
+				// F-2026-08-11-CAMPOS-EC-MODALIDAD: procedencia/modalidad/carta
+				procedencia: String(procedencia ?? '').trim() || undefined,
+				modalidad: String(modalidad ?? '').trim() || undefined,
+				carta_firmada_url: String(cartaFirmadaUrl ?? '').trim() || undefined
 			});
 			// ISSUE-PRE-WIZARD-002: capturar el ID de submission para mostrar al usuario
 			submissionId = (result as any)?.id || (result as any)?._id || '';
@@ -853,13 +891,14 @@
 									<label for="pr-descuento" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
 										Descuento <span class="text-xs font-normal text-gray-400">(opcional, 0-100%)</span>
 									</label>
+									<!-- F-FIX-TRIM-NUMBER (2026-08-11): type="text" + inputmode="decimal"
+									     para que el state SIEMPRE sea string. type="number" coerce a
+									     number|null y rompia .trim() en validacion. UX equivalente
+									     en mobile (teclado numerico via inputmode). -->
 									<input
 										id="pr-descuento"
-										type="number"
+										type="text"
 										inputmode="decimal"
-										step="0.01"
-										min="0"
-										max="100"
 										bind:value={descuentoPorcentaje}
 										oninput={() => { clearError('descuentoPorcentaje'); saveAutosave(); }}
 										class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
@@ -875,6 +914,91 @@
 										<p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Aplica a módulos, no a matrícula</p>
 									{/if}
 								</div>
+							</div>
+
+							<!-- F-2026-08-11-CAMPOS-EC-MODALIDAD (reunion UAGRM 2026-08-11):
+							     Procedencia + Modalidad + Carta firmada por el director.
+							     Si el estudiante es de PROVINCIA (procedencia != SCZ) o elige
+							     modalidad VIRTUAL, debe subir carta firmada (decision reunion). -->
+
+							<!-- Procedencia (codigo departamento Bolivia) + Modalidad (presencial/virtual) -->
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								<div>
+									<label for="pr-procedencia" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Procedencia <span class="text-xs font-normal text-gray-400">(opcional)</span>
+									</label>
+									<select
+										id="pr-procedencia"
+										bind:value={procedencia}
+										onchange={() => { clearError('procedencia'); clearError('cartaFirmadaUrl'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
+											{fieldErrors.procedencia ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
+										disabled={isExpired}
+									>
+										<option value="">— Selecciona tu departamento —</option>
+										<option value="SCZ">Santa Cruz (SCZ)</option>
+										<option value="LPZ">La Paz (LPZ)</option>
+										<option value="CBA">Cochabamba (CBA)</option>
+										<option value="TJA">Tarija (TJA)</option>
+										<option value="CHS">Chuquisaca (CHS)</option>
+										<option value="POT">Potosí (POT)</option>
+										<option value="ORU">Oruro (ORU)</option>
+										<option value="BEN">Beni (BEN)</option>
+										<option value="PND">Pando (PND)</option>
+									</select>
+									<p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Si no eres de Santa Cruz, se requerirá carta firmada</p>
+								</div>
+								<div>
+									<label for="pr-modalidad" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Modalidad <span class="text-xs font-normal text-gray-400">(opcional)</span>
+									</label>
+									<select
+										id="pr-modalidad"
+										bind:value={modalidad}
+										onchange={() => { clearError('modalidad'); clearError('cartaFirmadaUrl'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
+											{fieldErrors.modalidad ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
+										disabled={isExpired}
+									>
+										<option value="">— Selecciona —</option>
+										<option value="presencial">Presencial</option>
+										<option value="virtual">Virtual</option>
+									</select>
+									<p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Si elegís virtual, se requerirá carta firmada</p>
+								</div>
+							</div>
+
+							<!-- Carta firmada por el director (URL o identificador del documento) -->
+							<div>
+								<label for="pr-carta" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+									Carta firmada por el director
+									{#if procedencia && procedencia !== 'SCZ'}
+										<span class="text-red-500">*</span>
+									{:else if modalidad === 'virtual'}
+										<span class="text-red-500">*</span>
+									{:else}
+										<span class="text-xs font-normal text-gray-400">(opcional)</span>
+									{/if}
+								</label>
+								<input
+									id="pr-carta"
+									type="url"
+									bind:value={cartaFirmadaUrl}
+									oninput={() => { clearError('cartaFirmadaUrl'); saveAutosave(); }}
+									class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
+										{fieldErrors.cartaFirmadaUrl ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
+									placeholder="https://drive.google.com/file/d/... o enlace del documento firmado"
+									disabled={isExpired}
+									aria-invalid={!!fieldErrors.cartaFirmadaUrl}
+									aria-describedby={fieldErrors.cartaFirmadaUrl ? 'pr-carta-error' : 'pr-carta-help'}
+								/>
+								{#if fieldErrors.cartaFirmadaUrl}
+									<p id="pr-carta-error" class="mt-1 text-xs font-medium text-red-600">{fieldErrors.cartaFirmadaUrl}</p>
+								{:else}
+									<p id="pr-carta-help" class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+										Requerida si sos de provincia o elegiste modalidad virtual. Subí el documento a Google Drive / OneDrive / Dropbox y pegá el enlace acá.
+									</p>
+								{/if}
 							</div>
 						</div>
 						{/if}
@@ -920,7 +1044,7 @@
 							</div>
 
 							<!-- F-2026-08-11-CAMPOS-EC: resumen de datos EC (solo si alguno está lleno) -->
-							{#if registroUniversitario || avanceAcademicoCodigo || formularioDescuentoNumero || carreraCodigo || descuentoPorcentaje}
+							{#if registroUniversitario || avanceAcademicoCodigo || formularioDescuentoNumero || carreraCodigo || descuentoPorcentaje || procedencia || modalidad || cartaFirmadaUrl}
 								<div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-900/50 dark:bg-indigo-900/10">
 									<h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
 										<IdentificationIcon class="size-4" />
@@ -955,6 +1079,24 @@
 											<div class="flex justify-between gap-3">
 												<dt class="text-gray-500 dark:text-gray-400">Descuento</dt>
 												<dd class="font-semibold text-gray-900 dark:text-white text-right">{descuentoPorcentaje}%</dd>
+											</div>
+										{/if}
+										{#if procedencia}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Procedencia</dt>
+												<dd class="font-mono text-gray-900 dark:text-white text-right">{procedencia}</dd>
+											</div>
+										{/if}
+										{#if modalidad}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Modalidad</dt>
+												<dd class="font-semibold text-gray-900 dark:text-white text-right capitalize">{modalidad}</dd>
+											</div>
+										{/if}
+										{#if cartaFirmadaUrl}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Carta firmada</dt>
+												<dd class="font-mono text-xs text-gray-900 dark:text-white text-right break-all max-w-[60%]">{cartaFirmadaUrl}</dd>
 											</div>
 										{/if}
 									</dl>

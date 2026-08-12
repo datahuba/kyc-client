@@ -97,6 +97,14 @@ export interface PreRegistrationSubmit {
 	formulario_descuento_numero?: number;
 	carrera_codigo?: string;
 	descuento_porcentaje?: number; // 0.0 - 1.0
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD (reunion UAGRM 2026-08-11, seccion 4):
+	// procedencia (codigo departamento Bolivia) + modalidad (presencial/virtual)
+	// + carta_firmada_url (URL del PDF firmado por el director). El backend
+	// rechaza la submission si modalidad='virtual' o procedencia != 'SCZ' y
+	// carta_firmada_url esta vacia (regla de la reunion).
+	procedencia?: 'SCZ' | 'LPZ' | 'CBA' | 'TJA' | 'CHS' | 'POT' | 'ORU' | 'BEN' | 'PND';
+	modalidad?: 'presencial' | 'virtual';
+	carta_firmada_url?: string;
 }
 
 export interface PreRegistrationCounters {
