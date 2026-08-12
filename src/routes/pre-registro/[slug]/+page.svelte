@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
-	import { getPublicForm, submitPublicForm, uploadCartaFirmada } from '$lib/services/pre-registration.service';
+	import { getPublicForm, submitPublicForm, uploadCartaFirmada, uploadResolucion } from '$lib/services/pre-registration.service';
 	import type { PreRegistrationForm } from '$lib/services/pre-registration.service';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 	import { ExclamationCircleIcon } from '$lib/icons/solid';
@@ -70,13 +70,20 @@
 	let cartaFirmadaSubiendo = $state(false);
 	let cartaFirmadaError = $state('');
 
+	// F-2026-08-11-CAMPOS-EC-RESOLUCION (Kevin 22:37): resolucion del programa
+	// OPCIONAL. Misma mecanica de file upload que la carta firmada.
+	let resolucionUrl = $state('');
+	let resolucionNombre = $state('');
+	let resolucionSubiendo = $state(false);
+	let resolucionError = $state('');
+
 	let fieldErrors = $state<Record<string, string>>({});
 
 	// Wizard state
 	const STEPS = [
 		{ id: 1, title: 'Identidad', subtitle: '¿Quién eres?', icon: UserIcon, fields: ['nombre', 'email', 'carnet', 'extension'] },
 		{ id: 2, title: 'Contacto', subtitle: '¿Cómo te ubicamos?', icon: IdentificationIcon, fields: ['celular', 'fechaNacimiento', 'sexo', 'domicilio'] },
-		{ id: 3, title: 'Datos EC', subtitle: 'Educación continua (opcional)', icon: IdentificationIcon, fields: ['registroUniversitario', 'avanceAcademicoCodigo', 'formularioDescuentoNumero', 'carreraCodigo', 'descuentoPorcentaje', 'procedencia', 'modalidad', 'cartaFirmadaUrl'] },
+		{ id: 3, title: 'Datos EC', subtitle: 'Educación continua (opcional)', icon: IdentificationIcon, fields: ['registroUniversitario', 'avanceAcademicoCodigo', 'formularioDescuentoNumero', 'carreraCodigo', 'descuentoPorcentaje', 'procedencia', 'modalidad', 'cartaFirmadaUrl', 'resolucionUrl'] },
 		{ id: 4, title: 'Confirmar', subtitle: 'Revisa y envía', icon: CircleCheckIcon, fields: ['mensaje'] }
 	] as const;
 	let currentStep = $state(1);
@@ -135,7 +142,7 @@
 	function saveAutosave() {
 		if (success) return;
 		try {
-			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, procedencia, modalidad, cartaFirmadaUrl, cartaFirmadaNombre, currentStep, savedAt: Date.now() };
+			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, procedencia, modalidad, cartaFirmadaUrl, cartaFirmadaNombre, resolucionUrl, resolucionNombre, currentStep, savedAt: Date.now() };
 			localStorage.setItem(autosaveKey(), JSON.stringify(data));
 			// indicador "guardado"
 			justSaved = true;
@@ -184,6 +191,8 @@
 			modalidad = data.modalidad || '';
 			cartaFirmadaUrl = data.cartaFirmadaUrl || '';
 			cartaFirmadaNombre = data.cartaFirmadaNombre || '';
+			resolucionUrl = data.resolucionUrl || '';
+			resolucionNombre = data.resolucionNombre || '';
 			if (data.currentStep) {
 				currentStep = data.currentStep;
 				highestStepReached = data.currentStep;
@@ -223,6 +232,7 @@
 				case 'procedencia': return procedencia;
 				case 'modalidad': return modalidad;
 				case 'cartaFirmadaUrl': return cartaFirmadaUrl;
+				case 'resolucionUrl': return resolucionUrl;
 				default: return '';
 			}
 		})();
@@ -353,9 +363,12 @@
 				carrera_codigo: String(carreraCodigo ?? '').trim() || undefined,
 				descuento_porcentaje: String(descuentoPorcentaje ?? '').trim() ? Number(String(descuentoPorcentaje ?? '').trim()) / 100 : undefined,
 				// F-2026-08-11-CAMPOS-EC-MODALIDAD: procedencia/modalidad/carta
-				procedencia: String(procedencia ?? '').trim() || undefined,
-				modalidad: String(modalidad ?? '').trim() || undefined,
-				carta_firmada_url: String(cartaFirmadaUrl ?? '').trim() || undefined
+				// Cast al tipo literal porque String() devuelve string generica, no la union.
+				procedencia: (String(procedencia ?? '').trim() || undefined) as 'SCZ' | 'LPZ' | 'CBA' | 'TJA' | 'CHS' | 'POT' | 'ORU' | 'BEN' | 'PND' | undefined,
+				modalidad: (String(modalidad ?? '').trim() || undefined) as 'presencial' | 'virtual' | undefined,
+				carta_firmada_url: String(cartaFirmadaUrl ?? '').trim() || undefined,
+				// F-2026-08-11-CAMPOS-EC-RESOLUCION: resolucion del programa (opcional)
+				resolucion_url: String(resolucionUrl ?? '').trim() || undefined
 			});
 			// ISSUE-PRE-WIZARD-002: capturar el ID de submission para mostrar al usuario
 			submissionId = (result as any)?.id || (result as any)?._id || '';
@@ -439,6 +452,51 @@
 		cartaFirmadaNombre = '';
 		cartaFirmadaError = '';
 		clearError('cartaFirmadaUrl');
+		saveAutosave();
+	}
+
+	// F-2026-08-11-CAMPOS-EC-RESOLUCION: handlers para la resolucion (mismo
+	// patron que handleCartaSelected pero con uploadResolucion y state vars
+	// propios). OPCIONAL: no hay validacion obligatoria, solo subida libre.
+	async function handleResolucionSelected(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		const MAX_SIZE = 20 * 1024 * 1024;
+		if (file.size > MAX_SIZE) {
+			resolucionError = 'El archivo es demasiado grande (maximo 20MB).';
+			input.value = '';
+			return;
+		}
+		const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+		if (!allowed.includes(file.type)) {
+			resolucionError = 'Tipo de archivo no permitido. Usa PDF, JPG o PNG.';
+			input.value = '';
+			return;
+		}
+
+		resolucionError = '';
+		resolucionSubiendo = true;
+		try {
+			const result = await uploadResolucion(slug || '', file);
+			resolucionUrl = result.url;
+			resolucionNombre = file.name;
+			saveAutosave();
+		} catch (e: any) {
+			resolucionError = e?.message || 'No se pudo subir el archivo. Intentalo de nuevo.';
+			resolucionUrl = '';
+			resolucionNombre = '';
+		} finally {
+			resolucionSubiendo = false;
+			input.value = '';
+		}
+	}
+
+	function removeResolucion() {
+		resolucionUrl = '';
+		resolucionNombre = '';
+		resolucionError = '';
 		saveAutosave();
 	}
 </script>
@@ -1111,6 +1169,73 @@
 									</p>
 								{/if}
 							</div>
+
+							<!-- F-2026-08-11-CAMPOS-EC-RESOLUCION (Kevin 22:37): resolucion del programa
+							     OPCIONAL. Misma UI que la carta firmada pero sin asterisco rojo (no es obligatoria). -->
+							<div class="mt-4">
+								<label for="pr-resolucion" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+									Resolución del programa <span class="text-xs font-normal text-gray-400">(opcional)</span>
+								</label>
+
+								{#if resolucionUrl}
+									<div class="flex items-center gap-3 rounded-xl border-2 border-green-300 bg-green-50/50 p-3 dark:border-green-800/60 dark:bg-green-900/20">
+										<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/40">
+											<CheckIcon class="size-5 text-green-600 dark:text-green-400" />
+										</div>
+										<div class="min-w-0 flex-1">
+											<p class="truncate text-sm font-semibold text-gray-900 dark:text-white">{resolucionNombre || 'Resolucion.pdf'}</p>
+											<p class="text-xs text-gray-500 dark:text-gray-400 truncate">{resolucionUrl}</p>
+										</div>
+										<button
+											type="button"
+											onclick={removeResolucion}
+											disabled={isExpired}
+											class="shrink-0 rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 active:scale-95 dark:hover:bg-red-900/30"
+											aria-label="Quitar resolucion"
+										>
+											<svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+								{:else}
+									<label
+										class="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed bg-white dark:bg-dark-surface py-3 px-3 text-base transition-all
+											{resolucionError ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border hover:border-primary-500 hover:bg-primary-50/30 dark:hover:bg-primary-900/10'}
+											{isExpired ? 'cursor-not-allowed opacity-60' : ''}"
+									>
+										<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-100 dark:bg-primary-900/40">
+											{#if resolucionSubiendo}
+												<div class="h-5 w-5 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600"></div>
+											{:else}
+												<svg class="size-5 text-primary-600 dark:text-primary-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+												</svg>
+											{/if}
+										</div>
+										<div class="min-w-0 flex-1">
+											<p class="text-sm font-semibold text-gray-900 dark:text-white">
+												{resolucionSubiendo ? 'Subiendo...' : 'Subir resolucion (PDF, JPG, PNG)'}
+											</p>
+											<p class="text-xs text-gray-500 dark:text-gray-400">
+												{resolucionSubiendo ? 'Por favor espera unos segundos' : 'Opcional — si ya tenes la resolucion, subila aca (max 20MB)'}
+											</p>
+										</div>
+										<input
+											id="pr-resolucion"
+											type="file"
+											accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+											onchange={handleResolucionSelected}
+											disabled={isExpired || resolucionSubiendo}
+											class="sr-only"
+										/>
+									</label>
+								{/if}
+
+								{#if resolucionError}
+									<p class="mt-1 text-xs font-medium text-red-600">{resolucionError}</p>
+								{/if}
+							</div>
 						</div>
 						{/if}
 
@@ -1155,7 +1280,7 @@
 							</div>
 
 							<!-- F-2026-08-11-CAMPOS-EC: resumen de datos EC (solo si alguno está lleno) -->
-							{#if registroUniversitario || avanceAcademicoCodigo || formularioDescuentoNumero || carreraCodigo || descuentoPorcentaje || procedencia || modalidad || cartaFirmadaUrl}
+							{#if registroUniversitario || avanceAcademicoCodigo || formularioDescuentoNumero || carreraCodigo || descuentoPorcentaje || procedencia || modalidad || cartaFirmadaUrl || resolucionUrl}
 								<div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-900/50 dark:bg-indigo-900/10">
 									<h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
 										<IdentificationIcon class="size-4" />
@@ -1208,6 +1333,12 @@
 											<div class="flex justify-between gap-3">
 												<dt class="text-gray-500 dark:text-gray-400">Carta firmada</dt>
 												<dd class="font-mono text-xs text-gray-900 dark:text-white text-right break-all max-w-[60%]">{cartaFirmadaUrl}</dd>
+											</div>
+										{/if}
+										{#if resolucionUrl}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Resolución</dt>
+												<dd class="font-mono text-xs text-gray-900 dark:text-white text-right break-all max-w-[60%]">{resolucionUrl}</dd>
 											</div>
 										{/if}
 									</dl>

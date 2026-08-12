@@ -103,6 +103,12 @@
 	let formToDelete: PreRegistrationForm | null = $state(null);
 	let deleteSaving = $state(false);
 
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD-VIEW (Kevin 22:37): modal de detalle
+	// de submission para que el encargado pueda ver TODOS los datos (incluida
+	// la carta firmada y la resolucion, que son links a Cloudinary).
+	let showDetailModal = $state(false);
+	let detailSubmission: PreRegistration | null = $state(null);
+
 	// ISSUE-AUDIT-PRE-REGISTROS: fix race condition. El +page.svelte se monta
 	// ANTES de que el +layout.svelte termine de llamar a userStore.init(),
 	// entonces `isAdmin` es false (initial state del store) y redirigimos
@@ -455,6 +461,21 @@
 	function estadoBadgeFor(estado: string) {
 		return submissionStatusBadge(estado);
 	}
+
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD-VIEW (Kevin 22:37): abre el modal de
+	// detalle de una submission para que el encargado pueda ver la carta
+	// firmada (link a Cloudinary) y la resolucion (si subio el estudiante).
+	function openDetailModal(sub: PreRegistration) {
+		detailSubmission = sub;
+		showDetailModal = true;
+	}
+
+	// Helper: detecta si una URL Cloudinary es una imagen (jpg/png) o un PDF
+	// para mostrar el icono correcto en el modal de detalle.
+	function isCloudinaryImage(url: string | null | undefined): boolean {
+		if (!url) return false;
+		return /\.(jpg|jpeg|png|webp)(\?|$|#)/i.test(url);
+	}
 </script>
 
 <div class="space-y-6">
@@ -798,6 +819,8 @@
 							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estudiante</th>
 							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Carnet</th>
 							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Formulario</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">EC</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Docs</th>
 							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
 							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
 							<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
@@ -820,6 +843,41 @@
 									{#if sub.programa_nombre}
 										<div class="text-xs text-gray-500 dark:text-gray-400">{sub.programa_nombre}</div>
 									{/if}
+								</td>
+								<td class="px-4 py-3 text-xs">
+									<!-- F-2026-08-11-CAMPOS-EC-MODALIDAD-VIEW: badges de procedencia/modalidad -->
+									<div class="flex flex-wrap gap-1">
+										{#if sub.data.procedencia}
+											<span class="inline-flex items-center rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300" title="Procedencia: {sub.data.procedencia}">
+												{sub.data.procedencia}
+											</span>
+										{/if}
+										{#if sub.data.modalidad}
+											<span class="inline-flex items-center rounded bg-purple-100 dark:bg-purple-900/30 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300" title="Modalidad: {sub.data.modalidad}">
+												{sub.data.modalidad}
+											</span>
+										{/if}
+									</div>
+								</td>
+								<td class="px-4 py-3 text-xs">
+									<!-- F-2026-08-11-CAMPOS-EC-MODALIDAD-VIEW: badges carta/resol + Ver detalle -->
+									<div class="flex flex-wrap gap-1">
+										{#if sub.data.carta_firmada_url}
+											<a href={sub.data.carta_firmada_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50" title="Ver carta firmada">
+												<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+												Carta
+											</a>
+										{/if}
+										{#if sub.data.resolucion_url}
+											<a href={sub.data.resolucion_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 rounded bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/50" title="Ver resolucion del programa">
+												<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+												Resol
+											</a>
+										{/if}
+										<button type="button" onclick={() => openDetailModal(sub)} class="inline-flex items-center gap-1 rounded bg-gray-100 dark:bg-dark-border px-1.5 py-0.5 text-[10px] font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-dark-border/70" title="Ver todos los datos">
+											Ver detalle
+										</button>
+									</div>
 								</td>
 								<td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
 									{fmtDate(sub.created_at)}
@@ -1042,3 +1100,147 @@
 	onCancel={() => { showDeleteFormModal = false; formToDelete = null; }}
 	loading={deleteSaving}
 />
+
+<!-- F-2026-08-11-CAMPOS-EC-MODALIDAD-VIEW (Kevin 22:37): modal de detalle
+     con TODOS los datos de la submission (identidad, contacto, EC, docs).
+     El encargado abre esto para confirmar antes de aprobar: ve la carta
+     firmada, la resolucion, procedencia, modalidad, etc. -->
+{#if detailSubmission}
+	{@const d = detailSubmission.data || {}}
+	<Modal
+		isOpen={showDetailModal}
+		title={`Detalle: ${d.nombre || 'Pre-inscripción'}`}
+		onClose={() => { showDetailModal = false; detailSubmission = null; }}
+	>
+		<div class="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+			<!-- Estado + Formulario -->
+			<div class="flex flex-wrap items-center gap-2">
+				<span class={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${estadoBadgeFor(detailSubmission.estado)}`}>
+					{detailSubmission.estado}
+				</span>
+				{#if detailSubmission.form_nombre}
+					<span class="text-xs text-gray-500 dark:text-gray-400">
+						Formulario: <strong>{detailSubmission.form_nombre}</strong>
+					</span>
+				{/if}
+				{#if detailSubmission.programa_nombre}
+					<span class="text-xs text-gray-500 dark:text-gray-400">
+						Programa: <strong>{detailSubmission.programa_nombre}</strong>
+					</span>
+				{/if}
+				<span class="text-xs text-gray-500 dark:text-gray-400">
+					Enviado: {fmtDate(detailSubmission.created_at)}
+				</span>
+			</div>
+
+			<!-- Identidad -->
+			<div class="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface p-4">
+				<h3 class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Identidad</h3>
+				<dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
+					<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Nombre</dt><dd class="font-semibold text-right text-gray-900 dark:text-white">{d.nombre || '—'}</dd></div>
+					<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Email</dt><dd class="font-mono text-xs text-right text-gray-900 dark:text-white break-all">{d.email || '—'}</dd></div>
+					<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">CI</dt><dd class="font-mono text-right text-gray-900 dark:text-white">{d.carnet}{d.extension ? ` · ${d.extension}` : ''}</dd></div>
+					<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Celular</dt><dd class="font-mono text-right text-gray-900 dark:text-white">{d.celular || '—'}</dd></div>
+					<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Nacimiento</dt><dd class="text-right text-gray-900 dark:text-white">{d.fecha_nacimiento || '—'}</dd></div>
+					<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Sexo</dt><dd class="text-right text-gray-900 dark:text-white capitalize">{d.sexo || '—'}</dd></div>
+					<div class="flex justify-between gap-2 sm:col-span-2"><dt class="text-gray-500 dark:text-gray-400">Domicilio</dt><dd class="text-right text-gray-900 dark:text-white max-w-[60%]">{d.domicilio || '—'}</dd></div>
+				</dl>
+			</div>
+
+			<!-- Datos EC (solo si hay al menos uno) -->
+			{#if d.procedencia || d.modalidad || d.carta_firmada_url || d.resolucion_url || d.registro_universitario || d.avance_academico_codigo || d.formulario_descuento_numero || d.carrera_codigo || d.descuento_porcentaje}
+				<div class="rounded-xl border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-900/10 p-4">
+					<h3 class="mb-2 text-xs font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Datos de educación continua</h3>
+					<dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
+						<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Procedencia</dt><dd class="font-mono text-right text-gray-900 dark:text-white">{d.procedencia || '—'}</dd></div>
+						<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Modalidad</dt><dd class="text-right text-gray-900 dark:text-white capitalize">{d.modalidad || '—'}</dd></div>
+						<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Registro Univ.</dt><dd class="font-mono text-right text-gray-900 dark:text-white">{d.registro_universitario || '—'}</dd></div>
+						<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Avance académico</dt><dd class="font-mono text-right text-gray-900 dark:text-white">{d.avance_academico_codigo ?? '—'}</dd></div>
+						<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Nº Form. Descuento</dt><dd class="font-mono text-right text-gray-900 dark:text-white">{d.formulario_descuento_numero ?? '—'}</dd></div>
+						<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Carrera</dt><dd class="font-mono text-right text-gray-900 dark:text-white">{d.carrera_codigo || '—'}</dd></div>
+						<div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Descuento</dt><dd class="text-right text-gray-900 dark:text-white">{d.descuento_porcentaje != null ? `${(d.descuento_porcentaje * 100).toFixed(0)}%` : '—'}</dd></div>
+					</dl>
+				</div>
+			{/if}
+
+			<!-- Documentos (carta firmada + resolucion) -->
+			<div class="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface p-4">
+				<h3 class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Documentos</h3>
+				<dl class="space-y-2 text-sm">
+					<div class="flex items-center justify-between gap-3">
+						<dt class="text-gray-500 dark:text-gray-400 shrink-0">Carta firmada</dt>
+						<dd class="text-right">
+							{#if d.carta_firmada_url}
+								{#if isCloudinaryImage(d.carta_firmada_url)}
+									<a href={d.carta_firmada_url} target="_blank" rel="noopener noreferrer" class="inline-block">
+										<img src={d.carta_firmada_url} alt="Carta firmada" class="max-h-32 max-w-[200px] rounded border border-gray-200 dark:border-dark-border hover:opacity-80" />
+									</a>
+								{:else}
+									<a href={d.carta_firmada_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded bg-amber-100 dark:bg-amber-900/30 px-2 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-200">
+										<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+										Abrir PDF
+									</a>
+								{/if}
+							{:else}
+								<span class="text-xs text-gray-400">No adjuntó carta firmada</span>
+							{/if}
+						</dd>
+					</div>
+					<div class="flex items-center justify-between gap-3">
+						<dt class="text-gray-500 dark:text-gray-400 shrink-0">Resolución del programa</dt>
+						<dd class="text-right">
+							{#if d.resolucion_url}
+								{#if isCloudinaryImage(d.resolucion_url)}
+									<a href={d.resolucion_url} target="_blank" rel="noopener noreferrer" class="inline-block">
+										<img src={d.resolucion_url} alt="Resolución del programa" class="max-h-32 max-w-[200px] rounded border border-gray-200 dark:border-dark-border hover:opacity-80" />
+									</a>
+								{:else}
+									<a href={d.resolucion_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200">
+										<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+										Abrir PDF
+									</a>
+								{/if}
+							{:else}
+								<span class="text-xs text-gray-400">No adjuntó resolución (opcional)</span>
+							{/if}
+						</dd>
+					</div>
+				</dl>
+			</div>
+
+			<!-- Mensaje del estudiante -->
+			{#if d.mensaje}
+				<div class="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface p-4">
+					<h3 class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Mensaje</h3>
+					<p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{d.mensaje}</p>
+				</div>
+			{/if}
+
+			<!-- Motivo de rechazo si fue rechazado -->
+			{#if detailSubmission.estado === 'rechazado' && detailSubmission.motivo_rechazo}
+				<div class="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/10 p-4">
+					<h3 class="mb-2 text-xs font-bold uppercase tracking-wide text-red-700 dark:text-red-300">Motivo de rechazo</h3>
+					<p class="text-sm text-red-700 dark:text-red-300">{detailSubmission.motivo_rechazo}</p>
+				</div>
+			{/if}
+
+			<!-- Acciones del modal (aprobar/rechazar si pendiente) -->
+			{#if detailSubmission.estado === 'pendiente'}
+				<div class="flex items-center justify-end gap-2 border-t border-gray-100 dark:border-dark-border pt-4">
+					<Button variant="destructive" onclick={() => {
+						const sub = detailSubmission;
+						if (sub) { showDetailModal = false; openRejectSubmission(sub); }
+					}}>
+						Rechazar
+					</Button>
+					<Button onclick={() => {
+						const sub = detailSubmission;
+						if (sub) { showDetailModal = false; handleApproveSubmission(sub); }
+					}}>
+						Aprobar
+					</Button>
+				</div>
+			{/if}
+		</div>
+	</Modal>
+{/if}

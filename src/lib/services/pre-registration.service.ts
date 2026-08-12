@@ -105,6 +105,9 @@ export interface PreRegistrationSubmit {
 	procedencia?: 'SCZ' | 'LPZ' | 'CBA' | 'TJA' | 'CHS' | 'POT' | 'ORU' | 'BEN' | 'PND';
 	modalidad?: 'presencial' | 'virtual';
 	carta_firmada_url?: string;
+	// F-2026-08-11-CAMPOS-EC-RESOLUCION (Kevin 22:37): OPCIONAL.
+	// URL de la resolucion del programa que el estudiante subio.
+	resolucion_url?: string;
 }
 
 export interface PreRegistrationCounters {
@@ -235,6 +238,19 @@ export async function uploadCartaFirmada(slug: string, file: File): Promise<Cart
 	// manejar errores con la misma logica que el resto del sistema.
 	return apiKyC.postFormData<CartaFirmadaUploadResult>(
 		`/pre-registrations/public/${encodeURIComponent(slug)}/upload-carta`,
+		form,
+		{ requireAuth: false }
+	);
+}
+
+// F-2026-08-11-CAMPOS-EC-RESOLUCION (Kevin 22:37): misma mecanica que la carta
+// firmada pero para la resolucion del programa. Es OPCIONAL: el estudiante
+// puede incluirla si ya la tiene a mano, o el admin la sube despues.
+export async function uploadResolucion(slug: string, file: File): Promise<CartaFirmadaUploadResult> {
+	const form = new FormData();
+	form.append('file', file);
+	return apiKyC.postFormData<CartaFirmadaUploadResult>(
+		`/pre-registrations/public/${encodeURIComponent(slug)}/upload-resolucion`,
 		form,
 		{ requireAuth: false }
 	);
