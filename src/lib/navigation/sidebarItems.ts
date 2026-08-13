@@ -107,7 +107,13 @@ const staffFinancialGroup: NavigationGroup = {
 	children: [
 		{ type: 'item', name: 'Cuentas por Cobrar', href: '/app/reports/cuentas-por-cobrar', icon: ChartBarIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador', 'encargado_curso'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Deudores', href: '/app/payments/deudores', icon: ExclamationIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'cpd', 'coordinador'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
+		// F-2026-08-22-EC-PAGOS-READONLY (Kevin 2026-08-22): encargado_curso y coordinador
+		// (financiero) ven Gestion de Pagos en modo SOLO LECTURA. Pueden ver y descargar
+		// los pagos de SUS cursos asignados (filtro automatico del backend via
+		// filtro_cursos_por_rol), pero NO pueden editar, crear, aprobar, rechazar,
+		// ni eliminar pagos. El guard `coordinador no-financiero` del Sidebar.svelte
+		// sigue ocultando esta entrada a coordinadores academico/investigacion.
+		{ type: 'item', name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Informes', href: '/app/informes', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd', 'coordinador'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Reportes de Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'coordinador'], loginTypes: ['admin'] },
 	]

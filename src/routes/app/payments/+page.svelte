@@ -149,7 +149,16 @@
 	let isStudent = $derived(($userStore.role as string) === 'student');
 	let isCPD = $derived($userStore.role === 'cpd');
 	let isCobranza = $derived($userStore.role === 'cobranza');
-	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae'].includes($userStore.role || ''));
+	// F-2026-08-22-EC-PAGOS-READONLY (Kevin 2026-08-22): encargado_curso y
+	// coordinador (financiero) ahora son isStaff (pueden ver Gestion de Pagos).
+	// Eso les da acceso al toggle Lista/Matriz/PorPago, a los filtros, y al
+	// boton "Excel" de descarga. PERO no pueden crear/editar/eliminar pagos
+	// (esos botones siguen restringidos por canEditPayments mas abajo).
+	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae', 'encargado_curso', 'coordinador'].includes($userStore.role || ''));
+	// F-2026-08-22-EC-PAGOS-READONLY: solo los roles ECONOMICOS pueden crear,
+	// aprobar, rechazar, eliminar, subir comprobante, revertir pagos. EC y
+	// COORDINADOR quedan en modo SOLO LECTURA (solo pueden ver y descargar).
+	let canEditPayments = $derived(['admin', 'superadmin', 'cpd', 'cobranza'].includes($userStore.role || ''));
 	let coursesMap = $derived(
 		coursesList.reduce((acc, c) => ({ ...acc, [c._id]: c }), {} as Record<string, typeof coursesList[0]>)
 	);
@@ -814,6 +823,17 @@
 					Vista segmentada: solo se muestran pagos de los {cursosAsignadosUsuario.length} programa(s) asignado(s) a tu cuenta.
 				</p>
 			{/if}
+			<!-- F-2026-08-22-EC-PAGOS-READONLY (Kevin 2026-08-22): banner para que
+			     EC y COORDINADOR (financiero) sepan que están en modo SOLO LECTURA.
+			     Pueden ver y descargar, pero no editar/crear/aprobar/rechazar/eliminar. -->
+			{#if ($userStore.role === 'encargado_curso' || $userStore.role === 'coordinador') && !canEditPayments}
+				<p class="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+					<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+					</svg>
+					Modo lectura: solo puedes ver y descargar los pagos de tus programas asignados.
+				</p>
+			{/if}
 		</div>
 		
 		<div class="flex flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
@@ -864,8 +884,10 @@
 				</Button>
 			{/if}
 			<!-- F-COBRANZA-017 (2026-07-22): cobranza/admin/superadmin registran
-			     pagos en nombre del estudiante cuando este no pudo subirlos. -->
-			{#if isStaff}
+			     pagos en nombre del estudiante cuando este no pudo subirlos.
+			     F-2026-08-22-EC-PAGOS-READONLY (Kevin 2026-08-22): EC y COORD
+			     quedan en modo SOLO LECTURA, no ven este boton. -->
+			{#if canEditPayments}
 				<Button onclick={() => isAddByStaffModalOpen = true} class="flex-1 sm:flex-none justify-center">
 					{#snippet leftIcon()} <PlusIcon class="size-5" /> {/snippet}
 					<span class="whitespace-nowrap">Añadir Pago</span>
