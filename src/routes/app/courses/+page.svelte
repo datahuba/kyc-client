@@ -340,16 +340,19 @@
 		// aparece para EC/COORDINADOR (canCargaInicial). Antes solo aparecia
 		// para CPD/ADMIN/SUPERADMIN (canEditCourse), lo que dejaba al EC
 		// sin acceso a la opcion aunque el backend lo permitiera.
-		// F-2026-08-12-EC-CARGA-INICIAL-ESTADO-ACTIVO (Kevin 2026-08-22 feedback):
+		// F-2026-08-22-EC-CARGA-INICIAL-ESTADOS-FIX (Kevin 2026-08-22):
 		// la opcion antes solo aparecia en estados terminales (en_ejecucion,
 		// cerrado, historico). Eso dejaba al EC sin la opcion justo en el
-		// caso mas comun: un programa activo recien creado que aun no comenzo
-		// (estado='activo'). Ahora la opcion aparece para TODOS los estados
-		// del programa (incluyendo 'activo' y 'planificado'), porque cargar
-		// estudiantes es valido en cualquier momento. El backend sigue
-		// validando 403 si el curso no es del EC, asi que es seguro.
+		// caso mas comun: un programa programado (recien creado, sin iniciar).
+		// La primera version del fix tenia typos: usaba 'activo' (que es un
+		// boolean, no un estado) y 'planificado' (typo, lo correcto es
+		// 'programado'). El enum EstadoPrograma tiene solo 3 valores:
+		// 'programado' | 'en_ejecucion' | 'cerrado'. Ahora la opcion aparece
+		// para cualquiera de los 3 estados reales (o si es historico). El
+		// backend sigue validando 403 si el curso no es del EC, asi que es
+		// seguro.
 		const estadoCalc = (course as any).estado_calculado || (course as any).estado;
-		if (canCargaInicial && ['activo', 'planificado', 'en_ejecucion', 'cerrado'].includes(estadoCalc) || (canCargaInicial && (course as any).es_historico)) {
+		if (canCargaInicial && ['programado', 'en_ejecucion', 'cerrado'].includes(estadoCalc) || (canCargaInicial && (course as any).es_historico)) {
 			options.push({
 				label: 'Carga Inicial de Estudiantes',
 				id: 'carga-inicial',
