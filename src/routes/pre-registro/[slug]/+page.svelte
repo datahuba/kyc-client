@@ -616,7 +616,7 @@
 	</div>
 
 	<div class="relative z-10 flex min-h-dvh flex-col items-center justify-start px-4 py-10 sm:px-6 sm:py-12">
-		<div class="w-full max-w-2xl">
+		<div class="w-full max-w-2xl lg:max-w-6xl">
 			<!-- Header -->
 			<div class="mb-6 flex flex-col items-center text-center">
 				<div class="mb-3 flex items-center gap-3 sm:gap-4">
@@ -722,9 +722,119 @@
 					</div>
 				{/if}
 
+				<!-- F-2026-08-12-WIZARD-SPLIT-SCREEN (Kevin 2026-08-22): wrapper
+				     grid para split-screen 2 columnas en desktop. Sidebar sticky
+				     a la izquierda con stepper vertical, form a la derecha. En
+				     mobile/tablet el grid se desactiva y todo va en una columna. -->
+				<div class="lg:grid lg:grid-cols-[280px_1fr] lg:gap-8 lg:items-start">
+					<!-- Sidebar desktop: stepper vertical + info programa -->
+					<aside class="hidden lg:block lg:sticky lg:top-8 self-start space-y-4">
+						{#if !isExpired}
+							<div class="rounded-2xl border border-gray-200/60 bg-white/95 p-5 shadow-lg shadow-primary-900/5 backdrop-blur-md dark:border-dark-border/60 dark:bg-dark-surface/95 dark:shadow-black/20">
+								<h2 class="mb-1 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+									Progreso
+								</h2>
+								<p class="mb-4 text-2xl font-extrabold text-primary-700 dark:text-dark-tertiary">
+									{progressPct}<span class="text-base">%</span>
+								</p>
+								<!-- Progress bar -->
+								<div class="mb-5 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-border">
+									<div
+										class="h-full rounded-full bg-gradient-to-r from-primary-500 to-primary-600 transition-all duration-500 ease-out"
+										style="width: {progressPct}%"
+									></div>
+								</div>
+								<!-- Stepper vertical -->
+								<ol class="space-y-1" aria-label="Pasos del formulario">
+									{#each STEPS as step, i}
+										{@const isActive = currentStep === step.id}
+										{@const isComplete = currentStep > step.id}
+										{@const isReachable = step.id <= highestStepReached}
+										{@const isLast = i === STEPS.length - 1}
+										<li>
+											<button
+												type="button"
+												onclick={() => goToStep(step.id)}
+												disabled={!isReachable}
+												class="group flex w-full items-start gap-3 rounded-lg p-2.5 text-left transition-all
+													{isActive ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
+													{!isReachable ? 'cursor-not-allowed opacity-60' : 'hover:bg-gray-50 dark:hover:bg-dark-surface/60'}
+													{isComplete ? 'cursor-pointer' : ''}"
+												aria-current={isActive ? 'step' : undefined}
+											>
+												<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all
+													{isComplete ? 'bg-primary-600 text-white' : ''}
+													{isActive ? 'bg-primary-600 text-white ring-4 ring-primary-200 dark:ring-primary-900/40' : ''}
+													{!isComplete && !isActive ? 'bg-gray-200 text-gray-500 dark:bg-dark-border dark:text-gray-400' : ''}">
+													{#if isComplete}
+														<CheckIcon class="size-4" />
+													{:else}
+														{step.id}
+													{/if}
+												</span>
+												<span class="min-w-0 flex-1 pt-0.5">
+													<span class="block text-sm font-semibold
+														{isActive ? 'text-primary-700 dark:text-dark-tertiary' : isComplete ? 'text-primary-600 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400'}">
+														{step.title}
+													</span>
+													<span class="mt-0.5 block text-[11px] text-gray-500 dark:text-gray-400">
+														{step.subtitle}
+													</span>
+												</span>
+											</button>
+											{#if !isLast}
+												<div class="ml-[1.4rem] my-0.5 h-3 w-0.5 rounded-full transition-all
+													{isComplete ? 'bg-primary-500' : 'bg-gray-200 dark:bg-dark-border'}"></div>
+											{/if}
+										</li>
+									{/each}
+								</ol>
+							</div>
+						{/if}
+						<!-- Info del programa (si hay) -->
+						{#if form}
+							<div class="rounded-2xl border border-primary-200/60 bg-primary-50/50 p-5 backdrop-blur-md dark:border-primary-900/30 dark:bg-primary-900/10">
+								<h3 class="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary-700 dark:text-dark-tertiary">
+									<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+									</svg>
+									Sobre este programa
+								</h3>
+								<dl class="space-y-2 text-xs text-gray-700 dark:text-gray-300">
+									{#if form.fecha_inicio || form.fecha_fin}
+										<div>
+											<dt class="font-semibold text-gray-500 dark:text-gray-400">Vigencia</dt>
+											<dd class="mt-0.5">
+												{#if form.fecha_inicio}
+													{new Date(form.fecha_inicio).toLocaleDateString('es-BO', { day: '2-digit', month: 'short' })}
+												{/if}
+												{#if form.fecha_inicio && form.fecha_fin}
+													—
+												{/if}
+												{#if form.fecha_fin}
+													{new Date(form.fecha_fin).toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' })}
+												{/if}
+											</dd>
+										</div>
+									{/if}
+									<div>
+										<dt class="font-semibold text-gray-500 dark:text-gray-400">Plazo de revisión</dt>
+										<dd class="mt-0.5">Aprox. 2-3 días hábiles</dd>
+									</div>
+								</dl>
+							</div>
+						{/if}
+					</aside>
+					<!-- Contenido principal: form (con stepper horizontal solo mobile) -->
+					<div class="min-w-0">
+
 				<!-- Wizard Stepper (ActivePill pattern) -->
+				<!-- F-2026-08-12-WIZARD-SPLIT-SCREEN (Kevin 2026-08-22): en desktop el
+				     stepper horizontal se oculta (lg:hidden) y se muestra un stepper
+				     vertical en una sidebar sticky a la izquierda. En mobile/tablet
+				     se mantiene el stepper horizontal (que es mas compacto). -->
 				{#if !isExpired}
-					<div class="mb-5">
+					<div class="mb-5 lg:hidden">
 						<ol class="flex items-center gap-2 sm:gap-3" aria-label="Pasos del formulario">
 							{#each STEPS as step, i}
 								{@const isActive = currentStep === step.id}
@@ -1689,6 +1799,8 @@
 				<p class="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
 					Sistema de Gestión Académica y Financiera · © {new Date().getFullYear()} Unidad de Postgrado · UAGRM
 				</p>
+					</div><!-- /min-w-0 (columna derecha del split-screen desktop) -->
+				</div><!-- /lg:grid lg:grid-cols-[280px_1fr] (F-2026-08-12-WIZARD-SPLIT-SCREEN) -->
 			{/if}
 		</div>
 	</div>

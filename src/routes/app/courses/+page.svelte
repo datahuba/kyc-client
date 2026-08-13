@@ -340,8 +340,16 @@
 		// aparece para EC/COORDINADOR (canCargaInicial). Antes solo aparecia
 		// para CPD/ADMIN/SUPERADMIN (canEditCourse), lo que dejaba al EC
 		// sin acceso a la opcion aunque el backend lo permitiera.
+		// F-2026-08-12-EC-CARGA-INICIAL-ESTADO-ACTIVO (Kevin 2026-08-22 feedback):
+		// la opcion antes solo aparecia en estados terminales (en_ejecucion,
+		// cerrado, historico). Eso dejaba al EC sin la opcion justo en el
+		// caso mas comun: un programa activo recien creado que aun no comenzo
+		// (estado='activo'). Ahora la opcion aparece para TODOS los estados
+		// del programa (incluyendo 'activo' y 'planificado'), porque cargar
+		// estudiantes es valido en cualquier momento. El backend sigue
+		// validando 403 si el curso no es del EC, asi que es seguro.
 		const estadoCalc = (course as any).estado_calculado || (course as any).estado;
-		if (canCargaInicial && (estadoCalc === 'en_ejecucion' || estadoCalc === 'cerrado' || (course as any).es_historico)) {
+		if (canCargaInicial && ['activo', 'planificado', 'en_ejecucion', 'cerrado'].includes(estadoCalc) || (canCargaInicial && (course as any).es_historico)) {
 			options.push({
 				label: 'Carga Inicial de Estudiantes',
 				id: 'carga-inicial',
