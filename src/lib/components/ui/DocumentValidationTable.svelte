@@ -137,8 +137,9 @@
 	let todasColumnas = $derived.by<Array<{ key: string; label: string; emoji?: string }>>(() => {
 		const reqKeysSet = new Set<string>();
 		for (const e of enrollments) {
-			for (let i = 0; i < (e.requisitos || []).length; i++) {
-				reqKeysSet.add(`req:${i}:${e.requisitos[i].descripcion}`);
+			const requisitos = e.requisitos || [];
+			for (let i = 0; i < requisitos.length; i++) {
+				reqKeysSet.add(`req:${i}:${requisitos[i].descripcion}`);
 			}
 		}
 		const reqList = Array.from(reqKeysSet)
@@ -169,8 +170,9 @@
 				? getEstadoDoc('aprobado')
 				: getEstadoDoc('no_subido');
 			// Requisitos (1 celda por índice, todos los cursos comparten el mismo índice)
-			for (let i = 0; i < (enr.requisitos || []).length; i++) {
-				const req = enr.requisitos[i];
+			const enrRequisitos = enr.requisitos || [];
+			for (let i = 0; i < enrRequisitos.length; i++) {
+				const req = enrRequisitos[i];
 				celdas[`req:${i}`] = getEstadoDoc(req.estado);
 			}
 

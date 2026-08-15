@@ -18,10 +18,11 @@
 	export let loading = false;
 
 	type EstadoPrograma = 'programado' | 'en_ejecucion' | 'cerrado';
+	type CursoItems = MyCoursesResumen['items'];
 
 	$: grupos = (() => {
-		if (!data) return { en_ejecucion: [], programado: [], cerrado: [] } as Record<EstadoPrograma, typeof data.items>;
-		const g: Record<EstadoPrograma, typeof data.items> = {
+		if (!data) return { en_ejecucion: [], programado: [], cerrado: [] } as Record<EstadoPrograma, CursoItems>;
+		const g: Record<EstadoPrograma, CursoItems> = {
 			en_ejecucion: [],
 			programado: [],
 			cerrado: []

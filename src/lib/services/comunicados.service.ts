@@ -137,6 +137,6 @@ export const comunicadosService = {
 	},
 
 	async marcarVisto(id: string): Promise<{ ok: boolean; comunicado_id: string; visto_en: string }> {
-		return await apiKyC.post(`/comunicados/${id}/mark-as-seen`);
+		return await apiKyC.post(`/comunicados/${id}/mark-as-seen`, undefined);
 	},
 };

@@ -51,6 +51,10 @@ export interface Course {
 
 	// F-080: PDF de la resolución que respalda el programa (opcional).
 	resolucion_pdf_url?: string | null;
+
+	// F-080: estado calculado por fechas (no persistido, lo agrega el backend
+	// en cada response). Ver schemas/course.py:CourseResponse.estado_calculado.
+	estado_calculado?: 'programado' | 'en_ejecucion' | 'cerrado';
 }
 
 export interface CreateCourseRequest {
