@@ -20,6 +20,7 @@
 	// Importación de Componentes Modulares
 	import StudentFilters from './StudentFilters.svelte';
 	import StudentTable from './StudentTable.svelte';
+	import PullToRefresh from '$lib/components/ui/pullToRefresh.svelte';
 	import ImportModal from './ImportModal.svelte';
 	import EnrollmentsModal from './EnrollmentsModal.svelte';
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
@@ -631,20 +632,23 @@
 				: canCreateStudent ? handleCreateStudent : undefined}
 		/>
 	{:else}
-		<!-- Componente de Tabla Modularizado -->
-		<StudentTable
-			{students}
-			{isSuperAdmin}
-			{canEditStudent}
-			{getDropdownOptions}
-			{toggleSelectAll}
-			{toggleSelectStudent}
-			{toggleDropdown}
-			onEdit={handleEdit}
-			onDelete={handleDeleteClick}
-			bind:selectedStudentIds={selectedStudentIds}
-			bind:openDropdownId={openDropdownId}
-		/>
+		<!-- Componente de Tabla Modularizado.
+		     MOBILE-002: en mobile, tirar hacia abajo desde el tope recarga la lista. -->
+		<PullToRefresh onRefresh={loadStudents}>
+			<StudentTable
+				{students}
+				{isSuperAdmin}
+				{canEditStudent}
+				{getDropdownOptions}
+				{toggleSelectAll}
+				{toggleSelectStudent}
+				{toggleDropdown}
+				onEdit={handleEdit}
+				onDelete={handleDeleteClick}
+				bind:selectedStudentIds={selectedStudentIds}
+				bind:openDropdownId={openDropdownId}
+			/>
+		</PullToRefresh>
 
 		<Pagination
 			currentPage={page}

@@ -1,20 +1,27 @@
 <!--
   PullToRefresh — MOBILE-002
-  Componente que envuelve una zona scrollable y detecta el gesto de
-  "tirar para refrescar" nativo de iOS/Android.
-  
+  Envuelve una lista y detecta el gesto de "tirar para refrescar" nativo de
+  iOS/Android.
+
   Uso:
-    <PullToRefresh onRefresh={async () => { await loadStudents(); }}>
-      <div class="overflow-y-auto">
-        ... lista ...
-      </div>
+    <PullToRefresh onRefresh={loadStudents}>
+      <StudentTable {students} />
     </PullToRefresh>
-  
+
   Notas:
-  - Solo en mobile (sm:hidden wrapper)
-  - Threshold 80px muestra el spinner
-  - Threshold 120px dispara el refresh al soltar
-  - Bloquea el scroll del contenedor mientras se arrastra
+  - Solo actúa en mobile (<= 768px). En desktop es un wrapper transparente.
+  - Threshold 80px muestra el spinner; 120px dispara el refresh al soltar.
+  - Resistencia tipo iOS: el arrastre se amortigua a medida que baja.
+
+  F-FIX-MOBILE-002 (2026-08-16): la primera versión de este componente creaba
+  su PROPIO contenedor de scroll (`h-full overflow-hidden` + hijo
+  `h-full overflow-y-auto`). En el layout real de la app eso no sirve: el
+  scroll vive en `<main class="overflow-y-auto">` (ver routes/app/+layout.svelte),
+  así que envolver una página habría anidado dos contenedores de scroll —
+  el de adentro scrolleaba y el de afuera no. Por eso el componente quedó
+  escrito pero con CERO usos desde el 2026-07-18. Ahora no crea scroll
+  propio: busca el ancestro scrollable y solo engancha el gesto cuando ese
+  ancestro está arriba del todo (scrollTop === 0).
 -->
 <script lang="ts">
 	import { LoaderIcon } from '$lib/icons/outline';
@@ -29,29 +36,52 @@
 		children?: any;
 	}
 
-	let {
-		onRefresh,
-		showThreshold = 80,
-		refreshThreshold = 120,
-		children
-	}: Props = $props();
+	let { onRefresh, showThreshold = 80, refreshThreshold = 120, children }: Props = $props();
 
-	let containerRef = $state<HTMLDivElement | null>(null);
+	let wrapperRef = $state<HTMLDivElement | null>(null);
 	let dragOffset = $state(0);
 	let isDragging = $state(false);
 	let isRefreshing = $state(false);
-	let startY = 0;
 	let isMobile = $state(false);
 
+	let startY = 0;
+	let scrollParent: HTMLElement | null = null;
+
+	// Mantener isMobile sincronizado ante rotación / resize.
 	$effect(() => {
-		isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+		if (typeof window === 'undefined') return;
+		const mq = window.matchMedia('(max-width: 768px)');
+		isMobile = mq.matches;
+		const onChange = (e: MediaQueryListEvent) => {
+			isMobile = e.matches;
+		};
+		mq.addEventListener('change', onChange);
+		return () => mq.removeEventListener('change', onChange);
 	});
 
+	// Localizar el contenedor que realmente scrollea (en esta app, el <main>).
+	$effect(() => {
+		if (!wrapperRef) return;
+		let el: HTMLElement | null = wrapperRef.parentElement;
+		while (el) {
+			const overflowY = getComputedStyle(el).overflowY;
+			if (overflowY === 'auto' || overflowY === 'scroll') {
+				scrollParent = el;
+				return;
+			}
+			el = el.parentElement;
+		}
+		scrollParent = null; // sin ancestro scrollable: se usa el scroll del documento
+	});
+
+	function atTop(): boolean {
+		if (scrollParent) return scrollParent.scrollTop <= 0;
+		return (window.scrollY || document.documentElement.scrollTop || 0) <= 0;
+	}
+
 	function handleTouchStart(e: TouchEvent) {
-		if (!isMobile || isRefreshing) return;
-		// Solo activar si el scroll está en el top
-		const scrollEl = e.currentTarget as HTMLElement;
-		if (scrollEl.scrollTop > 0) return;
+		if (!isMobile || isRefreshing || !onRefresh) return;
+		if (!atTop()) return;
 		startY = e.touches[0].clientY;
 		isDragging = true;
 		dragOffset = 0;
@@ -59,65 +89,83 @@
 
 	function handleTouchMove(e: TouchEvent) {
 		if (!isDragging) return;
-		const currentY = e.touches[0].clientY;
-		const delta = currentY - startY;
-		if (delta > 0) {
-			dragOffset = delta;
-			// Resistencia tipo iOS: el drag se reduce a medida que baja
-			e.preventDefault();
-		} else {
+		const delta = e.touches[0].clientY - startY;
+
+		if (delta <= 0) {
+			// Se fue para arriba: soltar el gesto y devolver el scroll normal.
 			dragOffset = 0;
+			isDragging = false;
+			return;
 		}
+
+		// Resistencia tipo iOS: cuanto más se tira, menos avanza.
+		dragOffset = Math.round(delta / (1 + delta / 140));
+
+		// Solo secuestrar el scroll una vez que el gesto es claramente un pull.
+		if (dragOffset > 6 && e.cancelable) e.preventDefault();
 	}
 
 	async function handleTouchEnd() {
 		if (!isDragging) return;
 		isDragging = false;
+
 		if (dragOffset >= refreshThreshold && onRefresh) {
 			isRefreshing = true;
+			dragOffset = 0;
 			try {
 				await onRefresh();
 			} finally {
 				isRefreshing = false;
-				dragOffset = 0;
 			}
 		} else {
 			dragOffset = 0;
 		}
 	}
 
-	const pullStyle = $derived(
+	// En reposo se deja `transform` SIN declarar a propósito. Un transform
+	// distinto de `none` convierte al div en containing block y rompería el
+	// posicionamiento de cualquier descendiente `position: fixed` (modales,
+	// dropdowns). Solo se aplica mientras el gesto está activo.
+	const contentStyle = $derived(
 		isDragging && dragOffset > 0
 			? `transform: translateY(${dragOffset}px); transition: none;`
 			: ''
 	);
 
-	const spinnerStyle = $derived(
-		`opacity: ${Math.min(1, dragOffset / showThreshold)}; transform: rotate(${dragOffset * 3}deg);`
-	);
+	const indicatorHeight = $derived(isRefreshing ? 44 : Math.max(0, dragOffset));
+	const spinnerOpacity = $derived(isRefreshing ? 1 : Math.min(1, dragOffset / showThreshold));
+	const readyToRefresh = $derived(dragOffset >= refreshThreshold);
 </script>
 
 <div
-	bind:this={containerRef}
-	class="relative w-full h-full overflow-hidden"
+	bind:this={wrapperRef}
+	class="relative w-full"
 	ontouchstart={handleTouchStart}
 	ontouchmove={handleTouchMove}
 	ontouchend={handleTouchEnd}
+	ontouchcancel={handleTouchEnd}
 >
-	<!-- Indicador de pull -->
+	<!-- Indicador de pull: solo ocupa alto mientras se arrastra o refresca -->
 	<div
-		class="absolute top-0 left-0 right-0 flex items-center justify-center pointer-events-none z-10"
-		style="height: {Math.max(0, dragOffset)}px; {isRefreshing ? 'opacity: 1; height: 48px;' : ''}"
+		class="pointer-events-none flex items-start justify-center overflow-hidden"
+		style="height: {indicatorHeight}px; transition: {isDragging ? 'none' : 'height 220ms cubic-bezier(0.22, 1, 0.36, 1)'};"
+		aria-hidden={indicatorHeight === 0}
 	>
 		<div
-			class="flex items-center justify-center w-10 h-10 rounded-full bg-white dark:bg-gray-800 shadow-lg ring-1 ring-gray-200 dark:ring-gray-700"
-			style={spinnerStyle}
+			class="mt-1 flex size-9 items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-gray-200 dark:bg-dark-surface dark:ring-dark-border"
+			style="opacity: {spinnerOpacity}; transform: rotate({readyToRefresh && !isRefreshing
+				? 180
+				: 0}deg); transition: transform 180ms ease, opacity 120ms linear;"
 		>
 			<LoaderIcon class="size-5 text-primary-600 {isRefreshing ? 'animate-spin' : ''}" />
 		</div>
 	</div>
 
-	<div style={pullStyle} class="h-full overflow-y-auto">
+	<div style={contentStyle}>
 		{@render children?.()}
 	</div>
 </div>
+
+{#if isRefreshing}
+	<span class="sr-only" role="status" aria-live="polite">Actualizando…</span>
+{/if}
