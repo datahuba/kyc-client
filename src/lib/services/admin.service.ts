@@ -55,12 +55,11 @@ class AdminService {
 		return await apiKyC.post<any>(`/admin/errors/${errorId}/resolve`, { note: note || '' });
 	}
 
-	/**
-	 * F-XXX (2026-07-29): reabre un error marcado como resuelto.
-	 */
-	async unresolveError(errorId: string): Promise<any> {
-		return await apiKyC.post<any>(`/admin/errors/${errorId}/unresolve`, {});
-	}
+	// F-FIX-CONTRATO (2026-08-16): se elimino `unresolveError()`. Apuntaba a
+	// POST /admin/errors/{id}/unresolve, endpoint que NO existe en el backend:
+	// desde F-ERROR-VIEWER-FIX (2026-07-31) resolver un error hace HARD DELETE,
+	// asi que reabrirlo dejo de tener sentido y el boton "Reabrir" ya se habia
+	// quitado de la UI. El metodo quedo huerfano apuntando a un 404.
 
 	/**
 	 * F-XXX (2026-07-29): auto-resuelve todos los errores que matcheen el
