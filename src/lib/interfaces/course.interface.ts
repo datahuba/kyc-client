@@ -2,6 +2,16 @@ export interface Modulo {
 	docente_id: string;
 	nombre: string;
 	costo: number;
+	// ⚠️ SOLO FRONTEND (2026-08-16). `CourseForm` inicializa este campo en
+	// 'Pendiente' y lo bindea a un <select>, pero el modelo `Modulo` del backend
+	// (models/course.py) NO lo tiene: solo declara nombre, costo, docente_id,
+	// fecha_inicio y fecha_fin. Pydantic v2 descarta los campos extra, así que
+	// hoy lo que se elija en ese select NO SE PERSISTE. Se declara acá para que
+	// el estado local tipe bien; agregar el campo al backend quedó como issue
+	// en `.agents/steering/backlog.md`.
+	estado_operacional?: 'Pendiente' | 'En Ejecucion' | 'Ejecutado';
+	fecha_inicio?: string | null;
+	fecha_fin?: string | null;
 }
 
 // ISSUE-P-CARGO-MULTIITEM (2026-07-08): un ítem individual del cargo
@@ -13,6 +23,10 @@ export interface CargoAdicionalItem {
 
 export interface Course {
 	_id: string;
+	// Fallback defensivo de `._id`: varias vistas usan `c._id || c.id` porque
+	// segun el endpoint la API puede serializar el identificador de las dos
+	// formas. Declararlo evita el error de tipos sin borrar el fallback.
+	id?: string;
 	activo: boolean;
 	cantidad_cuotas: number;
 	codigo: string;
@@ -111,5 +125,11 @@ export interface CourseStudent {
 		total_pagado: number;
 		saldo_pendiente: number;
 		avance_pago: number;
+		// F-2026-08-22-PRE-REG-BADGE-DESCUENTO: el backend SI devuelve estos dos
+		// (ver services/course_service.py, objeto `financiero`), pero nunca se
+		// declararon acá. `descuento_personalizado` viene en % 0-100 (50.0 = 50%)
+		// y `descuento_origen` indica de dónde salió el descuento.
+		descuento_personalizado?: number | null;
+		descuento_origen?: 'vicerrectorado' | 'EC' | 'mixto' | null;
 	};
 }

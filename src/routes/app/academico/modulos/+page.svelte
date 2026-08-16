@@ -105,8 +105,8 @@
 	function getModulosStats(e: Enrollment): { finalizados: number; enCurso: number; total: number; progreso: number } {
 		const total = e.modulos?.length || 0;
 		if (total === 0) return { finalizados: 0, enCurso: 0, total: 0, progreso: 0 };
-		const finalizados = e.modulos.filter((m) => m.finalizado_en).length;
-		const enCurso = e.modulos.filter((m) => m.iniciado_en && !m.finalizado_en).length;
+		const finalizados = e.modulos.filter((m: any) => m.finalizado_en).length;
+		const enCurso = e.modulos.filter((m: any) => m.iniciado_en && !m.finalizado_en).length;
 		const progreso = Math.round((finalizados / total) * 100);
 		return { finalizados, enCurso, total, progreso };
 	}
@@ -127,13 +127,19 @@
 				if (filterEstado === 'completados' && stats.finalizados < stats.total) return false;
 			}
 			// Filtro por búsqueda (estudiante)
+			// F-FIX-MODULOS-ESTUDIANTE (2026-08-16): antes leía `e.estudiante?.nombre`
+			// y compañía. Ese objeto anidado NO EXISTE: GET /enrollments/ devuelve los
+			// campos joineados PLANOS (`estudiante_nombre`, `estudiante_registro`,
+			// `estudiante_ci` — ver F-FIX-DESCONOCIDO-ENROLLMENTS en
+			// schemas/enrollment.py). Como `est` siempre era undefined, `matches`
+			// quedaba falsy y este filtro descartaba TODAS las filas: escribir
+			// cualquier cosa en el buscador vaciaba la tabla.
 			if (search.trim()) {
 				const s = search.trim().toLowerCase();
-				const est = e.estudiante as any;
 				const matches =
-					(est?.nombre && String(est.nombre).toLowerCase().includes(s)) ||
-					(est?.registro && String(est.registro).includes(s)) ||
-					(est?.carnet && String(est.carnet).includes(s));
+					(e.estudiante_nombre && e.estudiante_nombre.toLowerCase().includes(s)) ||
+					(e.estudiante_registro && String(e.estudiante_registro).includes(s)) ||
+					(e.estudiante_ci && String(e.estudiante_ci).includes(s));
 				if (!matches) return false;
 			}
 			return true;
@@ -318,13 +324,12 @@
 					<tbody class="divide-y divide-gray-100 dark:divide-gray-700">
 						{#each filtered as e (e._id || e.id)}
 							{@const stats = getModulosStats(e)}
-							{@const est = e.estudiante as any}
 							<tr class="hover:bg-gray-50 dark:hover:bg-dark-background/30 transition-colors">
 								<td class="px-4 py-3">
-									<p class="font-medium text-gray-900 dark:text-white">{est?.nombre || `Estudiante ${e.estudiante_id}`}</p>
+									<p class="font-medium text-gray-900 dark:text-white">{e.estudiante_nombre || `Estudiante ${e.estudiante_id}`}</p>
 									<p class="text-xs text-gray-500 dark:text-gray-400">
-										{#if est?.registro}Reg: {est.registro}{/if}
-										{#if est?.carnet} · CI: {est.carnet}{/if}
+										{#if e.estudiante_registro}Reg: {e.estudiante_registro}{/if}
+										{#if e.estudiante_ci} · CI: {e.estudiante_ci}{/if}
 									</p>
 								</td>
 								<td class="px-4 py-3 text-gray-700 dark:text-gray-300">
@@ -363,7 +368,7 @@
 										variant="primary"
 										onclick={() => abrirModal(e)}
 										loading={modalLoading}
-										ariaLabel="Gestionar módulos de {est?.nombre || e.estudiante_id}"
+										ariaLabel="Gestionar módulos de {e.estudiante_nombre || e.estudiante_id}"
 									>
 										{#snippet leftIcon()}<BookIcon class="size-4" />{/snippet}
 										Gestionar

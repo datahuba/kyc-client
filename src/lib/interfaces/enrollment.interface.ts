@@ -14,6 +14,13 @@ export interface Enrollment {
 	_id: string;
 	// Fallback defensivo de `._id` usado en algunos componentes (ej. cobro en Caja).
 	id?: string;
+	// Campos joineados que el backend adjunta en GET /enrollments/ para que el
+	// frontend no muestre "Desconocido" (ver F-FIX-DESCONOCIDO-ENROLLMENTS en
+	// schemas/enrollment.py). Son PLANOS — no hay un objeto anidado `estudiante`.
+	estudiante_nombre?: string | null;
+	estudiante_registro?: string | null;
+	estudiante_ci?: string | null;
+	curso_codigo?: string | null;
 	requisitos?: Requisito[]; // ISSUE-Q-DOCUMENTOS-KYC
 	cantidad_cuotas: number;
 	costo_matricula: number;

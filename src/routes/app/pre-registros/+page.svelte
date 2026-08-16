@@ -1334,7 +1334,7 @@
 										<Button size="xs" onclick={() => openDetailModal(sub)}>Ver detalle</Button>
 										<p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Aprobar submission primero</p>
 									{:else if sub.estado === 'aprobado' && sub.migrated_to_student_id}
-										<Button size="xs" variant="indigo" onclick={() => openValidateDescuentoModal(sub)}>Validar descuento</Button>
+										<Button size="xs" variant="primary" onclick={() => openValidateDescuentoModal(sub)}>Validar descuento</Button>
 									{:else}
 										<Button size="xs" variant="secondary" onclick={() => openDetailModal(sub)}>Ver detalle</Button>
 									{/if}
@@ -1364,7 +1364,7 @@
 								{sub.estado}
 							</span>
 							{#if sub.estado === 'aprobado' && sub.migrated_to_student_id}
-								<Button size="sm" variant="indigo" onclick={() => openValidateDescuentoModal(sub)}>Validar descuento</Button>
+								<Button size="sm" variant="primary" onclick={() => openValidateDescuentoModal(sub)}>Validar descuento</Button>
 							{:else}
 								<Button size="sm" variant="secondary" onclick={() => openDetailModal(sub)}>Ver detalle</Button>
 							{/if}

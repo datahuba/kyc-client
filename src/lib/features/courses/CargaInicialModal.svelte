@@ -747,7 +747,7 @@
 					inscritos += resp.exitosos || 0;
 					fallidos += resp.fallidos || 0;
 					for (const r of resp.resultados || []) {
-						const itemChunk = chunk.find((c) => c.estudiante_id === r.estudiante_id);
+						const itemChunk = chunk.find((c: any) => c.estudiante_id === r.estudiante_id);
 						if (itemChunk) {
 							if (r.success) {
 								itemChunk.fila.estado = 'existe';

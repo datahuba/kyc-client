@@ -402,7 +402,8 @@
 				}
 			}
 
-			const payload = { ...formData };
+			// Se le hace `delete` de campos opcionales mas abajo, por eso el tipo laxo.
+			const payload: Record<string, any> = { ...formData };
 			// F-2026-08-12-EC-RESOLUCION-OBLIGATORIA: pasar la URL de la
 			// resolucion subida (o el valor que ya tenia en edicion).
 			payload.resolucion_pdf_url = resolucionPdfUrl || (formData as any).resolucion_pdf_url || null;
@@ -473,14 +474,14 @@
 			// ISSUE-P-CARGO-MULTIITEM: descartar ítems vacíos (sin nombre o con
 			// costo 0 dejado a medio llenar) antes de enviar.
 			payload.cargo_adicional_items = (payload.cargo_adicional_items || []).filter(
-				(it) => it.nombre?.trim()
+				(it: any) => it.nombre?.trim()
 			);
 
 			// ISSUE-Q-DOCUMENTOS-KYC: descartar requisitos vacíos (sin descripción)
-			payload.requisitos = (payload.requisitos || []).filter((r) => r.descripcion?.trim());
+			payload.requisitos = (payload.requisitos || []).filter((r: any) => r.descripcion?.trim());
 
 			if (!es_historico) {
-				payload.modulos = payload.modulos!.map((m) => {
+				payload.modulos = payload.modulos!.map((m: any) => {
 					const mod = { ...m };
 					if (!mod.docente_id) {
 						// `docente_id` no es opcional en el tipo; se castea para poder
@@ -495,7 +496,7 @@
 			// (Solo aplica a programas en operacion real; los historicos no
 			// tienen estructura financiera que validar.)
 			if (!es_historico) {
-				const sumModulos = (payload.modulos || []).reduce((acc, curr) => acc + Number(curr.costo), 0);
+				const sumModulos = (payload.modulos || []).reduce((acc: number, curr: any) => acc + Number(curr.costo), 0);
 				if (!autoCalculateModules && sumModulos !== payload.costo_total_interno) {
 					discrepancyMessage = `La suma manual de los módulos (Bs. ${sumModulos}) no coincide con el Costo Total (Bs. ${payload.costo_total_interno}). ¿Deseas guardar el programa con esta discrepancia?`;
 					pendingSubmitPayload = payload;
