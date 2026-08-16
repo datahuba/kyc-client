@@ -5,7 +5,6 @@
 	//  activos, congelados, modulos completados".
 	// ISSUE R10: eliminar "Abandono" y "Pasivo" del dashboard, solo "Congelado".
 	// Refleja el endpoint GET /enrollments/stats/resumen?curso_id=X.
-	import { onMount } from 'svelte';
 	import { enrollmentService, studentService } from '$lib/services';
 	import type { EnrollmentResumen, Student } from '$lib/interfaces';
 
@@ -150,12 +149,11 @@
 		return emb.carnet || e.estudiante_carnet || '?';
 	}
 
-	onMount(() => {
-		cargarResumen();
-		cargarEstudiantesDelCurso();
-	});
-
-	// Recargar si cambia cursoId
+	// F-FIX-DUPLICADO-RESUMEN (2026-08-16): antes esto se llamaba tanto en
+	// onMount() como en este $effect(), y $effect ya corre una vez al montar
+	// (ademas de cada vez que cambia cursoId) — resultaba en 2x llamadas a
+	// /enrollments/stats/resumen y /students/ por cada tarjeta de programa en
+	// el dashboard. $effect solo alcanza para ambos casos.
 	$effect(() => {
 		if (cursoId) {
 			cargarResumen();
