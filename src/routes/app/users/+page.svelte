@@ -85,9 +85,25 @@
 		}
 	}
 
+	// F-FIX-USERS-OBJECTID (2026-08-16): antes, si el curso no estaba en el
+	// mapa, esta función devolvía el `id` crudo y la UI mostraba un ObjectId
+	// de Mongo (ej. "6a79c8f0c54e53c6326a97b4") como si fuera el nombre del
+	// programa. Verificado que el listado `GET /courses/` NO filtra nada por
+	// defecto — todos sus filtros son condicionales — así que un id ausente
+	// del mapa apunta casi seguro a un curso BORRADO cuya referencia quedó
+	// huérfana en `user.cursos_asignados`. Esto es una mitigación de UI: deja
+	// de mostrar el ObjectId como nombre y hace el problema diagnosticable.
+	// La causa de fondo (limpiar las referencias huérfanas) necesita revisar
+	// los datos y quedó anotada en el backlog.
 	function getCursoNombre(id: string): string {
 		const curso = coursesById[id];
-		return curso ? `${curso.nombre_programa} (${curso.codigo})` : id;
+		if (curso) return `${curso.nombre_programa} (${curso.codigo})`;
+		return `Curso no encontrado (${String(id).slice(-6)})`;
+	}
+
+	/** True si el id no resolvió a un curso real: sirve para marcarlo visualmente. */
+	function esCursoHuerfano(id: string): boolean {
+		return !coursesById[id];
 	}
 
 	async function loadUsers() {
@@ -316,8 +332,12 @@
 					<div class="flex flex-wrap gap-1 max-w-xs">
 						{#each user.cursos_asignados ?? [] as cursoId}
 							<span
-								class="px-2 inline-flex text-xs leading-5 font-medium rounded-full bg-light-tertiary/10 text-light-tertiary dark:bg-dark-tertiary/20 dark:text-dark-tertiary"
-								title={getCursoNombre(cursoId)}
+								class="px-2 inline-flex text-xs leading-5 font-medium rounded-full {esCursoHuerfano(cursoId)
+									? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+									: 'bg-light-tertiary/10 text-light-tertiary dark:bg-dark-tertiary/20 dark:text-dark-tertiary'}"
+								title={esCursoHuerfano(cursoId)
+									? `Referencia huérfana: el curso ${cursoId} ya no existe. Conviene quitarlo de los cursos asignados de este usuario.`
+									: getCursoNombre(cursoId)}
 							>
 								{getCursoNombre(cursoId)}
 							</span>
@@ -403,7 +423,12 @@
 						<div class="flex flex-wrap gap-1">
 							{#each user.cursos_asignados ?? [] as cursoId}
 								<span
-									class="px-2 inline-flex text-xs leading-5 font-medium rounded-full bg-light-tertiary/10 text-light-tertiary dark:bg-dark-tertiary/20 dark:text-dark-tertiary"
+									class="px-2 inline-flex text-xs leading-5 font-medium rounded-full {esCursoHuerfano(cursoId)
+										? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+										: 'bg-light-tertiary/10 text-light-tertiary dark:bg-dark-tertiary/20 dark:text-dark-tertiary'}"
+									title={esCursoHuerfano(cursoId)
+										? `Referencia huérfana: el curso ${cursoId} ya no existe.`
+										: getCursoNombre(cursoId)}
 								>
 									{getCursoNombre(cursoId)}
 								</span>

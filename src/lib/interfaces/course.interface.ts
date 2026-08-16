@@ -2,14 +2,14 @@ export interface Modulo {
 	docente_id: string;
 	nombre: string;
 	costo: number;
-	// ⚠️ SOLO FRONTEND (2026-08-16). `CourseForm` inicializa este campo en
-	// 'Pendiente' y lo bindea a un <select>, pero el modelo `Modulo` del backend
-	// (models/course.py) NO lo tiene: solo declara nombre, costo, docente_id,
-	// fecha_inicio y fecha_fin. Pydantic v2 descarta los campos extra, así que
-	// hoy lo que se elija en ese select NO SE PERSISTE. Se declara acá para que
-	// el estado local tipe bien; agregar el campo al backend quedó como issue
-	// en `.agents/steering/backlog.md`.
-	estado_operacional?: 'Pendiente' | 'En Ejecucion' | 'Ejecutado';
+	// Estado del módulo en el cronograma al cargar un programa que ya venía en
+	// ejecución. `CourseForm` lo bindea a un <select> (solo visible cuando
+	// `tipo_programa === 'en_ejecucion'`).
+	// F-FIX-ESTADO-OPERACIONAL (2026-08-16): durante un tiempo este campo era
+	// SOLO de frontend — el backend no lo declaraba y Pydantic v2 lo descartaba,
+	// así que lo elegido se perdía en silencio al guardar. Ya está declarado en
+	// `models/course.py` y `schemas/course.py`, y persiste correctamente.
+	estado_operacional?: 'Pendiente' | 'En Ejecucion' | 'Ejecutado' | null;
 	fecha_inicio?: string | null;
 	fecha_fin?: string | null;
 }
