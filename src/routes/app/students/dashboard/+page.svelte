@@ -46,7 +46,7 @@
 			const cursoNombre = course?.nombre_programa ?? 'Curso';
 			const cursoCodigo = course?.codigo ?? '';
 			if (!enr.modulos) continue;
-			enr.modulos.forEach((m, idx) => {
+			enr.modulos.forEach((m: any, idx: number) => {
 				let estado: ModuloEstado['estado'];
 				if (m.iniciado_en && m.estado_academico !== 'Aprobado' && m.estado_academico !== 'Reprobado') {
 					estado = 'en_curso';
@@ -125,9 +125,16 @@
 		// Stats secundarios (no bloquean el load principal)
 		(async () => {
 			try {
-				const certs = await certificateService.getMy();
+				// F-FIX-CERT-GETMY (2026-08-16): antes llamaba a `getMy()`, que NO
+				// existe en CertificateService (el método real es `listMy()`). La
+				// llamada tiraba TypeError, el `catch {}` vacío se lo tragaba en
+				// silencio y el contador quedaba SIEMPRE en 0 aunque el estudiante
+				// tuviera certificados emitidos.
+				const certs = await certificateService.listMy();
 				cantidadCertificados = Array.isArray(certs) ? certs.length : 0;
-			} catch {}
+			} catch (e) {
+				console.error('[dashboard] no se pudo cargar el contador de certificados', e);
+			}
 		})();
 
 		// Cargar mis enrollments con detalle de módulos
@@ -137,7 +144,7 @@
 				const items = (res as any).items || [];
 				myEnrollments = items;
 				// Cargar info de cursos en batch
-				const courseIds = Array.from(new Set(items.map((e: any) => String(e.curso_id)).filter(Boolean)));
+				const courseIds: string[] = Array.from(new Set<string>(items.map((e: any) => String(e.curso_id)).filter(Boolean)));
 				for (const cid of courseIds) {
 					try {
 						const c: any = await courseService.getById(cid);
@@ -229,7 +236,7 @@
 				>
 					<div class="flex items-center gap-3">
 						<div class="shrink-0 w-12 h-12 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-purple-600 dark:text-purple-400 shadow-sm">
-							<CalendarIcon class="size-6" />
+							<CalendarIcon className="size-6" />
 						</div>
 						<div class="flex-1 min-w-0">
 							<p class="text-xs text-purple-700 dark:text-purple-300 font-semibold uppercase tracking-wider">

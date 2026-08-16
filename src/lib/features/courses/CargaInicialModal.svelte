@@ -77,7 +77,7 @@
 	// despues de parsear el Excel para mapear los descuentos detectados
 	// (0.5, 1, etc) a descuentos_id reales.
 	let catalogoDescuentos: { _id: string; nombre: string; porcentaje: number; es_institucional?: boolean }[] = $state([]);
-	let resultadoExcel = $state<{ creados: number; inscritos: number; actualizados: number; fallidos: number; detalles: any[] } | null>(null);
+	let resultadoExcel = $state<{ creados: number; inscritos: number; actualizados: number; fallidos: number; detalles: any[]; exitosos?: number } | null>(null);
 	// F-VER-FALLIDOS (2026-08-05, Kevin): vista expandible de los fallidos
 	// con carnet + razon. El usuario puede ver que fallo y reintentar.
 	let mostrarFallidos = $state(false);
@@ -133,7 +133,7 @@
 					const resp = await studentService.getAll(1, 5, { q: carnet });
 					const match = resp.data.find((s: any) => s.carnet === carnet);
 					if (match) {
-						return { id: match._id, nombre: match.nombre, carnet: match.carnet, encontrado: true };
+						return { id: match._id, nombre: match.nombre, carnet, encontrado: true };
 					}
 					return { id: '', nombre: '', carnet, encontrado: false };
 				} catch {
@@ -747,7 +747,7 @@
 					inscritos += resp.exitosos || 0;
 					fallidos += resp.fallidos || 0;
 					for (const r of resp.resultados || []) {
-						const itemChunk = chunk.find((c) => c.estudiante_id === r.estudiante_id);
+						const itemChunk = chunk.find((c: any) => c.estudiante_id === r.estudiante_id);
 						if (itemChunk) {
 							if (r.success) {
 								itemChunk.fila.estado = 'existe';
@@ -777,7 +777,7 @@
 
 			// F-VER-FALLIDOS: agregar tambien los fallos del Paso 1 (crear
 			// estudiante). Esos tambien deben verse en la lista de fallidos.
-			for (const fila of filasValidas.filter((f) => f.estado === 'error' && !fila.estudiante_id)) {
+			for (const fila of filasValidas.filter((f) => f.estado === 'error' && !f.estudiante_id)) {
 				if (!detalles.find((d) => d.carnet === fila.carnet)) {
 					detalles.push({
 						carnet: fila.carnet,
@@ -1017,7 +1017,7 @@
 	let excelValidos = $derived(filasExcel.filter((f) => f.estado === 'nuevo' || f.estado === 'existe').length);
 </script>
 
-<Modal {isOpen} onClose={cerrar} title="Carga Inicial de Estudiantes" size="lg">
+<Modal {isOpen} onClose={cerrar} title="Carga Inicial de Estudiantes" maxWidth="sm:max-w-2xl">
 	{#if !course}
 		<p class="text-sm text-gray-500">No hay programa seleccionado.</p>
 	{:else}
@@ -1029,7 +1029,7 @@
 					{course.codigo} - {course.nombre_programa}
 				</div>
 				<div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-					Estado: <span class="font-mono">{course.estado_calculado || course.estado}</span>
+					Estado: <span class="font-mono">{course.estado_calculado}</span>
 					{#if esEnEjecucion}
 						<span class="ml-2 inline-flex items-center rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
 							EN EJECUCION

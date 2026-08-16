@@ -270,7 +270,7 @@
 							<tr
 								class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors {selectedEnrollmentIdForResumen === (enrollment._id || enrollment.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}"
 								onclick={() => {
-									const eid = enrollment._id || enrollment.id;
+									const eid = enrollment._id || enrollment.id || null;
 									selectedEnrollmentIdForResumen = selectedEnrollmentIdForResumen === eid ? null : eid;
 								}}
 							>

@@ -152,7 +152,7 @@
 	}
 </script>
 
-<Modal {isOpen} onClose={cerrar} title="Agregar Estudiante al Programa" size="lg">
+<Modal {isOpen} onClose={cerrar} title="Agregar Estudiante al Programa" maxWidth="sm:max-w-2xl">
 	{#if !course}
 		<p class="text-sm text-gray-500">No hay programa seleccionado.</p>
 	{:else}
@@ -164,7 +164,7 @@
 					{course.codigo} - {course.nombre_programa}
 				</div>
 				<div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-					Estado: <span class="font-mono">{course.estado_calculado || course.estado}</span>
+					Estado: <span class="font-mono">{course.estado_calculado}</span>
 				</div>
 			</div>
 
@@ -179,7 +179,6 @@
 							id="buscar-estudiante"
 							bind:value={busqueda}
 							placeholder="Ej: Juan Perez, 8099472, juan@email.com"
-							onInput={() => {}}
 						/>
 					</div>
 
@@ -205,7 +204,7 @@
 										<tr>
 											<td class="px-3 py-2 text-xs font-mono">{s.carnet}</td>
 											<td class="px-3 py-2 text-xs">{s.nombre}</td>
-											<td class="px-3 py-2 text-xs text-gray-500">{s.contacto?.email || '-'}</td>
+											<td class="px-3 py-2 text-xs text-gray-500">{s.email || '-'}</td>
 											<td class="px-3 py-2 text-center">
 												<Button type="button" size="sm" variant="secondary" onclick={() => seleccionarEstudiante(s)}>
 													Seleccionar

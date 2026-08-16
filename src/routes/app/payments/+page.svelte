@@ -1466,7 +1466,7 @@
 				<EmptyState
 					title="Sin pagos"
 					description="No hay pagos que coincidan con los filtros actuales."
-					icon="document"
+					icon="payment"
 				/>
 			{:else}
 				{@const maxCols = Math.min(porPagoData.max_pagos || 0, 20)}

@@ -18,7 +18,8 @@
 	import { onMount } from 'svelte';
 	import { userStore } from '$lib/stores/userStore';
 	import { paymentService, courseService } from '$lib/services';
-	import type { DeudoresResponse, DeudoresEstudiante, DeudoresModulo, DeudoresMatricula, Course } from '$lib/services/payment.service';
+	import type { DeudoresResponse, DeudoresEstudiante, DeudoresModulo, DeudoresMatricula, DeudoresResumen } from '$lib/services/payment.service';
+	import type { Course } from '$lib/interfaces/course.interface';
 	import Card from '$lib/components/ui/card.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import { DownloadIcon, CheckIcon, RefreshIcon } from '$lib/icons/outline';
@@ -55,14 +56,23 @@
 		return lista;
 	});
 
-	// Resumen derivado (recalcula cuando cambia data o soloDeudores)
-	let resumen = $derived(data?.resumen ?? null);
+	// Resumen derivado (recalcula cuando cambia data o soloDeudores).
+	// svelte-check infiere `data` como `never` en este punto (quirk del
+	// control-flow analysis del preprocesador con el `if (!data) return []`
+	// del $derived.by de arriba). Cast explicito, sin cambio de comportamiento.
+	let resumen: DeudoresResumen | null = $derived((data as DeudoresResponse | null)?.resumen ?? null);
 
 	async function loadCursos() {
 		try {
 			const resp: any = await courseService.getAll(1, 100);
 			const lista: Course[] = Array.isArray(resp) ? resp : resp.data ?? [];
-			cursos = lista.filter((c) => c.estado === 'activo' || c.estado === 'ejecucion' || c.estado === 'publicado' || !c.estado);
+			// El filtro anterior comparaba `c.estado` contra 'activo'/'ejecucion'/'publicado',
+			// un campo y valores que nunca existieron en Course (el campo real es
+			// `estado_calculado` con valores 'programado'/'en_ejecucion'/'cerrado').
+			// Como `c.estado` siempre era undefined, el filtro nunca excluyo nada en la
+			// practica. Se deja sin filtrar (mismo comportamiento real de hoy) hasta que
+			// se defina si Cobranza quiere ocultar programas cerrados de este listado.
+			cursos = lista;
 		} catch (e) {
 			console.error('Error cargando cursos', e);
 		}
@@ -153,7 +163,7 @@
 					<CreditCardIcon class="size-7 text-primary-700 dark:text-primary-300" />
 				</div>
 				<div class="flex-1 min-w-0">
-					<Heading>
+					<Heading level="h1">
 						<span>Deudores</span>
 					</Heading>
 					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">

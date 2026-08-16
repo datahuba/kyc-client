@@ -146,7 +146,7 @@
 			cambiar_a_activo: `Cambiar enrollment a ACTIVO?\n\nEstudiante: ${item.estudiante_nombre}\nPrograma: ${item.programa_codigo}\n\nEsta accion cambiara el estado a ACTIVO.`,
 			reclasificar: `Reclasificar el estado del estudiante?\n\nEstudiante: ${item.estudiante_nombre}\nNuevo motivo: ${item.metadata?.motivo || 'congelado'}`,
 			marcar_cumple: `Marcar requisito como cumplido?\n\nRequisito: ${item.metadata?.requisito}\nEstudiante: ${item.estudiante_nombre}`,
-			anular_duplicados: `Anular pagos duplicados?\n\n${item.metadata?.count} pagos, total Bs ${item.monto}\nSe mantendra el primero, se anularan los ${(item.metadata?.count || 1) - 1} restantes.`,
+			anular_duplicados: `Anular pagos duplicados?\n\n${item.metadata?.count} pagos, total Bs ${item.metadata?.monto ?? '—'}\nSe mantendra el primero, se anularan los ${(item.metadata?.count || 1) - 1} restantes.`,
 			decidir_historico_o_activo: `Este programa esta marcado como historico pero esta en_ejecucion.\n\nPrograma: ${item.programa_codigo}\nInscritos: ${item.metadata?.inscritos || 0}\n\nDecide:\n- marcar_historico: confirma que es historico (excluir del alcance)\n- marcar_activo: confirma que esta activo (incluir en alcance)`,
 			corregir_porcentaje: `Corregir porcentaje del descuento?\n\nDescuento: ${item.programa_codigo}\nPorcentaje actual: ${item.metadata?.porcentaje}% (fuera de 0-100)`,
 			verificar_pagos_beca: `Recalcular saldo del becado?\n\nEstudiante: ${item.estudiante_nombre}\nSaldo actual: Bs ${item.metadata?.saldo}\nEsto recalculara el total_pagado y saldo_pendiente.`,
@@ -273,7 +273,7 @@
 			</p>
 		</div>
 		<div class="flex gap-2">
-			<Button variant="secondary" onclick={loadData} disabled={loading}>
+			<Button variant="secondary" onclick={() => loadData(true)} disabled={loading}>
 				<RefreshIcon class="h-4 w-4 mr-1" />
 				Actualizar
 			</Button>
@@ -298,7 +298,7 @@
 			<div class="p-6 text-center text-red-600">
 				<ExclamationIcon class="h-12 w-12 mx-auto" />
 				<p class="mt-2">{error}</p>
-				<Button variant="secondary" onclick={loadData} class="mt-3">Reintentar</Button>
+				<Button variant="secondary" onclick={() => loadData(true)} class="mt-3">Reintentar</Button>
 			</div>
 		</Card>
 	{:else if loading && !data}
@@ -423,7 +423,7 @@
 										{#if item.accion_sugerida}
 											<button
 												class="text-blue-600 hover:underline"
-												onclick={(e) => { e.stopPropagation(); openConfirmAccion(item.accion_sugerida, item); }}
+												onclick={(e) => { e.stopPropagation(); if (item.accion_sugerida) openConfirmAccion(item.accion_sugerida, item); }}
 											>
 												{item.accion_sugerida}
 											</button>
@@ -483,7 +483,7 @@
 			{#if selectedItem.accion_sugerida}
 				<div class="pt-2 border-t">
 					<Button
-						onclick={() => { detailOpen = false; openConfirmAccion(selectedItem.accion_sugerida, selectedItem); }}
+						onclick={() => { detailOpen = false; if (selectedItem?.accion_sugerida) openConfirmAccion(selectedItem.accion_sugerida, selectedItem); }}
 						disabled={actionInProgress}
 					>
 						Aplicar: {selectedItem.accion_sugerida}

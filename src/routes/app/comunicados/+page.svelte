@@ -5,7 +5,7 @@
 	import { courseService } from '$lib/services/course.service';
 	import { BellIcon, ExclamationIcon, MailIcon, TrashIcon, PencilIcon, PlusIcon, EyeIcon, XIcon } from '$lib/icons/outline';
 	import ExclamationCircleSolid from '$lib/icons/solid/exclamationCircleIcon.svelte';
-	import { alert, confirmDialog } from '$lib/utils';
+	import { alert } from '$lib/utils';
 	import { goto } from '$app/navigation';
 
 	// =============================================================
