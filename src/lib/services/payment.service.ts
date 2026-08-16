@@ -59,9 +59,10 @@ class PaymentService {
 		return await apiKyC.post<Payment>('/payments/', formData, { customTimeout: 60000 });
 	}
 
-	async update(id: string, data: UpdatePaymentRequest): Promise<Payment> {
-		return await apiKyC.put<Payment>(`/payments/${id}`, data);
-	}
+	// F-FIX-CONTRATO (2026-08-16): se elimino `update()`. Hacia
+	// PUT /payments/{id}, que NO existe en el backend — los unicos PUT de
+	// payments son /{id}/aprobar, /{id}/rechazar y /{id}/anular. No lo
+	// llamaba nadie en la UI, pero cualquier uso futuro habria dado 404.
 
 	async delete(id: string): Promise<Payment> {
 		return await apiKyC.delete<Payment>(`/payments/${id}`);
