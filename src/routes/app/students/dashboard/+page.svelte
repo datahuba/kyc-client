@@ -18,9 +18,16 @@
 	import { goto } from '$app/navigation';
 	import DashboardSkeleton from '$lib/components/skeletons/DashboardSkeleton.svelte';
 
-	let loading = true;
-	let studentData: Student | null = null;
-	let greeting = '';
+	// F-FIX-REACTIVIDAD-DASHBOARD (2026-08-16): estas tres eran `let` planos.
+	// En Svelte 5 una variable sin $state() NO dispara re-render al cambiar, y
+	// el template hace {#if loading}<DashboardSkeleton />{:else if studentData}.
+	// Resultado: `loading = false` al terminar el fetch no re-evaluaba el
+	// bloque y el dashboard del estudiante quedaba PEGADO en el esqueleto de
+	// carga. svelte-check lo venia avisando como warning
+	// ("Changing its value will not correctly trigger updates").
+	let loading = $state(true);
+	let studentData: Student | null = $state(null);
+	let greeting = $state('');
 	let interval: any;
 
 	// F-DASH-ESTUDIANTE (2026-07-30): quick stats + módulos pendientes.

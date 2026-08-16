@@ -66,14 +66,17 @@
 	let formsPage = $state(1);
 	let formsTotal = $state(0);
 	let formsTotalPages = $state(1);
-	let formsPerPage = 20;
+	// F-FIX-REACTIVIDAD-PREREG (2026-08-16): los tres *PerPage eran `let` planos.
+	// En Svelte 5 eso no dispara re-render, asi que cambiar el tamano de pagina
+	// no refrescaba el listado. svelte-check lo avisaba como warning.
+	let formsPerPage = $state(20);
 
 	// Submissions
 	let submissions: PreRegistration[] = $state([]);
 	let subsPage = $state(1);
 	let subsTotal = $state(0);
 	let subsTotalPages = $state(1);
-	let subsPerPage = 20;
+	let subsPerPage = $state(20);
 	let subsEstadoFilter = $state<'' | 'pendiente' | 'aprobado' | 'rechazado'>('');
 	let subsFormFilter = $state('');
 
@@ -84,7 +87,7 @@
 	let descPage = $state(1);
 	let descTotal = $state(0);
 	let descTotalPages = $state(1);
-	let descPerPage = 20;
+	let descPerPage = $state(20);
 
 	// Counters
 	let counters = $state({ forms_total: 0, forms_activos: 0, submissions_pendientes: 0, descuentos_pendientes: 0 });
