@@ -73,7 +73,15 @@ export type NavigationEntry = NavigationItem | NavigationGroup | NavigationSpace
 // Items compartidos entre student/docente y staff
 const sharedAcademicItems: NavigationItem[] = [
 	{ type: 'item', name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
-	{ type: 'item', name: 'Certificados', href: '/app/certificates', icon: FileTextIcon, roles: ['student', 'admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador', 'docente'], loginTypes: ['academic', 'admin'] },
+	// F-LIMPIEZA-DUPLICADOS (Kevin 2026-08-17): la vista de auditoria de
+	// certificados emitidos salio del sidebar del staff — "tenemos en
+	// solicitudes otra que hace lo mismo y mejor" (Solicitudes de
+	// Certificados, /app/certificates/requests).
+	//
+	// El item NO se borra: /app/certificates es TAMBIEN la pantalla donde el
+	// estudiante solicita y descarga SUS certificados. Se le saco al staff y
+	// se le dejo al estudiante, que es quien la necesita.
+	{ type: 'item', name: 'Certificados', href: '/app/certificates', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
 	{ type: 'item', name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	{ type: 'item', name: 'Mis Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
 	{ type: 'item', name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },

@@ -10,7 +10,6 @@
 	import DashboardSkeleton from '$lib/components/skeletons/DashboardSkeleton.svelte';
 	import { userStore } from '$lib/stores/userStore';
 	import { get } from 'svelte/store';
-	import DocumentValidationModal from '$lib/components/ui/DocumentValidationModal.svelte';
 	import { FileTextIcon } from '$lib/icons/outline';
 	// F-COBRANZA-041 (2026-07-22): tarjetas KPI de inscritos movidas de
 	// /app/enrollments al Dashboard (Kevin: "deberian salir en el dashboard
@@ -26,7 +25,7 @@
 	// Ahora: 1 sola llamada a /dashboard/v2 -> ~1-2s cold, <50ms hot.
 	// El backend devuelve TODO consolidado:
 	//   stats + courseBreakdown + resumenInscritos + resumenEconomico
-	//   + cxcResumen + recentEnrollments + recentPayments + pendingDocumentsCount
+	//   + cxcResumen + recentEnrollments + recentPayments
 
 	// ROLES QUE VEN INSCRITOS: todos los administrativos (excluye student).
 	const ROLES_QUE_VEN_INSCRITOS = ['superadmin', 'admin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'];
@@ -64,7 +63,6 @@
 	let resumenInscritos: any = null;       // viene del v2
 	let recentEnrollments: any[] = [];      // viene del v2
 	let recentPayments: any[] = [];         // viene del v2
-	let pendingDocumentsCount = 0;          // viene del v2
 
 	interface CourseBreakdown {
 		id: string;
@@ -90,7 +88,6 @@
 	let groupedByType: Record<string, CourseBreakdown[]> = {};
 	let expandedGroups: Set<string> = new Set();
 
-	let showDocumentModal = false;
 
 	const TYPE_ORDER = ['maestría', 'doctorado', 'diplomado', 'curso', 'taller', 'seminario', 'otro'];
 
@@ -180,7 +177,6 @@
 			cxcResumen = v2.cxcResumen;
 			recentEnrollments = v2.recentEnrollments ?? [];
 			recentPayments = v2.recentPayments ?? [];
-			pendingDocumentsCount = v2.pendingDocumentsCount ?? 0;
 
 		} catch (error) {
 			console.error('Error loading dashboard data:', error);
@@ -202,26 +198,14 @@
 		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
   			<Heading level="h1">Dashboard</Heading>
 			
-			{#if ['encargado_curso', 'cpd', 'admin', 'superadmin', 'coordinador'].includes(currentRole)}
-				<button 
-					onclick={() => showDocumentModal = true}
-					class="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all active:scale-95 text-gray-700 dark:text-gray-200 font-medium text-sm w-full sm:w-auto justify-center"
-				>
-					<FileTextIcon class="size-5 text-amber-500" />
-					Validación de Documentos
-					{#if pendingDocumentsCount > 0}
-						<span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded-full ml-1">
-							{pendingDocumentsCount}
-						</span>
-					{/if}
-				</button>
-			{/if}
 		</div>
 
-		<DocumentValidationModal
-			isOpen={showDocumentModal}
-			onClose={() => showDocumentModal = false}
-		/>
+		<!-- F-LIMPIEZA-DUPLICADOS (Kevin 2026-08-17): el boton y el modal de
+		     Validacion de Documentos se sacaron de aca. Habia DOS accesos a lo
+		     mismo — este y el del sidebar — y Kevin pidio dejar solo el del
+		     sidebar (`DocumentValidationTable`), que es el completo.
+		     Se elimino tambien `pendingDocumentsCount`, que solo alimentaba el
+		     badge de este boton. -->
 
 		<!-- US-007 (2026-08-03): banner de alerta "X estudiantes con módulos
 		     pendiente(s) de iniciar" eliminado. Kevin: "eliminar mensaje amarillo".
