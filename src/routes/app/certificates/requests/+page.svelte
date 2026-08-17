@@ -62,6 +62,13 @@
 	let detailLoading = $state(false);
 	let actionInProgress = $state(false);
 
+	// F-CERT-NO-DEUDOR-COBRO (2026-08-17)
+	// Tratamiento profesional elegido al aprobar (vacío = sin tratamiento,
+	// que es lo que corresponde a los de diplomado continuo) y nota opcional
+	// al confirmar la firma física.
+	let tratamientoElegido = $state('');
+	let observacionFirma = $state('');
+
 	// Modal de rechazo
 	let rejectOpen = $state(false);
 	let rejectTarget = $state<CertificateRequest | null>(null);
@@ -77,9 +84,35 @@
 		return String(u?.role || u?.rol || '');
 	}
 
-	function canApprove(): boolean {
+	function esCoordinadorFinanciero(): boolean {
+		const u: any = $userStore?.user;
+		return getUserRole() === 'coordinador' && u?.subtipo_coordinador === 'financiero';
+	}
+
+	/**
+	 * Quién puede aprobar ESTA solicitud.
+	 *
+	 * F-CERT-NO-DEUDOR-COBRO (2026-08-17): el No Deudor se separó del flujo de
+	 * Notas. Solo lo aprueban el coordinador financiero y el superadmin —
+	 * ahora acredita que no hay deuda Y cobra un arancel, o sea que es una
+	 * decisión económica, no académica. El backend impone lo mismo; esto es
+	 * para no mostrar botones que van a devolver 403.
+	 */
+	function canApprove(req?: CertificateRequest | null): boolean {
 		const role = getUserRole();
+		const tipo = req?.tipo ?? (selectedRequest?.tipo || 'notas');
+		if (tipo === 'no_deudor') {
+			return role === 'superadmin' || esCoordinadorFinanciero();
+		}
 		return ['admin', 'superadmin', 'encargado_curso'].includes(role);
+	}
+
+	/** Tratamientos admitidos, en espejo con TRATAMIENTOS_VALIDOS del backend. */
+	const TRATAMIENTOS = ['Lic.', 'Lic.a', 'Ing.', 'Arq.', 'Dr.', 'Dra.', 'Msc.', 'Tec.'];
+
+	function fmtBs(n: number | null | undefined): string {
+		if (n === null || n === undefined) return '—';
+		return `Bs ${n.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 	}
 
 	function fmtDate(s: string | null | undefined): string {
@@ -179,9 +212,14 @@
 
 	async function openDetail(req: CertificateRequest) {
 		selectedRequest = req;
+		// Se arrastra el tratamiento ya guardado si lo hubiera; si no, arranca
+		// vacío en vez de con un valor por defecto: poner "Lic." de arranque
+		// haría que se apruebe con un título que nadie eligió.
+		tratamientoElegido = req.tratamiento ?? '';
+		observacionFirma = '';
 		detailOpen = true;
 		// Si está pendiente, lo marcamos en_revision al abrirlo (UX: "lo estoy mirando")
-		if (req.estado === 'pendiente' && canApprove()) {
+		if (req.estado === 'pendiente' && canApprove(req)) {
 			detailLoading = true;
 			try {
 				const updated = await certificateService.markRequestInReview(req.id);
@@ -204,13 +242,24 @@
 
 	async function approve() {
 		if (!selectedRequest || actionInProgress) return;
+		const esNoDeudor = selectedRequest.tipo === 'no_deudor';
 		actionInProgress = true;
 		try {
-			const updated = await certificateService.approveRequest(selectedRequest.id);
+			const updated = await certificateService.approveRequest(
+				selectedRequest.id,
+				esNoDeudor ? tratamientoElegido || null : null
+			);
 			requests = requests.map((r) => (r.id === updated.id ? updated : r));
 			selectedRequest = updated;
-			alert('success', 'Solicitud aprobada. El certificado fue emitido.');
-			// Refrescar stats
+			// El mensaje distingue los dos flujos a propósito: si dijera solo
+			// "aprobada" en el No Deudor, el coordinador se iría creyendo que
+			// el estudiante ya lo tiene, cuando todavía falta la firma.
+			alert(
+				'success',
+				esNoDeudor
+					? 'Aprobada y certificado emitido. Falta confirmar la firma física para que el estudiante pueda descargarlo.'
+					: 'Solicitud aprobada. El certificado fue emitido.'
+			);
 			await loadStats();
 		} catch (e: any) {
 			console.error('Error aprobando:', e);
@@ -219,6 +268,48 @@
 		} finally {
 			actionInProgress = false;
 		}
+	}
+
+	/**
+	 * Segundo paso del No Deudor: el coordinador ya hizo firmar la copia
+	 * física y con esto habilita al estudiante a descargar el PDF.
+	 */
+	async function confirmarFirma() {
+		if (!selectedRequest || actionInProgress) return;
+		actionInProgress = true;
+		try {
+			const updated = await certificateService.confirmSignature(
+				selectedRequest.id,
+				observacionFirma.trim() || undefined
+			);
+			requests = requests.map((r) => (r.id === updated.id ? updated : r));
+			selectedRequest = updated;
+			observacionFirma = '';
+			alert('success', 'Firma confirmada. El estudiante ya puede descargar su certificado.');
+		} catch (e: any) {
+			console.error('Error confirmando firma:', e);
+			const detail =
+				e?.response?.data?.detail || e?.message || 'No se pudo confirmar la firma física.';
+			alert('error', detail);
+		} finally {
+			actionInProgress = false;
+		}
+	}
+
+	/**
+	 * Abre los pagos de ESTE estudiante en ESTE programa, en otra pestaña.
+	 *
+	 * Kevin lo pidió explícitamente: antes de aprobar hay que poder chequear
+	 * que el estudiante efectivamente no debe, sin perder la solicitud que se
+	 * está mirando.
+	 */
+	function verificarPagos() {
+		if (!selectedRequest) return;
+		const params = new URLSearchParams({
+			estudiante_id: selectedRequest.estudiante_id,
+			curso_id: selectedRequest.course_id
+		});
+		window.open(`/app/payments?${params.toString()}`, '_blank', 'noopener');
 	}
 
 	function openReject() {
@@ -428,7 +519,7 @@
 						<span class="text-[11px] text-gray-400 dark:text-gray-500">
 							{fmtDate(req.created_at)}
 						</span>
-						{#if canApprove() && (req.estado === 'pendiente' || req.estado === 'en_revision')}
+						{#if canApprove(req) && (req.estado === 'pendiente' || req.estado === 'en_revision')}
 							<span class="text-[10px] font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider">
 								Click para revisar →
 							</span>
@@ -518,6 +609,44 @@
 				</div>
 			{/if}
 
+			<!-- ============================================================
+			     F-CERT-NO-DEUDOR-COBRO (2026-08-17): bloque económico.
+			     Solo para 'no_deudor', que es el único con arancel.
+			     ============================================================ -->
+			{#if selectedRequest.tipo === 'no_deudor'}
+				<div class="rounded-lg border border-gray-200 dark:border-dark-border p-3 space-y-3">
+					<div class="flex flex-wrap items-center justify-between gap-2">
+						<div>
+							<p class="text-xs font-semibold text-gray-700 dark:text-gray-300">Arancel del certificado</p>
+							<p class="text-lg font-bold text-primary-700 dark:text-primary-300">
+								{fmtBs(selectedRequest.monto)}
+							</p>
+						</div>
+						<Button variant="secondary" size="sm" onclick={verificarPagos}>
+							<EyeIcon class="w-4 h-4 mr-1.5" />Verificar pagos
+						</Button>
+					</div>
+
+					{#if selectedRequest.comprobante_url}
+						<a
+							href={selectedRequest.comprobante_url}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:underline dark:text-primary-400"
+						>
+							<FileTextIcon class="w-4 h-4" />Ver comprobante adjunto
+						</a>
+					{:else}
+						<!-- No bloquea la aprobación: el estudiante puede haber
+						     pagado en caja física, y para eso está el botón de
+						     "Verificar pagos". Pero tiene que verse. -->
+						<p class="text-sm text-amber-700 dark:text-amber-400">
+							El estudiante no adjuntó comprobante. Verificá el pago en caja antes de aprobar.
+						</p>
+					{/if}
+				</div>
+			{/if}
+
 			{#if selectedRequest.certificate_id}
 				<div class="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
 					<div class="flex items-center gap-2">
@@ -529,8 +658,61 @@
 				</div>
 			{/if}
 
+			<!-- ============================================================
+			     Segundo paso del No Deudor: firma física.
+			     Aprobar ya emitió el PDF, pero el estudiante no lo ve hasta
+			     que se confirme acá. Kevin: "el coordinador hace firmar la
+			     copia física y debe habilitar al estudiante".
+			     ============================================================ -->
+			{#if selectedRequest.tipo === 'no_deudor' && selectedRequest.estado === 'aprobada'}
+				{#if selectedRequest.firma_fisica_confirmada}
+					<div class="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950/20">
+						<p class="text-sm font-medium text-green-800 dark:text-green-300">
+							Firma física confirmada por {selectedRequest.confirmada_por ?? '—'} ·
+							{fmtDate(selectedRequest.fecha_firma_fisica)}
+						</p>
+						<p class="mt-0.5 text-xs text-green-700 dark:text-green-400">
+							El estudiante ya puede descargar su certificado.
+						</p>
+						{#if selectedRequest.observacion_firma}
+							<p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+								{selectedRequest.observacion_firma}
+							</p>
+						{/if}
+					</div>
+				{:else}
+					<div class="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950/20">
+						<p class="text-sm font-semibold text-amber-800 dark:text-amber-300">
+							Falta la firma física
+						</p>
+						<p class="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+							El certificado ya está emitido, pero el estudiante todavía no puede
+							descargarlo. Imprimí la copia, hacela firmar y confirmá acá.
+						</p>
+						{#if canApprove(selectedRequest)}
+							<input
+								type="text"
+								bind:value={observacionFirma}
+								maxlength="500"
+								placeholder="Nota opcional (ej. a quién se entregó la copia)"
+								aria-label="Observación de la firma física"
+								class="mt-2 w-full rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-amber-700 dark:bg-dark-background dark:text-gray-100"
+							/>
+							<Button
+								size="sm"
+								class="mt-2"
+								onclick={confirmarFirma}
+								loading={actionInProgress}
+							>
+								<CircleCheckIcon class="w-4 h-4 mr-1.5" />Confirmar firma y habilitar descarga
+							</Button>
+						{/if}
+					</div>
+				{/if}
+			{/if}
+
 			<!-- Acciones -->
-			<div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-200 dark:border-dark-border">
+			<div class="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-gray-200 dark:border-dark-border">
 				{#if selectedRequest.certificate_id}
 					<Button variant="secondary" size="sm" onclick={downloadCertPdf}>
 						<DownloadIcon class="w-4 h-4 mr-1.5" />Descargar PDF
@@ -539,7 +721,24 @@
 				<Button variant="secondary" size="sm" onclick={closeDetail} disabled={actionInProgress}>
 					Cerrar
 				</Button>
-				{#if canApprove() && (selectedRequest.estado === 'pendiente' || selectedRequest.estado === 'en_revision')}
+				{#if canApprove(selectedRequest) && (selectedRequest.estado === 'pendiente' || selectedRequest.estado === 'en_revision')}
+					{#if selectedRequest.tipo === 'no_deudor'}
+						<!-- El tratamiento lo elige quien aprueba, no el estudiante:
+						     es el que conoce el título real y el que firma. Arranca
+						     vacío porque los de diplomado continuo no llevan. -->
+						<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+							<span class="whitespace-nowrap">Tratamiento</span>
+							<select
+								bind:value={tratamientoElegido}
+								class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-dark-border dark:bg-dark-background dark:text-gray-100"
+							>
+								<option value="">Sin tratamiento</option>
+								{#each TRATAMIENTOS as t (t)}
+									<option value={t}>{t}</option>
+								{/each}
+							</select>
+						</label>
+					{/if}
 					<Button
 						variant="destructive"
 						size="sm"

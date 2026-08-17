@@ -45,6 +45,19 @@ export interface CertificateRequest {
 
 	certificate_id?: string | null;
 
+	// F-CERT-NO-DEUDOR-COBRO (2026-08-17): arancel, comprobante, tratamiento
+	// profesional y firma fisica. Solo aplican a 'no_deudor'; en las
+	// solicitudes de 'notas' vienen nulos.
+	monto?: number | null;
+	comprobante_url?: string | null;
+	tratamiento?: string | null;
+	firma_fisica_confirmada?: boolean;
+	fecha_firma_fisica?: string | null;
+	confirmada_por?: string | null;
+	observacion_firma?: string | null;
+	/** Calculado en el backend: si el estudiante ya puede bajarse el PDF. */
+	descargable?: boolean;
+
 	created_at?: string;
 	updated_at?: string;
 }
