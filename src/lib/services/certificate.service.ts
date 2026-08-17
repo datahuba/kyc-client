@@ -214,6 +214,20 @@ class CertificateService {
 	}
 
 	/**
+	 * Arancel vigente del Certificado de No Deudor.
+	 *
+	 * Se consulta al servidor en vez de hardcodear 150 en el frontend: el monto
+	 * vive en la config del backend y es provisorio (Kevin lo va a ajustar
+	 * cuando se confirme el arancel real). Si esto se duplicara acá, el día que
+	 * lo cambie la pantalla mentiría.
+	 */
+	async getArancelNoDeudor(): Promise<{ monto: number; moneda: string }> {
+		return await apiKyC.get<{ monto: number; moneda: string }>(
+			'/certificates/arancel-no-deudor'
+		);
+	}
+
+	/**
 	 * [Estudiante] Adjuntar el comprobante de pago del arancel a su solicitud.
 	 * Se puede reemplazar mientras siga pendiente o en revisión.
 	 */
