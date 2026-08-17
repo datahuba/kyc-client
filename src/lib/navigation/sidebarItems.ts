@@ -197,6 +197,23 @@ const staffDataQualityGroup: NavigationGroup = {
 	]
 };
 
+// F-REPORTE-BUGS (2026-08-17, Kevin): "un nuevo modulo en el sidebar para
+// todos los perfiles excepto docentes y estudiantes, solo perfiles adm, que
+// puedan reportar bugs o errores".
+//
+// Va como item suelto y no dentro de "Administrativo" por dos razones: ese
+// grupo no incluye a `encargado_curso` (que sí debe poder reportar), y un
+// reporte de error se hace en el momento en que se lo ve — enterrarlo dos
+// niveles adentro es la mejor forma de que nadie lo use.
+const staffBugReportItem: NavigationItem = {
+	type: 'item',
+	name: 'Reportar un Error',
+	href: '/app/bug-reports',
+	icon: ExclamationIcon,
+	roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'],
+	loginTypes: ['admin']
+};
+
 const staffDashboardItem: NavigationItem = {
 	type: 'item',
 	name: 'Dashboard',
@@ -234,6 +251,9 @@ export function getAllNavItems(): NavigationEntry[] {
 
 		// === Items compartidos (academic) ===
 		...sharedAcademicItems,
+
+		// === Item suelto del staff ===
+		staffBugReportItem,
 
 		// === Grupos del staff ===
 		staffAcademicGroup,
