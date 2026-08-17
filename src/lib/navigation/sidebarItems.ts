@@ -106,6 +106,10 @@ const staffFinancialGroup: NavigationGroup = {
 	loginTypes: ['admin'],
 	children: [
 		{ type: 'item', name: 'Cuentas por Cobrar', href: '/app/reports/cuentas-por-cobrar', icon: ChartBarIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador', 'encargado_curso'], loginTypes: ['admin'] },
+		// F-CUENTAS-HISTORICAS (2026-08-16, Kevin): los programas historicos
+		// salieron del Dashboard y de Cuentas por Cobrar; este es su expediente
+		// aparte. Va justo despues de CxC porque es su contraparte.
+		{ type: 'item', name: 'Cuentas Históricas', href: '/app/reports/cuentas-historicas', icon: ChartBarIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador', 'encargado_curso'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Deudores', href: '/app/payments/deudores', icon: ExclamationIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'cpd', 'coordinador'], loginTypes: ['admin'] },
 		// F-2026-08-22-EC-PAGOS-READONLY (Kevin 2026-08-22): encargado_curso y coordinador
 		// (financiero) ven Gestion de Pagos en modo SOLO LECTURA. Pueden ver y descargar

@@ -68,7 +68,7 @@
 
 	// ISSUE-R-PERFIL-GENERICO: solo el coordinador FINANCIERO ve las vistas económicas.
 	let esCoordinadorFinanciero = $derived($userStore.user?.subtipo_coordinador === 'financiero');
-	const ECONOMIC_HREFS = ['/app/reports', '/app/payments', '/app/payment-config', '/app/bank-statements', '/app/informes'];
+	const ECONOMIC_HREFS = ['/app/reports', '/app/reports/cuentas-historicas', '/app/payments', '/app/payment-config', '/app/bank-statements', '/app/informes'];
 
 	function entryAllowed(entry: NavigationEntry): boolean {
 		if (entry.type === 'spacer') return true;
