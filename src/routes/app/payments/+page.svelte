@@ -339,9 +339,13 @@
 	// vuelo, la vieja se ignora (stale). Esto previene el escenario donde 2 fetches en
 	// paralelo dejan porPagoLoading pegado en true si la 2da tarda más que la 1ra.
 	let _porPagoCallId = 0;
+	// F-FIX-DEBUG-TITLE (2026-08-16): esta funcion pisaba `document.title` con
+	// cadenas de depuracion en 5 puntos, asi que la PESTANA DEL NAVEGADOR mostraba
+	// cosas como "[F-087] call#1 FINALLY loading=false hasData=true" en produccion.
+	// Eran rastros de la investigacion del spinner pegado (FIX 8/8b) que nunca se
+	// limpiaron. La logica de dedupe por _porPagoCallId SI es necesaria y se conserva.
 	async function loadPorPago() {
 		const myCallId = ++_porPagoCallId;
-		document.title = `[F-087] call#${myCallId} START loading=${porPagoLoading} hasData=${!!porPagoData}`;
 		porPagoLoading = true;
 		// Forzar re-render para que aparezca el spinner
 		await tick();
@@ -360,25 +364,19 @@
 		try {
 			const data = await paymentService.getMatrizPorPago(filtrosLimpios);
 			// Si una llamada más nueva llegó mientras esperábamos, ignorar este resultado (stale)
-			if (myCallId !== _porPagoCallId) {
-				document.title = `[F-087] call#${myCallId} STALE (current=#${_porPagoCallId}), ignoring data`;
-				return;
-			}
+			if (myCallId !== _porPagoCallId) return;
 			porPagoData = data;
-			document.title = `[F-087] call#${myCallId} DATA OK, est=${data.estudiantes?.length} loading=${porPagoLoading}`;
 		} catch (error: any) {
 			if (myCallId !== _porPagoCallId) return;
 			console.error('[F-087] error cargando vista por-pago:', error);
 			alert('error', error?.message || 'Error al cargar la vista por-pago');
 			porPagoData = null;
-			document.title = `[F-087] call#${myCallId} ERROR: ${error?.message || 'unknown'}`;
 		} finally {
 			// Solo la última llamada en vuelo es dueña del estado de loading
 			if (myCallId === _porPagoCallId) {
 				porPagoLoading = false;
 				// Forzar re-render para que desaparezca el spinner
 				await tick();
-				document.title = `[F-087] call#${myCallId} FINALLY loading=${porPagoLoading} hasData=${!!porPagoData}`;
 			}
 		}
 	}
