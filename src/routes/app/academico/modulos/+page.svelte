@@ -46,6 +46,20 @@
 	let filterCurso = $state('');
 	let filterEstado = $state('todos'); // todos | en_curso | finalizados | sin_iniciar
 	let search = $state('');
+	// F-FIX-BUSQUEDA-DEBOUNCE (2026-08-16): `search` es lo que se va tipeando y
+	// `searchAplicado` es lo que realmente filtra. Sin esto, cada tecla
+	// recalculaba el $derived sobre cientos de inscripciones y la escritura se
+	// sentia trabada. 250ms es el mismo criterio que ya usan /app/students y
+	// /app/enrollments.
+	let searchAplicado = $state('');
+	let debounceBusqueda: any;
+
+	function alTipearBusqueda() {
+		clearTimeout(debounceBusqueda);
+		debounceBusqueda = setTimeout(() => {
+			searchAplicado = search;
+		}, 250);
+	}
 
 	let modalOpen = $state(false);
 	let modalEnrollment: Enrollment | null = $state(null);
@@ -59,24 +73,76 @@
 	// CARGA DE DATOS
 	// ========================================================================
 
+	/**
+	 * Trae TODAS las paginas de un listado paginado, no solo la primera.
+	 *
+	 * Existe porque el buscador de esta pantalla filtra en memoria: si la
+	 * carga se queda corta, los registros que faltan son invisibles para la
+	 * busqueda y el usuario no se entera. Ver F-FIX-BUSQUEDA-TOPE.
+	 *
+	 * Si se alcanza el tope de seguridad, AVISA en vez de recortar callado.
+	 */
+	async function traerTodo<T>(
+		pedir: (page: number) => Promise<any>,
+		etiqueta: string,
+		maximo = 10000
+	): Promise<T[]> {
+		const acumulado: T[] = [];
+		let page = 1;
+		let hayMas = true;
+		while (hayMas) {
+			let resp: any;
+			try {
+				resp = await pedir(page);
+			} catch (e) {
+				// Si falla la primera pagina no hay nada que mostrar; si falla una
+				// posterior, al menos avisamos que la lista quedo incompleta.
+				if (page === 1) return [];
+				alert('error', `Se cargaron ${acumulado.length} ${etiqueta}, pero la lista quedó incompleta.`);
+				return acumulado;
+			}
+			acumulado.push(...((resp?.data as T[]) || []));
+			hayMas = Boolean(resp?.meta?.hasNextPage);
+			page += 1;
+			if (acumulado.length >= maximo) {
+				alert(
+					'warning',
+					`Se alcanzó el límite de ${maximo} ${etiqueta}. La búsqueda puede no encontrar todo; conviene filtrar por programa.`
+				);
+				break;
+			}
+		}
+		return acumulado;
+	}
+
 	async function loadData() {
 		loading = true;
 		try {
 			// Cargar cursos y enrollments en paralelo
 			// NOTA: ambos endpoints devuelven PaginatedResponse<{data: T[], meta: ...}>
 			// así que extraemos .data para obtener el array.
-			// LIMITES del backend: enrollments per_page<=500, courses per_page<=100.
-			// Pedimos los topes para traer todos los registros en una sola llamada.
+			// F-FIX-BUSQUEDA-TOPE (2026-08-16): antes esto pedia UNA sola pagina
+			// con el tope del backend (500 enrollments / 100 cursos) y se
+			// quedaba con eso. Como el buscador de esta pantalla filtra EN
+			// MEMORIA sobre lo que se cargo, cualquier registro por encima del
+			// tope se volvia invisible: el usuario buscaba un alumno que existe
+			// y no aparecia, sin ningun aviso de que la lista estaba recortada.
+			//
+			// Hoy no se notaba (239 inscripciones activas, 23 cursos), pero la
+			// carga historica pendiente son 130 + 480 alumnos — cruzaria el tope
+			// de 500 y la busqueda empezaria a fallar en silencio.
+			//
+			// Ahora se pagina hasta traer todo. El tope de seguridad corta en
+			// 10.000 registros y AVISA en vez de recortar callado.
 			const [coursesResp, enrollmentsResp] = await Promise.all([
-				courseService
-					.getAll(1, 100)
-					.catch(() => ({ data: [], meta: { page: 1, limit: 0, totalItems: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false } })),
-				enrollmentService
-					.getAll(1, 500, { estado: 'activo' })
-					.catch(() => ({ data: [], meta: { page: 1, limit: 0, totalItems: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false } })),
+				traerTodo<Course>((p) => courseService.getAll(p, 100), 'cursos'),
+				traerTodo<Enrollment>(
+					(p) => enrollmentService.getAll(p, 500, { estado: 'activo' }),
+					'inscripciones'
+				),
 			]);
-			courses = (coursesResp as PaginatedResponse<Course>).data || [];
-			enrollments = (enrollmentsResp as PaginatedResponse<Enrollment>).data || [];
+			courses = coursesResp;
+			enrollments = enrollmentsResp;
 
 			// Mapa de cursos para lookup rápido
 			const map: Record<string, string> = {};
@@ -134,8 +200,8 @@
 			// schemas/enrollment.py). Como `est` siempre era undefined, `matches`
 			// quedaba falsy y este filtro descartaba TODAS las filas: escribir
 			// cualquier cosa en el buscador vaciaba la tabla.
-			if (search.trim()) {
-				const s = search.trim().toLowerCase();
+			if (searchAplicado.trim()) {
+				const s = searchAplicado.trim().toLowerCase();
 				const matches =
 					(e.estudiante_nombre && e.estudiante_nombre.toLowerCase().includes(s)) ||
 					(e.estudiante_registro && String(e.estudiante_registro).includes(s)) ||
@@ -263,6 +329,7 @@
 						id="search"
 						type="text"
 						bind:value={search}
+						oninput={alTipearBusqueda}
 						placeholder="Nombre, CI o registro..."
 						class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-dark-surface text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
 					/>
