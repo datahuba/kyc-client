@@ -101,6 +101,14 @@
 	// se está subiendo, para deshabilitar solo ese input y no todos.
 	let subiendoComprobanteId = $state<string | null>(null);
 
+	// Arancel del Certificado de No Deudor, traído del servidor.
+	//
+	// Se consulta en vez de hardcodear 150 acá: el monto vive en la config del
+	// backend y Kevin lo va a ajustar cuando se confirme el arancel real. Si
+	// falla la consulta queda en null y el badge de precio simplemente no se
+	// muestra — mejor no mostrar precio que mostrar uno inventado.
+	let arancelNoDeudor = $state<number | null>(null);
+
 	$effect(() => {
 		if (enrollments.length > 0 && !selectedEnrollmentId) {
 			selectedEnrollmentId = String(enrollments[0]._id || enrollments[0].id || '');
@@ -322,7 +330,7 @@
 
 		loading = true;
 		try {
-			const [enrollmentsData, certsData, requestsData] = await Promise.all([
+			const [enrollmentsData, certsData, requestsData, arancelData] = await Promise.all([
 				enrollmentService.getByStudentId(userId),
 				certificateService.listMy().catch((err) => {
 					console.warn('No se pudieron cargar certificados:', err);
@@ -333,12 +341,20 @@
 				certificateService.listMyRequests().catch((err) => {
 					console.warn('No se pudieron cargar solicitudes de cert:', err);
 					return [];
+				}),
+				// F-CERT-NO-DEUDOR-COBRO (2026-08-17): el arancel se muestra ANTES
+				// de que el estudiante solicite. Si falla, queda en null y el badge
+				// de precio no se dibuja — no se inventa un monto.
+				certificateService.getArancelNoDeudor().catch((err) => {
+					console.warn('No se pudo cargar el arancel del No Deudor:', err);
+					return null;
 				})
 			]);
 
 			enrollments = enrollmentsData || [];
 			issuedCertificates = certsData;
 			myRequests = requestsData;
+			arancelNoDeudor = arancelData?.monto ?? null;
 
 			const cursoIds = Array.from(
 				new Set(enrollments.map((e) => e.curso_id).filter(Boolean))
@@ -1062,184 +1078,286 @@
 							</section>
 						{/if}
 
-						<!-- SECCIÓN 1: Certificado de Notas -->
-						<section class="mb-6">
-							<div class="flex items-center gap-2 mb-3">
-								<FileTextIcon class="w-5 h-5 text-primary-600 dark:text-primary-400" />
-								<h4 class="text-base font-semibold text-light-black dark:text-dark-white">Certificado de Notas</h4>
-							</div>
-
-							{#if notasYaEmitido}
-								<div class="rounded-lg border border-light-success/40 bg-light-success/5 dark:border-dark-success/40 dark:bg-dark-success/5 p-4">
-									<div class="flex items-start gap-3">
-										<CircleCheckIcon class="w-6 h-6 text-light-success dark:text-dark-success shrink-0 mt-0.5" />
-										<div class="flex-1 min-w-0">
-											<p class="text-sm font-medium text-light-black dark:text-dark-white">Ya emitido · Folio {notasYaEmitido.folio}</p>
-											<p class="text-xs text-light-four dark:text-dark-four mt-0.5">{formatDate(notasYaEmitido.emitido_en)}</p>
-										</div>
-										<Button variant="primary" size="sm" loading={downloadingId === notasYaEmitido.id} onclick={() => descargarPdf(notasYaEmitido)} ariaLabel="Re-descargar Certificado de Notas {notasYaEmitido.folio}">
-											<DownloadIcon class="w-4 h-4 mr-1.5" />Descargar
-										</Button>
+						<!-- ============================================================
+						     SECCIÓN 1: Certificado de Notas
+						     F-CERT-UX-ESTUDIANTE (2026-08-17, Kevin: "está muy feo").
+						     Misma estructura de tarjeta que No Deudor: cabecera con
+						     ícono + nombre + badge de costo, y cuerpo. Antes cada
+						     sección usaba un borde y un fondo distinto y parecían
+						     dos componentes de apps diferentes.
+						     ============================================================ -->
+						<section class="mb-4">
+							<div class="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
+								<div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-dark-border">
+									<div class="flex items-center gap-2.5 min-w-0">
+										<FileTextIcon class="w-5 h-5 shrink-0 text-primary-600 dark:text-primary-400" />
+										<h4 class="text-sm font-semibold text-light-black dark:text-dark-white truncate">
+											Certificado de notas
+										</h4>
 									</div>
+									<span class="shrink-0 rounded-full bg-light-success/10 dark:bg-dark-success/20 px-3 py-1 text-xs font-medium text-light-success dark:text-dark-success">
+										Sin costo
+									</span>
 								</div>
-							{:else if isNotasSolicitudActiva(enrollment)}
-								{@const solNotas = isNotasSolicitudActiva(enrollment)}
-								<div class="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 p-4">
-									<div class="flex items-start gap-3">
-										<div class="flex-1 min-w-0">
-											<div class="flex items-center gap-2 mb-1">
+
+								<div class="p-4">
+									{#if notasYaEmitido}
+										<div class="flex items-start gap-3">
+											<CircleCheckIcon class="w-5 h-5 shrink-0 mt-0.5 text-light-success dark:text-dark-success" />
+											<div class="flex-1 min-w-0">
+												<p class="text-sm font-medium text-light-black dark:text-dark-white">
+													Listo · Folio {notasYaEmitido.folio}
+												</p>
+												<p class="text-xs text-light-four dark:text-dark-four mt-0.5">
+													Emitido el {formatDate(notasYaEmitido.emitido_en)}
+												</p>
+											</div>
+											<Button variant="primary" size="sm" loading={downloadingId === notasYaEmitido.id} onclick={() => descargarPdf(notasYaEmitido)} ariaLabel="Descargar certificado de notas folio {notasYaEmitido.folio}">
+												<DownloadIcon class="w-4 h-4 mr-1.5" />Descargar
+											</Button>
+										</div>
+									{:else if isNotasSolicitudActiva(enrollment)}
+										{@const solNotas = isNotasSolicitudActiva(enrollment)}
+										<div class="flex flex-wrap items-start justify-between gap-3">
+											<div class="min-w-0 flex-1">
 												<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {estadoBadgeClass(solNotas!.estado)}">
 													{estadoLabel(solNotas!.estado)}
 												</span>
-											</div>
-											<p class="text-sm text-light-black dark:text-dark-white">
-												Solicitud creada el {formatDate(solNotas!.created_at)}.
-											</p>
-											<p class="text-xs text-light-four dark:text-dark-four mt-1">
-												El encargado del programa debe aprobarla antes de que puedas descargar el PDF.
-											</p>
-											{#if solNotas!.estado === 'rechazada' && solNotas!.motivo_rechazo}
-												<p class="text-xs text-red-700 dark:text-red-300 mt-2">
-													<strong>Motivo del rechazo:</strong> {solNotas!.motivo_rechazo}
+												<p class="text-sm text-light-black dark:text-dark-white mt-2">
+													Solicitado el {formatDate(solNotas!.created_at)}.
 												</p>
-											{/if}
-										</div>
-										{#if solNotas!.estado === 'pendiente' || solNotas!.estado === 'en_revision'}
-											<Button variant="ghost" size="sm" loading={cancellingRequestId === solNotas!.id} onclick={() => cancelarMiSolicitud(solNotas!)} ariaLabel="Cancelar solicitud">
-												Cancelar
-											</Button>
-										{/if}
-									</div>
-								</div>
-							{:else}
-								<!-- F-CERT-APROBACION (2026-07-30): el estudiante crea una
-								     solicitud en vez de descargar directo. El encargado
-								     del programa la aprueba y recien queda disponible. -->
-								<div class="rounded-lg border border-light-info/40 bg-light-info/5 dark:border-dark-info/40 dark:bg-dark-info/5 p-4">
-									<p class="text-sm text-light-black dark:text-dark-white mb-3">Solicita tu Certificado de Notas. El encargado del programa lo revisará y aprobará; una vez aprobado, podrás descargar el PDF.</p>
-									<Button variant="primary" size="md" loading={emittingNotas[eid]} onclick={() => solicitarNotas(enrollment)} ariaLabel="Solicitar Certificado de Notas">
-										<FileTextIcon class="w-4 h-4 mr-2" />Solicitar Certificado de Notas
-									</Button>
-								</div>
-							{/if}
-						</section>
-
-						<!-- SECCIÓN 2: Certificado de No Deudor -->
-						<section>
-							<div class="flex items-center gap-2 mb-3">
-								<IdentificationIcon class="w-5 h-5 text-uagrm-blue dark:text-dark-tertiary" />
-								<h4 class="text-base font-semibold text-light-black dark:text-dark-white">Certificado de No Deudor</h4>
-							</div>
-
-							<div class="rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface p-4">
-								<p class="text-sm text-light-black dark:text-dark-white mb-3">Puedes solicitar este certificado en cualquier momento, indicando hasta qué módulo ya has cancelado.</p>
-
-								{#if totalModulos === 0}
-									<p class="text-sm text-light-four dark:text-dark-four italic">Esta inscripción no tiene módulos asociados.</p>
-								{:else}
-									<!-- Hint visual: hasta dónde podés llegar ahora -->
-									<div class="mb-3 flex items-center gap-2 text-xs">
-										<span class="inline-flex items-center gap-1.5 rounded-md bg-light-success/10 dark:bg-dark-success/20 text-light-success dark:text-dark-success px-2 py-1 font-medium">
-											<span aria-hidden="true">✓</span>
-											<span>Hasta Módulo {ultPagado} disponible{ultPagado === 1 ? '' : 's'}</span>
-										</span>
-										{#if ultPagado < totalModulos}
-											<span class="text-light-four dark:text-dark-four">
-												· Pagá los siguientes para ampliar el alcance
-											</span>
-										{/if}
-									</div>
-
-									<label for="modulo-n-{eid}" class="block mb-2 text-sm font-medium text-light-black dark:text-dark-white">¿Hasta qué módulo?</label>
-									<div class="flex flex-col sm:flex-row sm:items-center gap-3">
-										<select
-											id="modulo-n-{eid}"
-											class="rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-light-black dark:text-dark-white px-3 py-2 text-sm min-w-[8rem] focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-											value={hastaN}
-											onchange={(ev) => {
-												const v = parseInt((ev.currentTarget as HTMLSelectElement).value, 10);
-												hastaModuloNSelections = { ...hastaModuloNSelections, [eid]: v };
-											}}
-										>
-											{#each Array.from({ length: totalModulos }, (_, i) => i + 1) as n}
-												{@const isPagado = n <= ultPagado}
-												<option value={n}>
-													Módulo {n}{isPagado ? ' ✓' : ''}
-												</option>
-											{/each}
-										</select>
-										{#if noDeudorYaEmitido}
-											<Button variant="primary" size="md" loading={downloadingId === noDeudorYaEmitido.id} onclick={() => descargarPdf(noDeudorYaEmitido)} ariaLabel="Descargar Certificado de No Deudor folio {noDeudorYaEmitido.folio}">
-												<DownloadIcon class="w-4 h-4 mr-2" />Descargar No Deudor (Folio {noDeudorYaEmitido.folio})
-											</Button>
-										{:else if isNoDeudorSolicitudActiva(enrollment, hastaN)}
-											{@const solND = isNoDeudorSolicitudActiva(enrollment, hastaN)}
-											<div class="flex flex-col gap-1.5">
-												<span class="inline-flex items-center self-start rounded-full px-2.5 py-0.5 text-xs font-medium {estadoBadgeClass(solND!.estado)}">
-													{estadoLabel(solND!.estado)}
-												</span>
-												{#if solND!.estado === 'rechazada' && solND!.motivo_rechazo}
-													<p class="text-xs text-red-700 dark:text-red-300">
-														<strong>Rechazado:</strong> {solND!.motivo_rechazo}
-													</p>
-												{:else if solND!.estado === 'aprobada' && !solND!.firma_fisica_confirmada}
-													<!-- F-CERT-NO-DEUDOR-COBRO (2026-08-17): aprobado NO
-													     es descargable todavía. Si acá dijera solo
-													     "aprobado", el estudiante buscaría un botón de
-													     descarga que no existe y creería que está roto. -->
-													<p class="text-xs text-amber-700 dark:text-amber-400">
-														Aprobado. Falta que el coordinador haga firmar la copia
-														física; ahí se te habilita la descarga.
+												{#if solNotas!.estado === 'rechazada' && solNotas!.motivo_rechazo}
+													<p class="text-xs text-light-error dark:text-dark-error mt-1">
+														<strong>Motivo:</strong> {solNotas!.motivo_rechazo}
 													</p>
 												{:else}
-													<p class="text-xs text-light-four dark:text-dark-four">
-														El coordinador debe aprobarlo.
+													<p class="text-xs text-light-four dark:text-dark-four mt-1">
+														Coordinación tiene que aprobarlo antes de que puedas descargarlo.
+													</p>
+												{/if}
+											</div>
+											{#if solNotas!.estado === 'pendiente' || solNotas!.estado === 'en_revision'}
+												<Button variant="ghost" size="sm" loading={cancellingRequestId === solNotas!.id} onclick={() => cancelarMiSolicitud(solNotas!)} ariaLabel="Cancelar solicitud de certificado de notas">
+													Cancelar
+												</Button>
+											{/if}
+										</div>
+									{:else}
+										<div class="flex flex-wrap items-center justify-between gap-3">
+											<p class="text-sm text-light-four dark:text-dark-four min-w-0 flex-1">
+												Acredita las notas que obtuviste en el programa.
+											</p>
+											<Button variant="primary" size="md" loading={emittingNotas[eid]} onclick={() => solicitarNotas(enrollment)} ariaLabel="Solicitar certificado de notas">
+												Solicitar
+											</Button>
+										</div>
+									{/if}
+								</div>
+							</div>
+						</section>
+
+						<!-- ============================================================
+						     SECCIÓN 2: Certificado de No Deudor
+						     F-CERT-NO-DEUDOR-COBRO + F-CERT-UX-ESTUDIANTE (2026-08-17).
+
+						     Dos arreglos de fondo, no solo estéticos:
+						       1. El ARANCEL se muestra ANTES de solicitar. Antes el
+						          estudiante se enteraba del costo en el aviso posterior
+						          a haber creado la solicitud — o sea que se le cobraba
+						          sin avisarle.
+						       2. Se explican los TRES PASOS antes de solicitar. Sin eso
+						          el estudiante pedía, se lo aprobaban, y no entendía por
+						          qué no aparecía el botón de descarga.
+						     ============================================================ -->
+						<section>
+							<div class="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
+								<div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-dark-border">
+									<div class="flex items-center gap-2.5 min-w-0">
+										<IdentificationIcon class="w-5 h-5 shrink-0 text-uagrm-blue dark:text-dark-tertiary" />
+										<h4 class="text-sm font-semibold text-light-black dark:text-dark-white truncate">
+											Certificado de no deudor
+										</h4>
+									</div>
+									{#if arancelNoDeudor !== null}
+										<span class="shrink-0 rounded-full bg-light-warning/15 dark:bg-light-warning/20 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-300">
+											Bs {arancelNoDeudor}
+										</span>
+									{/if}
+								</div>
+
+								<div class="p-4">
+									{#if totalModulos === 0}
+										<p class="text-sm text-light-four dark:text-dark-four italic">
+											Esta inscripción no tiene módulos asociados.
+										</p>
+									{:else}
+										{@const solND = isNoDeudorSolicitudActiva(enrollment, hastaN)}
+
+										{#if noDeudorYaEmitido}
+											<!-- Emitido y habilitado: solo queda descargarlo -->
+											<div class="flex flex-wrap items-start justify-between gap-3">
+												<div class="flex items-start gap-3 min-w-0 flex-1">
+													<CircleCheckIcon class="w-5 h-5 shrink-0 mt-0.5 text-light-success dark:text-dark-success" />
+													<div class="min-w-0">
+														<p class="text-sm font-medium text-light-black dark:text-dark-white">
+															Listo · Folio {noDeudorYaEmitido.folio}
+														</p>
+														<p class="text-xs text-light-four dark:text-dark-four mt-0.5">
+															Cubre hasta el módulo {hastaN}.
+														</p>
+													</div>
+												</div>
+												<Button variant="primary" size="sm" loading={downloadingId === noDeudorYaEmitido.id} onclick={() => descargarPdf(noDeudorYaEmitido)} ariaLabel="Descargar certificado de no deudor folio {noDeudorYaEmitido.folio}">
+													<DownloadIcon class="w-4 h-4 mr-1.5" />Descargar
+												</Button>
+											</div>
+
+										{:else if solND}
+											<!-- Hay una solicitud en curso: su estado ocupa la
+											     tarjeta entera. Antes esto vivía apretado en una
+											     columna angosta al lado del selector de módulo. -->
+											<div class="flex flex-wrap items-center gap-2 mb-3">
+												<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {estadoBadgeClass(solND.estado)}">
+													{estadoLabel(solND.estado)}
+												</span>
+												{#if solND.estado === 'aprobada' && !solND.firma_fisica_confirmada}
+													<span class="inline-flex items-center rounded-full bg-light-warning/15 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-light-warning/20 dark:text-amber-300">
+														Esperando firma
+													</span>
+												{/if}
+											</div>
+
+											{#if solND.estado === 'rechazada' && solND.motivo_rechazo}
+												<p class="text-sm text-light-error dark:text-dark-error">
+													<strong>Motivo del rechazo:</strong> {solND.motivo_rechazo}
+												</p>
+											{:else if solND.estado === 'aprobada' && !solND.firma_fisica_confirmada}
+												<p class="text-sm text-light-black dark:text-dark-white">
+													Ya fue aprobado. Coordinación tiene que hacer firmar la copia
+													física; ahí se te habilita la descarga.
+												</p>
+											{:else}
+												<p class="text-sm text-light-black dark:text-dark-white">
+													Coordinación va a revisar tu solicitud y el pago del arancel.
+												</p>
+											{/if}
+
+											<!-- Comprobante del arancel -->
+											<div class="mt-3 pt-3 border-t border-gray-200 dark:border-dark-border space-y-2">
+												{#if solND.comprobante_url}
+													<div class="flex items-center gap-2 text-xs">
+														<span class="text-light-four dark:text-dark-four">Comprobante</span>
+														<a
+															href={solND.comprobante_url}
+															target="_blank"
+															rel="noopener noreferrer"
+															class="font-medium text-primary-600 hover:underline dark:text-primary-400"
+														>
+															Ver el que enviaste
+														</a>
+													</div>
+												{:else if solND.estado === 'pendiente' || solND.estado === 'en_revision'}
+													<p class="text-xs text-amber-700 dark:text-amber-400">
+														Todavía no adjuntaste el comprobante del pago.
 													</p>
 												{/if}
 
-												<!-- Arancel y comprobante -->
-												{#if solND!.monto}
-													<p class="text-xs text-light-four dark:text-dark-four">
-														Arancel: <strong>Bs {solND!.monto}</strong>
-													</p>
-												{/if}
-												{#if solND!.comprobante_url}
-													<a
-														href={solND!.comprobante_url}
-														target="_blank"
-														rel="noopener noreferrer"
-														class="self-start text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
-													>
-														Ver comprobante enviado
-													</a>
-												{/if}
-												{#if solND!.estado === 'pendiente' || solND!.estado === 'en_revision'}
-													<label class="self-start text-xs text-light-four dark:text-dark-four">
-														<span class="block mb-1">
-															{solND!.comprobante_url ? 'Reemplazar comprobante' : 'Adjuntar comprobante de pago'}
-														</span>
+												{#if solND.estado === 'pendiente' || solND.estado === 'en_revision'}
+													<div>
+														<label
+															for="comprobante-{solND.id}"
+															class="block mb-1 text-xs font-medium text-light-black dark:text-dark-white"
+														>
+															{solND.comprobante_url ? 'Reemplazar comprobante' : 'Adjuntar comprobante de pago'}
+														</label>
 														<input
+															id="comprobante-{solND.id}"
 															type="file"
 															accept="image/*,application/pdf"
-															disabled={subiendoComprobanteId === solND!.id}
-															onchange={(ev) => subirComprobante(solND!, ev)}
-															class="block text-xs file:mr-2 file:rounded-md file:border-0 file:bg-primary-50 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-primary-700 dark:file:bg-primary-900/40 dark:file:text-primary-300"
+															disabled={subiendoComprobanteId === solND.id}
+															onchange={(ev) => subirComprobante(solND, ev)}
+															class="block w-full text-xs text-light-four dark:text-dark-four file:mr-2 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-primary-900/40 dark:file:text-primary-300"
 														/>
-													</label>
+													</div>
+												{/if}
+
+												{#if solND.estado === 'pendiente' || solND.estado === 'en_revision'}
+													<div class="pt-1">
+														<Button variant="ghost" size="sm" loading={cancellingRequestId === solND.id} onclick={() => cancelarMiSolicitud(solND)} ariaLabel="Cancelar solicitud de certificado de no deudor">
+															Cancelar solicitud
+														</Button>
+													</div>
 												{/if}
 											</div>
+
 										{:else}
-											<Button variant="primary" size="md" disabled={!elegibleNoDeudor.ok} loading={emittingNoDeudor[eid]} onclick={() => solicitarNoDeudor(enrollment)} ariaLabel="Solicitar Certificado de No Deudor hasta Módulo {hastaN}">
-												<FileTextIcon class="w-4 h-4 mr-2" />Solicitar No Deudor
-											</Button>
+											<!-- Sin solicitud: acá es donde el estudiante decide,
+											     así que acá tiene que estar toda la información. -->
+											<ol class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+												<li class="border-l-2 border-primary-600 dark:border-primary-500 pl-3">
+													<p class="text-[11px] text-light-four dark:text-dark-four">Paso 1</p>
+													<p class="text-xs text-light-black dark:text-dark-white mt-0.5">
+														Pagás el arancel y solicitás
+													</p>
+												</li>
+												<li class="border-l-2 border-gray-300 dark:border-dark-border pl-3">
+													<p class="text-[11px] text-light-four dark:text-dark-four">Paso 2</p>
+													<p class="text-xs text-light-four dark:text-dark-four mt-0.5">
+														Coordinación lo aprueba
+													</p>
+												</li>
+												<li class="border-l-2 border-gray-300 dark:border-dark-border pl-3">
+													<p class="text-[11px] text-light-four dark:text-dark-four">Paso 3</p>
+													<p class="text-xs text-light-four dark:text-dark-four mt-0.5">
+														Firman la copia y lo descargás
+													</p>
+												</li>
+											</ol>
+
+											<div class="flex flex-col sm:flex-row sm:items-end gap-3">
+												<div class="flex-1 min-w-0">
+													<label
+														for="modulo-n-{eid}"
+														class="block mb-1.5 text-xs font-medium text-light-black dark:text-dark-white"
+													>
+														Alcance del certificado
+													</label>
+													<select
+														id="modulo-n-{eid}"
+														class="w-full rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-light-black dark:text-dark-white px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+														value={hastaN}
+														onchange={(ev) => {
+															const v = parseInt((ev.currentTarget as HTMLSelectElement).value, 10);
+															hastaModuloNSelections = { ...hastaModuloNSelections, [eid]: v };
+														}}
+													>
+														{#each Array.from({ length: totalModulos }, (_, i) => i + 1) as n (n)}
+															<option value={n}>
+																Hasta el módulo {n}{n <= ultPagado ? ' — pagado' : ''}
+															</option>
+														{/each}
+													</select>
+												</div>
+												<Button variant="primary" size="md" disabled={!elegibleNoDeudor.ok} loading={emittingNoDeudor[eid]} onclick={() => solicitarNoDeudor(enrollment)} ariaLabel="Solicitar certificado de no deudor hasta el módulo {hastaN}">
+													Solicitar
+												</Button>
+											</div>
+
+											{#if !elegibleNoDeudor.ok}
+												<p class="mt-2 text-xs text-light-error dark:text-dark-error">
+													{elegibleNoDeudor.motivo}
+												</p>
+											{:else}
+												<p class="mt-2 flex items-center gap-1.5 text-xs text-light-four dark:text-dark-four">
+													<CircleCheckIcon class="w-3.5 h-3.5 shrink-0 text-light-success dark:text-dark-success" />
+													<span>
+														Módulos 1 a {hastaN} pagados. Podés emitirlo con ese alcance.
+													</span>
+												</p>
+											{/if}
 										{/if}
-									</div>
-									{#if !elegibleNoDeudor.ok}
-										<p class="text-xs text-light-error dark:text-dark-error mt-2">{elegibleNoDeudor.motivo}</p>
-									{:else if ultPagado >= hastaN}
-										<p class="text-xs text-light-success dark:text-dark-success mt-2">✓ Los módulos 1 a {hastaN} están pagados. Puedes emitir este certificado.</p>
 									{/if}
-								{/if}
+								</div>
 							</div>
 						</section>
 					</Card>
