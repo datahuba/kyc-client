@@ -734,6 +734,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Inscripciones · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<Heading level="h1">Inscripciones</Heading>

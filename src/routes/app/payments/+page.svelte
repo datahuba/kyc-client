@@ -808,6 +808,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Gestión de Pagos · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6 relative z-10">
 	<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 		<div>
