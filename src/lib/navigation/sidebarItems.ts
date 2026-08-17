@@ -32,7 +32,8 @@ import {
 	BellIcon,
 	EyeIcon,
 	IdentificationIcon,
-	UserIcon
+	UserIcon,
+	MailIcon
 } from '$lib/icons/outline';
 import {
 	BookIcon,
@@ -156,6 +157,11 @@ const staffAdminGroup: NavigationGroup = {
 		{ type: 'item', name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
+		// F-CORREOS-REGISTRO (2026-08-17, Kevin): "ver cuales son las que llegan
+		// a los usuarios". Solo admin/superadmin porque el registro guarda el
+		// cuerpo de los correos, y el de credenciales trae la contraseña inicial
+		// del alumno en texto plano.
+		{ type: 'item', name: 'Registro de Correos', href: '/app/correos', icon: MailIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Visor de Errores', href: '/app/admin/errors', icon: ExclamationIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
 	]
 };

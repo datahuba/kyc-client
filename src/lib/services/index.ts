@@ -18,3 +18,4 @@ export * from './cuentas-por-cobrar.service'; // F-CUENTAS-POR-COBRAR (2026-07-2
 export * from './cuentas-historicas.service'; // F-CUENTAS-HISTORICAS (2026-08-16)
 export * from './tramite-solicitud.service';  // F-TRAMITES-SOLICITUD (2026-07-29)
 export * from './bug-report.service';         // F-REPORTE-BUGS (2026-08-17)
+export * from './email-log.service';        // F-CORREOS-REGISTRO (2026-08-17)
