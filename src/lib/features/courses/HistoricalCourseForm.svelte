@@ -145,10 +145,10 @@
 				es_historico: true
 			};
 
-			console.log('[HistoricalCourseForm] Enviando payload:', JSON.stringify(payload, null, 2));
-
+			// F-FIX-DEBUG-CONSOLA (2026-08-16): se quitaron dos console.log que
+			// volcaban el payload completo y el curso creado a la consola del
+			// navegador. Eran rastros de desarrollo.
 			const course = await courseService.create(payload);
-			console.log('[HistoricalCourseForm] Programa creado:', course);
 
 			// 2. Subir la resolución si hay (tolerante a fallos)
 			if (resolucionFile && course._id) {

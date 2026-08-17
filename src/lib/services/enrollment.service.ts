@@ -64,7 +64,6 @@ class EnrollmentService {
 	}
 
 	async getByStudentId(studentId: string): Promise<Enrollment[]> {
-		//console.log("entre a traer pagos de students");
 		return await apiKyC.get<Enrollment[]>(`/enrollments/student/${studentId}`);
 	}
 
