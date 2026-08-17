@@ -486,6 +486,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Mi Perfil · KYC DataHub</title>
+</svelte:head>
 {#if ($userStore.role as string) === 'student'}
 	<div class="space-y-6 pb-8">
 		<div class="flex items-center justify-between">

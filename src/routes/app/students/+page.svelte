@@ -575,6 +575,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Estudiantes · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
 		<Heading level="h1">Estudiantes</Heading>

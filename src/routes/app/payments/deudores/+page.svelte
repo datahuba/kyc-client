@@ -154,6 +154,10 @@
 	});
 </script>
 
+
+<svelte:head>
+	<title>Deudores · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-4">
 	<!-- Header con título + selector de curso + acciones -->
 	<Card>

@@ -258,6 +258,10 @@
 	const TABS: TipoTramite[] = ['convalidacion', 'tutoria', 'readmision', 'titulacion'];
 </script>
 
+
+<svelte:head>
+	<title>Solicitudes · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6">
 	<Heading level="h1">
 		<span class="flex items-center gap-2">

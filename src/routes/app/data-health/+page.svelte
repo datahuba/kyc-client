@@ -262,6 +262,10 @@
 	});
 </script>
 
+
+<svelte:head>
+	<title>Calidad de Datos · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6 p-4 sm:p-6 lg:p-8">
 	<!-- HEADER -->
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

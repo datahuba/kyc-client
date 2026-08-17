@@ -226,6 +226,10 @@
 	];
 </script>
 
+
+<svelte:head>
+	<title>Mi Panel · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-8">
 	{#if loading}
 		<DashboardSkeleton />

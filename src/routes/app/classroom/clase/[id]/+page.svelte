@@ -460,6 +460,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Clase · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 		<div class="flex items-center gap-3 min-w-0">

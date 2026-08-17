@@ -167,7 +167,13 @@
 				por_cobrar: c.por_cobrar ?? 0,
 			}));
 			groupedByType = buildGrouped(courseBreakdown);
-			expandedGroups = new Set(Object.keys(groupedByType));
+			// F-DASHBOARD-COLLAPSE (2026-08-16): grupos arrancan colapsados.
+			// Antes: Object.keys(groupedByType) los abría todos por default,
+			// y cada curso trae su propia tarjeta grande (4 KPIs + resumen de
+			// inscritos), asi que con varios programas activos el dashboard
+			// quedaba larguisimo. El admin ahora expande solo lo que le
+			// interesa; el conteo/badge de cada tipo sigue visible cerrado.
+			expandedGroups = new Set();
 
 			resumenInscritos = v2.resumenInscritos;
 			resumenEconomico = v2.resumenEconomico;

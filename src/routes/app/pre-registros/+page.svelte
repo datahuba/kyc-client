@@ -729,6 +729,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Pre-registros · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6">
 	<!-- F-2026-08-12-EC-CURSOS-FILTRO (Kevin 2026-08-12): banner informativo
 	     para encargado_curso y coordinador. Les avisa que solo ven datos

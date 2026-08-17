@@ -218,6 +218,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Validación de Notas · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6 max-w-7xl mx-auto">
 	<div class="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
 		<div>
