@@ -427,6 +427,20 @@
 			filters.curso_id = cursoIdParam;
 		}
 
+		// F-CERT-NO-DEUDOR-COBRO (2026-08-17): el botón "Verificar pagos" del
+		// panel de Solicitudes de Certificado abre esta pantalla ya filtrada
+		// por estudiante y programa, para que el coordinador confirme que no
+		// hay deuda sin perder la solicitud que estaba mirando.
+		//
+		// Se fuerza la vista de lista: la Matriz ignora `estudiante_id`, así
+		// que sin esto el coordinador vería el programa completo y creería que
+		// el filtro no funcionó.
+		const estudianteIdParam = $appPage.url.searchParams.get('estudiante_id');
+		if (estudianteIdParam && isStaff) {
+			filters.estudiante_id = estudianteIdParam;
+			viewMode = 'lista';
+		}
+
 		// F-FIX-MATRIZ-RACE-CONDITION (2026-08-11, Kevin): si la vista activa
 		// es Matriz y todavia no hay curso seleccionado (no vino en URL, no
 		// quedo de una sesion previa), auto-seleccionar el primer programa

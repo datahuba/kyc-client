@@ -97,6 +97,9 @@
 	// F-CERT-APROBACION (2026-07-30): solicitudes de certificado del estudiante
 	let myRequests: CertificateRequest[] = $state([]);
 	let cancellingRequestId = $state<string | null>(null);
+	// F-CERT-NO-DEUDOR-COBRO (2026-08-17): id de la solicitud cuyo comprobante
+	// se está subiendo, para deshabilitar solo ese input y no todos.
+	let subiendoComprobanteId = $state<string | null>(null);
 
 	$effect(() => {
 		if (enrollments.length > 0 && !selectedEnrollmentId) {
@@ -508,10 +511,16 @@
 				motivo: `Solicitud de Certificado de No Deudor hasta Módulo ${hastaN}.`
 			});
 			myRequests = [req, ...myRequests];
+			// F-CERT-NO-DEUDOR-COBRO (2026-08-17): el arancel y el paso de la
+			// firma física se avisan ACÁ, al crear la solicitud, y no cuando el
+			// estudiante intente descargar. Enterarse del costo recién al final
+			// es la forma más segura de que vuelva a preguntar por qué no puede
+			// bajar su certificado.
+			const arancel = req.monto ? ` Tiene un costo de Bs ${req.monto}.` : '';
 			alert(
 				'success',
-				'Solicitud creada. El encargado del programa la revisará y aprobará. ' +
-				'Te avisaremos cuando esté lista para descargar.'
+				`Solicitud creada.${arancel} Cuando la aprueben, el coordinador tiene que hacer ` +
+				'firmar la copia física antes de habilitarte la descarga. Te avisamos cuando esté lista.'
 			);
 		} catch (err: any) {
 			console.error('Error creando solicitud de no deudor:', err);
@@ -519,6 +528,41 @@
 			alert('error', detail);
 		} finally {
 			emittingNoDeudor = { ...emittingNoDeudor, [eid]: false };
+		}
+	}
+
+	/**
+	 * Adjunta el comprobante de pago del arancel a una solicitud de No Deudor.
+	 *
+	 * F-CERT-NO-DEUDOR-COBRO (2026-08-17). Se permite reemplazarlo mientras la
+	 * solicitud siga abierta: si subió el archivo equivocado tiene que poder
+	 * corregirlo sin cancelar y volver a empezar.
+	 */
+	async function subirComprobante(req: CertificateRequest, ev: Event) {
+		const input = ev.target as HTMLInputElement;
+		const archivo = input.files?.[0];
+		if (!archivo) return;
+
+		// 10 MB: más que eso suele ser una foto sin comprimir y la subida
+		// falla sin decir por qué.
+		if (archivo.size > 10 * 1024 * 1024) {
+			alert('error', 'El comprobante no puede pasar los 10 MB.');
+			input.value = '';
+			return;
+		}
+
+		subiendoComprobanteId = req.id;
+		try {
+			const updated = await certificateService.uploadComprobante(req.id, archivo);
+			myRequests = myRequests.map((r) => (r.id === updated.id ? updated : r));
+			alert('success', 'Comprobante enviado.');
+		} catch (err: any) {
+			console.error('Error subiendo comprobante:', err);
+			const detail = err?.response?.data?.detail || err?.message || 'No se pudo subir el comprobante.';
+			alert('error', detail);
+		} finally {
+			subiendoComprobanteId = null;
+			input.value = '';
 		}
 	}
 
@@ -1138,10 +1182,50 @@
 													<p class="text-xs text-red-700 dark:text-red-300">
 														<strong>Rechazado:</strong> {solND!.motivo_rechazo}
 													</p>
+												{:else if solND!.estado === 'aprobada' && !solND!.firma_fisica_confirmada}
+													<!-- F-CERT-NO-DEUDOR-COBRO (2026-08-17): aprobado NO
+													     es descargable todavía. Si acá dijera solo
+													     "aprobado", el estudiante buscaría un botón de
+													     descarga que no existe y creería que está roto. -->
+													<p class="text-xs text-amber-700 dark:text-amber-400">
+														Aprobado. Falta que el coordinador haga firmar la copia
+														física; ahí se te habilita la descarga.
+													</p>
 												{:else}
 													<p class="text-xs text-light-four dark:text-dark-four">
-														El encargado del programa debe aprobarlo.
+														El coordinador debe aprobarlo.
 													</p>
+												{/if}
+
+												<!-- Arancel y comprobante -->
+												{#if solND!.monto}
+													<p class="text-xs text-light-four dark:text-dark-four">
+														Arancel: <strong>Bs {solND!.monto}</strong>
+													</p>
+												{/if}
+												{#if solND!.comprobante_url}
+													<a
+														href={solND!.comprobante_url}
+														target="_blank"
+														rel="noopener noreferrer"
+														class="self-start text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
+													>
+														Ver comprobante enviado
+													</a>
+												{/if}
+												{#if solND!.estado === 'pendiente' || solND!.estado === 'en_revision'}
+													<label class="self-start text-xs text-light-four dark:text-dark-four">
+														<span class="block mb-1">
+															{solND!.comprobante_url ? 'Reemplazar comprobante' : 'Adjuntar comprobante de pago'}
+														</span>
+														<input
+															type="file"
+															accept="image/*,application/pdf"
+															disabled={subiendoComprobanteId === solND!.id}
+															onchange={(ev) => subirComprobante(solND!, ev)}
+															class="block text-xs file:mr-2 file:rounded-md file:border-0 file:bg-primary-50 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-primary-700 dark:file:bg-primary-900/40 dark:file:text-primary-300"
+														/>
+													</label>
 												{/if}
 											</div>
 										{:else}

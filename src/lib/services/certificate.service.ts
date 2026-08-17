@@ -184,11 +184,47 @@ class CertificateService {
 
 	/**
 	 * [Encargado/Admin] Aprobar solicitud. Al aprobar, se emite el Certificate.
+	 *
+	 * F-CERT-NO-DEUDOR-COBRO (2026-08-17): para 'no_deudor' se manda además el
+	 * tratamiento profesional (Lic./Ing./...) que va a salir impreso antes del
+	 * nombre. Lo elige quien aprueba, no el estudiante. Va vacío para los de
+	 * diplomado continuo.
+	 *
+	 * OJO: aprobar un 'no_deudor' NO habilita la descarga. Falta
+	 * `confirmSignature()`.
 	 */
-	async approveRequest(requestId: string): Promise<CertificateRequest> {
+	async approveRequest(requestId: string, tratamiento?: string | null): Promise<CertificateRequest> {
 		return await apiKyC.patch<CertificateRequest>(
 			`/certificates/requests/${requestId}/approve`,
-			{}
+			{ tratamiento: tratamiento || null }
+		);
+	}
+
+	/**
+	 * [Coordinador financiero/Superadmin] Confirmar la firma física y habilitar
+	 * al estudiante a descargar el certificado.
+	 *
+	 * Segundo paso de la aprobación del No Deudor (F-CERT-NO-DEUDOR-COBRO).
+	 */
+	async confirmSignature(requestId: string, observacion?: string): Promise<CertificateRequest> {
+		return await apiKyC.patch<CertificateRequest>(
+			`/certificates/requests/${requestId}/confirmar-firma`,
+			{ observacion: observacion || null }
+		);
+	}
+
+	/**
+	 * [Estudiante] Adjuntar el comprobante de pago del arancel a su solicitud.
+	 * Se puede reemplazar mientras siga pendiente o en revisión.
+	 */
+	async uploadComprobante(requestId: string, archivo: File): Promise<CertificateRequest> {
+		const form = new FormData();
+		form.append('archivo', archivo);
+		// customTimeout 60s: puede ser una foto pesada del comprobante.
+		return await apiKyC.post<CertificateRequest>(
+			`/certificates/requests/${requestId}/comprobante`,
+			form,
+			{ customTimeout: 60000 }
 		);
 	}
 
