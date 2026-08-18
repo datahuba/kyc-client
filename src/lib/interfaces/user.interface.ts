@@ -25,6 +25,7 @@ export interface User {
 	foto_url?: string; // Optional as it wasn't in the snippet but used in header
 	nombre_funcional?: string | null; // ISSUE-R-ROLES: nombre por función/programa
 	cursos_asignados?: string[]; // ISSUE-R-ROLES: cursos que puede operar (encargado_curso/cobranza)
+	ambito?: string | null;
 	subtipo_coordinador?: string | null; // ISSUE-R-PERFIL-GENERICO: 'financiero'|'academico'|'investigacion'
 	terminos_aceptados?: boolean; // ISSUE-Q-PRE: siempre true para personal admin/docente, real para estudiantes
 	email_verificado?: boolean; // ISSUE-A-VERIFICACION: no bloqueante, solo informativo
@@ -49,6 +50,8 @@ export interface CreateUserRequest {
 	cursos_asignados?: string[]; // ISSUE-R-ROLES
 	carnet?: string | null; // GAP-1
 	subtipo_coordinador?: string | null; // ISSUE-R-PERFIL-GENERICO
+	// P-AMBITO-FORMACION (2026-08-18): 'educacion_continua' | 'profesional'
+	ambito?: string | null;
 }
 
 export interface UpdateUserRequest extends Partial<CreateUserRequest> {}

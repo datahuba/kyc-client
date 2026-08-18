@@ -38,7 +38,8 @@ interface Props {
 		nombre_funcional: '',
 		cursos_asignados: [],
 		carnet: '',
-		subtipo_coordinador: ''
+		subtipo_coordinador: '',
+		ambito: ''
 	});
 
 	// GAP-1 (audio 2026-07-08): si se completa el CI y se deja la contraseña en
@@ -59,6 +60,19 @@ interface Props {
 	let requiereCursosAsignados = $derived(formData.role === 'encargado_curso');
 	// ISSUE-R-PERFIL-GENERICO: el Coordinador requiere subtipo (financiero/académico/investigación).
 	let requiereSubtipoCoordinador = $derived(formData.role === 'coordinador');
+
+	// P-AMBITO-FORMACION (2026-08-18, Kevin): "separar las cuentas de
+	// encargados de los de educación continua y los de profesionales, así
+	// sabemos cuál es cuál".
+	//
+	// Cada encargado maneja UN solo tipo de programa, así que su ámbito
+	// determina el de los programas que crea y el formulario deja de
+	// preguntárselo. Además define qué campos de matrícula ve: los de
+	// educación continua son diferenciados por alumno (200/500), los de
+	// programas profesionales son una matrícula única.
+	let requiereAmbito = $derived(
+		formData.role === 'encargado_curso' || formData.role === 'coordinador'
+	);
 	// Cobranza también puede asignarse a programas, pero es OPCIONAL: si no se
 	// marca ninguno, ve/gestiona todos los pagos (comportamiento general);
 	// si se marcan, queda segmentado a esos programas (ISSUE-P-SEGMENTACION).
@@ -121,7 +135,8 @@ interface Props {
 				nombre_funcional: user.nombre_funcional ?? '',
 				cursos_asignados: user.cursos_asignados ?? [],
 				carnet: user.carnet ?? '',
-				subtipo_coordinador: user.subtipo_coordinador ?? ''
+				subtipo_coordinador: user.subtipo_coordinador ?? '',
+				ambito: user.ambito ?? ''
 			};
 		} else {
 			formData = {
@@ -133,7 +148,8 @@ interface Props {
 				nombre_funcional: '',
 				cursos_asignados: [],
 				carnet: '',
-				subtipo_coordinador: ''
+				subtipo_coordinador: '',
+				ambito: ''
 			};
 		}
 		errors = {};
@@ -187,6 +203,9 @@ interface Props {
 				nuevosErrores.cursos_asignados = 'Un Encargado de Curso puede tener máximo 10 programas asignados.';
 			}
 		}
+		if (requiereAmbito && !formData.ambito) {
+			nuevosErrores.ambito = 'Indica si maneja programas de educación continua o profesionales.';
+		}
 		if (requiereSubtipoCoordinador && !formData.subtipo_coordinador) {
 			nuevosErrores.subtipo_coordinador = 'Selecciona el subtipo del Coordinador (financiero, académico o investigación).';
 		}
@@ -222,7 +241,8 @@ interface Props {
 				carnet: formData.carnet?.trim() || undefined,
 				nombre_funcional: requiereNombreFuncional ? formData.nombre_funcional : undefined,
 				cursos_asignados: permiteCursosAsignados ? formData.cursos_asignados : undefined,
-				subtipo_coordinador: requiereSubtipoCoordinador ? formData.subtipo_coordinador : undefined
+				subtipo_coordinador: requiereSubtipoCoordinador ? formData.subtipo_coordinador : undefined,
+				ambito: requiereAmbito ? formData.ambito : undefined
 			};
 
 			if (isEditMode && user) {
@@ -352,6 +372,20 @@ interface Props {
 							perder el historial.
 						</p>
 					{/if}
+				</div>
+			{/if}
+
+			{#if requiereAmbito}
+				<div class="sm:col-span-2">
+					<Select label="Ámbito de los programas que maneja" bind:value={formData.ambito} required error={errors.ambito}>
+						<option value="">— Seleccione —</option>
+						<option value="educacion_continua">Educación continua (cursos, talleres, diplomados de continua)</option>
+						<option value="profesional">Profesionales (maestrías, doctorados, diplomados profesionales)</option>
+					</Select>
+					<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+						Define qué campos de matrícula ve al crear un programa, y evita que
+						tenga que elegir el tipo cada vez.
+					</p>
 				</div>
 			{/if}
 
