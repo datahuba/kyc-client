@@ -461,13 +461,13 @@
 					{/snippet}
 					Nuevo Programa
 				</Button>
-				<!-- F-2026-08-11-EC-AUTOSERVICIO: aviso para encargado/coordinador -->
-				{#if ['encargado_curso', 'coordinador'].includes(currentRole)}
-					<p class="text-[10px] text-amber-700 dark:text-amber-400 max-w-xs text-right">
-						Como encargado de EC, solo puedes crear programas <strong>históricos</strong>
-						(fecha_fin ya pasó). Para programas nuevos consulta con CPD.
-					</p>
-				{/if}
+				<!-- F-FIX-FECHA-FIN-INVERTIDA (2026-08-18, Kevin): aca habia un aviso
+				     que decia que el encargado solo podia crear programas historicos
+				     "(fecha_fin ya paso)". Era el reflejo de una validacion del
+				     backend que estaba AL REVES: le exigia a un programa en ejecucion
+				     haber terminado en el pasado. Corregida esa validacion, el
+				     encargado crea cualquier tipo de programa, asi que el aviso ya no
+				     corresponde y solo confundia. -->
 			</div>
 		{/if}
 	</div>

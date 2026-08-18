@@ -13,6 +13,7 @@
 	import { alert } from '$lib/utils';
 	import { CheckIcon, DocumentAddIcon } from '$lib/icons/outline';
 	import { onMount } from 'svelte';
+	import { userStore } from '$lib/stores/userStore';
 
 	// F-US-006-3TIPOS (2026-08-04): el tipo de programa define comportamiento,
 	// validaciones y visibilidad. Hay 3 tipos: proximo (próximo a iniciar),
@@ -53,6 +54,20 @@
 	let tipo_programa: TipoPrograma = $state(initialTipoPrograma);
 	let es_historico = $derived(tipo_programa === 'historico');
 
+
+	// F-EC-AUTOASIGNA-AVISO (2026-08-18, Kevin): "cuando un encargado de
+	// programa crea su programa ahi deberia salir que ya se asignara
+	// automaticamente a ese perfil".
+	//
+	// Ademas arregla una caja vacia enganosa: GET /users/ exige superadmin,
+	// asi que cuando un encargado abria el formulario la llamada daba 403, el
+	// catch se la comia y quedaba el cartel "No hay Encargados de Curso o
+	// Coordinadores registrados en el sistema" — que es falso, hay 8.
+	//
+	// El encargado no necesita elegir a nadie: el backend lo auto-asigna al
+	// crear (F-2026-08-12-EC-AUTOASIGNAR-CURSO). Se le muestra eso.
+	let rolActual = $derived(($userStore.role || '').toLowerCase());
+	let seAutoAsigna = $derived(rolActual === 'encargado_curso' || rolActual === 'coordinador');
 
 	let isEditMode = $derived(!!course);
 	let saving = $state(false);
@@ -292,10 +307,16 @@
 					es_historico: false
 				};
 				es_historico = false;
-				// F-US-006-3TIPOS (2026-08-04): al crear un programa nuevo,
-				// el default es 'proximo' (cambia el comportamiento default
-				// del antiguo form que empezaba como "En operación").
-				tipo_programa = 'proximo';
+				// F-FIX-TIPO-PROGRAMA-SE-RESETEA (2026-08-18, Kevin): aca se
+				// forzaba `tipo_programa = 'proximo'` sin mirar lo que venia del
+				// wizard. Como el wizard pasa el tipo elegido por
+				// `initialTipoPrograma`, elegir "En ejecucion" abria el modal y
+				// este effect lo pisaba de vuelta a "Programado": habia que
+				// volver a seleccionarlo a mano en cada creacion.
+				//
+				// Ahora se respeta lo que eligio el usuario; 'proximo' queda
+				// solo como default cuando el form se abre sin wizard.
+				tipo_programa = initialTipoPrograma ?? 'proximo';
 				prevCuotas = 1;
 				prevCostoTotal = 0;
 
@@ -747,6 +768,12 @@
 					</label>
 				{/each}
 			</div>
+		{:else if seAutoAsigna}
+			<p class="text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 p-3 rounded-md border border-green-100 dark:border-green-800">
+				Este programa <strong>se asignará automáticamente a tu perfil</strong> al
+				crearlo, así que vas a poder gestionarlo enseguida. Si además tiene que
+				administrarlo otra persona, pedile a CPD que la agregue.
+			</p>
 		{:else}
 			<p class="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md border border-amber-100 dark:border-amber-800">
 				No hay Encargados de Curso o Coordinadores registrados en el sistema.
