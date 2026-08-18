@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { enrollmentService, studentService, courseService, discountService, cuentasPorCobrarService } from '$lib/services';
+	import { enrollmentService, studentService, courseService, discountService, cuentasPorCobrarService, paymentService } from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
 	import {
 		hasRole,
@@ -303,6 +303,70 @@
 		selectedKardex = enrollment;
 		isKardexOpen = true;
 		openDropdownId = null;
+		cargarPagosKardex(enrollment);
+	}
+
+	// F-LIBRETA-IMPRIMIR (2026-08-18, Kevin en la capacitacion): la libreta
+	// muestra notas y estado de pago por modulo, pero NO el numero de
+	// comprobante ni la fecha — esos viven en los Payment, no en la
+	// inscripcion. Kevin los pidio explicitamente para el documento impreso:
+	// "la fecha en la que se subio y el numero de comprobante".
+	//
+	// Se filtra por estudiante + curso, que es exactamente esta inscripcion.
+	let pagosKardex: any[] = $state([]);
+	let cargandoPagosKardex = $state(false);
+
+	async function cargarPagosKardex(enrollment: Enrollment) {
+		pagosKardex = [];
+		const estudianteId = typeof enrollment.estudiante_id === 'object'
+			? (enrollment.estudiante_id as any)?._id
+			: enrollment.estudiante_id;
+		const cursoId = typeof enrollment.curso_id === 'object'
+			? (enrollment.curso_id as any)?._id
+			: enrollment.curso_id;
+		if (!estudianteId || !cursoId) return;
+
+		cargandoPagosKardex = true;
+		try {
+			// per_page alto: una inscripcion puede tener un pago por modulo mas
+			// la matricula, y el documento impreso tiene que traerlos todos.
+			const resp = await paymentService.getAll(1, 200, {
+				estudiante_id: String(estudianteId),
+				curso_id: String(cursoId)
+			});
+			pagosKardex = (resp as any)?.data ?? [];
+		} catch (e) {
+			// No romper la libreta si los pagos no cargan: el resto de la
+			// informacion (notas, costos, estados) sigue siendo util.
+			console.error('No se pudieron cargar los pagos de la libreta', e);
+			pagosKardex = [];
+		} finally {
+			cargandoPagosKardex = false;
+		}
+	}
+
+	/** Fecha en formato boliviano. Las ISO del backend vienen en UTC. */
+	function fechaCorta(valor: any): string {
+		if (!valor) return '--';
+		try {
+			// Mismo saneamiento que el resto del sistema: espacio -> T,
+			// microsegundos recortados y sufijo Z forzado.
+			let iso = String(valor).replace(' ', 'T');
+			iso = iso.replace(/\.\d+/, '');
+			if (!iso.endsWith('Z')) iso += 'Z';
+			const d = new Date(iso);
+			if (isNaN(d.getTime())) return '--';
+			return d.toLocaleDateString('es-BO', {
+				day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/La_Paz'
+			});
+		} catch {
+			return '--';
+		}
+	}
+
+	/** Dispara la impresion del navegador (el usuario elige "Guardar como PDF"). */
+	function imprimirLibreta() {
+		window.print();
 	}
 
 	// F-MODULOS-MODAL (2026-07-31): abre el modal centralizado de gestión
@@ -1066,7 +1130,7 @@
 		maxWidth="sm:max-w-5xl"
 	>
 		{#if selectedKardex}
-			<div class="p-6 space-y-6">
+			<div class="p-6 space-y-6 libreta-imprimible">
 				<!-- Cabecera de la Libreta -->
 				<div class="bg-gray-50 dark:bg-dark-background/40 p-5 rounded-2xl border border-gray-200 dark:border-dark-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 					<div>
@@ -1375,6 +1439,72 @@
 					</div>
 				</div>
 
+				<!-- ================================================================
+				     F-LIBRETA-IMPRIMIR (2026-08-18, Kevin en la capacitación)
+				     ================================================================
+				     "el nombre, dirá el pago, la nota, y te dije si podía agregar
+				     el número de comprobante (...) y la fecha en la que se subió".
+
+				     La tabla de módulos de arriba muestra el ESTADO del pago, pero
+				     no con qué comprobante se pagó. Ese dato vive en los Payment,
+				     no en la inscripción, y es justo lo que la coordinadora
+				     necesita para verificar contra el banco antes de firmar.
+				-->
+				<div class="border border-gray-200 dark:border-dark-border rounded-xl shadow-sm overflow-hidden">
+					<div class="bg-gray-100 dark:bg-dark-background px-4 py-3">
+						<p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Comprobantes de pago</p>
+					</div>
+					{#if cargandoPagosKardex}
+						<p class="px-4 py-4 text-sm text-slate-500">Cargando comprobantes…</p>
+					{:else if pagosKardex.length === 0}
+						<p class="px-4 py-4 text-sm text-slate-500">
+							No hay pagos registrados para esta inscripción.
+						</p>
+					{:else}
+						<div class="overflow-x-auto">
+							<table class="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
+								<thead class="bg-gray-50 dark:bg-dark-background/60">
+									<tr>
+										<th class="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Concepto</th>
+										<th class="px-4 py-2 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Monto (Bs)</th>
+										<th class="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">N° Comprobante</th>
+										<th class="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
+										<th class="px-4 py-2 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+									</tr>
+								</thead>
+								<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
+									{#each pagosKardex as pago}
+										<tr>
+											<td class="px-4 py-3 text-sm text-slate-900 dark:text-white">
+												{pago.concepto || '--'}
+												{#if pago.numero_cuota}
+													<span class="text-xs text-slate-500"> (cuota {pago.numero_cuota})</span>
+												{/if}
+											</td>
+											<td class="px-4 py-3 text-sm text-right font-semibold text-slate-900 dark:text-white">
+												{formatCurrency(pago.cantidad_pago ?? 0)}
+											</td>
+											<td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
+												<!-- En caja física no existe número de transferencia: se
+												     dice "Caja" en vez de dejarlo como un dato faltante. -->
+												{pago.numero_transaccion || (pago.metodo_pago === 'Caja' ? 'Caja' : '--')}
+											</td>
+											<td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
+												{fechaCorta(pago.fecha_comprobante || pago.created_at)}
+											</td>
+											<td class="px-4 py-3 text-center">
+												<span class="px-2 py-1 text-[11px] font-bold rounded-full uppercase tracking-wide {pago.estado_pago === 'Aprobado' ? 'bg-green-100 text-green-700' : pago.estado_pago === 'Rechazado' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}">
+													{pago.estado_pago || '--'}
+												</span>
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					{/if}
+				</div>
+
 				<div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
 					<!-- Si es estudiante y debe dinero, mostrar atajo rápido al pago -->
 					{#if currentRole === 'student' && selectedKardex.saldo_pendiente > 0}
@@ -1382,7 +1512,14 @@
 							Pagar Saldo Pendiente
 						</Button>
 					{/if}
-					<Button variant="secondary" onclick={() => isKardexOpen = false}>Cerrar Libreta</Button>
+					<!-- F-LIBRETA-IMPRIMIR (2026-08-18, Kevin): "un recuadro que diga
+					     imprimir y te imprima solamente esto". El flujo real es:
+					     la coordinadora verifica, imprime, se lo lleva al firmante
+					     y recién con la firma física aprueba. -->
+					<Button onclick={imprimirLibreta} class="bg-primary-600 hover:bg-primary-700 text-white no-print">
+						Imprimir
+					</Button>
+					<Button variant="secondary" onclick={() => isKardexOpen = false} class="no-print">Cerrar Libreta</Button>
 				</div>
 			</div>
 		{/if}
@@ -1497,3 +1634,67 @@
 		}}
 	/>
 </div>
+
+<!-- ============================================================================
+     F-LIBRETA-IMPRIMIR (2026-08-18, Kevin en la capacitación)
+     ============================================================================
+     Kevin: "algo que ya te muestra (...) lo que yo quiero es que se imprima
+     así, que se vea así la impresión". Por eso NO se construye un documento
+     aparte: se imprime la libreta que ya existe, ocultando todo lo demás.
+
+     Se usa la impresión del navegador en vez de generar el PDF en el backend
+     porque el destino real es papel — la coordinadora imprime, se lo lleva al
+     firmante, y recién con la firma física aprueba. Quien prefiera el archivo
+     elige "Guardar como PDF" en el mismo diálogo.
+============================================================================ -->
+<style>
+	@media print {
+		/* Solo la libreta va al papel. El resto de la página (tabla de
+		   inscripciones, filtros, menús) se oculta. */
+		:global(body * ) {
+			visibility: hidden;
+		}
+		:global(.libreta-imprimible),
+		:global(.libreta-imprimible *) {
+			visibility: visible;
+		}
+		:global(.libreta-imprimible) {
+			position: absolute;
+			left: 0;
+			top: 0;
+			width: 100%;
+			padding: 0;
+		}
+
+		/* Botones y controles no se imprimen: en el papel no sirven y
+		   además desplazan el contenido. */
+		:global(.no-print) {
+			display: none !important;
+		}
+
+		/* El modal recorta con scroll en pantalla; en papel tiene que fluir
+		   completo, si no se imprime solo lo visible. */
+		:global(.libreta-imprimible .overflow-x-auto),
+		:global(.libreta-imprimible .overflow-y-auto) {
+			overflow: visible !important;
+		}
+
+		/* Fondo blanco y texto negro: los fondos de color no se imprimen por
+		   defecto y dejarían texto claro sobre papel blanco. */
+		:global(.libreta-imprimible),
+		:global(.libreta-imprimible *) {
+			background: #fff !important;
+			color: #000 !important;
+			box-shadow: none !important;
+		}
+
+		/* Las tablas no se parten por la mitad entre páginas. */
+		:global(.libreta-imprimible table) {
+			page-break-inside: auto;
+		}
+		:global(.libreta-imprimible tr) {
+			page-break-inside: avoid;
+			page-break-after: auto;
+		}
+	}
+</style>
