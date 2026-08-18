@@ -24,6 +24,7 @@
 	import {
 		analizarHoja,
 		cleanEmail,
+		contarEstudiantesUnicos,
 		fusionarHojas,
 		normColName,
 		parseNumero,
@@ -1025,9 +1026,9 @@
 							onclick={aplicarHojasSeleccionadas}
 							disabled={hojasDetectadas.filter((h) => h.seleccionada).length === 0}
 						>
-							Continuar con {hojasDetectadas
-								.filter((h) => h.seleccionada)
-								.reduce((acc, h) => acc + h.conCarnet, 0)} estudiantes
+							Continuar con {contarEstudiantesUnicos(
+								hojasDetectadas.filter((h) => h.seleccionada)
+							)} estudiantes
 						</Button>
 					</div>
 				</div>

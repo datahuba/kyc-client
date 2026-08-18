@@ -14,6 +14,8 @@ import * as XLSX from 'xlsx';
 import {
 	analizarHoja,
 	cleanEmail,
+	contarEstudiantesUnicos,
+	esColumnaDePago,
 	fusionarHojas,
 	normColName,
 	parseNumero,
@@ -289,5 +291,123 @@ describe('libro con varias hojas', () => {
 		const cargable = fusionadas.find((f) => f.estado !== 'duplicado' && f.carnet)!;
 		expect(cargable.hoja).toBe('Primera');
 		expect(cargable.email).toBe('primera@mail.com');
+	});
+});
+
+// ============================================================================
+// Bugs encontrados por Kevin usando el cargador en vivo (2026-08-18)
+// ============================================================================
+describe('bugs reportados en la capacitación', () => {
+	describe('pago fantasma de 1 Bs', () => {
+		// Kevin, mirando el preview: "aquí en pago, por ejemplo, dice una, hay
+		// que ver de dónde está sacando este dato, pago un boliviano, de dónde
+		// está sacando este pago".
+		it('una columna MODULO con el número de módulo NO es un pago', () => {
+			const hoja = analizarHoja(
+				comoHoja([
+					[...CABECERA, 'MODULO'],
+					['1', 'Juan Perez', '7654321', 'juan@mail.com', '70011223', 1]
+				]),
+				'Grupo A'
+			);
+
+			expect(hoja.filas[0].pagos).toEqual([]);
+			expect(hoja.filas[0].total_pagado).toBe(0);
+		});
+
+		it('tampoco lo son MODULO ACTUAL ni MODULO INICIAL', () => {
+			expect(esColumnaDePago('modulo')).toBe(false);
+			expect(esColumnaDePago('moduloactual')).toBe(false);
+			expect(esColumnaDePago('moduloinicial')).toBe(false);
+		});
+
+		it('pero MODULO 1 y Pago Modulo 2 sí siguen siendo pagos', () => {
+			expect(esColumnaDePago('modulo1')).toBe(true);
+			expect(esColumnaDePago('pagomodulo2')).toBe(true);
+		});
+
+		it('las columnas de total se siguen ignorando', () => {
+			expect(esColumnaDePago('modulototal')).toBe(false);
+			expect(esColumnaDePago('totalmodulos')).toBe(false);
+		});
+
+		it('convive una columna MODULO con columnas de pago reales', () => {
+			const hoja = analizarHoja(
+				comoHoja([
+					[...CABECERA, 'MODULO', 'Pago Modulo 1', 'Pago Modulo 2'],
+					['1', 'Juan Perez', '7654321', 'juan@mail.com', '70011223', 3, 294, 294]
+				]),
+				'Grupo A'
+			);
+
+			// El 3 de "MODULO" no entra; los dos pagos reales sí.
+			expect(hoja.filas[0].pagos).toHaveLength(2);
+			expect(hoja.filas[0].total_pagado).toBe(588);
+		});
+	});
+
+	describe('filas vacías no son errores', () => {
+		// Kevin: "estos que están en error es por qué? porque están vacío, no
+		// hay nada (...) pero esos no son alumnos, sino que están vacío".
+		it('una fila sin ningún dato de persona se saltea', () => {
+			const hoja = analizarHoja(
+				comoHoja([
+					CABECERA,
+					['1', 'Juan Perez', '7654321', 'juan@mail.com', '70011223'],
+					['2', '', '', '', ''],
+					['3', '', '', '', '']
+				]),
+				'Grupo A'
+			);
+
+			expect(hoja.filas).toHaveLength(1);
+			expect(hoja.filas.filter((f) => f.estado === 'error')).toHaveLength(0);
+		});
+
+		it('pero una persona identificable SIN CI sí es un error a corregir', () => {
+			const hoja = analizarHoja(
+				comoHoja([
+					CABECERA,
+					['1', 'Ana Lopez', '', 'ana@mail.com', '70044556']
+				]),
+				'Grupo A'
+			);
+
+			expect(hoja.filas).toHaveLength(1);
+			expect(hoja.filas[0].estado).toBe('error');
+			expect(hoja.filas[0].mensaje).toBe('Sin CI/carnet');
+			expect(hoja.filas[0].nombre).toBe('Ana Lopez');
+		});
+	});
+
+	describe('el conteo del selector no suma la misma persona dos veces', () => {
+		// Kevin: "esos 52 está sumado seguramente 87 más 87 + 87".
+		it('cuenta personas únicas entre hojas, no filas', () => {
+			const filaJuan = ['1', 'Juan Perez', '7654321', 'juan@mail.com', '70011223'];
+			const filaAna = ['2', 'Ana Lopez', '8765432', 'ana@mail.com', '70044556'];
+
+			const hojas = [
+				analizarHoja(comoHoja([CABECERA, filaJuan, filaAna]), 'Grupo A'),
+				analizarHoja(comoHoja([CABECERA, filaJuan, filaAna]), 'Consolidado')
+			];
+
+			// Sumar por hoja daría 4; las personas distintas son 2.
+			expect(hojas.reduce((a, h) => a + h.conCarnet, 0)).toBe(4);
+			expect(contarEstudiantesUnicos(hojas)).toBe(2);
+		});
+
+		it('el conteo coincide con lo que realmente se va a cargar', () => {
+			const filaJuan = ['1', 'Juan Perez', '7654321', 'juan@mail.com', '70011223'];
+			const hojas = [
+				analizarHoja(comoHoja([CABECERA, filaJuan]), 'Grupo A'),
+				analizarHoja(comoHoja([CABECERA, filaJuan]), 'Consolidado')
+			];
+
+			const cargables = fusionarHojas(hojas).filter(
+				(f) => f.carnet && f.estado !== 'duplicado'
+			);
+
+			expect(contarEstudiantesUnicos(hojas)).toBe(cargables.length);
+		});
 	});
 });

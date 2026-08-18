@@ -140,6 +140,31 @@ const HEADER_KEYWORDS = [
 const SUBHEADER_KEYWORDS = /hoja|fotocopia|solicitud|credencial|fondo|provisi|requisito/i;
 
 /**
+ * F-EXCEL-PAGO-FANTASMA (2026-08-18): decide si una columna trae un IMPORTE
+ * pagado por modulo, o solo el numero de modulo del estudiante.
+ *
+ * `kNorm` ya viene normalizado por normColName (minusculas, sin acentos ni
+ * signos), asi que "Pago Módulo 1" llega como "pagomodulo1".
+ *
+ * La distincion clave: una columna de pago identifica CUAL modulo se pago,
+ * asi que lleva el numero en el nombre. Una columna "MODULO" a secas dice en
+ * que modulo va el alumno — su valor (1, 2, 3...) NO es dinero.
+ */
+export function esColumnaDePago(kNorm: string): boolean {
+	// Los totales se calculan, no se importan como pago de un modulo.
+	if (kNorm.includes('total')) return false;
+
+	// "pagomodulo1", "pagomodulo2": explicitas, requieren el numero igual.
+	if (kNorm.startsWith('pago') && /modulo\d/.test(kNorm)) return true;
+
+	// "modulo1", "modulo2": el numero pegado al nombre indica de que modulo
+	// es el importe. "modulo" solo, "moduloactual" o "moduloinicial" no.
+	if (/^modulo\d/.test(kNorm)) return true;
+
+	return false;
+}
+
+/**
  * Busca la fila de cabecera. No siempre es la primera: estos archivos suelen
  * traer el titulo del programa y el logo arriba (en un caso real los headers
  * estaban en la fila 6). Una cabecera tiene >= 4 celdas de texto corto y al
@@ -234,6 +259,21 @@ export function analizarHoja(rawRows: any[][], nombreHoja: string): HojaDetectad
 		);
 
 		if (!carnet) {
+			// F-EXCEL-FILAS-VACIAS (2026-08-18, Kevin en la capacitacion):
+			// "estos que estan en error es por que? porque estan vacio, no hay
+			// nada (...) pero esos no son alumnos, sino que estan vacio".
+			//
+			// Una fila sin NINGUN dato de persona no es un estudiante mal
+			// cargado: es una linea vacia de la planilla (separadores, filas
+			// de formato, el relleno del final de la hoja). Reportarla como
+			// error obligaba a revisar decenas de "errores" que no lo eran y
+			// escondia los pocos casos reales.
+			//
+			// Solo se marca error cuando hay una persona identificable pero le
+			// falta el CI: ahi si hay algo que corregir.
+			const tieneAlgunDato = Boolean(nombre || email || celular);
+			if (!tieneAlgunDato) continue;
+
 			filas.push({
 				carnet: '',
 				nombre,
@@ -247,18 +287,29 @@ export function analizarHoja(rawRows: any[][], nombreHoja: string): HojaDetectad
 			continue;
 		}
 
-		// Pagos por modulo: columnas tipo "Pago Modulo 1" o "MODULO 2"
+		// Pagos por modulo: columnas tipo "Pago Modulo 1" o "MODULO 2".
+		//
+		// F-EXCEL-PAGO-FANTASMA (2026-08-18, Kevin en la capacitacion):
+		// "aqui en pago, por ejemplo, dice una, hay que ver de donde esta
+		// sacando este dato, pago un boliviano, de donde esta sacando este
+		// pago".
+		//
+		// La causa: la regla anterior tomaba como pago CUALQUIER columna que
+		// empezara con "modulo". Estos archivos traen una columna "MODULO" (o
+		// "MODULO ACTUAL") con el NUMERO del modulo en el que va el
+		// estudiante. Un 1 ahi se leia como "pago de 1 Bs", inventando plata
+		// que nadie cobro.
+		//
+		// Ahora una columna de pago tiene que llevar el numero DEL MODULO en
+		// el nombre ("modulo1", "pago modulo 2"). "MODULO" a secas es el
+		// numero de modulo del alumno, no un importe.
 		const pagos: { modulo: string; monto: number }[] = [];
 		for (const key of Object.keys(row)) {
 			const kNorm = normColName(key);
-			if (
-				(kNorm.startsWith('pago') && kNorm.includes('modulo')) ||
-				(kNorm.startsWith('modulo') && !kNorm.includes('total'))
-			) {
-				const monto = parseNumero(row[key]);
-				if (monto > 0) {
-					pagos.push({ modulo: key, monto });
-				}
+			if (!esColumnaDePago(kNorm)) continue;
+			const monto = parseNumero(row[key]);
+			if (monto > 0) {
+				pagos.push({ modulo: key, monto });
 			}
 		}
 
@@ -324,6 +375,26 @@ export function analizarHoja(rawRows: any[][], nombreHoja: string): HojaDetectad
  * Las filas sin CI pasan tal cual (ya vienen marcadas como error) para que el
  * usuario las vea y las corrija en el preview.
  */
+/**
+ * F-EXCEL-CONTEO-UNICOS (2026-08-18, Kevin en la capacitacion): cuenta las
+ * PERSONAS distintas de un conjunto de hojas.
+ *
+ * Kevin, mirando el selector: "esos 52 esta sumado seguramente 87 mas 87 mas
+ * 87". El boton sumaba el total de cada hoja por separado, asi que un archivo
+ * con una hoja por grupo mas una consolidada mostraba el triple de gente de
+ * la que se iba a cargar. La carga estaba bien —fusionarHojas deduplica— pero
+ * el numero prometia algo que no iba a pasar.
+ */
+export function contarEstudiantesUnicos(hojas: HojaDetectada[]): number {
+	const carnets = new Set<string>();
+	for (const hoja of hojas) {
+		for (const fila of hoja.filas) {
+			if (fila.carnet) carnets.add(fila.carnet);
+		}
+	}
+	return carnets.size;
+}
+
 export function fusionarHojas(hojas: HojaDetectada[]): FilaEstudiante[] {
 	const vistos = new Map<string, string>(); // carnet -> hoja de la primera aparicion
 	const fusionadas: FilaEstudiante[] = [];
