@@ -25,7 +25,10 @@
 		{ name: 'Aula', href: '/app/classroom', icon: BookIcon, roles: ['student', 'docente', 'admin', 'superadmin', 'cpd', 'mae', 'encargado_curso'], loginTypes: ['academic', 'admin'] },
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
+		// F-EC-SIDEBAR-PROGRAMAS (2026-08-18, Kevin): mismo criterio que el
+		// sidebar de escritorio (sidebarItems.ts) — el encargado y el
+		// coordinador tambien acceden a Programas desde el menu.
+		{ name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		// F-2026-08-22-EC-PAGOS-READONLY (Kevin 2026-08-22): EC y COORDINADOR (financiero)
 		// acceden a Pagos en modo solo lectura. NO pueden editar nada, solo ver y
 		// descargar. Filtro automatico del backend por cursos_asignados.

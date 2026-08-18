@@ -18,6 +18,18 @@
 	import { alert } from '$lib/utils';
 	import type { Course } from '$lib/interfaces';
 	import { UsersIcon, CheckIcon, DocumentAddIcon, TrashIcon, PlusIcon, RefreshIcon } from '$lib/icons/outline';
+	// F-EXCEL-MULTIHOJA (2026-08-18): la logica pura de parseo vive en su
+	// propio modulo para poder probarla sin abrir el navegador.
+	// Ver excelCargaInicial.test.ts.
+	import {
+		analizarHoja,
+		cleanEmail,
+		fusionarHojas,
+		normColName,
+		parseNumero,
+		type FilaEstudiante,
+		type HojaDetectada
+	} from './excelCargaInicial';
 
 	interface Props {
 		isOpen: boolean;
@@ -43,34 +55,16 @@
 
 	// === MODO EXCEL (nuevo) ===
 
-	// Fila del Excel parseado: editable por el usuario
-	interface FilaEstudiante {
-		// Datos originales del Excel (pueden estar vacios)
-		carnet: string;
-		nombre: string;
-		email: string;
-		celular: string;
-		// Estado de la fila
-		estado: 'nuevo' | 'existe' | 'duplicado' | 'error';
-		// Si existe, ID del estudiante en la BD
-		estudiante_id?: string;
-		// Mensaje de error o info
-		mensaje?: string;
-		// Pagos del Excel (opcional, mostrados al usuario)
-		pagos: { modulo: string; monto: number }[];
-		total_pagado?: number;
-		// F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): descuento detectado del
-		// Excel (0.5 = 50%, 1 = 100%, etc). Se mapea a un descuento_id real
-		// del catalogo institucional via catalogoDescuentos.
-		descuento_pct?: number;
-		descuento_id?: string;
-		descuento_origen?: string; // 'institucional' | 'manual_requerido' | 'sin_descuento'
-	}
 
 	let filasExcel = $state<FilaEstudiante[]>([]);
 	let excelFileName = $state('');
 	let parseandoExcel = $state(false);
-	let etapaExcel: 'subir' | 'preview' | 'procesando' | 'resultado' = $state('subir');
+	let etapaExcel: 'subir' | 'hojas' | 'preview' | 'procesando' | 'resultado' = $state('subir');
+
+	// F-EXCEL-MULTIHOJA (2026-08-18, Kevin): hojas encontradas en el archivo.
+	// Antes el parser leia SOLO SheetNames[0] y descartaba el resto en
+	// silencio, asi que un libro con varias hojas cargaba una sola sin avisar.
+	let hojasDetectadas = $state<HojaDetectada[]>([]);
 
 	// F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): catalogo de descuentos
 	// institucionales del Organo Judicial (50%, 30%, 100%). Se carga
@@ -194,316 +188,95 @@
 	// MODO EXCEL (nuevo)
 	// ========================================================================
 
-	/**
-	 * Normaliza un string para comparacion flexible de nombres de columna:
-	 * lowercase, sin acentos, sin espacios/underscores/guiones/parentesis/signos.
-	 * Sirve para que "Nombre(s) y Apellido(s)" matchee con "nombre" o "nombresyapellidos".
-	 */
-	function normColName(s: string): string {
-		return s
-			.toLowerCase()
-			.normalize('NFD')
-			.replace(/[\u0300-\u036f]/g, '') // quitar diacriticos
-			.replace(/[^a-z0-9]/g, ''); // quitar TODO lo no alfanumerico
-	}
 
 	/**
-	 * Detecta el nombre de una columna. Estrategia:
-	 * 1. Match EXACTO (normalizado) - el mas confiable.
-	 * 2. Match por substring SOLO en una direccion: si el nombre de la columna
-	 *    INCLUYE al candidato (kNorm.includes(norm)), nunca al reves.
-	 *    Esto evita que "carnet" (norm) matchee con "N" (kNorm) porque
-	 *    "carnet".includes("n") = true.
-	 * 3. Solo aplica substring si ambos (norm y kNorm) tienen >= 4 chars
-	 *    normalizados.
+	 * F-EXCEL-MULTIHOJA (2026-08-18, Kevin): lee el archivo y analiza TODAS
+	 * las hojas del libro.
 	 *
-	 * Si la columna no se detecta, devuelve ''.
-	 */
-	function pickColumn(row: Record<string, any>, ...candidatos: string[]): string {
-		const keys = Object.keys(row);
-		const normKeys = new Map(keys.map((k) => [k, normColName(k)]));
-
-		// Fase 1: match exacto (mas confiable)
-		for (const candidato of candidatos) {
-			const norm = normColName(candidato);
-			for (const [key, kNorm] of normKeys.entries()) {
-				if (kNorm === norm && row[key] != null && String(row[key]).trim() !== '') {
-					return String(row[key]).trim();
-				}
-			}
-		}
-
-		// Fase 2: substring match (kNorm incluye a norm) - solo si ambos >= 4
-		for (const candidato of candidatos) {
-			const norm = normColName(candidato);
-			if (norm.length < 4) continue;
-			for (const [key, kNorm] of normKeys.entries()) {
-				if (kNorm.length < 4) continue; // evitar match con headers cortos tipo "N", "f", etc.
-				if (kNorm.includes(norm) && row[key] != null && String(row[key]).trim() !== '') {
-					return String(row[key]).trim();
-				}
-			}
-		}
-
-		return '';
-	}
-
-	/**
-	 * Parsea un numero que puede venir como string "294" o 294 o "294.0".
-	 */
-	function parseNumero(v: any): number {
-		if (v == null) return 0;
-		if (typeof v === 'number') return v;
-		const s = String(v).replace(/[^\d.-]/g, '');
-		const n = parseFloat(s);
-		return isNaN(n) ? 0 : n;
-	}
-
-	/**
-	 * Limpia un email que puede venir con multiples valores separados por
-	 * espacio, coma, punto-y-coma o barra. Toma el primer valor valido.
-	 * "padillaalberto2026@gmail.com  otro@gmail.com" → "padillaalberto2026@gmail.com"
-	 * Si no hay ninguno valido, devuelve ''.
-	 */
-	function cleanEmail(raw: string): string {
-		if (!raw) return '';
-		const parts = String(raw)
-			.split(/[\s,;|/]+/)
-			.map((p) => p.trim())
-			.filter((p) => p.length > 0);
-		for (const p of parts) {
-			// validacion basica: tiene @ y un punto despues
-			if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p)) {
-				return p;
-			}
-		}
-		return '';
-	}
-
-	/**
-	 * Parsea un Excel cargado como File.
-	 * Detecta automaticamente la fila de headers (puede no ser la fila 1
-	 * si el Excel tiene titulos arriba) y las columnas dinamicamente
-	 * (carnet, nombre, email, celular, descuentos, pagos).
+	 * Antes se leia solo `workbook.SheetNames[0]`. En los archivos reales de
+	 * la Unidad conviven varias hojas (grupos, resumenes, notas, docentes), y
+	 * cargar la primera en silencio significaba importar la hoja equivocada, o
+	 * importar 20 de 80 estudiantes sin que nada lo indicara.
 	 *
-	 * F-HISTORICO-AUTOSERVICIO-EXCEL-FIX2 (2026-08-05, Kevin): el parser
-	 * anterior usaba XLSX.utils.sheet_to_json que asume la fila 1 como
-	 * header. Pero muchos Excels tienen titulos/titulos del programa en
-	 * las primeras filas y los headers reales estan mas abajo (ej.
-	 * LISTA MAESTRIA ORGANO JUDICIAL tenia los headers en la fila 6).
-	 * Eso causaba que 0 columnas se detectaran y todos los estudiantes
-	 * quedaran con "Sin CI/carnet".
-	 *
-	 * Solucion: leer el sheet como matriz de arrays, buscar la primera
-	 * fila que tenga >= 4 celdas de texto corto con >= 2 keywords de
-	 * headers conocidos, y usar esa como header. Luego construir las
-	 * filas a partir de la siguiente.
+	 * Si hay una sola hoja con estudiantes, se sigue derecho al preview (mismo
+	 * flujo de siempre). Si hay varias, se muestra el selector para que el
+	 * usuario confirme cuales cargar.
 	 */
 	async function parsearExcel(file: File) {
 		parseandoExcel = true;
 		try {
 			const buffer = await file.arrayBuffer();
 			const workbook = XLSX.read(buffer, { type: 'array' });
-			const sheetName = workbook.SheetNames[0];
-			const sheet = workbook.Sheets[sheetName];
-			// Leer como matriz de arrays (no objetos) para tener control sobre
-			// cual fila es el header.
-			const rawRows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, defval: '' });
 
-			if (rawRows.length === 0) {
-				alert('error', 'El Excel esta vacio o no tiene datos legibles');
+			if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+				alert('error', 'El archivo no tiene ninguna hoja legible');
 				return;
 			}
 
-			// F-HISTORICO-AUTOSERVICIO-EXCEL-FIX2: buscar la fila de headers
-			// automaticamente. Una fila de headers tiene:
-			// - >= 4 celdas con texto no vacio
-			// - el texto es CORTO (headers son palabras o frases cortas, no titulos)
-			// - contiene >= 2 keywords de headers conocidos
-			const headerKeywords = [
-				'nombre', 'apellido', 'carnet', 'ci', 'cedula', 'identidad',
-				'correo', 'email', 'mail', 'celular', 'telefono', 'phone',
-				'departamento', 'descuento', 'plataforma', 'cargo',
-				'men', 'mensualidad', 'detalle', 'requisito', 'fecha'
-			];
-			let headerRowIdx = -1;
-			for (let i = 0; i < Math.min(20, rawRows.length); i++) {
-				const row = rawRows[i];
-				if (!Array.isArray(row)) continue;
-				const textCells = row.filter(
-					(c) => typeof c === 'string' && c.trim().length > 0 && c.trim().length < 60
-				);
-				if (textCells.length < 4) continue;
-				const allText = textCells.join(' ').toLowerCase();
-				const matchCount = headerKeywords.filter((k) => allText.includes(k)).length;
-				if (matchCount >= 2) {
-					headerRowIdx = i;
-					break;
-				}
-			}
-			if (headerRowIdx === -1) {
+			const hojas: HojaDetectada[] = workbook.SheetNames.map((nombre) => {
+				const sheet = workbook.Sheets[nombre];
+				const rawRows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, defval: '' });
+				return analizarHoja(rawRows, nombre);
+			});
+
+			excelFileName = file.name;
+			hojasDetectadas = hojas;
+
+			const conEstudiantes = hojas.filter((h) => h.tieneEstudiantes);
+
+			if (conEstudiantes.length === 0) {
+				const detalle = hojas.map((h) => `• ${h.nombre}: ${h.motivo}`).join('\n');
 				alert(
 					'error',
-					'No se encontraron los headers del Excel. Asegurate de que tenga columnas como Nombre, CI/Carnet, Email, Celular. Headers esperados: N°, NOMBRE COMPLETO, CORREO ELECTRONICO, CELULAR, CARNET DE IDENTIDAD.'
+					`No se encontraron estudiantes en ninguna de las ${hojas.length} hoja(s) del archivo.\n\n${detalle}\n\nRevisa que la hoja tenga columnas como NOMBRE COMPLETO, CARNET DE IDENTIDAD, CORREO ELECTRONICO.`
 				);
 				return;
 			}
 
-			// Construir headers limpios (sin acentos, sin duplicados vacios)
-			const headers: string[] = rawRows[headerRowIdx].map(
-				(h, idx) => String(h || `col_${idx}`).trim() || `col_${idx}`
-			);
-
-			// Saltar sub-headers (fila con palabras como "Hoja de Vida",
-			// "Fotocopia", "Solicitud" pero sin datos numericos/email)
-			const subheaderKeywords = /hoja|fotocopia|solicitud|credencial|fondo|provisi|requisito/i;
-			const rows: Record<string, any>[] = [];
-			for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
-				const row = rawRows[i];
-				if (!Array.isArray(row)) continue;
-				// Saltar filas completamente vacias
-				if (row.every((c) => c === '' || c == null)) continue;
-				// Detectar sub-header: palabras de requisitos sin datos reales
-				const textCells = row.filter((c) => typeof c === 'string' && c.trim().length > 0);
-				if (textCells.length > 0) {
-					const allText = textCells.join(' ');
-					const hasData = row.some(
-						(c) => /^\d{5,}/.test(String(c).trim()) || /@/.test(String(c))
-					);
-					if (subheaderKeywords.test(allText) && !hasData) continue;
-				}
-				// Construir objeto con los headers como keys
-				const obj: Record<string, any> = {};
-				for (let j = 0; j < headers.length; j++) {
-					obj[headers[j]] = row[j];
-				}
-				rows.push(obj);
+			// Una sola hoja util: no molestar al usuario con un selector de un
+			// solo item, va derecho al preview como siempre.
+			if (conEstudiantes.length === 1 && hojas.length === 1) {
+				await aplicarHojasSeleccionadas();
+				return;
 			}
 
-			// Parsear cada fila
-			const filas: FilaEstudiante[] = [];
-			for (const row of rows) {
-				const carnet = pickColumn(
-					row,
-					'ci',
-					'cisinextension',
-					'carnet',
-					'cedula',
-					'documento',
-					'identidad',
-					'documentoidentidad'
-				);
-				const nombre = pickColumn(
-					row,
-					'nombresyapellidos',
-					'nombrecompleto',
-					'nombreyapellido',
-					'nombre',
-					'alumno',
-					'estudiante',
-					'fullname'
-				);
-				const email = pickColumn(
-					row,
-					'direcciondecorreoelectronico',
-					'direcciondecorreo',
-					'correoelectronico',
-					'email',
-					'correo',
-					'mail'
-				);
-				const celular = pickColumn(
-					row,
-					'celular',
-					'telefono',
-					'phone',
-					'movil',
-					'f',
-					'ndetelefonocelular'
-				);
-
-				if (!carnet) {
-					filas.push({
-						carnet: '',
-						nombre,
-						email,
-						celular,
-						estado: 'error',
-						mensaje: 'Sin CI/carnet',
-						pagos: [],
-					});
-					continue;
-				}
-
-				// Detectar pagos por modulo (columnas que empiezan con "Pago Modulo" o "MODULO")
-				const pagos: { modulo: string; monto: number }[] = [];
-				for (const key of Object.keys(row)) {
-					const kNorm = normColName(key);
-					if ((kNorm.startsWith('pago') && kNorm.includes('modulo')) ||
-						(kNorm.startsWith('modulo') && !kNorm.includes('total'))) {
-						const monto = parseNumero(row[key]);
-						if (monto > 0) {
-							pagos.push({ modulo: key, monto });
-						}
-					}
-				}
-
-				// F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): detectar descuento
-				// del Excel. La columna "DESCUENTOS" tiene un valor que puede ser
-				// 0.5 (50%), 1 (100%), o "BECA 100% POR MERITO". Lo mapeamos a
-				// un descuento_id del catalogo institucional.
-				const descuentoRaw = pickColumn(row, 'descuentos', 'descuento');
-				let descuento_pct: number | undefined;
-				let descuento_id: string | undefined;
-				let descuento_origen: 'institucional' | 'manual_requerido' | 'sin_descuento' = 'sin_descuento';
-				if (descuentoRaw) {
-					const dStr = String(descuentoRaw).trim().toLowerCase();
-					// Detectar "100" o "1" como 100%
-					if (dStr === '100' || dStr === '1' || dStr.includes('beca 100') || dStr.includes('merito')) {
-						descuento_pct = 100;
-					} else {
-						// Parsear como decimal: 0.5, 0.7, etc
-						const d = parseNumero(descuentoRaw);
-						if (d > 0 && d <= 1) {
-							descuento_pct = d * 100;
-						} else if (d === 100) {
-							descuento_pct = 100;
-						} else if (d > 0) {
-							// Numero raro (ej. 754800): ignorar
-							descuento_pct = undefined;
-						}
-					}
-				}
-
-				filas.push({
-					carnet,
-					nombre,
-					email,
-					celular,
-					estado: 'nuevo', // se actualiza despues del lookup
-					pagos,
-					total_pagado: pagos.reduce((acc, p) => acc + p.monto, 0),
-					descuento_pct,
-					descuento_id,
-					descuento_origen,
-				});
-			}
-
-			filasExcel = filas;
-			excelFileName = file.name;
-			// F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): cargar el catalogo
-			// de descuentos institucionales y mapear los descuentos detectados
-			// a descuento_id. Si el descuento no matchea ninguno, marcar como
-			// 'manual_requerido' (el usuario lo debe asignar manualmente).
-			await cargarYMappearDescuentos();
-			etapaExcel = 'preview';
-			await verificarEstudiantesEnBD();
+			etapaExcel = 'hojas';
 		} catch (e: any) {
 			console.error('Error parseando Excel', e);
 			alert('error', `Error al parsear el Excel: ${e?.message || 'desconocido'}`);
 		} finally {
 			parseandoExcel = false;
 		}
+	}
+
+	/**
+	 * F-EXCEL-MULTIHOJA (2026-08-18, Kevin): fusiona las filas de las hojas
+	 * marcadas y pasa al preview.
+	 *
+	 * La deduplicacion entre hojas se hace aca y NO en verificarEstudiantesEnBD,
+	 * porque son casos distintos: repetido DENTRO de una hoja suele ser un
+	 * error de tipeo, mientras que el mismo CI en dos hojas es lo esperable
+	 * cuando el archivo trae un grupo por hoja mas una hoja consolidada.
+	 * En los dos casos se conserva la PRIMERA aparicion (es el mismo alumno) y
+	 * se marcan las siguientes indicando de que hoja venian.
+	 */
+	async function aplicarHojasSeleccionadas() {
+		const elegidas = hojasDetectadas.filter((h) => h.seleccionada);
+		if (elegidas.length === 0) {
+			alert('error', 'Selecciona al menos una hoja para continuar');
+			return;
+		}
+
+		// La deduplicacion por CI (conservando la primera aparicion) vive en
+		// fusionarHojas, en excelCargaInicial.ts, con sus tests.
+		filasExcel = fusionarHojas(elegidas);
+		// F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): cargar el catalogo
+		// de descuentos institucionales y mapear los descuentos detectados
+		// a descuento_id. Si el descuento no matchea ninguno, marcar como
+		// 'manual_requerido' (el usuario lo debe asignar manualmente).
+		await cargarYMappearDescuentos();
+		etapaExcel = 'preview';
+		await verificarEstudiantesEnBD();
 	}
 
 	/**
@@ -550,24 +323,20 @@
 	 * POST /students/batch-lookup que resuelve todos en 1 sola query MongoDB.
 	 */
 	async function verificarEstudiantesEnBD() {
-		// Detectar duplicados primero
-		const carnetCount = new Map<string, number>();
-		for (const fila of filasExcel) {
-			if (fila.carnet) {
-				carnetCount.set(fila.carnet, (carnetCount.get(fila.carnet) || 0) + 1);
-			}
-		}
-
-		// Marcar duplicados y juntar carnets unicos
+		// F-EXCEL-DEDUP-PRIMERA (2026-08-18, Kevin): la deduplicacion ya la
+		// hizo aplicarHojasSeleccionadas(), que conserva la PRIMERA aparicion
+		// de cada CI y marca las siguientes como 'duplicado'.
+		//
+		// Antes se hacia aca y se marcaban como duplicado TODAS las apariciones,
+		// incluida la primera. Como confirmarCargaExcel() descarta las filas en
+		// estado 'duplicado', un CI repetido hacia que ese estudiante NO se
+		// cargara en absoluto — se perdia el alumno entero por venir dos veces
+		// en la planilla, que es justo lo que pasa cuando el archivo trae una
+		// hoja por grupo mas una hoja consolidada.
 		const carnetsUnicos = new Set<string>();
 		for (const fila of filasExcel) {
-			if (!fila.carnet) continue;
-			if (carnetCount.get(fila.carnet)! > 1) {
-				fila.estado = 'duplicado';
-				fila.mensaje = `CI aparece ${carnetCount.get(fila.carnet)} veces en el Excel`;
-			} else {
-				carnetsUnicos.add(fila.carnet);
-			}
+			if (!fila.carnet || fila.estado === 'duplicado') continue;
+			carnetsUnicos.add(fila.carnet);
 		}
 
 		if (carnetsUnicos.size === 0) return;
@@ -1164,6 +933,102 @@
 								}}
 							/>
 						</label>
+					</div>
+				</div>
+
+			<!-- ============== MODO EXCEL: SELECTOR DE HOJAS ============== -->
+			<!--
+				F-EXCEL-MULTIHOJA (2026-08-18, Kevin): aparece solo cuando el
+				libro tiene mas de una hoja. Muestra que encontro en cada una y
+				deja elegir. Las hojas sin estudiantes se listan igual, en gris
+				y con el motivo, para que quede claro que el sistema las vio y
+				por que las descarto (antes ni siquiera se leian).
+			-->
+			{:else if tabActiva === 'excel' && etapaExcel === 'hojas'}
+				<div class="space-y-3">
+					<div class="flex items-center justify-between">
+						<p class="text-xs text-gray-600 dark:text-gray-400">
+							<strong>{excelFileName}</strong> — {hojasDetectadas.length} hojas encontradas
+						</p>
+						<button
+							type="button"
+							class="text-xs text-primary-600 hover:underline"
+							onclick={() => {
+								etapaExcel = 'subir';
+								hojasDetectadas = [];
+								filasExcel = [];
+								excelFileName = '';
+							}}
+						>
+							← Subir otro archivo
+						</button>
+					</div>
+
+					<p class="text-xs text-gray-600 dark:text-gray-400">
+						Elegí qué hojas cargar. Si un estudiante aparece en más de una hoja, se
+						carga una sola vez (se conserva la primera aparición).
+					</p>
+
+					<div class="space-y-2">
+						{#each hojasDetectadas as hoja, i}
+							<label
+								class="flex items-start gap-3 rounded-md border p-3 {hoja.tieneEstudiantes
+									? 'cursor-pointer border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800'
+									: 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50'}"
+							>
+								<input
+									type="checkbox"
+									class="mt-0.5 size-4 rounded border-gray-300 text-primary-600"
+									checked={hoja.seleccionada}
+									disabled={!hoja.tieneEstudiantes}
+									onchange={(e) => {
+										const marcado = (e.target as HTMLInputElement).checked;
+										hojasDetectadas = hojasDetectadas.map((h, idx) =>
+											idx === i ? { ...h, seleccionada: marcado } : h
+										);
+									}}
+								/>
+								<div class="min-w-0 flex-1">
+									<div class="flex items-center gap-2">
+										<span class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+											{hoja.nombre}
+										</span>
+										{#if hoja.tieneEstudiantes}
+											<span
+												class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300"
+											>
+												{hoja.conCarnet} estudiantes
+											</span>
+										{:else}
+											<span
+												class="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+											>
+												sin estudiantes
+											</span>
+										{/if}
+									</div>
+									{#if !hoja.tieneEstudiantes}
+										<p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{hoja.motivo}</p>
+									{:else if hoja.filas.length > hoja.conCarnet}
+										<p class="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
+											{hoja.filas.length - hoja.conCarnet} fila(s) sin CI se marcarán como error
+										</p>
+									{/if}
+								</div>
+							</label>
+						{/each}
+					</div>
+
+					<div class="flex justify-end gap-2 pt-1">
+						<Button variant="secondary" onclick={() => (etapaExcel = 'subir')}>Cancelar</Button>
+						<Button
+							onclick={aplicarHojasSeleccionadas}
+							disabled={hojasDetectadas.filter((h) => h.seleccionada).length === 0}
+						>
+							Continuar con {hojasDetectadas
+								.filter((h) => h.seleccionada)
+								.reduce((acc, h) => acc + h.conCarnet, 0)} estudiantes
+						</Button>
 					</div>
 				</div>
 

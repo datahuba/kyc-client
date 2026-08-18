@@ -96,7 +96,15 @@
 	// F-2026-08-11-EC-AUTOSERVICIO: encargado_curso/coord pueden intentar
 	// crear programas. El backend rechaza con 403 si NO son historicos.
 	let canCreateCourse = $derived(STAFF_EC_COURSES.includes(currentRole));
-	let canEditCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	// F-EC-EDITAR-PROGRAMA (2026-08-18, Kevin en capacitacion): "tienen que
+	// tener una opcion aqui en programa que sea editar programas (...) para
+	// cambiar fecha, si hay que cambiar el nombre algun dato, si hay que
+	// seleccionar a los docentes". El backend YA lo permite desde FIX-ISSUE-258
+	// (api/courses.py update_course acepta EC/COORD y valida que el programa
+	// este en sus cursos_asignados, respondiendo 403 si no). Era solo el
+	// frontend escondiendo el boton, igual que pasaba con Programas en el
+	// sidebar. Si el EC intenta editar un programa ajeno, el backend lo corta.
+	let canEditCourse = $derived(STAFF_EC_COURSES.includes(currentRole));
 	let canDeleteCourse = $derived(currentRole === 'superadmin');
 	// Comunicados: Encargado de Programa / Coordinador / CPD / Admin / Superadmin.
 	// (El Encargado solo a sus programas: lo valida el backend con 403.)
@@ -163,18 +171,25 @@
 			const response = await courseService.getAll(page, limit, filterParams);
 
 			if (response && response.data) {
-				// F-COURSES-FILTER-ENCARGADO (2026-08-09, Kevin): encargado_curso
-				// con cursos_asignados solo ve los cursos que tiene asignados.
-				// Antes el backend no filtraba y el frontend mostraba todos los
-				// programas del sistema, exponiendo informacion de programas que
-				// el usuario no deberia ver.
-				const cursosAsignados = ($userStore.user?.cursos_asignados ?? []) as string[];
-				if (currentRole === 'encargado_curso' && cursosAsignados.length > 0) {
-					const assignedSet = new Set(cursosAsignados.map(String));
-					courses = response.data.filter((c: Course) => assignedSet.has(String(c._id)));
-				} else {
-					courses = response.data;
-				}
+				// F-EC-PROGRAMA-NUEVO-INVISIBLE (2026-08-18, Kevin en capacitacion):
+				// aca habia un segundo filtro en el cliente que comparaba cada
+				// curso contra `$userStore.user.cursos_asignados`. Ese dato es una
+				// copia guardada en el navegador desde el login, y NO se actualiza
+				// cuando el backend auto-asigna un curso recien creado
+				// (courses.py, F-2026-08-12-EC-AUTOASIGNAR-CURSO). Resultado: el
+				// encargado creaba un programa, el backend se lo asignaba bien en
+				// la base, pero esta linea lo escondia de la lista por comparar
+				// contra la lista vieja. Se veia en el Dashboard (que consulta al
+				// backend) y no en Programas. Recargar no ayudaba, porque el store
+				// se rehidrata del localStorage, no del servidor.
+				//
+				// El filtro del cliente ademas era redundante: el backend YA
+				// segmenta por cursos_asignados via filtro_cursos_por_rol
+				// (api/courses.py) usando el usuario fresco de la base, que es la
+				// fuente autoritativa. Y rompia la paginacion, porque totalItems
+				// seguia siendo el total del backend mientras el array se
+				// recortaba despues.
+				courses = response.data;
 				totalItems = response.meta.totalItems;
 				totalPages = response.meta.totalPages;
 			} else {
