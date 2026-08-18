@@ -35,14 +35,23 @@ FLOCK_TIMEOUT="${FLOCK_TIMEOUT:-900}"  # 15 min default
 FRONTEND_DIR="/root/postgrado/frontend"
 COMPOSE_DIR="/root/postgrado"
 SKIP_BUILD=0
+NO_CACHE=0
 MAX_LOCK_AGE_MIN=10  # auto-limpiar locks huerfanos mas viejos que esto
+IMAGE="postgrado-frontend"
+ROLLBACK_TAG="${IMAGE}:rollback"
 
 # Parse args
 for arg in "$@"; do
   case $arg in
     --skip-build) SKIP_BUILD=1 ;;
+    --no-cache) NO_CACHE=1 ;;
     --help|-h)
-      echo "Uso: $0 [--skip-build]"
+      echo "Uso: $0 [--skip-build] [--no-cache]"
+      echo ""
+      echo "  --skip-build   solo reinicia el contenedor, sin reconstruir"
+      echo "  --no-cache     build sin cache de Docker (lento: ~15 min)."
+      echo "                 Ya NO es el default: ver F-DEPLOY-BUILD-THEN-SWAP."
+      echo ""
       echo "Variables de entorno:"
       echo "  FLOCK_TIMEOUT=segundos   (default 900 = 15 min)"
       exit 0
@@ -113,11 +122,25 @@ pre_cleanup_container() {
 # Cleanup imagenes huerfanas
 # -----------------------------------------------------------------------------
 cleanup_old_images() {
-  log "Limpiando imagenes postgrado-frontend huerfanas..."
-  # Borra todas las imagenes con tag latest que no sean la actual
-  # (docker dangling = untagged)
-  sudo docker images -f "dangling=true" -q | head -1 | xargs -r sudo docker rmi -f 2>/dev/null || true
-  sudo docker images postgrado-frontend --format '{{.ID}}' | tail -n +2 | xargs -r sudo docker rmi -f 2>/dev/null || true
+  # F-DEPLOY-BUILD-THEN-SWAP: esta limpieza corre SOLO despues de que el
+  # health check paso. Hasta ese momento la imagen anterior se conserva
+  # etiquetada como :rollback, que es lo que permite volver atras.
+  log "Limpiando imagenes huerfanas (el deploy ya esta verificado)..."
+  # Soltar la etiqueta de rollback: la version nueva ya demostro que sirve.
+  sudo docker rmi -f "$ROLLBACK_TAG" 2>/dev/null || true
+
+  # Borrar las imagenes viejas DE ESTE PROYECTO, dejando la actual.
+  #
+  # OJO: este VPS es compartido — corre tambien el proyecto `oys` con sus
+  # propios contenedores. Por eso NO se hace un barrido global de
+  # `dangling=true`: borraria imagenes huerfanas ajenas y podria dejar al
+  # otro proyecto sin su propio rollback. La limpieza se acota a las
+  # imagenes de postgrado-frontend por ID, que es lo unico nuestro.
+  local actual
+  actual="$(sudo docker images "$IMAGE" --format '{{.ID}}' | head -1)"
+  sudo docker images "$IMAGE" --format '{{.ID}}' \
+    | grep -v "^${actual}$" \
+    | xargs -r sudo docker rmi -f 2>/dev/null || true
   log "  OK"
 }
 
@@ -157,11 +180,27 @@ main() {
       exit 1
     }
 
-    # Pre-cleanup container zombie
-    pre_cleanup_container || {
-      log "ERROR: pre-cleanup fallo. Abortando."
-      exit 1
-    }
+    # =====================================================================
+    # F-DEPLOY-BUILD-THEN-SWAP (2026-08-18, Kevin)
+    # =====================================================================
+    # ANTES este bloque hacia, EN ESTE ORDEN:
+    #   1. borrar el contenedor kyc-frontend
+    #   2. borrar la imagen postgrado-frontend
+    #   3. recien ahi construir, con --no-cache
+    #
+    # Dos consecuencias graves:
+    #   - Produccion quedaba caida durante TODO el build (~15 min medidos,
+    #     754 s en un solo paso), no unos segundos.
+    #   - Si el build fallaba no quedaba NADA para volver atras: ni
+    #     contenedor ni imagen. Eso fue exactamente lo que dejo el sitio
+    #     caido 50 minutos el 2026-08-18, cuando el workflow de GitHub
+    #     Actions corto la sesion SSH y mato el build.
+    #
+    # AHORA se construye PRIMERO, con el contenedor viejo sirviendo, y
+    # recien cuando hay una imagen nueva buena se hace el swap. Si el build
+    # falla, produccion ni se entera. La imagen anterior se conserva
+    # etiquetada como :rollback hasta que el health check del nuevo pase.
+    # =====================================================================
 
     # Sync codigo
     log "1. SYNC CODIGO"
@@ -173,18 +212,49 @@ main() {
     sudo git clean -fd
     log "  HEAD: $(sudo git log -1 --oneline)"
 
-    # Build
+    # Build (produccion sigue arriba durante todo este paso)
     if [ "$SKIP_BUILD" -eq 0 ]; then
-      log "2. BUILD (puede tardar 1-2 min)..."
-      sudo docker rmi -f $(sudo docker images -q postgrado-frontend) 2>/dev/null || true
+      # Guardar la imagen actual como rollback ANTES de construir.
+      if sudo docker image inspect "${IMAGE}:latest" >/dev/null 2>&1; then
+        sudo docker tag "${IMAGE}:latest" "$ROLLBACK_TAG"
+        log "  Imagen actual etiquetada como $ROLLBACK_TAG"
+      else
+        log "  AVISO: no hay imagen previa; este deploy no tendra rollback"
+      fi
+
+      # El --no-cache dejo de ser el default: el build pasaba de ~2 min a
+      # ~15 solo por rehacer npm install en cada deploy. `git reset --hard`
+      # arriba ya garantiza codigo fresco, y Docker invalida las capas que
+      # dependen de archivos modificados. Queda como opt-in (--no-cache)
+      # para cuando haga falta un build realmente limpio.
+      if [ "$NO_CACHE" -eq 1 ]; then
+        log "2. BUILD sin cache (--no-cache): puede tardar ~15 min..."
+        BUILD_ARGS="--no-cache"
+      else
+        log "2. BUILD con cache (produccion sigue arriba)..."
+        BUILD_ARGS=""
+      fi
+
       cd "$COMPOSE_DIR"
-      sudo docker compose build --no-cache frontend
+      # shellcheck disable=SC2086
+      if ! sudo docker compose build $BUILD_ARGS frontend; then
+        log "ERROR: el build fallo. NO se toca el contenedor en produccion."
+        log "       El sitio sigue sirviendo la version anterior."
+        exit 1
+      fi
+      log "  Build OK"
     else
       log "2. SKIP BUILD (--skip-build)"
     fi
 
-    # Up
-    log "3. UP"
+    # Swap: recien ahora se baja el contenedor viejo. Esta es la unica
+    # ventana de indisponibilidad, y dura segundos en vez de todo el build.
+    log "3. SWAP (bajando el contenedor viejo y levantando el nuevo)"
+    pre_cleanup_container || {
+      log "ERROR: no se pudo limpiar el contenedor previo. Abortando."
+      exit 1
+    }
+
     cd "$COMPOSE_DIR"
     sudo docker compose up -d --no-deps --force-recreate frontend
 
@@ -193,9 +263,27 @@ main() {
     log "4. ESTADO FINAL"
     sudo docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E 'kyc-frontend|NAMES' || true
 
-    # Health check
+    # Health check + rollback automatico
+    # F-DEPLOY-BUILD-THEN-SWAP: si la imagen nueva construyo bien pero no
+    # levanta (variable de entorno faltante, error en runtime, puerto
+    # ocupado), antes quedaba el sitio caido y habia que arreglarlo a mano.
+    # Ahora se vuelve sola a la imagen anterior.
     if ! healthcheck; then
-      log "ERROR: health check fallo. Revisar logs."
+      log "ERROR: la version nueva no respondio 200."
+      if sudo docker image inspect "$ROLLBACK_TAG" >/dev/null 2>&1; then
+        log "ROLLBACK: volviendo a la imagen anterior..."
+        sudo docker tag "$ROLLBACK_TAG" "${IMAGE}:latest"
+        sudo docker rm -f kyc-frontend 2>/dev/null || true
+        cd "$COMPOSE_DIR"
+        sudo docker compose up -d --no-deps --force-recreate frontend
+        if healthcheck; then
+          log "ROLLBACK OK: el sitio volvio con la version anterior."
+        else
+          log "ROLLBACK FALLIDO: el sitio sigue caido. Intervencion manual."
+        fi
+      else
+        log "Sin imagen de rollback disponible. Intervencion manual."
+      fi
       exit 1
     fi
 
