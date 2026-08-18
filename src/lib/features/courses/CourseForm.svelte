@@ -206,14 +206,21 @@
 
 	onMount(async () => {
 		try {
+			// F-FIX-403-USERS (2026-08-18, Kevin): `GET /users/` exige SUPERADMIN.
+			// Se pedia siempre, asi que con cualquier otro rol devolvia 403, el
+			// catch se lo tragaba y ademas ensuciaba la consola con
+			// "Se requiere rol de SUPERADMIN" en cada apertura del formulario.
+			// Ahora solo se pide cuando el usuario puede leerlo.
+			const puedeListarUsuarios = ($userStore.role || '').toLowerCase() === 'superadmin';
+
 			const [resDiscounts, resTeachers, resUsers] = await Promise.all([
 				discountService.getAll(1, 100),
 				userService.getTeachers(),
-				userService.getAll(1, 100)
+				puedeListarUsuarios ? userService.getAll(1, 100) : Promise.resolve({ data: [] } as any)
 			]);
 			discounts = resDiscounts.data;
 			teachers = resTeachers;
-			availableEncargados = resUsers.data.filter(u => u.rol === 'encargado_curso' || u.rol === 'coordinador' || u.role === 'encargado_curso' || u.role === 'coordinador');
+			availableEncargados = (resUsers.data ?? []).filter((u: any) => u.rol === 'encargado_curso' || u.rol === 'coordinador' || u.role === 'encargado_curso' || u.role === 'coordinador');
 		} catch (e) {
 			console.error('Error fetching data for course form', e);
 		}
@@ -626,7 +633,18 @@
 			// Se mantiene la llamada para CPD/admin/superadmin, incluso con la
 			// lista vacía: ahí una lista vacía significa "quitar a todos", que
 			// es una acción válida al editar.
-			if (savedCourse && savedCourse._id && !es_historico && !seAutoAsigna) {
+			// CORREGIDO (2026-08-18, segunda pasada): la condicion anterior
+			// miraba el ROL, y no alcanzaba. `GET /users/` exige SUPERADMIN, asi
+			// que la lista de encargados queda vacia para TODOS los demas roles
+			// — CPD y admin incluidos. Cualquiera de ellos seguia disparando el
+			// PUT y recibiendo el 403.
+			//
+			// La condicion correcta no depende del rol: si la lista nunca se
+			// pudo cargar, el usuario no pudo haber seleccionado a nadie, asi
+			// que no hay nada que mandar. Quien SI puede administrar encargados
+			// (superadmin) tiene la lista cargada, y ahi una seleccion vacia
+			// sigue significando "quitar a todos".
+			if (savedCourse && savedCourse._id && !es_historico && availableEncargados.length > 0) {
 				try {
 					await courseService.assignEncargados(savedCourse._id, selectedEncargadosIds);
 				} catch (err: any) {
@@ -790,8 +808,12 @@
 				administrarlo otra persona, pedile a CPD que la agregue.
 			</p>
 		{:else}
-			<p class="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md border border-amber-100 dark:border-amber-800">
-				No hay Encargados de Curso o Coordinadores registrados en el sistema.
+			<!-- Solo el superadmin puede listar usuarios, asi que para el resto
+			     esta seccion nunca tuvo datos. Antes decia "no hay encargados
+			     registrados", que era falso y confundia. -->
+			<p class="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md border border-gray-200 dark:border-gray-700">
+				La asignación de encargados la gestiona el superadministrador. Si este
+				programa tiene que administrarlo otra persona, pedile que la agregue.
 			</p>
 		{/if}
 	</Card>
