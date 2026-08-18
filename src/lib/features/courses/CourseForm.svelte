@@ -610,8 +610,23 @@
 				}
 			}
 
-			// Asignar los encargados de curso seleccionados
-			if (savedCourse && savedCourse._id && !es_historico) {
+			// Asignar los encargados de curso seleccionados.
+			//
+			// F-FIX-403-ENCARGADOS (2026-08-18, Kevin): esta llamada se hacía
+			// SIEMPRE, pero PUT /courses/{id}/encargados exige rol CPD. Cuando
+			// el que creaba el programa era un encargado o coordinador, el
+			// programa se guardaba bien y acto seguido saltaba un aviso de que
+			// no tenía permisos — confuso, porque el programa sí se había
+			// creado.
+			//
+			// Y era ademas innecesario: a ellos el backend ya los auto-asigna
+			// al crear (F-2026-08-12-EC-AUTOASIGNAR-CURSO). Encima la lista
+			// venía vacía, porque GET /users/ tambien les da 403.
+			//
+			// Se mantiene la llamada para CPD/admin/superadmin, incluso con la
+			// lista vacía: ahí una lista vacía significa "quitar a todos", que
+			// es una acción válida al editar.
+			if (savedCourse && savedCourse._id && !es_historico && !seAutoAsigna) {
 				try {
 					await courseService.assignEncargados(savedCourse._id, selectedEncargadosIds);
 				} catch (err: any) {
