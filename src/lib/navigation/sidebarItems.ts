@@ -102,7 +102,14 @@ const staffAcademicGroup: NavigationGroup = {
 		// F-MODAL-GESTION-MODULOS (2026-08-03, Kevin): vista centralizada de
 		// gestión de módulos. Accesible desde el sidebar Académico.
 		{ type: 'item', name: 'Módulos', href: '/app/academico/modulos', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ type: 'item', name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
+		// F-EC-SIDEBAR-PROGRAMAS (2026-08-18, Kevin en capacitacion): "a todos
+		// los encargados hay que darles el acceso a programas desde el
+		// slidebar y no solo desde el Dashboard". Programas era el UNICO item
+		// de Academico que excluia a encargado_curso/coordinador (Calendario,
+		// Docentes y Modulos ya los incluian), asi que llegaban a la vista
+		// solo rebotando desde el Dashboard. La pagina en si ya los soportaba
+		// (STAFF_EC_COURSES en auth/roles.ts los lista), era solo el menu.
+		{ type: 'item', name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ type: 'item', name: 'Validación de Notas', href: '/app/admin/grade-validation', icon: AcademicCapIcon, roles: ['cpd', 'admin', 'superadmin'], loginTypes: ['admin'] },
 	]
 };
