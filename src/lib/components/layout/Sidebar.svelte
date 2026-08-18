@@ -6,7 +6,7 @@
 	import { slide, fade } from 'svelte/transition';
 	import { LogoutIcon, BookIcon } from '$lib/icons/solid';
 	import { goto } from '$app/navigation';
-	import { getAllNavItems, type NavigationEntry } from '$lib/navigation/sidebarItems';
+	import { getAllNavItems, staffBugReportItem, type NavigationEntry } from '$lib/navigation/sidebarItems';
 	import CourseCatalogModal from './CourseCatalogModal.svelte';
 	import BenefitsModal from './BenefitsModal.svelte';
 	import DocumentValidationTable from '$lib/components/ui/DocumentValidationTable.svelte';
@@ -65,6 +65,14 @@
 
 	let isStudentUser = $derived(userRole === 'student' || academicRole === 'student');
 	let canValidateDocs = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(userRole));
+
+	// F-SIDEBAR-TECNICOS (Kevin 2026-08-17): "Reportar un Error" y "Validación
+	// de Documentos" van juntos al pie, separados del resto. Kevin: "son
+	// opciones y módulos más técnicos".
+	//
+	// Los roles se leen del propio item en sidebarItems.ts en vez de repetir la
+	// lista acá: si mañana cambia quién puede reportar, se toca en un solo lado.
+	let canReportBug = $derived(staffBugReportItem.roles.includes(userRole) && loginType === 'admin');
 
 	// ISSUE-R-PERFIL-GENERICO: solo el coordinador FINANCIERO ve las vistas económicas.
 	let esCoordinadorFinanciero = $derived($userStore.user?.subtipo_coordinador === 'financiero');
@@ -284,21 +292,41 @@
 					</li>
 				{/if}
 
-				{#if canValidateDocs}
+				{#if canReportBug}
+					<!-- Componente directo en vez de <svelte:component>: en runes mode
+					     ese tag esta deprecado y sumaba un warning al baseline. El
+					     {@const} va aca porque Svelte solo lo admite como hijo
+					     inmediato de un bloque, no dentro del <a>. -->
+					{@const IconoBug = staffBugReportItem.icon}
 					<li class={isStudentUser ? '' : 'mt-auto border-t border-gray-200 dark:border-gray-800 pt-2'}>
+						<a
+							href={staffBugReportItem.href}
+							title={isCollapsed ? staffBugReportItem.name : ''}
+							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isCurrent(staffBugReportItem.href) ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600'}`}
+						>
+							<IconoBug
+								class={`size-6 shrink-0 ${isCurrent(staffBugReportItem.href) ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 group-hover:text-primary-600'}`}
+							/>
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>{staffBugReportItem.name}</span>{/if}
+						</a>
+					</li>
+				{/if}
+
+				{#if canValidateDocs}
+					<li class={isStudentUser || canReportBug ? '' : 'mt-auto border-t border-gray-200 dark:border-gray-800 pt-2'}>
 						<button
 							type="button"
 							onclick={() => isDocValidationOpen = true}
-							title={isCollapsed ? 'Validación de Docs' : ''}
+							title={isCollapsed ? 'Validación de Documentos' : ''}
 							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}
 						>
 							<ClipboardIcon class="size-6 shrink-0 text-amber-600 dark:text-amber-400 group-hover:text-primary-600" />
-							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Validación de Docs</span>{/if}
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Validación de Documentos</span>{/if}
 						</button>
 					</li>
 				{/if}
 
-				<li class={isStudentUser || canValidateDocs ? '' : 'mt-auto'}>
+				<li class={isStudentUser || canValidateDocs || canReportBug ? '' : 'mt-auto'}>
 					<button onclick={logout} title={isCollapsed ? 'Cerrar Sesión' : ''} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 hover:bg-gray-50 hover:text-red-600 w-full text-left transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}>
 						<LogoutIcon class="size-6 shrink-0 text-gray-400 group-hover:text-red-600" />
 						{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Cerrar Sesión</span>{/if}

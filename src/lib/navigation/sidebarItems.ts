@@ -215,11 +215,15 @@ const staffDataQualityGroup: NavigationGroup = {
 // todos los perfiles excepto docentes y estudiantes, solo perfiles adm, que
 // puedan reportar bugs o errores".
 //
-// Va como item suelto y no dentro de "Administrativo" por dos razones: ese
-// grupo no incluye a `encargado_curso` (que sí debe poder reportar), y un
-// reporte de error se hace en el momento en que se lo ve — enterrarlo dos
-// niveles adentro es la mejor forma de que nadie lo use.
-const staffBugReportItem: NavigationItem = {
+// F-SIDEBAR-TECNICOS (Kevin 2026-08-17): NO va en la lista alfabética. Se
+// renderiza abajo de todo, pegado a "Validación de Documentos", porque los
+// dos son herramientas de mantenimiento técnico y no tareas del día a día.
+// Kevin: "son opciones y módulos más técnicos".
+//
+// Se exporta para que Sidebar.svelte pueda leer sus `roles` en vez de
+// duplicar la lista: el ítem sigue siendo la única fuente de verdad de quién
+// lo ve (los 7 perfiles administrativos, sin docentes ni estudiantes).
+export const staffBugReportItem: NavigationItem = {
 	type: 'item',
 	name: 'Reportar un Error',
 	href: '/app/bug-reports',
@@ -266,8 +270,6 @@ export function getAllNavItems(): NavigationEntry[] {
 		// === Items compartidos (academic) ===
 		...sharedAcademicItems,
 
-		// === Item suelto del staff ===
-		staffBugReportItem,
 
 		// === Grupos del staff ===
 		staffAcademicGroup,
