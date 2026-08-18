@@ -167,7 +167,13 @@
 		ambitoForzadoProfesional ? AMBITO_PROFESIONAL : (formData.ambito || AMBITO_CONTINUA)
 	);
 
-	let cobraMatricula = $derived(ambitoEfectivo === AMBITO_CONTINUA && !es_historico);
+	// Educación continua: matrícula DIFERENCIADA según el alumno (200/500).
+	let cobraMatriculaDiferenciada = $derived(ambitoEfectivo === AMBITO_CONTINUA && !es_historico);
+	// Profesional: matrícula ÚNICA, igual para todos, la del programa.
+	// CORREGIDO (Kevin, 2026-08-18 noche): la primera versión escondía la
+	// matrícula en los profesionales asumiendo que no cobraban. Falso:
+	// MAES-GTAF-2026/1 cobra 1300 y DIPL-IA-2026 cobra 300, ambos profesionales.
+	let cobraMatriculaUnica = $derived(ambitoEfectivo === AMBITO_PROFESIONAL && !es_historico);
 
 	let prevCuotas = $state(1);
 	let prevCostoTotal = $state(0);
@@ -817,14 +823,34 @@
 			</div>
 		{/if}
 
-		{#if ambitoForzadoProfesional && !es_historico}
-			<p class="mt-3 rounded-md bg-gray-50 dark:bg-gray-800/50 p-3 text-xs text-gray-600 dark:text-gray-400">
-				Las maestrías y doctorados son programas profesionales: no llevan matrícula
-				institucional, el costo ya está incluido en el programa.
-			</p>
+		{#if cobraMatriculaUnica}
+			<div class="mt-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+				<p class="mb-2 text-xs font-semibold text-gray-900 dark:text-gray-100">
+					Matrícula del programa
+				</p>
+				<p class="mb-3 text-[11px] text-gray-600 dark:text-gray-400">
+					{#if ambitoForzadoProfesional}
+						Las maestrías y doctorados cobran una matrícula única, igual para todos
+						los estudiantes.
+					{:else}
+						Un programa profesional cobra una matrícula única, igual para todos los
+						estudiantes.
+					{/if}
+					Si no cobra matrícula, escribí 0.
+				</p>
+				<div class="max-w-xs">
+					<Input
+						label="Matrícula (Bs)"
+						id="matricula_interno"
+						type="number"
+						bind:value={formData.matricula_interno}
+						error={errors.matricula_interno}
+					/>
+				</div>
+			</div>
 		{/if}
 
-		{#if cobraMatricula}
+		{#if cobraMatriculaDiferenciada}
 			<div class="mt-3 rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-900/10 p-3">
 				<p class="mb-2 text-xs font-semibold text-indigo-900 dark:text-indigo-200">
 					Matrícula (educación continua)
