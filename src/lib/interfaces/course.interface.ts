@@ -41,6 +41,8 @@ export interface Course {
 	// override por curso de la matricula diferenciada primer carrera vs
 	// profesional. Si son null, el backend usa los defaults globales
 	// (200 / 500 Bs).
+	// P-AMBITO-FORMACION (2026-08-18): 'educacion_continua' | 'profesional'.
+	ambito?: string | null;
 	matricula_primer_carrera?: number | null;
 	matricula_profesional?: number | null;
 	// ISSUE-P-CARGO-MULTIITEM (2026-07-08): precio único para todos los
@@ -80,6 +82,8 @@ export interface CreateCourseRequest {
 	matricula_interno: number;
 	// F-2026-08-12-DESCUENTO-BECA: override de matricula para primer
 	// carrera y profesional. Si es null, el backend usa los defaults globales.
+	// P-AMBITO-FORMACION (2026-08-18): 'educacion_continua' | 'profesional'.
+	ambito?: string | null;
 	matricula_primer_carrera?: number | null;
 	matricula_profesional?: number | null;
 	cargo_adicional_items?: CargoAdicionalItem[];

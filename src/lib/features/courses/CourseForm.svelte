@@ -53,6 +53,7 @@
 	let tipo_programa: TipoPrograma = $state(initialTipoPrograma);
 	let es_historico = $derived(tipo_programa === 'historico');
 
+
 	let isEditMode = $derived(!!course);
 	let saving = $state(false);
 	let discounts: Discount[] = $state([]);
@@ -117,6 +118,8 @@
 		matricula_interno: 0,
 		matricula_primer_carrera: null as number | null,
 		matricula_profesional: null as number | null,
+		// P-AMBITO-FORMACION: lo resuelve el backend si no se manda.
+		ambito: null as string | null,
 		cargo_adicional_items: [],
 		cantidad_cuotas: 1,
 		descuento_curso: 0,
@@ -132,6 +135,39 @@
 		requisitos: [],
 		es_historico: false
 	});
+
+	// ========================================================================
+	// P-AMBITO-FORMACION (2026-08-18, Kevin en la capacitacion)
+	// ========================================================================
+	// "El tema de educacion continua no lo veo necesario para los programas
+	// de profesionales (...) para los que no, como se evita eso."
+	//
+	// Un programa profesional (maestria, doctorado, y algunos diplomados) NO
+	// cobra matricula institucional: el costo ya esta dentro del programa.
+	// Uno de educacion continua SI, y diferenciada segun primera carrera o
+	// profesional.
+	//
+	// Ademas de esconder campos, esto arregla un bug de plata: los campos de
+	// matricula diferenciada VACIOS no significaban "sin matricula", sino
+	// "cobra el default global" (200 / 500 Bs). Y el campo "Matricula" que se
+	// veia arriba ni siquiera era el que el backend usaba para cobrar. Por eso
+	// abajo se mandan CEROS EXPLICITOS y nunca null.
+	const AMBITO_CONTINUA = 'educacion_continua';
+	const AMBITO_PROFESIONAL = 'profesional';
+
+	// Maestria y doctorado son siempre profesionales (Kevin, 2026-08-18), asi
+	// que ahi el selector ni se muestra. El diplomado es ambiguo — "hay
+	// diplomados uno educacion continua y el otro profesional" — y curso y
+	// taller son continua por defecto.
+	let ambitoForzadoProfesional = $derived(
+		formData.tipo_curso === 'maestría' || formData.tipo_curso === 'doctorado'
+	);
+
+	let ambitoEfectivo = $derived(
+		ambitoForzadoProfesional ? AMBITO_PROFESIONAL : (formData.ambito || AMBITO_CONTINUA)
+	);
+
+	let cobraMatricula = $derived(ambitoEfectivo === AMBITO_CONTINUA && !es_historico);
 
 	let prevCuotas = $state(1);
 	let prevCostoTotal = $state(0);
@@ -736,46 +772,86 @@
 					</p>
 				{/if}
 			</div>
-			<Input
-				label="Matrícula"
-				id="matricula_interno"
-				type="number"
-				bind:value={formData.matricula_interno}
-				required
-				error={errors.matricula_interno}
-			/>
+			<!-- P-AMBITO-FORMACION (2026-08-18): el campo "Matrícula"
+			     (matricula_interno) ya NO se pide. Era el campo que el
+			     encargado veía y completaba, pero el backend cobra con
+			     matricula_primer_carrera / matricula_profesional, así que lo
+			     que se escribía acá no tenía efecto sobre el cobro. Se
+			     mantiene en el modelo por retrocompatibilidad y lo setea el
+			     backend según el ámbito. -->
 		</div>
 
-		<!-- F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
-		     diferencia la matricula de PRIMERA CARRERA vs PROFESIONAL CON TITULO.
-		     Si ambos quedan vacios, se usan los defaults GLOBALES del sistema
-		     (MATRICULA_PRIMER_CARRERA_DEFAULT=200, MATRICULA_PROFESIONAL_DEFAULT=500).
-		     Tipico en educacion continua: primer carrera paga 200, profesional paga 500. -->
-		<div class="mt-3 rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-900/10 p-3">
-			<p class="mb-2 text-xs font-semibold text-indigo-900 dark:text-indigo-200">
-				Matrícula diferenciada por tipo de estudiante (educación continua)
-			</p>
-			<p class="mb-3 text-[11px] text-indigo-700 dark:text-indigo-300">
-				Opcional. Si los dejas vacíos, se usan los defaults del sistema
-				(primer carrera 200 Bs, profesional 500 Bs).
-			</p>
-			<div class="grid grid-cols-2 gap-3">
-				<Input
-					label="Matrícula primer carrera (override)"
-					id="matricula_primer_carrera"
-					type="number"
-					bind:value={formData.matricula_primer_carrera}
-					placeholder="Default: 200"
-				/>
-				<Input
-					label="Matrícula profesional (override)"
-					id="matricula_profesional"
-					type="number"
-					bind:value={formData.matricula_profesional}
-					placeholder="Default: 500"
-				/>
+		<!-- ================================================================
+		     P-AMBITO-FORMACION (2026-08-18, Kevin en la capacitación)
+		     ================================================================
+		     Antes acá había DOS bloques de matrícula compitiendo, y el que se
+		     veía arriba no era el que cobraba. Ahora hay uno solo, y solo
+		     aparece cuando corresponde: si el programa es profesional no se
+		     muestra nada, porque no lleva matrícula institucional.
+		-->
+		{#if !es_historico && !ambitoForzadoProfesional}
+			<div class="mt-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+				<p class="mb-2 text-xs font-semibold text-gray-900 dark:text-gray-100">
+					Tipo de programa
+				</p>
+				<div class="flex flex-col gap-2 sm:flex-row sm:gap-4">
+					<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+						<input
+							type="radio"
+							class="size-4 text-primary-600"
+							checked={ambitoEfectivo === AMBITO_CONTINUA}
+							onchange={() => (formData.ambito = AMBITO_CONTINUA)}
+						/>
+						Educación continua <span class="text-xs text-gray-500">(cobra matrícula)</span>
+					</label>
+					<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+						<input
+							type="radio"
+							class="size-4 text-primary-600"
+							checked={ambitoEfectivo === AMBITO_PROFESIONAL}
+							onchange={() => (formData.ambito = AMBITO_PROFESIONAL)}
+						/>
+						Profesional <span class="text-xs text-gray-500">(sin matrícula)</span>
+					</label>
+				</div>
 			</div>
-		</div>
+		{/if}
+
+		{#if ambitoForzadoProfesional && !es_historico}
+			<p class="mt-3 rounded-md bg-gray-50 dark:bg-gray-800/50 p-3 text-xs text-gray-600 dark:text-gray-400">
+				Las maestrías y doctorados son programas profesionales: no llevan matrícula
+				institucional, el costo ya está incluido en el programa.
+			</p>
+		{/if}
+
+		{#if cobraMatricula}
+			<div class="mt-3 rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-900/10 p-3">
+				<p class="mb-2 text-xs font-semibold text-indigo-900 dark:text-indigo-200">
+					Matrícula (educación continua)
+				</p>
+				<p class="mb-3 text-[11px] text-indigo-700 dark:text-indigo-300">
+					Es lo que paga el estudiante además del costo del programa. Si un monto
+					debe ser 0, escribí 0 — dejarlo vacío aplica el valor por defecto
+					(200 / 500 Bs), que no es lo mismo.
+				</p>
+				<div class="grid grid-cols-2 gap-3">
+					<Input
+						label="Primera carrera"
+						id="matricula_primer_carrera"
+						type="number"
+						bind:value={formData.matricula_primer_carrera}
+						placeholder="Default: 200"
+					/>
+					<Input
+						label="Ya es profesional"
+						id="matricula_profesional"
+						type="number"
+						bind:value={formData.matricula_profesional}
+						placeholder="Default: 500"
+					/>
+				</div>
+			</div>
+		{/if}
 	</Card>
 
 	<!-- SECCIÓN: Cargo adicional (ISSUE-P-CARGO-MULTIITEM, 2026-07-08) -->
