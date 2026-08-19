@@ -44,6 +44,10 @@
 	let academicRole = $derived($userStore?.academicRole);
 	let esCoordinadorFinanciero = $derived($userStore.user?.subtipo_coordinador === 'financiero');
 	const ECONOMIC_HREFS = ['/app/reports', '/app/payments', '/app/payment-config', '/app/bank-statements'];
+	// F-SIDEBAR-COORD-FINANCIERO-SOLO-ECONOMICO (2026-08-19): mismo criterio
+	// que Sidebar.svelte — al financiero se le esconde lo académico/
+	// inscripciones, no solo se le muestra lo económico a los demás.
+	const FINANCIERO_HIDDEN_HREFS = ['/app/enrollments', '/app/students', '/app/teachers', '/app/courses'];
 
 	let filteredNavigation = $derived(navigation.filter(item => {
 		const isStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(userRole);
@@ -53,6 +57,7 @@
 		if (isStaff) {
 			if (!(item.loginTypes.includes('admin') && item.roles.includes(userRole))) return false;
 			if (userRole === 'coordinador' && ECONOMIC_HREFS.includes(item.href) && !esCoordinadorFinanciero) return false;
+			if (userRole === 'coordinador' && esCoordinadorFinanciero && FINANCIERO_HIDDEN_HREFS.includes(item.href)) return false;
 			return true;
 		}
 		if (loginType === 'academic' || isTeacher || isStudent) {
