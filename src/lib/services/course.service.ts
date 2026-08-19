@@ -1,9 +1,37 @@
 import { apiKyC } from '$lib/config';
 import type { Course, CreateCourseRequest, UpdateCourseRequest } from '$lib/interfaces';
 
+export interface SupervisionEncargado {
+	id: string;
+	nombre: string;
+}
+
+export interface SupervisionPrograma {
+	curso_id: string;
+	codigo: string;
+	nombre_programa: string;
+	estado: string;
+	encargados: SupervisionEncargado[];
+	inscritos: number;
+	modulos_total: number;
+	modulos_ejecutados: number;
+	inscripciones_con_alguna_nota: number;
+	cobertura_notas_pct: number;
+}
+
 class CourseService {
 	async getById(id: string): Promise<Course> {
 		return await apiKyC.get<Course>(`/courses/${id}`);
+	}
+
+	/**
+	 * F-COORD-ACADEMICO-SUPERVISION (2026-08-19, Kevin): "mis Encargados de
+	 * Curso supervisados + estado academico consolidado de sus programas".
+	 * Segmentado en el backend igual que el resto del sistema: financiero ve
+	 * todo, academico/investigacion solo sus cursos_asignados.
+	 */
+	async getSupervisionAcademica(): Promise<SupervisionPrograma[]> {
+		return await apiKyC.get<SupervisionPrograma[]>('/courses/supervision-academica');
 	}
 
 	async getAll(
