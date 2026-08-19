@@ -1656,12 +1656,21 @@
 		   de Kardex abierto (Ctrl+P directo), `.libreta-imprimible` no
 		   existe para revelarse de nuevo y antes salía todo en blanco.
 		   Con `:has()` la regla de ocultar solo se activa si hay
-		   contenido imprimible real en la página. */
+		   contenido imprimible real en la página.
+
+		   BUG INTRODUCIDO Y CORREGIDO EN LA MISMA SESIÓN: agregar
+		   `:has(.libreta-imprimible)` a la regla de esconder le subió la
+		   especificidad por encima de `.libreta-imprimible`/`.libreta-imprimible *`
+		   (0,1,1 contra 0,1,0) — la regla de "volver a mostrar" pasó a
+		   PERDER la cascada y dejaba TODO invisible, parent y children.
+		   Verificado con una reproducción HTML aislada: con la
+		   especificidad pareja (repitiendo `:has()` también del lado de
+		   "mostrar"), la visibilidad computada da `visible`. */
 		:global(body:has(.libreta-imprimible) *) {
 			visibility: hidden;
 		}
-		:global(.libreta-imprimible),
-		:global(.libreta-imprimible *) {
+		:global(body:has(.libreta-imprimible) .libreta-imprimible),
+		:global(body:has(.libreta-imprimible) .libreta-imprimible *) {
 			visibility: visible;
 		}
 		:global(.libreta-imprimible) {

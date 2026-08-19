@@ -238,12 +238,23 @@
 		   revelarse de nuevo y la impresión salía completamente en blanco
 		   — visto en vivo en capacitación. Con `:has()` la regla de
 		   ocultar solo se activa si de verdad hay contenido imprimible en
-		   la página. */
+		   la página.
+
+		   BUG INTRODUCIDO Y CORREGIDO EN LA MISMA SESIÓN: agregar
+		   `:has(.libreta-imprimible)` a la regla de esconder le subió la
+		   especificidad por encima de `.libreta-imprimible`/`.libreta-imprimible *`
+		   (0,1,1 contra 0,1,0) — la regla de "volver a mostrar" pasó a
+		   PERDER la cascada, así que el fix de arriba dejaba TODO
+		   invisible, parent y children, en vez de arreglar el problema
+		   original. Verificado con una reproducción HTML aislada antes de
+		   subir esto: con la especificidad pareja (repitiendo la misma
+		   condición `:has()` también del lado de "mostrar"), la
+		   visibilidad computada da `visible` en vez de `hidden`. */
 		:global(body:has(.libreta-imprimible) *) {
 			visibility: hidden;
 		}
-		:global(.libreta-imprimible),
-		:global(.libreta-imprimible *) {
+		:global(body:has(.libreta-imprimible) .libreta-imprimible),
+		:global(body:has(.libreta-imprimible) .libreta-imprimible *) {
 			visibility: visible;
 		}
 		:global(.libreta-imprimible) {
