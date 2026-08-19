@@ -277,6 +277,87 @@
 		exportToExcel(rows, columnDefs, `Planilla_${activeModule.curso_codigo}_Modulo${activeModule.modulo_index}`);
 	}
 
+	function normalizeText(text: string | null | undefined): string {
+		if (!text) return '';
+		return text
+			.toLowerCase()
+			.normalize('NFD')
+			.replace(/[\u0300-\u036f]/g, '')
+			.replace(/[^a-z0-9\s]/g, ' ')
+			.replace(/\s+/g, ' ')
+			.trim();
+	}
+
+	function extractNota(cell: any): number | null {
+		if (cell === undefined || cell === null) return null;
+		if (typeof cell === 'number') {
+			return !isNaN(cell) && cell >= 0 && cell <= 100 ? Math.round(cell * 100) / 100 : null;
+		}
+		const str = String(cell).trim();
+		if (str === '') return null;
+		const match = str.match(/(\d+(?:[.,]\d+)?)/);
+		if (match) {
+			const num = parseFloat(match[1].replace(',', '.'));
+			if (!isNaN(num) && num >= 0 && num <= 100) {
+				return Math.round(num * 100) / 100;
+			}
+		}
+		return null;
+	}
+
+	function matchStudent(
+		candidate: { registro?: string; ci?: string; fullName?: string; apellidos?: string; nombres?: string },
+		student: Student
+	): boolean {
+		const normCandidateCI = normalizeText(candidate.ci).replace(/\s+/g, '');
+		const normStudentCI = normalizeText(student.carnet).replace(/\s+/g, '');
+		if (normCandidateCI && normStudentCI && normCandidateCI === normStudentCI) {
+			return true;
+		}
+
+		const normCandidateReg = normalizeText(candidate.registro).replace(/\s+/g, '');
+		const normStudentReg = normalizeText(student.registro).replace(/\s+/g, '');
+		if (normCandidateReg && normStudentReg && normCandidateReg === normStudentReg) {
+			return true;
+		}
+
+		const normStudentName = normalizeText(student.nombre);
+		if (!normStudentName) return false;
+
+		const studentTokens = normStudentName.split(' ').filter(t => t.length > 2);
+		if (studentTokens.length === 0) return false;
+
+		const candidatesToTest: string[] = [];
+		if (candidate.fullName) candidatesToTest.push(candidate.fullName);
+		if (candidate.apellidos && candidate.nombres) {
+			candidatesToTest.push(`${candidate.apellidos} ${candidate.nombres}`);
+			candidatesToTest.push(`${candidate.nombres} ${candidate.apellidos}`);
+		} else if (candidate.apellidos) {
+			candidatesToTest.push(candidate.apellidos);
+		}
+
+		for (const rawCandidate of candidatesToTest) {
+			const normCandidate = normalizeText(rawCandidate);
+			if (!normCandidate) continue;
+
+			if (normCandidate === normStudentName) return true;
+			if (normStudentName.includes(normCandidate) || normCandidate.includes(normStudentName)) return true;
+
+			const candidateTokens = normCandidate.split(' ').filter(t => t.length > 2);
+			if (candidateTokens.length >= 2) {
+				const matchingTokens = candidateTokens.filter(t => 
+					studentTokens.some(st => st === t || st.includes(t) || t.includes(st))
+				);
+				const matchRatio = matchingTokens.length / Math.min(candidateTokens.length, studentTokens.length);
+				if (matchingTokens.length >= 2 && matchRatio >= 0.7) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
 	async function importFile(event: Event) {
 		const target = event.target as HTMLInputElement;
 		const file = target.files?.[0];
@@ -292,32 +373,103 @@
 			}
 			const sheet = workbook.Sheets[firstSheetName];
 			const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-			
+			if (rows.length === 0) {
+				alert('warning', 'El archivo está vacío.');
+				return;
+			}
+
+			// 1. Detectar si hay fila de cabecera
+			let headerRowIndex = -1;
+			let colRegistro = -1;
+			let colCI = -1;
+			let colApellidos = -1;
+			let colNombres = -1;
+			let colNombreCompleto = -1;
+			let colNota = -1;
+
+			for (let i = 0; i < Math.min(rows.length, 10); i++) {
+				const row = rows[i];
+				if (!row || row.length === 0) continue;
+				const rowStrings = row.map(c => normalizeText(String(c ?? '')));
+				
+				const hasNameOrCI = rowStrings.some(s => 
+					s.includes('apellido') || s.includes('nombre') || s.includes('estudiante') || 
+					s.includes('alumno') || s.includes('ci') || s.includes('carnet') || s.includes('registro')
+				);
+				const hasGrade = rowStrings.some(s => 
+					s.includes('total') || s.includes('nota') || s.includes('calificacion') || 
+					s.includes('final') || s.includes('100')
+				);
+
+				if (hasNameOrCI || hasGrade) {
+					headerRowIndex = i;
+					rowStrings.forEach((str, colIdx) => {
+						if (str.includes('registro') || str === 'reg') colRegistro = colIdx;
+						else if (str.includes('ci') || str.includes('carnet') || str.includes('cedula') || str.includes('documento')) colCI = colIdx;
+						else if (str.includes('apellido')) colApellidos = colIdx;
+						else if (str.includes('nombre') && !str.includes('completo')) colNombres = colIdx;
+						else if (str.includes('estudiante') || str.includes('alumno') || str.includes('nombre completo')) colNombreCompleto = colIdx;
+						
+						if (str.includes('total') || str.includes('nota') || str.includes('calificacion') || str.includes('final') || str.includes('100')) {
+							colNota = colIdx;
+						}
+					});
+					break;
+				}
+			}
+
+			const startRow = headerRowIndex >= 0 ? headerRowIndex + 1 : 0;
 			let importedCount = 0;
-			for (let i = 1; i < rows.length; i++) {
+
+			for (let i = startRow; i < rows.length; i++) {
 				const row = rows[i];
 				if (!row || row.length === 0) continue;
 
-				// Columnas esperadas de "Exportar Planilla":
-				// [0] Estudiante, [1] Registro, [2] CI, [3] Calificacion
-				const registroStr = row[1] !== undefined ? String(row[1]).replace(/"/g, '').trim() : '';
-				const ciStr = row[2] !== undefined ? String(row[2]).replace(/"/g, '').trim() : '';
-				const notaRaw = row[3];
-				
-				if (notaRaw !== undefined && notaRaw !== null && String(notaRaw).trim() !== '') {
-					const notaNum = Number(notaRaw);
-					if (!isNaN(notaNum) && notaNum >= 0 && notaNum <= 100) {
-						const enrollmentMatch = moduleEnrollments.find(enr => {
-							const st = students[enr.estudiante_id];
-							return (registroStr && st?.registro === registroStr) || 
-							       (ciStr && st?.carnet === ciStr) ||
-							       (registroStr && st?.carnet === registroStr);
-						});
+				// Construir candidato de estudiante
+				const candidate: { registro?: string; ci?: string; fullName?: string; apellidos?: string; nombres?: string } = {};
 
-						if (enrollmentMatch) {
-							calificacionInputs[enrollmentMatch._id] = notaNum;
-							importedCount++;
+				if (colRegistro >= 0 && row[colRegistro] !== undefined) candidate.registro = String(row[colRegistro]);
+				if (colCI >= 0 && row[colCI] !== undefined) candidate.ci = String(row[colCI]);
+				if (colApellidos >= 0 && row[colApellidos] !== undefined) candidate.apellidos = String(row[colApellidos]);
+				if (colNombres >= 0 && row[colNombres] !== undefined) candidate.nombres = String(row[colNombres]);
+				if (colNombreCompleto >= 0 && row[colNombreCompleto] !== undefined) candidate.fullName = String(row[colNombreCompleto]);
+
+				// Si no se detectaron columnas específicas por encabezado, usar posición por defecto
+				if (colRegistro < 0 && colCI < 0 && colApellidos < 0 && colNombres < 0 && colNombreCompleto < 0) {
+					if (row.length >= 4) {
+						candidate.fullName = String(row[0] ?? '');
+						candidate.registro = String(row[1] ?? '');
+						candidate.ci = String(row[2] ?? '');
+					} else if (row.length >= 2) {
+						candidate.fullName = String(row[0] ?? '');
+					}
+				}
+
+				// Extraer nota
+				let notaNum: number | null = null;
+				if (colNota >= 0 && row[colNota] !== undefined) {
+					notaNum = extractNota(row[colNota]);
+				} else {
+					// Buscar en las celdas de derecha a izquierda un valor de nota
+					for (let c = row.length - 1; c >= 0; c--) {
+						const val = extractNota(row[c]);
+						if (val !== null) {
+							notaNum = val;
+							break;
 						}
+					}
+				}
+
+				if (notaNum !== null) {
+					const enrollmentMatch = moduleEnrollments.find(enr => {
+						const st = students[enr.estudiante_id];
+						if (!st) return false;
+						return matchStudent(candidate, st);
+					});
+
+					if (enrollmentMatch) {
+						calificacionInputs[enrollmentMatch._id] = notaNum;
+						importedCount++;
 					}
 				}
 			}
@@ -325,7 +477,7 @@
 			if (importedCount > 0) {
 				alert('success', `Se cargaron ${importedCount} notas del archivo (${file.name}). Haz clic en "Guardar Todo" para guardarlas.`);
 			} else {
-				alert('warning', 'No se encontraron notas válidas en el archivo que coincidan con los estudiantes del curso.');
+				alert('warning', 'No se encontraron notas válidas en el archivo que coincidan con los estudiantes del curso. Revisa que los nombres o CI coincidan.');
 			}
 		} catch (err: any) {
 			alert('error', 'Error al leer el archivo. Asegúrate de subir un archivo Excel (.xlsx, .xls) o CSV válido.');
