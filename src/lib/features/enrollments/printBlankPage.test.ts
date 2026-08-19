@@ -20,6 +20,14 @@
 // computada daba `hidden` con la primera version, `visible` con la
 // segunda (que repite `:has()` tambien del lado de "mostrar", empatando
 // la especificidad).
+//
+// TERCERA VUELTA (2026-08-19 tarde): la impresion desde
+// /app/certificates/requests seguia en blanco. Los overflow de los
+// ancestros del layout (overflow-hidden, overflow-y-auto) recortaban el
+// contenido absolutamente posicionado de .libreta-imprimible. Y los
+// backdrops de los modales (position:fixed inset:0) tapaban todo. Se
+// agregaron reglas para forzar overflow:visible en todos los ancestros y
+// display:none en los backdrops, ambas condicionadas a :has().
 // ============================================================================
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -49,6 +57,32 @@ function verificarEspecificidadPareja(src: string) {
 	);
 }
 
+function verificarOverflowAncestros(src: string) {
+	// Las reglas de overflow deben apuntar a TODOS los ancestros del
+	// arbol (condicionados a :has(.libreta-imprimible)), no solo a los
+	// que estan DENTRO de .libreta-imprimible. Los tres overflow que
+	// recortaban:
+	//   1. overflow-hidden (layout wrapper)
+	//   2. overflow-y-auto (main y body del modal)
+	//   3. overflow-x-auto (tabla)
+	expect(src).toContain('body:has(.libreta-imprimible) .overflow-hidden');
+	expect(src).toContain('body:has(.libreta-imprimible) .overflow-y-auto');
+	expect(src).toContain('body:has(.libreta-imprimible) .overflow-x-auto');
+
+	// NO debe existir la version vieja que solo apuntaba DENTRO de
+	// .libreta-imprimible (esa no neutralizaba el layout padre):
+	expect(src).not.toMatch(
+		/:global\(\.libreta-imprimible \.overflow-x-auto\)\s*\{/
+	);
+}
+
+function verificarBackdropsOcultos(src: string) {
+	// Los backdrops de los modales (position:fixed, backdrop-blur-sm)
+	// deben ocultarse con display:none para que no participen del layout
+	// de impresion.
+	expect(src).toContain('body:has(.libreta-imprimible) .backdrop-blur-sm');
+}
+
 describe('LibretaResumenModal.svelte: print CSS no deja la pagina en blanco (ni con el modal cerrado, ni con el modal abierto)', () => {
 	const src = fuente('LibretaResumenModal.svelte');
 
@@ -58,6 +92,14 @@ describe('LibretaResumenModal.svelte: print CSS no deja la pagina en blanco (ni 
 
 	it('la regla de mostrar tiene la misma especificidad que la de esconder', () => {
 		verificarEspecificidadPareja(src);
+	});
+
+	it('neutraliza overflow en ancestros del layout, no solo dentro de .libreta-imprimible', () => {
+		verificarOverflowAncestros(src);
+	});
+
+	it('oculta los backdrops de los modales con display:none', () => {
+		verificarBackdropsOcultos(src);
 	});
 });
 
@@ -70,5 +112,13 @@ describe('/app/enrollments/+page.svelte: mismo fix en el print CSS del Kardex', 
 
 	it('la regla de mostrar tiene la misma especificidad que la de esconder', () => {
 		verificarEspecificidadPareja(src);
+	});
+
+	it('neutraliza overflow en ancestros del layout, no solo dentro de .libreta-imprimible', () => {
+		verificarOverflowAncestros(src);
+	});
+
+	it('oculta los backdrops de los modales con display:none', () => {
+		verificarBackdropsOcultos(src);
 	});
 });

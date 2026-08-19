@@ -1687,11 +1687,24 @@
 			display: none !important;
 		}
 
-		/* El modal recorta con scroll en pantalla; en papel tiene que fluir
-		   completo, si no se imprime solo lo visible. */
-		:global(.libreta-imprimible .overflow-x-auto),
-		:global(.libreta-imprimible .overflow-y-auto) {
+		/* Neutralizar TODOS los overflow de ancestros que recortan el
+		   contenido absolutamente posicionado de .libreta-imprimible.
+		   Antes solo se neutralizaba DENTRO de .libreta-imprimible; el
+		   bug de la tarde del 2026-08-19 mostró que las capas del
+		   layout (overflow-hidden en el wrapper, overflow-y-auto en
+		   main) también recortan. */
+		:global(body:has(.libreta-imprimible) .overflow-hidden),
+		:global(body:has(.libreta-imprimible) .overflow-y-auto),
+		:global(body:has(.libreta-imprimible) .overflow-x-auto) {
 			overflow: visible !important;
+		}
+
+		/* Los backdrops de los modales (position:fixed inset:0) tapan
+		   el contenido de impresión. Con display:none no participan
+		   del layout de impresión en absoluto. */
+		:global(body:has(.libreta-imprimible) > .fixed),
+		:global(body:has(.libreta-imprimible) .backdrop-blur-sm) {
+			display: none !important;
 		}
 
 		/* Fondo blanco y texto negro: los fondos de color no se imprimen por
