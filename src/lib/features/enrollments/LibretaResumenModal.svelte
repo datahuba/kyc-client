@@ -227,52 +227,11 @@
      fondo blanco y texto negro. -->
 <style>
 	@media print {
-		/* F-FIX-PRINT-PAGINA-EN-BLANCO (2026-08-19): esta regla es CSS
-		   global (:global) y queda cargada en el bundle de la ruta
-		   mientras este componente exista ahí, INCLUSO con el modal
-		   cerrado ({#if isOpen} solo controla el montaje del markup, no la
-		   presencia del <style> en la hoja de estilos de la página). Antes
-		   escondía TODO `body *` sin condición: si alguien imprimía la
-		   página (Ctrl+P o el botón nativo del navegador) sin el modal
-		   abierto, `.libreta-imprimible` no existía en el DOM para
-		   revelarse de nuevo y la impresión salía completamente en blanco
-		   — visto en vivo en capacitación. Con `:has()` la regla de
-		   ocultar solo se activa si de verdad hay contenido imprimible en
-		   la página.
-
-		   BUG INTRODUCIDO Y CORREGIDO EN LA MISMA SESIÓN: agregar
-		   `:has(.libreta-imprimible)` a la regla de esconder le subió la
-		   especificidad por encima de `.libreta-imprimible`/`.libreta-imprimible *`
-		   (0,1,1 contra 0,1,0) — la regla de "volver a mostrar" pasó a
-		   PERDER la cascada, así que el fix de arriba dejaba TODO
-		   invisible, parent y children, en vez de arreglar el problema
-		   original. Verificado con una reproducción HTML aislada antes de
-		   subir esto: con la especificidad pareja (repitiendo la misma
-		   condición `:has()` también del lado de "mostrar"), la
-		   visibilidad computada da `visible` en vez de `hidden`.
-
-		   FIX 2026-08-19 (sesión de la tarde): la impresión desde
-		   /app/certificates/requests (el flujo de certificados de No
-		   Deudor) seguía saliendo en blanco. La causa era que
-		   .libreta-imprimible usa position:absolute para "salir" del
-		   modal, pero TRES capas de overflow en ancestros recortaban el
-		   contenido:
-		   1. El layout wrapper <div class="overflow-hidden"> en
-		      /app/+layout.svelte — recorta todo lo que sale del viewport.
-		   2. El <main class="overflow-y-auto"> — contenedor scrolleable
-		      de la página.
-		   3. El body del Modal <div class="overflow-y-auto"> — el scroll
-		      del panel del modal.
-		   Además, los backdrops de los modales (position:fixed, inset:0)
-		   seguían pintándose en el contexto de impresión y tapaban el
-		   contenido aun con visibility:hidden (ocupan el viewport entero
-		   como elementos fijos).
-
-		   La solución fuerza overflow:visible en TODOS los ancestros del
-		   árbol cuando hay contenido imprimible, y oculta los backdrops
-		   con display:none para que ni siquiera participen del layout de
-		   impresión. Esto es seguro porque las reglas solo aplican
-		   dentro de @media print — la UI en pantalla no se ve afectada. */
+		/* F-FIX-PRINT-PAGINA-EN-BLANCO (2026-08-19):
+		   1. Ocultar todo lo que no sea libreta-imprimible
+		   2. display:none en header, sidebar, nav, backdrops y no-print para que no ocupen espacio
+		   3. Resetear alturas fijas (.h-dvh, main, relative) a static/auto para que no empujen a pagina 2
+		   4. .libreta-imprimible posicionada a top:0, left:0 con padding prolijo */
 		:global(body:has(.libreta-imprimible) *) {
 			visibility: hidden;
 		}
@@ -280,39 +239,57 @@
 		:global(body:has(.libreta-imprimible) .libreta-imprimible *) {
 			visibility: visible;
 		}
-		:global(.libreta-imprimible) {
-			position: absolute;
-			left: 0;
-			top: 0;
-			width: 100%;
-			padding: 0;
-		}
-		:global(.no-print) {
+
+		:global(body:has(.libreta-imprimible) header),
+		:global(body:has(.libreta-imprimible) aside),
+		:global(body:has(.libreta-imprimible) nav),
+		:global(body:has(.libreta-imprimible) .no-print),
+		:global(body:has(.libreta-imprimible) .backdrop-blur-sm),
+		:global(body:has(.libreta-imprimible) > .fixed) {
 			display: none !important;
 		}
 
-		/* Neutralizar TODOS los overflow de ancestros que recortan el
-		   contenido absolutamente posicionado de .libreta-imprimible.
-		   Sin esto, position:absolute se posiciona contra el <main> que
-		   es el primer ancestro con position:relative, pero el contenido
-		   queda recortado por overflow-hidden/overflow-y-auto de las
-		   capas superiores del layout y del modal. */
+		:global(html:has(.libreta-imprimible)),
+		:global(body:has(.libreta-imprimible)) {
+			height: auto !important;
+			min-height: 0 !important;
+			margin: 0 !important;
+			padding: 0 !important;
+			position: static !important;
+			overflow: visible !important;
+		}
+
+		:global(body:has(.libreta-imprimible) .h-dvh),
+		:global(body:has(.libreta-imprimible) .h-screen),
+		:global(body:has(.libreta-imprimible) main),
+		:global(body:has(.libreta-imprimible) .modal-sheet),
+		:global(body:has(.libreta-imprimible) [role="dialog"]) {
+			position: static !important;
+			transform: none !important;
+			inset: auto !important;
+			height: auto !important;
+			min-height: 0 !important;
+			max-height: none !important;
+			margin: 0 !important;
+			padding: 0 !important;
+			overflow: visible !important;
+		}
+
+		:global(.libreta-imprimible) {
+			position: absolute !important;
+			left: 0 !important;
+			top: 0 !important;
+			width: 100% !important;
+			margin: 0 !important;
+			padding: 1.5rem !important;
+			transform: none !important;
+			box-sizing: border-box !important;
+		}
+
 		:global(body:has(.libreta-imprimible) .overflow-hidden),
 		:global(body:has(.libreta-imprimible) .overflow-y-auto),
 		:global(body:has(.libreta-imprimible) .overflow-x-auto) {
 			overflow: visible !important;
-		}
-
-		/* Los backdrops de los modales son botones con position:fixed
-		   inset:0 — aun con visibility:hidden siguen forzando el
-		   viewport a su tamaño (un fixed de 100vw×100vh). Con
-		   display:none no participan del layout de impresión en
-		   absoluto. Se usa el selector del backdrop tal como lo genera
-		   modal.svelte: un <button> con las clases fixed e inset-0 y
-		   z-50, que es el que maneja el click para cerrar el modal. */
-		:global(body:has(.libreta-imprimible) > .fixed),
-		:global(body:has(.libreta-imprimible) .backdrop-blur-sm) {
-			display: none !important;
 		}
 
 		:global(.libreta-imprimible),
@@ -322,6 +299,8 @@
 			box-shadow: none !important;
 		}
 		:global(.libreta-imprimible table) {
+			width: 100% !important;
+			border-collapse: collapse !important;
 			page-break-inside: auto;
 		}
 		:global(.libreta-imprimible tr) {

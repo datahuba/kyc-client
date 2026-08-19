@@ -1673,42 +1673,59 @@
 		:global(body:has(.libreta-imprimible) .libreta-imprimible *) {
 			visibility: visible;
 		}
-		:global(.libreta-imprimible) {
-			position: absolute;
-			left: 0;
-			top: 0;
-			width: 100%;
-			padding: 0;
-		}
 
-		/* Botones y controles no se imprimen: en el papel no sirven y
-		   además desplazan el contenido. */
-		:global(.no-print) {
+		:global(body:has(.libreta-imprimible) header),
+		:global(body:has(.libreta-imprimible) aside),
+		:global(body:has(.libreta-imprimible) nav),
+		:global(body:has(.libreta-imprimible) .no-print),
+		:global(body:has(.libreta-imprimible) .backdrop-blur-sm),
+		:global(body:has(.libreta-imprimible) > .fixed) {
 			display: none !important;
 		}
 
-		/* Neutralizar TODOS los overflow de ancestros que recortan el
-		   contenido absolutamente posicionado de .libreta-imprimible.
-		   Antes solo se neutralizaba DENTRO de .libreta-imprimible; el
-		   bug de la tarde del 2026-08-19 mostró que las capas del
-		   layout (overflow-hidden en el wrapper, overflow-y-auto en
-		   main) también recortan. */
+		:global(html:has(.libreta-imprimible)),
+		:global(body:has(.libreta-imprimible)) {
+			height: auto !important;
+			min-height: 0 !important;
+			margin: 0 !important;
+			padding: 0 !important;
+			position: static !important;
+			overflow: visible !important;
+		}
+
+		:global(body:has(.libreta-imprimible) .h-dvh),
+		:global(body:has(.libreta-imprimible) .h-screen),
+		:global(body:has(.libreta-imprimible) main),
+		:global(body:has(.libreta-imprimible) .modal-sheet),
+		:global(body:has(.libreta-imprimible) [role="dialog"]) {
+			position: static !important;
+			transform: none !important;
+			inset: auto !important;
+			height: auto !important;
+			min-height: 0 !important;
+			max-height: none !important;
+			margin: 0 !important;
+			padding: 0 !important;
+			overflow: visible !important;
+		}
+
+		:global(.libreta-imprimible) {
+			position: absolute !important;
+			left: 0 !important;
+			top: 0 !important;
+			width: 100% !important;
+			margin: 0 !important;
+			padding: 1.5rem !important;
+			transform: none !important;
+			box-sizing: border-box !important;
+		}
+
 		:global(body:has(.libreta-imprimible) .overflow-hidden),
 		:global(body:has(.libreta-imprimible) .overflow-y-auto),
 		:global(body:has(.libreta-imprimible) .overflow-x-auto) {
 			overflow: visible !important;
 		}
 
-		/* Los backdrops de los modales (position:fixed inset:0) tapan
-		   el contenido de impresión. Con display:none no participan
-		   del layout de impresión en absoluto. */
-		:global(body:has(.libreta-imprimible) > .fixed),
-		:global(body:has(.libreta-imprimible) .backdrop-blur-sm) {
-			display: none !important;
-		}
-
-		/* Fondo blanco y texto negro: los fondos de color no se imprimen por
-		   defecto y dejarían texto claro sobre papel blanco. */
 		:global(.libreta-imprimible),
 		:global(.libreta-imprimible *) {
 			background: #fff !important;
@@ -1716,8 +1733,9 @@
 			box-shadow: none !important;
 		}
 
-		/* Las tablas no se parten por la mitad entre páginas. */
 		:global(.libreta-imprimible table) {
+			width: 100% !important;
+			border-collapse: collapse !important;
 			page-break-inside: auto;
 		}
 		:global(.libreta-imprimible tr) {
