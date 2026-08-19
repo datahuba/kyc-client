@@ -849,5 +849,7 @@
 <LibretaResumenModal
 	isOpen={libretaOpen}
 	enrollmentId={selectedRequest?.enrollment_id ?? null}
+	estudianteNombre={selectedRequest?.nombre_completo ?? ''}
+	cursoNombre={selectedRequest?.programa_nombre ?? ''}
 	onClose={() => (libretaOpen = false)}
 />

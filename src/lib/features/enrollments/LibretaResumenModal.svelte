@@ -25,17 +25,19 @@
 	// impresión (@media print con la clase .libreta-imprimible).
 	import Modal from '$lib/components/ui/modal.svelte';
 	import Button from '$lib/components/ui/button.svelte';
-	import { enrollmentService, paymentService } from '$lib/services';
+	import { enrollmentService, paymentService, studentService, courseService } from '$lib/services';
 	import { formatCurrency } from '$lib/utils';
 	import type { Enrollment } from '$lib/interfaces';
 
 	interface Props {
 		isOpen: boolean;
 		enrollmentId: string | null;
+		estudianteNombre?: string;
+		cursoNombre?: string;
 		onClose: () => void;
 	}
 
-	let { isOpen, enrollmentId, onClose }: Props = $props();
+	let { isOpen, enrollmentId, estudianteNombre = '', cursoNombre = '', onClose }: Props = $props();
 
 	let cargando = $state(false);
 	let enrollment: Enrollment | null = $state(null);
@@ -67,11 +69,23 @@
 				typeof (e as any).curso_id === 'object' ? (e as any).curso_id?._id : (e as any).curso_id;
 
 			if (estudianteId && cursoId) {
-				const resp = await paymentService.getAll(1, 200, {
-					estudiante_id: String(estudianteId),
-					curso_id: String(cursoId)
-				});
+				const [resp, s, c] = await Promise.all([
+					paymentService.getAll(1, 200, {
+						estudiante_id: String(estudianteId),
+						curso_id: String(cursoId)
+					}),
+					studentService.getById(String(estudianteId)).catch(() => null),
+					courseService.getById(String(cursoId)).catch(() => null)
+				]);
 				pagos = (resp as any)?.data ?? [];
+				if (s) {
+					const sNombre = (s as any).nombre ? `${(s as any).nombre} ${(s as any).apellidos || ''}`.trim() : (s as any).full_name || '';
+					if (sNombre) (enrollment as any).estudiante_nombre = sNombre;
+				}
+				if (c) {
+					const cNombre = (c as any).nombre_completo || (c as any).nombre || (c as any).codigo || '';
+					if (cNombre) (enrollment as any).curso_nombre = cNombre;
+				}
 			}
 		} catch (e: any) {
 			error = e?.message || 'No se pudieron cargar los pagos.';
@@ -109,8 +123,19 @@
 
 	function imprimir() {
 		if (!enrollment) return;
-		const estudianteNombre = (enrollment as any).estudiante_nombre || '—';
-		const cursoNombre = (enrollment as any).curso_nombre || '—';
+		const remitenteValido = pagos.find((p) => p.remitente && String(p.remitente).trim() !== '')?.remitente;
+		const finalEstudianteNombre =
+			estudianteNombre ||
+			(enrollment as any).estudiante_nombre ||
+			(enrollment as any).estudiante?.nombre ||
+			(enrollment as any).estudiante_id?.nombre ||
+			remitenteValido ||
+			'—';
+		const finalCursoNombre =
+			cursoNombre ||
+			(enrollment as any).curso_nombre ||
+			(enrollment as any).curso?.nombre ||
+			'—';
 		const estado = enrollment.estado || '—';
 		const fechaImpresion = new Date().toLocaleDateString('es-BO', {
 			day: '2-digit',
@@ -136,14 +161,14 @@
 			.join('');
 
 		const totalAprobado = pagos
-			.filter((p) => p.estado_pago === 'Aprobado')
-			.reduce((sum, p) => sum + (p.cantidad_pago || 0), 0);
+			.filter((p) => String(p.estado_pago || '').toLowerCase() === 'aprobado')
+			.reduce((sum, p) => sum + (Number(p.cantidad_pago) || 0), 0);
 
 		const html = `<!doctype html>
 <html lang="es">
 <head>
 	<meta charset="utf-8" />
-	<title>Resumen de Pagos - ${esc(estudianteNombre)}</title>
+	<title>Resumen de Pagos - ${esc(finalEstudianteNombre)}</title>
 	<style>
 		* { box-sizing: border-box; margin: 0; padding: 0; }
 		body { font-family: Arial, Helvetica, sans-serif; color: #111; padding: 25px; font-size: 12px; }
@@ -178,9 +203,9 @@
 	<div class="info-box">
 		<div class="info-col">
 			<div class="label">Estudiante</div>
-			<div class="value">${esc(estudianteNombre)}</div>
+			<div class="value">${esc(finalEstudianteNombre)}</div>
 			<div class="label" style="margin-top: 6px;">Programa</div>
-			<div class="sub-value">${esc(cursoNombre)}</div>
+			<div class="sub-value">${esc(finalCursoNombre)}</div>
 		</div>
 		<div class="info-col" style="text-align: right; max-width: 200px;">
 			<div class="label">Estado Inscripción</div>
@@ -262,10 +287,10 @@
 						Programa
 					</p>
 					<p class="text-lg font-bold leading-tight text-slate-900 dark:text-white">
-						{(enrollment as any).curso_nombre || '—'}
+						{cursoNombre || (enrollment as any).curso_nombre || '—'}
 					</p>
 					<p class="mt-1 text-sm font-semibold text-blue-600">
-						Estudiante: {(enrollment as any).estudiante_nombre || '—'}
+						Estudiante: {estudianteNombre || (enrollment as any).estudiante_nombre || '—'}
 					</p>
 				</div>
 				<div
@@ -336,10 +361,10 @@
 										</td>
 										<td class="px-4 py-3 text-center">
 											<span
-												class="rounded-full px-2 py-1 text-[11px] font-bold uppercase tracking-wide {pago.estado_pago ===
-												'Aprobado'
+												class="rounded-full px-2 py-1 text-[11px] font-bold uppercase tracking-wide {String(pago.estado_pago || '').toLowerCase() ===
+												'aprobado'
 													? 'bg-green-100 text-green-700'
-													: pago.estado_pago === 'Rechazado'
+													: String(pago.estado_pago || '').toLowerCase() === 'rechazado'
 														? 'bg-red-100 text-red-700'
 														: 'bg-slate-100 text-slate-600'}"
 											>
