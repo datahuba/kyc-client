@@ -78,6 +78,19 @@
 	let esCoordinadorFinanciero = $derived($userStore.user?.subtipo_coordinador === 'financiero');
 	const ECONOMIC_HREFS = ['/app/reports', '/app/reports/cuentas-historicas', '/app/payments', '/app/payment-config', '/app/bank-statements', '/app/informes'];
 
+	// F-SIDEBAR-COORD-FINANCIERO-SOLO-ECONOMICO (2026-08-19, Kevin en
+	// capacitación): "los de sidebar de los coordinadores solo debe salir
+	// lo que les corresponde no que salga todo". Lo de arriba (ECONOMIC_HREFS)
+	// es unidireccional: esconde lo económico de quien NO es financiero. Acá
+	// va la inversa — esconder del financiero lo que es gestión académica o
+	// de inscripciones, que no es su alcance (mismo criterio ya aplicado en
+	// el backend vía require_gestion_academica, ver AGENTS.md RBAC).
+	// "Reportar un Error" y "Validación de Documentos" quedan visibles
+	// siempre — son herramientas técnicas transversales, no del área
+	// académica (F-SIDEBAR-TECNICOS).
+	const FINANCIERO_HIDDEN_GROUPS = ['Académico', 'Inscripciones'];
+	const FINANCIERO_HIDDEN_HREFS = ['/app/students', '/app/requests'];
+
 	function entryAllowed(entry: NavigationEntry): boolean {
 		if (entry.type === 'spacer') return true;
 
@@ -88,6 +101,7 @@
 		if (isStaff) {
 			if (!(entry.loginTypes.includes('admin') && entry.roles.includes(userRole))) return false;
 			if (entry.type === 'item' && userRole === 'coordinador' && ECONOMIC_HREFS.includes(entry.href) && !esCoordinadorFinanciero) return false;
+			if (entry.type === 'item' && userRole === 'coordinador' && esCoordinadorFinanciero && FINANCIERO_HIDDEN_HREFS.includes(entry.href)) return false;
 			return true;
 		}
 		if (loginType === 'academic' || isTeacher || isStudent) {
@@ -106,6 +120,7 @@
 				const visibleChildren = entry.children.filter(c => entryAllowed(c));
 				if (visibleChildren.length === 0) return null;
 				if (entry.name === 'Financiero' && userRole === 'coordinador' && !esCoordinadorFinanciero) return null;
+				if (FINANCIERO_HIDDEN_GROUPS.includes(entry.name) && userRole === 'coordinador' && esCoordinadorFinanciero) return null;
 				return { ...entry, children: visibleChildren };
 			}
 			return entryAllowed(entry) ? entry : null;

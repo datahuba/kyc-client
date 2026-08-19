@@ -367,12 +367,23 @@
 
 	async function downloadCertPdf() {
 		if (!selectedRequest?.certificate_id) return;
+		// F-FIX-DESCARGA-PDF-RACE (2026-08-19): antes se leia
+		// `selectedRequest.tipo`/`.id` DESPUES del await de downloadPdf().
+		// Si el usuario cerraba el modal (o navegaba) mientras la descarga
+		// estaba en curso, `selectedRequest` podia quedar en null y el
+		// acceso reventaba con "Cannot read properties of null (reading
+		// 'tipo')" — visto en vivo en consola durante la capacitacion.
+		// Se capturan los valores ANTES del await, que es lo unico que
+		// necesita el nombre del archivo.
+		const certificateId = selectedRequest.certificate_id;
+		const tipo = selectedRequest.tipo;
+		const id = selectedRequest.id;
 		try {
-			const blob = await certificateService.downloadPdf(selectedRequest.certificate_id);
+			const blob = await certificateService.downloadPdf(certificateId);
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
-			a.download = `certificado_${selectedRequest.tipo}_${selectedRequest.id}.pdf`;
+			a.download = `certificado_${tipo}_${id}.pdf`;
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
