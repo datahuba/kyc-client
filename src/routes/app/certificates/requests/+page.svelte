@@ -30,6 +30,7 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import Card from '$lib/components/ui/card.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
+	import LibretaResumenModal from '$lib/features/enrollments/LibretaResumenModal.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import {
 		FileTextIcon,
@@ -68,6 +69,20 @@
 	// al confirmar la firma física.
 	let tratamientoElegido = $state('');
 	let observacionFirma = $state('');
+
+	// F-CERT-GATE-IMPRESION (2026-08-18, Kevin en la capacitación): "una vez
+	// impreso, recién salga la siguiente opción del flujo, que sea la de
+	// marcar la casilla que ya está firmado para la copia física". El
+	// documento que se imprime acá es el certificado ya emitido (botón
+	// "Descargar PDF", visible apenas se aprueba) — eso es lo que la
+	// coordinadora le lleva a Fausto para que lo firme en papel.
+	//
+	// El navegador no avisa de forma confiable si el diálogo de impresión se
+	// completó o se canceló, así que el gate no se dispara solo al abrirlo:
+	// es una confirmación EXPLÍCITA de la persona ("ya lo imprimí y lo tengo
+	// en mano"), que es lo que realmente hace falta asegurar antes de que se
+	// pueda decir que el papel está firmado.
+	let confirmoImpresionCert = $state(false);
 
 	// Modal de rechazo
 	let rejectOpen = $state(false);
@@ -217,6 +232,7 @@
 		// haría que se apruebe con un título que nadie eligió.
 		tratamientoElegido = req.tratamiento ?? '';
 		observacionFirma = '';
+		confirmoImpresionCert = false;
 		detailOpen = true;
 		// Si está pendiente, lo marcamos en_revision al abrirlo (UX: "lo estoy mirando")
 		if (req.estado === 'pendiente' && canApprove(req)) {
@@ -285,6 +301,7 @@
 			requests = requests.map((r) => (r.id === updated.id ? updated : r));
 			selectedRequest = updated;
 			observacionFirma = '';
+			confirmoImpresionCert = false;
 			alert('success', 'Firma confirmada. El estudiante ya puede descargar su certificado.');
 		} catch (e: any) {
 			console.error('Error confirmando firma:', e);
@@ -303,13 +320,16 @@
 	 * que el estudiante efectivamente no debe, sin perder la solicitud que se
 	 * está mirando.
 	 */
+	// F-CERT-LIBRETA-RESUMEN (2026-08-18, Kevin en la capacitación): antes
+	// esto abria /app/payments filtrado en OTRA PESTAÑA — la lista completa
+	// de pagos del sistema, sin imprimir. Ahora abre un pop-up de solo los
+	// pagos de ESTA persona, con boton Imprimir, sin perder de vista la
+	// solicitud que se esta revisando.
+	let libretaOpen = $state(false);
+
 	function verificarPagos() {
 		if (!selectedRequest) return;
-		const params = new URLSearchParams({
-			estudiante_id: selectedRequest.estudiante_id,
-			curso_id: selectedRequest.course_id
-		});
-		window.open(`/app/payments?${params.toString()}`, '_blank', 'noopener');
+		libretaOpen = true;
 	}
 
 	function openReject() {
@@ -690,6 +710,26 @@
 							descargarlo. Imprimí la copia, hacela firmar y confirmá acá.
 						</p>
 						{#if canApprove(selectedRequest)}
+							{#if selectedRequest.certificate_id}
+								<Button
+									size="sm"
+									variant="secondary"
+									class="mt-2"
+									onclick={downloadCertPdf}
+								>
+									<DownloadIcon class="w-4 h-4 mr-1.5" />Descargar / imprimir certificado
+								</Button>
+							{/if}
+							<label class="mt-3 flex items-start gap-2 text-sm text-amber-900 dark:text-amber-200">
+								<input
+									type="checkbox"
+									bind:checked={confirmoImpresionCert}
+									class="mt-0.5 size-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+								/>
+								<span>
+									Ya imprimí el certificado y lo tengo físicamente en mano para llevarlo a firmar.
+								</span>
+							</label>
 							<input
 								type="text"
 								bind:value={observacionFirma}
@@ -703,6 +743,7 @@
 								class="mt-2"
 								onclick={confirmarFirma}
 								loading={actionInProgress}
+								disabled={!confirmoImpresionCert}
 							>
 								<CircleCheckIcon class="w-4 h-4 mr-1.5" />Confirmar firma y habilitar descarga
 							</Button>
@@ -793,3 +834,9 @@
 		</div>
 	</div>
 </Modal>
+
+<LibretaResumenModal
+	isOpen={libretaOpen}
+	enrollmentId={selectedRequest?.enrollment_id ?? null}
+	onClose={() => (libretaOpen = false)}
+/>

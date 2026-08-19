@@ -130,6 +130,22 @@ class CertificateService {
 	}
 
 	/**
+	 * [Estudiante] Sube el comprobante del arancel ANTES de crear la solicitud
+	 * de No Deudor. F-CERT-COMPROBANTE-OBLIGATORIO (2026-08-18): "una vez sube
+	 * el comprobante, recien se pueda dejar enviar la solicitud". Devuelve la
+	 * URL para pasarla en `comprobante_url` al llamar a createRequest.
+	 */
+	async uploadComprobanteTemp(archivo: File): Promise<{ url: string }> {
+		const form = new FormData();
+		form.append('archivo', archivo);
+		return await apiKyC.post<{ url: string }>(
+			'/certificates/requests/upload-comprobante-temp',
+			form,
+			{ customTimeout: 60000 }
+		);
+	}
+
+	/**
 	 * [Estudiante] Lista mis solicitudes de certificado.
 	 */
 	async listMyRequests(): Promise<CertificateRequest[]> {

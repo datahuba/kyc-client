@@ -93,6 +93,14 @@
 	let emittingNotas = $state<Record<string, boolean>>({});
 	let emittingNoDeudor = $state<Record<string, boolean>>({});
 	let hastaModuloNSelections = $state<Record<string, number>>({});
+
+	// F-CERT-COMPROBANTE-OBLIGATORIO (2026-08-18, Kevin): "hay que solicitar
+	// obviamente el comprobante al estudiante. Una vez sube el comprobante,
+	// recien se pueda dejar enviar la solicitud". Se sube ANTES de crear la
+	// solicitud (POST /certificates/requests/upload-comprobante-temp) y la
+	// URL se guarda por inscripción hasta que se solicita.
+	let comprobanteNoDeudorUrl = $state<Record<string, string>>({});
+	let comprobanteNoDeudorSubiendo = $state<Record<string, boolean>>({});
 	let selectedEnrollmentId = $state<string>('');
 	// F-CERT-APROBACION (2026-07-30): solicitudes de certificado del estudiante
 	let myRequests: CertificateRequest[] = $state([]);
@@ -509,6 +517,29 @@
 		}
 	}
 
+	/**
+	 * Sube el comprobante del arancel ANTES de solicitar. Sin esto el botón
+	 * "Solicitar" queda deshabilitado — ver el gate en el template.
+	 */
+	async function handleComprobanteNoDeudor(eid: string, file: File | undefined) {
+		if (!file) return;
+		if (file.size > 10 * 1024 * 1024) {
+			alert('error', 'El comprobante no puede pasar los 10 MB.');
+			return;
+		}
+		comprobanteNoDeudorSubiendo = { ...comprobanteNoDeudorSubiendo, [eid]: true };
+		try {
+			const { url } = await certificateService.uploadComprobanteTemp(file);
+			comprobanteNoDeudorUrl = { ...comprobanteNoDeudorUrl, [eid]: url };
+		} catch (err: any) {
+			console.error('Error subiendo comprobante:', err);
+			const detail = err?.response?.data?.detail || err?.message || 'No se pudo subir el comprobante.';
+			alert('error', detail);
+		} finally {
+			comprobanteNoDeudorSubiendo = { ...comprobanteNoDeudorSubiendo, [eid]: false };
+		}
+	}
+
 	async function solicitarNoDeudor(e: Enrollment) {
 		const eid = e._id || e.id;
 		if (!eid) return;
@@ -518,14 +549,24 @@
 			alert('warning', elegible.motivo || 'No cumples los requisitos.');
 			return;
 		}
+		const comprobanteUrl = comprobanteNoDeudorUrl[eid];
+		if (!comprobanteUrl) {
+			alert('warning', 'Subí el comprobante del pago del arancel antes de solicitar.');
+			return;
+		}
 		emittingNoDeudor = { ...emittingNoDeudor, [eid]: true };
 		try {
 			const req = await certificateService.createRequest({
 				tipo: 'no_deudor',
 				enrollment_id: eid,
 				hasta_modulo_n: hastaN,
-				motivo: `Solicitud de Certificado de No Deudor hasta Módulo ${hastaN}.`
+				motivo: `Solicitud de Certificado de No Deudor hasta Módulo ${hastaN}.`,
+				comprobante_url: comprobanteUrl
 			});
+			// Limpio para que una eventual segunda solicitud (en otro modulo,
+			// tras un rechazo) no arrastre el comprobante de la anterior.
+			const { [eid]: _omitido, ...resto } = comprobanteNoDeudorUrl;
+			comprobanteNoDeudorUrl = resto;
 			myRequests = [req, ...myRequests];
 			// F-CERT-NO-DEUDOR-COBRO (2026-08-17): el arancel y el paso de la
 			// firma física se avisan ACÁ, al crear la solicitud, y no cuando el
@@ -1338,7 +1379,47 @@
 														{/each}
 													</select>
 												</div>
-												<Button variant="primary" size="md" disabled={!elegibleNoDeudor.ok} loading={emittingNoDeudor[eid]} onclick={() => solicitarNoDeudor(enrollment)} ariaLabel="Solicitar certificado de no deudor hasta el módulo {hastaN}">
+											</div>
+
+											<!-- F-CERT-COMPROBANTE-OBLIGATORIO (2026-08-18, Kevin): "hay que
+											     solicitar obviamente el comprobante al estudiante. Una vez sube
+											     el comprobante, recien se pueda dejar enviar la solicitud". El
+											     botón queda deshabilitado hasta que la subida termine. -->
+											<div class="flex flex-col sm:flex-row sm:items-center gap-3">
+												<div class="flex-1 min-w-0">
+													<label
+														for="comprobante-nd-{eid}"
+														class="block mb-1.5 text-xs font-medium text-light-black dark:text-dark-white"
+													>
+														Comprobante del pago del arancel
+													</label>
+													<input
+														id="comprobante-nd-{eid}"
+														type="file"
+														accept="image/*,application/pdf"
+														class="block w-full text-xs text-light-four dark:text-dark-four file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-xs file:font-medium file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-primary-900/20 dark:file:text-primary-300"
+														disabled={comprobanteNoDeudorSubiendo[eid]}
+														onchange={(ev) => {
+															const f = (ev.currentTarget as HTMLInputElement).files?.[0];
+															handleComprobanteNoDeudor(eid, f);
+														}}
+													/>
+													{#if comprobanteNoDeudorSubiendo[eid]}
+														<p class="mt-1 text-xs text-light-four dark:text-dark-four">Subiendo…</p>
+													{:else if comprobanteNoDeudorUrl[eid]}
+														<p class="mt-1 text-xs font-medium text-green-600 dark:text-green-400">
+															✓ Comprobante listo. Si pagaste en caja, sirve una foto del recibo.
+														</p>
+													{/if}
+												</div>
+												<Button
+													variant="primary"
+													size="md"
+													disabled={!elegibleNoDeudor.ok || !comprobanteNoDeudorUrl[eid] || comprobanteNoDeudorSubiendo[eid]}
+													loading={emittingNoDeudor[eid]}
+													onclick={() => solicitarNoDeudor(enrollment)}
+													ariaLabel="Solicitar certificado de no deudor hasta el módulo {hastaN}"
+												>
 													Solicitar
 												</Button>
 											</div>
