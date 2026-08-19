@@ -38,7 +38,8 @@ interface Props {
 		nombre_funcional: '',
 		cursos_asignados: [],
 		carnet: '',
-		subtipo_coordinador: ''
+		subtipo_coordinador: '',
+		ambito: ''
 	});
 
 	// GAP-1 (audio 2026-07-08): si se completa el CI y se deja la contraseña en
@@ -59,6 +60,27 @@ interface Props {
 	let requiereCursosAsignados = $derived(formData.role === 'encargado_curso');
 	// ISSUE-R-PERFIL-GENERICO: el Coordinador requiere subtipo (financiero/académico/investigación).
 	let requiereSubtipoCoordinador = $derived(formData.role === 'coordinador');
+
+	// P-AMBITO-FORMACION (2026-08-18, Kevin): "separar las cuentas de
+	// encargados de los de educación continua y los de profesionales, así
+	// sabemos cuál es cuál".
+	//
+	// Cada ENCARGADO DE CURSO maneja UN solo tipo de programa, así que su
+	// ámbito determina el de los programas que crea y el formulario deja de
+	// preguntárselo. Además define qué campos de matrícula ve.
+	//
+	// CORREGIDO (2026-08-19, Kevin): el COORDINADOR NO entra en esta regla.
+	// "el coordinador debería poder ver todo lo económico (...) los
+	// coordinadores ven los resúmenes de todo dependientes de su área, en
+	// este caso hablamos de finanzas" — el "área" de un coordinador
+	// financiero es lo económico en sí, transversal a TODOS los programas,
+	// no un ámbito de formación en particular. Pedirle que elija
+	// "educación continua" o "profesional" para poder crear su cuenta no
+	// tiene sentido y lo bloqueaba en el alta. Si un coordinador llega a
+	// crear un programa, `resolver_ambito()` en el backend igual resuelve
+	// el ámbito por el tipo de curso o por selección explícita en el
+	// formulario del programa — no depende de que la cuenta lo tenga fijo.
+	let requiereAmbito = $derived(formData.role === 'encargado_curso');
 	// Cobranza también puede asignarse a programas, pero es OPCIONAL: si no se
 	// marca ninguno, ve/gestiona todos los pagos (comportamiento general);
 	// si se marcan, queda segmentado a esos programas (ISSUE-P-SEGMENTACION).
@@ -69,20 +91,40 @@ interface Props {
 	let cursosDisponibles: Course[] = $state([]);
 
 	$effect(() => {
-		// Cargar cursos activos una sola vez, se usan en el multi-select de
-		// Encargado de Curso. El backend limita per_page a 100 (422 si se
-		// supera), por eso se pagina en silencio si hay más de 100 cursos.
+		// Cargar TODOS los cursos (activos e inactivos, historicos incluidos) para
+		// que el admin pueda asignar/desasignar cualquier programa al EC desde
+		// el modal. Antes se filtraba por activo=true, lo que ocultaba los
+		// historicos recien creados (F-FIX-2026-08-12-EC-USERMODAL-HISTORICOS:
+		// Kevin reporto que el modal "Editar Usuario" no mostraba los programas
+		// historicos creados por el EC, impidiendo re-asignarlos o dejarlos
+		// sin asignar). El backend limita per_page a 100 (422 si se supera),
+		// por eso se pagina en silencio si hay más de 100 cursos.
 		(async () => {
 			try {
 				const todos: Course[] = [];
 				let currentPage = 1;
 				let hasMore = true;
 				while (hasMore) {
-					const res = await courseService.getAll(currentPage, 100, { activo: true });
+					// FIX-F-2026-08-12-EC-USERMODAL-HISTORICOS: SIN filtro activo
+					// para ver historicos e inactivos. El admin los distingue
+					// visualmente con el badge (es_historico / inactivo).
+					const res = await courseService.getAll(currentPage, 100);
 					todos.push(...res.data);
 					hasMore = res.meta.hasNextPage;
 					currentPage += 1;
 				}
+				// Ordenar: activos primero, luego historicos, luego inactivos.
+				// Dentro de cada grupo, alfabetico por nombre.
+				todos.sort((a, b) => {
+					const rank = (c: Course) => {
+						if (!c.activo) return 2;
+						if (c.es_historico) return 1;
+						return 0;
+					};
+					const r = rank(a) - rank(b);
+					if (r !== 0) return r;
+					return (a.nombre_programa || '').localeCompare(b.nombre_programa || '');
+				});
 				cursosDisponibles = todos;
 			} catch {
 				cursosDisponibles = [];
@@ -101,7 +143,8 @@ interface Props {
 				nombre_funcional: user.nombre_funcional ?? '',
 				cursos_asignados: user.cursos_asignados ?? [],
 				carnet: user.carnet ?? '',
-				subtipo_coordinador: user.subtipo_coordinador ?? ''
+				subtipo_coordinador: user.subtipo_coordinador ?? '',
+				ambito: user.ambito ?? ''
 			};
 		} else {
 			formData = {
@@ -113,7 +156,8 @@ interface Props {
 				nombre_funcional: '',
 				cursos_asignados: [],
 				carnet: '',
-				subtipo_coordinador: ''
+				subtipo_coordinador: '',
+				ambito: ''
 			};
 		}
 		errors = {};
@@ -164,8 +208,11 @@ interface Props {
 			if (numCursos === 0) {
 				nuevosErrores.cursos_asignados = 'Selecciona al menos un curso para este Encargado de Curso.';
 			} else if (numCursos > 5) {
-				nuevosErrores.cursos_asignados = 'Un Encargado de Curso puede tener máximo 5 programas asignados.';
+				nuevosErrores.cursos_asignados = 'Un Encargado de Curso puede tener máximo 10 programas asignados.';
 			}
+		}
+		if (requiereAmbito && !formData.ambito) {
+			nuevosErrores.ambito = 'Indica si maneja programas de educación continua o profesionales.';
 		}
 		if (requiereSubtipoCoordinador && !formData.subtipo_coordinador) {
 			nuevosErrores.subtipo_coordinador = 'Selecciona el subtipo del Coordinador (financiero, académico o investigación).';
@@ -202,7 +249,8 @@ interface Props {
 				carnet: formData.carnet?.trim() || undefined,
 				nombre_funcional: requiereNombreFuncional ? formData.nombre_funcional : undefined,
 				cursos_asignados: permiteCursosAsignados ? formData.cursos_asignados : undefined,
-				subtipo_coordinador: requiereSubtipoCoordinador ? formData.subtipo_coordinador : undefined
+				subtipo_coordinador: requiereSubtipoCoordinador ? formData.subtipo_coordinador : undefined,
+				ambito: requiereAmbito ? formData.ambito : undefined
 			};
 
 			if (isEditMode && user) {
@@ -335,6 +383,20 @@ interface Props {
 				</div>
 			{/if}
 
+			{#if requiereAmbito}
+				<div class="sm:col-span-2">
+					<Select label="Ámbito de los programas que maneja" bind:value={formData.ambito} required error={errors.ambito}>
+						<option value="">— Seleccione —</option>
+						<option value="educacion_continua">Educación continua (cursos, talleres, diplomados de continua)</option>
+						<option value="profesional">Profesionales (maestrías, doctorados, diplomados profesionales)</option>
+					</Select>
+					<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+						Define qué campos de matrícula ve al crear un programa, y evita que
+						tenga que elegir el tipo cada vez.
+					</p>
+				</div>
+			{/if}
+
 			{#if requiereSubtipoCoordinador}
 				<div class="md:col-span-2">
 					<Select label="Subtipo de Coordinador" bind:value={formData.subtipo_coordinador} required error={errors.subtipo_coordinador}>
@@ -363,12 +425,34 @@ interface Props {
 							<p class="text-sm text-gray-500 dark:text-gray-400">No hay cursos activos disponibles.</p>
 						{:else}
 							{#each cursosDisponibles as curso (curso._id)}
-								<Checkbox
-									id={`curso_${curso._id}`}
-									label={`${curso.nombre_programa} (${curso.codigo})`}
-									checked={(formData.cursos_asignados ?? []).includes(curso._id)}
-									onchange={() => toggleCurso(curso._id)}
-								/>
+								<div class="flex items-center justify-between gap-2">
+									<Checkbox
+										id={`curso_${curso._id}`}
+										label={`${curso.nombre_programa} (${curso.codigo})`}
+										checked={(formData.cursos_asignados ?? []).includes(curso._id)}
+										onchange={() => toggleCurso(curso._id)}
+									/>
+									<!-- FIX-F-2026-08-12-EC-USERMODAL-HISTORICOS: badges
+									     para que el admin identifique de un vistazo que
+									     el curso es historico o esta inactivo. Sin esto
+									     no se distingue del resto y puede asignar por
+									     error un programa archivado. -->
+									{#if curso.es_historico}
+										<span
+											class="shrink-0 inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300"
+											title="Programa histórico (no acepta nuevas inscripciones)"
+										>
+											Histórico
+										</span>
+									{:else if !curso.activo}
+										<span
+											class="shrink-0 inline-flex items-center rounded-full bg-gray-200 dark:bg-gray-700 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:text-gray-300"
+											title="Programa inactivo"
+										>
+											Inactivo
+										</span>
+									{/if}
+								</div>
 							{/each}
 						{/if}
 					</div>

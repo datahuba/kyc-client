@@ -48,6 +48,7 @@
 		"vitest-browser-svelte": "^2.0.1"
 	},
 	"dependencies": {
-		"notyf": "^3.10.0"
+		"notyf": "^3.10.0",
+		"xlsx": "^0.18.5"
 	}
 }

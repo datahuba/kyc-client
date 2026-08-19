@@ -19,66 +19,45 @@ jobs:
           port: 2222
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 15m
+          command_timeout: 20m
           script: |
-            # F-ACTIONS-FIX: todo el script con sudo -n bash (deploy user
-            # no puede acceder a /root directamente).
-            sudo -n bash << 'REMOTE_EOF'
-            set -e
-            echo "🧹 1. LIMPIANDO ESTADO LOCAL DEL VPS..."
-            # ISSUE-MIGRACION (2026-07-17): movido de /var/www/frontend a /root/postgrado/frontend
-            cd /root/postgrado/frontend
+            # F-ACTIONS-FRONTEND-DEPLOY-UNIFIED (2026-07-30): el workflow del
+            # frontend antes tenia su propio script inline con un bug donde
+            # el lock /tmp/deploy-frontend.lock quedaba huerfano cuando el
+            # deploy fallaba (ej. container name conflict). Esto bloqueaba
+            # todos los deploys futuros hasta que alguien limpiara el lock
+            # manualmente.
+            #
+            # Solucion: mismo patron que el backend. Un script unificado
+            # /usr/local/bin/kyc-deploy-frontend con:
+            #   - Auto-cleanup de locks huerfanos (>10 min)
+            #   - Pre-cleanup de container zombie (evita el "name conflict")
+            #   - Lock con flock + timeout 15 min
+            #   - Log persistente en /tmp/deploy-frontend.log
+            #   - Health check al final
+            #   - Cleanup de imagenes huerfanas
+            # El script esta en el repo (scripts/kyc-deploy-frontend.sh)
+            # y se instala idempotentemente en cada deploy.
+            sudo -n bash -c '
+              set -e
+              # Instalar el script si no existe o si es mas viejo que el del repo
+              REPO_SCRIPT="/root/postgrado/frontend/scripts/kyc-deploy-frontend.sh"
+              INSTALLED_SCRIPT="/usr/local/bin/kyc-deploy-frontend"
+              if [[ ! -f "$INSTALLED_SCRIPT" ]] || [[ "$REPO_SCRIPT" -nt "$INSTALLED_SCRIPT" ]]; then
+                install -m 0755 "$REPO_SCRIPT" "$INSTALLED_SCRIPT"
+                echo "kyc-deploy-frontend instalado/actualizado en /usr/local/bin/"
+              fi
 
-            # F-ACTIONS-FIX: refspec explícito (descubrimos que git pull no
-            # actualizaba la ref local de develop_kevin).
-            git fetch origin +refs/heads/develop_kevin:refs/remotes/origin/develop_kevin
-            echo "🔖 SHA remoto descargado:"
-            git rev-parse origin/develop_kevin
+              # Log de quien disparo el deploy (util para auditoria)
+              echo "=== DEPLOY disparado por GitHub Actions ===" >> /tmp/deploy-frontend.log
+              echo "    triggered_by=github-actions sha=$(git -C /root/postgrado/frontend rev-parse origin/develop_kevin 2>/dev/null || echo unknown)" >> /tmp/deploy-frontend.log
 
-            git checkout develop_kevin
-            git reset --hard origin/develop_kevin
-            git clean -fd
-            echo "🆕 HEAD actual:"
-            git log -1 --oneline
-
-            echo "🔥 2. DESTRUYENDO CACHÉ FÍSICO DE SVELTE..."
-            rm -rf build/ .svelte-kit/ node_modules/ || true
-
-            echo "🧨 3. DESTRUYENDO IMAGEN VIEJA DE DOCKER..."
-            cd /root/postgrado
-            # F-ACTIONS-DEPLOY-FIX-2 (2026-07-23): el `docker compose down` no
-            # alcanza porque el container tiene `restart: always` en
-            # docker-compose.yml y Docker lo REINICIA automáticamente antes
-            # de que podamos crear el nuevo. El log mostraba:
-            #   "Conflict. The container name '/kyc-frontend' is already in use"
-            # aunque el `down` se ejecutaba correctamente. Solución:
-            # 1. Desactivar restart policy con `docker update --restart=no`
-            # 2. Stop + Kill + Remove directo
-            # 3. Verificar que NO existe antes de continuar
-            docker update --restart=no kyc-frontend 2>/dev/null || true
-            docker compose stop frontend 2>/dev/null || true
-            docker kill kyc-frontend 2>/dev/null || true
-            docker rm -f kyc-frontend 2>/dev/null || true
-            # Verificar que NO existe (por las dudas)
-            sleep 1
-            if docker ps -a --format '{{.Names}}' | grep -q '^kyc-frontend$'; then
-                echo "❌ ERROR: kyc-frontend todavía existe después de kill+rm, abortando"
-                docker ps -a --format 'table {{.Names}} | {{.Status}}' | grep kyc-frontend
-                exit 1
-            fi
-            # Borra la imagen física para evitar que Docker use capas viejas
-            docker rmi -f $(docker images -q postgrado-frontend) 2>/dev/null || true
-            docker rmi -f $(docker images -q "*frontend*") 2>/dev/null || true
-
-            echo "🚀 4. CONSTRUYENDO Y LEVANTANDO DESDE CERO..."
-            docker compose build --no-cache frontend
-            docker compose up -d --no-deps --force-recreate frontend
-
-            sleep 3
-            docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}' | grep -E 'kyc-frontend|postgrado-frontend' || echo "WARN: kyc-frontend no encontrado en docker ps"
-
-            echo "🧹 5. LIMPIEZA DE IMÁGENES HUÉRFANAS..."
-            docker image prune -f
-
-            echo "✅ DESPLIEGUE FINALIZADO"
-            REMOTE_EOF
+              # Ejecutar el deploy unificado. El script maneja:
+              # - auto-cleanup de locks huerfanos
+              # - pre-cleanup de container zombie (evita el "name conflict")
+              # - lock con flock + timeout 15 min
+              # - log persistente
+              # - health check post-deploy
+              # - cleanup de imagenes huerfanas
+              /usr/local/bin/kyc-deploy-frontend
+            '

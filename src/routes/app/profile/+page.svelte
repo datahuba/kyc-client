@@ -11,7 +11,8 @@
 	import { FileUpload, Modal, Button, Select } from '$lib/components/ui';
 	import DocumentRow from '$lib/components/ui/documentRow.svelte';
 	import FormularioInscripcionModal from '$lib/features/enrollments/FormularioInscripcionModal.svelte';
-	import type { Student, UpdateStudentSelfRequest, TituloData } from '$lib/interfaces/student.interface';
+	import MisCursosActivos from '$lib/components/dashboard/MisCursosActivos.svelte';
+	import type { Student, UpdateStudentSelfRequest, TituloData, MyCoursesResumen } from '$lib/interfaces';
 	import { authService } from '$lib/services';
 	import { ExclamationCircleIcon } from '$lib/icons/solid';
 
@@ -21,6 +22,23 @@
 	let editMode = $state(false);
 	let uploadingPhoto = $state(false);
 	let uploadingDoc = $state<string | null>(null);
+
+	// F-087-CAL · Mis Cursos (en ejecución / por iniciar / finalizados).
+	// Aparece solo para estudiantes y se renderiza al final de la columna
+	// principal del perfil, antes del sidebar de Información del Sistema.
+	let myCourses: MyCoursesResumen | null = $state(null);
+	let myCoursesLoading = $state(true);
+
+	async function loadMyCoursesResumen() {
+		try {
+			myCourses = await enrollmentService.getMyCoursesResumen();
+		} catch (e) {
+			console.error('Error cargando Mis Cursos:', e);
+			myCourses = null;
+		} finally {
+			myCoursesLoading = false;
+		}
+	}
 
 	// ISSUE-A-VERIFICACION: no bloqueante, solo informativo
 	let resendingVerification = $state(false);
@@ -56,11 +74,20 @@
 		if (!tituloForm.numero_titulo.trim()) errs.numero_titulo = 'El número de título es obligatorio';
 		if (!tituloForm.universidad.trim()) errs.universidad = 'La universidad es obligatoria';
 		if (!tituloForm.año_expedicion.trim()) errs.año_expedicion = 'El año de expedición es obligatorio';
-		
+
 		const existingUrl = profileData?.titulo?.titulo_url || (profileData?.titulo as any)?.url;
 		if (!tituloFile && !existingUrl) errs.file = 'Debes adjuntar el documento del título (PDF o imagen)';
 		tituloErrors = errs;
 		if (Object.keys(errs).length > 0) return;
+
+		// F-090: guard de tamaño para el PDF/imagen del título
+		if (tituloFile) {
+			const sizeMB = tituloFile.size / 1024 / 1024;
+			if (sizeMB > 15) {
+				alert('error', `El archivo del título pesa ${sizeMB.toFixed(1)} MB, excede el límite de 15 MB. Comprime y vuelve a intentar.`);
+				return;
+			}
+		}
 
 		const id = $userStore.user?._id;
 		if (!id) return;
@@ -91,7 +118,14 @@
 			alert('success', 'Archivo subido correctamente.');
 		} catch (e: any) {
 			console.error(e);
-			alert('error', e?.message || 'Error al subir el título');
+			const msg = String(e?.message || '');
+			if (/413|too large|payload/i.test(msg)) {
+				alert('error', `El archivo es demasiado pesado. Reduce la calidad y vuelve a intentar.`);
+			} else if (/timeout|aborted|network/i.test(msg)) {
+				alert('error', `La subida se cortó. Intenta con un archivo más pequeño.`);
+			} else {
+				alert('error', e?.message || 'Error al subir el título');
+			}
 		} finally {
 			uploadingTitulo = false;
 		}
@@ -125,6 +159,13 @@
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
+		// F-090: guard de tamaño
+		const sizeMB = file.size / 1024 / 1024;
+		if (sizeMB > 15) {
+			alert('error', `El formulario pesa ${sizeMB.toFixed(1)} MB, excede el límite de 15 MB. Comprime y vuelve a intentar.`);
+			input.value = '';
+			return;
+		}
 		subiendoFormulario[enrollmentId] = true;
 		try {
 			const actualizado = await enrollmentService.uploadFormularioInscripcion(enrollmentId, file);
@@ -132,7 +173,14 @@
 			alert('success', 'Formulario de inscripción subido correctamente.');
 		} catch (e: any) {
 			console.error(e);
-			alert('error', e?.message || 'No se pudo subir el formulario.');
+			const msg = String(e?.message || '');
+			if (/413|too large|payload/i.test(msg)) {
+				alert('error', `El archivo es demasiado pesado (${sizeMB.toFixed(1)} MB). Reduce la calidad y vuelve a intentar.`);
+			} else if (/timeout|aborted|network/i.test(msg)) {
+				alert('error', `La subida se cortó. Intenta con un archivo más pequeño.`);
+			} else {
+				alert('error', e?.message || 'No se pudo subir el formulario.');
+			}
 		} finally {
 			subiendoFormulario[enrollmentId] = false;
 			if (input) input.value = '';
@@ -162,6 +210,13 @@
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
+		// F-090: guard de tamaño
+		const sizeMB = file.size / 1024 / 1024;
+		if (sizeMB > 15) {
+			alert('error', `El archivo pesa ${sizeMB.toFixed(1)} MB, excede el límite de 15 MB. Comprime la imagen o usa un PDF más liviano.`);
+			input.value = '';
+			return;
+		}
 		const key = `${enrollmentId}-${index}`;
 		subiendoReq[key] = true;
 		try {
@@ -175,7 +230,15 @@
 			});
 			alert('success', 'Documento subido. Quedó pendiente de revisión por CPD.');
 		} catch (e: any) {
-			alert('error', e?.message || 'No se pudo subir el documento');
+			console.error(e);
+			const msg = String(e?.message || '');
+			if (/413|too large|payload/i.test(msg)) {
+				alert('error', `El archivo es demasiado pesado (${sizeMB.toFixed(1)} MB). Reduce la calidad y vuelve a intentar.`);
+			} else if (/timeout|aborted|network/i.test(msg)) {
+				alert('error', `La subida se cortó. Intenta con un archivo más pequeño.`);
+			} else {
+				alert('error', e?.message || 'No se pudo subir el documento');
+			}
 		} finally {
 			subiendoReq[key] = false;
 			input.value = '';
@@ -219,6 +282,30 @@
 		}
 	});
 
+	// F-090 (2026-07-29): warning antes de cerrar/refrescar si hay uploads
+	// en curso. Caso Nelly: subió todo, el último PDF pesado falló, refrescó
+	// la página, "se borró todo" (en realidad nunca estuvo persistido, era
+	// estado local). Con este guard el navegador le pregunta antes de irse.
+	$effect(() => {
+		function handler(e: BeforeUnloadEvent) {
+			// Si hay CUALQUIER subida en curso (photo, doc, requisito, form, título)
+			const busy =
+				uploadingPhoto ||
+				uploadingDoc ||
+				Object.values(subiendoReq).some(Boolean) ||
+				Object.values(subiendoFormulario).some(Boolean) ||
+				uploadingTitulo;
+			if (busy) {
+				e.preventDefault();
+				// Chrome requiere que se setee returnValue
+				e.returnValue = 'Hay una subida en curso. ¿Seguro que quieres salir?';
+				return e.returnValue;
+			}
+		}
+		window.addEventListener('beforeunload', handler);
+		return () => window.removeEventListener('beforeunload', handler);
+	});
+
 	async function loadProfile() {
 		const id = $userStore.user?._id;
 		const role = $userStore.role;
@@ -248,6 +335,10 @@
 				editData = buildEditData();
 				// ISSUE-Q-DOCUMENTOS-KYC: cargar sus inscripciones para mostrar documentos requeridos
 				await cargarDocumentosEstudiante(id);
+				// F-087-CAL · cargar resumen de cursos del estudiante (Mis Cursos)
+				// en paralelo (no bloquea el resto del perfil). Se muestra al final
+				// de la columna principal, antes del sidebar.
+				loadMyCoursesResumen();
 			} else {
 				profileData = $userStore.user; 
 			}
@@ -331,7 +422,15 @@
 
 	async function handleDocumentUpload(type: 'ci' | 'cv' | 'afiliacion' | 'titulo', file: File | null) {
 		if (!file || !$userStore.user?._id) return;
-		
+
+		// F-090 (2026-07-29): guard de tamaño. El FileUpload ya valida el lado
+		// del input, pero validamos aquí también por si entra por otro path.
+		const sizeMB = file.size / 1024 / 1024;
+		if (sizeMB > 15) {
+			alert('error', `El archivo pesa ${sizeMB.toFixed(1)} MB, excede el límite de 15 MB. Comprime la imagen o usa un PDF más liviano.`);
+			return;
+		}
+
 		// Validar que el título no esté verificado si se intenta subir
 		if (type === 'titulo' && profileData.titulo?.estado === 'verificado') {
 			alert('error', 'No puedes actualizar un título ya verificado');
@@ -342,7 +441,7 @@
 		try {
 			const id = $userStore.user._id;
 			let updated: Student;
-			
+
 			if (type === 'ci') {
 				updated = await studentService.uploadCarnet(id, file);
 			} else if (type === 'cv') {
@@ -350,17 +449,17 @@
 			} else if (type === 'afiliacion') {
 				updated = await studentService.uploadAfiliacion(id, file);
 			} else if (type === 'titulo') {
-				const titleData: TituloData = profileData.titulo || { 
-					titulo: '', 
-					numero_titulo: '', 
-					año_expedicion: '', 
-					universidad: '' 
+				const titleData: TituloData = profileData.titulo || {
+					titulo: '',
+					numero_titulo: '',
+					año_expedicion: '',
+					universidad: ''
 				};
 				updated = await studentService.uploadTitulo(id, file, titleData);
 			} else {
 				return;
 			}
-			
+
 			profileData = { ...updated };
 			if ($userStore.user) {
 				userStore.updateCurrentUser(updated);
@@ -368,7 +467,15 @@
 			alert('success', 'Archivo subido correctamente.');
 		} catch (e: any) {
 			console.error(e);
-			alert('error', e?.message || 'Error al subir documento');
+			// F-090: mensaje específico para archivos pesados (413 Payload Too Large)
+			const msg = String(e?.message || '');
+			if (/413|too large|payload/i.test(msg)) {
+				alert('error', `El archivo es demasiado pesado (${sizeMB.toFixed(1)} MB). El servidor rechaza archivos mayores a 15 MB. Reduce la calidad y vuelve a intentar.`);
+			} else if (/timeout|aborted|network/i.test(msg)) {
+				alert('error', `La subida se cortó (red inestable o archivo muy pesado). Intenta con un archivo más pequeño.`);
+			} else {
+				alert('error', e?.message || 'Error al subir documento');
+			}
 		} finally {
 			uploadingDoc = null;
 		}
@@ -379,6 +486,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Mi Perfil · KYC DataHub</title>
+</svelte:head>
 {#if ($userStore.role as string) === 'student'}
 	<div class="space-y-6 pb-8">
 		<div class="flex items-center justify-between">
@@ -940,8 +1051,11 @@
 					{/if}
 				</div>
 
+				<!-- F-087-CAL · Mis Cursos (en ejecución / por iniciar / finalizados) -->
+				<MisCursosActivos data={myCourses} loading={myCoursesLoading} />
+
 				<!-- Sidebar -->
-				<div class="space-y-6">				
+				<div class="space-y-6">
 					<!-- Información del Sistema -->
 					<Card>
 						{#snippet header()}

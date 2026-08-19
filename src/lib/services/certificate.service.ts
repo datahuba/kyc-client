@@ -1,0 +1,272 @@
+/**
+ * Servicio de Certificados
+ * ========================
+ *
+ * F-CERTIFICADOS (2026-07-29): endpoints /certificates/* del backend.
+ * - POST /certificates/emit       (estudiante pide emisión)
+ * - GET  /certificates/my          (lista del estudiante autenticado)
+ * - GET  /certificates/by-enrollment/{id}  (auditoría / staff)
+ * - GET  /certificates/{id}        (metadatos de un certificado)
+ * - GET  /certificates/{id}/pdf    (descarga el PDF)
+ *
+ * F-CERT-APROBACION (2026-07-30): flujo de solicitud + aprobación.
+ * - POST /certificates/requests/   (estudiante crea solicitud)
+ * - GET  /certificates/requests/my (estudiante ve las suyas)
+ * - GET  /certificates/requests/   (staff ve la cola)
+ * - PATCH /certificates/requests/{id}/approve (staff aprueba)
+ * - PATCH /certificates/requests/{id}/reject  (staff rechaza)
+ * - PATCH /certificates/requests/{id}/in-review
+ * - PATCH /certificates/requests/{id}/cancel  (estudiante cancela)
+ */
+
+import { apiKyC } from '$lib/config';
+import type {
+	Certificate,
+	CertificateEmitRequest,
+	CertificateListResponse,
+	CertificateRequest,
+	CertificateRequestCreate,
+	CertificateRequestListResponse,
+	CertificateRequestStats
+} from '$lib/interfaces';
+
+class CertificateService {
+	/**
+	 * Emite un Certificado de Notas.
+	 * Backend valida: programa finalizado (todos los módulos con nota) + saldo cero.
+	 * Retorna 409 si ya existe uno emitido para el mismo enrollment.
+	 */
+	async emitNotas(enrollmentId: string): Promise<Certificate> {
+		const payload: CertificateEmitRequest = {
+			tipo: 'notas',
+			enrollment_id: enrollmentId
+		};
+		return await apiKyC.post<Certificate>('/certificates/emit', payload);
+	}
+
+	/**
+	 * Emite un Certificado de No Deudor hasta el módulo N.
+	 * Backend valida que los módulos 1..N estén todos pagados.
+	 */
+	async emitNoDeudor(enrollmentId: string, hastaModuloN: number): Promise<Certificate> {
+		const payload: CertificateEmitRequest = {
+			tipo: 'no_deudor',
+			enrollment_id: enrollmentId,
+			hasta_modulo_n: hastaModuloN
+		};
+		return await apiKyC.post<Certificate>('/certificates/emit', payload);
+	}
+
+	/**
+	 * Lista los certificados emitidos del estudiante autenticado.
+	 */
+	async listMy(): Promise<Certificate[]> {
+		const resp = await apiKyC.get<CertificateListResponse>('/certificates/my');
+		return resp.items;
+	}
+
+	/**
+	 * Lista los certificados emitidos de una inscripción específica.
+	 * Útil para mostrar el historial en el kardex del estudiante o para
+	 * auditoría del staff.
+	 */
+	async listByEnrollment(enrollmentId: string): Promise<Certificate[]> {
+		const resp = await apiKyC.get<CertificateListResponse>(
+			`/certificates/by-enrollment/${enrollmentId}`
+		);
+		return resp.items;
+	}
+
+	/**
+	 * Descarga el PDF de un certificado como Blob.
+	 * El caller es responsable de invocar `URL.createObjectURL` y disparar
+	 * la descarga.
+	 */
+	async downloadPdf(certId: string): Promise<Blob> {
+		return await apiKyC.getBlob(`/certificates/${certId}/pdf`);
+	}
+
+	/**
+	 * [Staff] Lista todos los certificados emitidos con filtros opcionales.
+	 * FIX 2026-07-29 19:11: Kevin pidió que la sección sea visible para todos
+	 * (estudiantes y staff). El staff tiene esta vista de auditoría.
+	 */
+	async listAdmin(filters: {
+		student_id?: string;
+		course_id?: string;
+		enrollment_id?: string;
+		tipo?: 'notas' | 'no_deudor';
+		anio?: number | null;
+		folio?: string;
+		page?: number;
+		per_page?: number;
+	} = {}): Promise<CertificateListResponse> {
+		const params = new URLSearchParams();
+		if (filters.student_id) params.append('student_id', filters.student_id);
+		if (filters.course_id) params.append('course_id', filters.course_id);
+		if (filters.enrollment_id) params.append('enrollment_id', filters.enrollment_id);
+		if (filters.tipo) params.append('tipo', filters.tipo);
+		if (filters.anio) params.append('anio', filters.anio.toString());
+		if (filters.folio) params.append('folio', filters.folio);
+		if (filters.page) params.append('page', filters.page.toString());
+		if (filters.per_page) params.append('per_page', filters.per_page.toString());
+
+		const qs = params.toString();
+		const url = `/certificates/admin/list${qs ? `?${qs}` : ''}`;
+		return await apiKyC.get<CertificateListResponse>(url);
+	}
+
+	// ========================================================================
+	// F-CERT-APROBACION (2026-07-30): flujo de solicitud + aprobación
+	// ========================================================================
+
+	/**
+	 * [Estudiante] Crea una solicitud de certificado.
+	 * La solicitud queda en estado 'pendiente' hasta que el encargado del
+	 * programa (o admin/superadmin) la apruebe.
+	 */
+	async createRequest(data: CertificateRequestCreate): Promise<CertificateRequest> {
+		return await apiKyC.post<CertificateRequest>('/certificates/requests/', data);
+	}
+
+	/**
+	 * [Estudiante] Sube el comprobante del arancel ANTES de crear la solicitud
+	 * de No Deudor. F-CERT-COMPROBANTE-OBLIGATORIO (2026-08-18): "una vez sube
+	 * el comprobante, recien se pueda dejar enviar la solicitud". Devuelve la
+	 * URL para pasarla en `comprobante_url` al llamar a createRequest.
+	 */
+	async uploadComprobanteTemp(archivo: File): Promise<{ url: string }> {
+		const form = new FormData();
+		form.append('archivo', archivo);
+		return await apiKyC.post<{ url: string }>(
+			'/certificates/requests/upload-comprobante-temp',
+			form,
+			{ customTimeout: 60000 }
+		);
+	}
+
+	/**
+	 * [Estudiante] Lista mis solicitudes de certificado.
+	 */
+	async listMyRequests(): Promise<CertificateRequest[]> {
+		return await apiKyC.get<CertificateRequest[]>('/certificates/requests/my');
+	}
+
+	/**
+	 * [Estudiante] Cancela mi solicitud (solo si está pendiente o en revisión).
+	 */
+	async cancelMyRequest(requestId: string, motivo_cancelacion?: string): Promise<CertificateRequest> {
+		return await apiKyC.patch<CertificateRequest>(
+			`/certificates/requests/${requestId}/cancel`,
+			{ motivo_cancelacion }
+		);
+	}
+
+	/**
+	 * [Staff] Cola de solicitudes (filtrada automáticamente por cursos_asignados
+	 * del encargado, o todas si es admin/superadmin/CPD/etc).
+	 */
+	async listRequestsQueue(
+		estado?: 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | 'cancelada',
+		page = 1,
+		perPage = 20
+	): Promise<CertificateRequestListResponse> {
+		const params = new URLSearchParams();
+		if (estado) params.append('estado', estado);
+		params.append('page', page.toString());
+		params.append('per_page', perPage.toString());
+		const qs = params.toString();
+		return await apiKyC.get<CertificateRequestListResponse>(
+			`/certificates/requests/${qs ? `?${qs}` : ''}`
+		);
+	}
+
+	/**
+	 * [Staff] Estadísticas de la cola (KPIs del panel del encargado).
+	 */
+	async getRequestsStats(): Promise<CertificateRequestStats> {
+		return await apiKyC.get<CertificateRequestStats>('/certificates/requests/stats');
+	}
+
+	/**
+	 * [Encargado] Marcar solicitud en revisión.
+	 */
+	async markRequestInReview(requestId: string): Promise<CertificateRequest> {
+		return await apiKyC.patch<CertificateRequest>(
+			`/certificates/requests/${requestId}/in-review`,
+			{}
+		);
+	}
+
+	/**
+	 * [Encargado/Admin] Aprobar solicitud. Al aprobar, se emite el Certificate.
+	 *
+	 * F-CERT-NO-DEUDOR-COBRO (2026-08-17): para 'no_deudor' se manda además el
+	 * tratamiento profesional (Lic./Ing./...) que va a salir impreso antes del
+	 * nombre. Lo elige quien aprueba, no el estudiante. Va vacío para los de
+	 * diplomado continuo.
+	 *
+	 * OJO: aprobar un 'no_deudor' NO habilita la descarga. Falta
+	 * `confirmSignature()`.
+	 */
+	async approveRequest(requestId: string, tratamiento?: string | null): Promise<CertificateRequest> {
+		return await apiKyC.patch<CertificateRequest>(
+			`/certificates/requests/${requestId}/approve`,
+			{ tratamiento: tratamiento || null }
+		);
+	}
+
+	/**
+	 * [Coordinador financiero/Superadmin] Confirmar la firma física y habilitar
+	 * al estudiante a descargar el certificado.
+	 *
+	 * Segundo paso de la aprobación del No Deudor (F-CERT-NO-DEUDOR-COBRO).
+	 */
+	async confirmSignature(requestId: string, observacion?: string): Promise<CertificateRequest> {
+		return await apiKyC.patch<CertificateRequest>(
+			`/certificates/requests/${requestId}/confirmar-firma`,
+			{ observacion: observacion || null }
+		);
+	}
+
+	/**
+	 * Arancel vigente del Certificado de No Deudor.
+	 *
+	 * Se consulta al servidor en vez de hardcodear 150 en el frontend: el monto
+	 * vive en la config del backend y es provisorio (Kevin lo va a ajustar
+	 * cuando se confirme el arancel real). Si esto se duplicara acá, el día que
+	 * lo cambie la pantalla mentiría.
+	 */
+	async getArancelNoDeudor(): Promise<{ monto: number; moneda: string }> {
+		return await apiKyC.get<{ monto: number; moneda: string }>(
+			'/certificates/arancel-no-deudor'
+		);
+	}
+
+	/**
+	 * [Estudiante] Adjuntar el comprobante de pago del arancel a su solicitud.
+	 * Se puede reemplazar mientras siga pendiente o en revisión.
+	 */
+	async uploadComprobante(requestId: string, archivo: File): Promise<CertificateRequest> {
+		const form = new FormData();
+		form.append('archivo', archivo);
+		// customTimeout 60s: puede ser una foto pesada del comprobante.
+		return await apiKyC.post<CertificateRequest>(
+			`/certificates/requests/${requestId}/comprobante`,
+			form,
+			{ customTimeout: 60000 }
+		);
+	}
+
+	/**
+	 * [Encargado/Admin] Rechazar solicitud con motivo.
+	 */
+	async rejectRequest(requestId: string, motivo_rechazo: string): Promise<CertificateRequest> {
+		return await apiKyC.patch<CertificateRequest>(
+			`/certificates/requests/${requestId}/reject`,
+			{ motivo_rechazo }
+		);
+	}
+}
+
+export const certificateService = new CertificateService();

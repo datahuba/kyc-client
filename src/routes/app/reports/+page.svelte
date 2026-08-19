@@ -71,14 +71,41 @@
 		// F-COBRANZA-003 (mejorado 2026-07-21): cargar estudiantes para el
 		// select del filtro. Se hace en paralelo con el reporte para no
 		// bloquear la UI.
+		await cargarEstudiantes();
+		await loadReporte();
+	});
+
+	/**
+	 * Carga las opciones del select de Estudiante.
+	 *
+	 * F-FIX-FILTRO-ESTUDIANTE-POR-CURSO (2026-08-17, Kevin): antes esto pedia
+	 * `getAll(1, 500)` sin filtrar, asi que el desplegable listaba estudiantes
+	 * de TODOS los programas aunque hubiera uno seleccionado. Kevin:
+	 * "que no entre cualquiera, solamente del curso o programa que se
+	 * seleccciono". Ahora la lista sigue al programa elegido.
+	 */
+	async function cargarEstudiantes() {
 		try {
-			const stuRes = await studentService.getAll(1, 500);
+			const filtro = filters.curso_id ? { curso_id: filters.curso_id } : {};
+			const stuRes = await studentService.getAll(1, 500, filtro);
 			studentsList = stuRes.data;
 		} catch (e) {
 			console.error('Error cargando estudiantes para el reporte', e);
+			studentsList = [];
 		}
-		await loadReporte();
-	});
+	}
+
+	/**
+	 * Etiqueta del estudiante en el desplegable.
+	 *
+	 * Hay estudiantes en produccion con `nombre` en null (registros 99001 y
+	 * 99100, de prueba). Sin esto la opcion se veia como " (99100)" — un
+	 * parentesis suelto sin nombre. Mismo criterio que en Cuentas por Cobrar.
+	 */
+	function etiquetaEstudiante(s: Student): string {
+		const reg = s.registro ? ` (${s.registro})` : '';
+		return (s.nombre?.trim() || '(sin nombre)') + reg;
+	}
 
 	async function loadReporte() {
 		if (!filters.fecha_desde || !filters.fecha_hasta) {
@@ -118,6 +145,20 @@
 	function handleFilterChange() {
 		page = 1;
 		loadReporte();
+	}
+
+	/**
+	 * Al cambiar de programa hay que rearmar la lista de estudiantes, y si el
+	 * que estaba elegido no pertenece al programa nuevo, soltarlo — si no, el
+	 * reporte quedaria filtrado por alguien que ya no esta en el desplegable.
+	 */
+	async function handleCursoChange() {
+		const anterior = filters.estudiante_id;
+		await cargarEstudiantes();
+		if (anterior && !studentsList.some((s) => s._id === anterior)) {
+			filters.estudiante_id = '';
+		}
+		handleFilterChange();
 	}
 
 	function handlePageChange(newPage: number) {
@@ -181,6 +222,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Reportes de Caja · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<div>
@@ -218,7 +263,7 @@
 	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 bg-white dark:bg-dark-surface p-4 rounded-xl border border-gray-200 dark:border-gray-700">
 		<Input label="Desde" id="fecha_desde" type="date" bind:value={filters.fecha_desde} onchange={handleFilterChange} />
 		<Input label="Hasta" id="fecha_hasta" type="date" bind:value={filters.fecha_hasta} onchange={handleFilterChange} />
-		<Select label="Curso" bind:value={filters.curso_id} onchange={handleFilterChange}>
+		<Select label="Curso" bind:value={filters.curso_id} onchange={handleCursoChange}>
 			<option value="">Todos los cursos</option>
 			{#each coursesListFiltrada as course (course._id)}
 				<option value={course._id}>{course.nombre_programa}</option>
@@ -242,7 +287,7 @@
 		>
 			<option value="">Todos los estudiantes</option>
 			{#each studentsList as student (student._id)}
-				<option value={student._id}>{student.nombre}{student.registro ? ` (${student.registro})` : ''}</option>
+				<option value={student._id}>{etiquetaEstudiante(student)}</option>
 			{/each}
 		</Select>
 	</div>

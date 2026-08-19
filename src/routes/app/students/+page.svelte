@@ -15,10 +15,12 @@
 	import { PlusIcon, DownloadIcon } from '$lib/icons/outline';
 	import { alert } from '$lib/utils';
 	import { Pagination } from '$lib/components/ui';
+	import { exportToExcel } from '$lib/utils/excelExport';
 
 	// Importación de Componentes Modulares
 	import StudentFilters from './StudentFilters.svelte';
 	import StudentTable from './StudentTable.svelte';
+	import PullToRefresh from '$lib/components/ui/pullToRefresh.svelte';
 	import ImportModal from './ImportModal.svelte';
 	import EnrollmentsModal from './EnrollmentsModal.svelte';
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
@@ -77,12 +79,32 @@
 	let allCourses: Course[] = $state([]);
 
 	// Permisos Visuales Granulares
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let currentRole = $derived($userStore.role || '');
 	let isSuperAdmin = $derived(currentRole === 'superadmin');
-	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
-	let canEditStudent = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	// F-FIX-COORD-FINANCIERO-NO-ACADEMICO (2026-08-19, Kevin): "financiero no
+	// deberia crear programas ni editar, tampoco estudiantes". El backend ya
+	// lo bloquea (require_gestion_academica en create_student/create_enrollment);
+	// esto es para no mostrarle un boton que le va a fallar.
+	let esCoordinadorFinanciero = $derived(
+		currentRole.toLowerCase() === 'coordinador' && $userStore.user?.subtipo_coordinador === 'financiero'
+	);
+	let canCreateStudent = $derived(
+		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole) &&
+			!esCoordinadorFinanciero
+	);
+	// F-FIX-STUDENT-EDIT-PERMISSIONS (2026-08-11, Kevin): antes canEditStudent
+	// solo permitía ['superadmin', 'admin', 'cpd'] pero el backend (require_cpd)
+	// también solo esos. El problema: Lisa/encargado_curso y coordinadores
+	// tenían que editar datos personales (cumpleaños, celular, domicilio) pero
+	// recibían 403 al guardar. Ahora backend usa require_encargado_curso (5 roles)
+	// y este array se alinea con canCreateStudent/canEnrollStudent. Tambien
+	// handleEdit() chequea este flag antes de abrir el form (defense in depth).
+	let canEditStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 	let canVerifyTitle = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
-	let canEnrollStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
+	let canEnrollStudent = $derived(
+		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole) &&
+			!esCoordinadorFinanciero
+	);
 
 	let isAllSelected = $derived(
 		students.length > 0 && students.every(s => selectedStudentIds.includes(s._id))
@@ -213,7 +235,18 @@
 		if (cursoIdParam) {
 			filters.curso_id = cursoIdParam;
 		}
-		loadStudents();
+
+		const qParam = $appPage.url.searchParams.get('q');
+		if (qParam) {
+			filters.q = qParam;
+		}
+
+		await loadStudents();
+
+		if (qParam && students.length > 0) {
+			const target = students.find(s => s._id === qParam || s.carnet === qParam || s.registro === qParam) || students[0];
+			handleViewDetails(target);
+		}
 	});
 
 	function handleCreate() {
@@ -222,6 +255,17 @@
 	}
 
 	function handleEdit(student: Student) {
+		// F-FIX-STUDENT-EDIT-PERMISSIONS (2026-08-11, Kevin): defense in depth.
+		// Aunque canEditStudent ya filtra el botón de editar en la UI, esta
+		// validación previene que se abra el form si se invoca handleEdit
+		// desde un deep-link, atajo de teclado, o futuro caller que olvide
+		// el check. Si pasa, el usuario verá el form, llenará datos, y
+		// recibirá 403 al guardar -- antipattern que el bug original demostró.
+		if (!canEditStudent) {
+			alert('error', 'No tienes permisos para editar estudiantes. Consulta con CPD o administración.');
+			openDropdownId = null;
+			return;
+		}
 		selectedStudent = student;
 		isFormOpen = true;
 	}
@@ -447,36 +491,34 @@
 				return;
 			}
 
-			const headers = ['Estudiante', 'Email', 'Registro', 'Carnet', 'Contacto', 'Domicilio', 'Estado', 'Título'];
-			
-			const rows = allStudents.map(s => [
-				`"${s.nombre || 'Sin nombre'}"`,
-				s.email || 'N/A',
-				s.registro || 'N/A',
-				s.carnet || 'N/A',
-				s.celular || 'N/A',
-				`"${s.domicilio || 'N/A'}"`,
-				s.activo ? 'Activo' : 'Inactivo',
-				s.titulo && s.titulo.estado ? s.titulo.estado : 'Sin Título'
-			]);
+			// F-XXX (2026-07-29): XLSX en vez de CSV.
+			const columnDefs = [
+				{ header: 'Estudiante', key: 'nombre', width: 30 },
+				{ header: 'Email', key: 'email', width: 28 },
+				{ header: 'Registro', key: 'registro', width: 14 },
+				{ header: 'Carnet', key: 'carnet', width: 14 },
+				{ header: 'Celular', key: 'celular', width: 14 },
+				{ header: 'Domicilio', key: 'domicilio', width: 32 },
+				{ header: 'Estado', key: 'estado', width: 12 },
+				{ header: 'Título', key: 'titulo_estado', width: 14 },
+			];
+			const rows = allStudents.map(s => ({
+				nombre: s.nombre || 'Sin nombre',
+				email: s.email || '',
+				registro: s.registro || '',
+				carnet: s.carnet || '',
+				celular: s.celular || '',
+				domicilio: s.domicilio || '',
+				estado: s.activo ? 'Activo' : 'Inactivo',
+				titulo_estado: (s.titulo && s.titulo.estado) ? s.titulo.estado : 'Sin Título',
+			}));
 
 			const courseName = filters.curso_id
 				? (allCourses.find(c => c._id === filters.curso_id)?.codigo ?? filters.curso_id)
 				: 'todos';
-			const filename = `estudiantes_${courseName}_${new Date().getTime()}.csv`;
-
-			const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');
-			const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-			const url = URL.createObjectURL(blob);
-			const link = document.createElement('a');
-			link.href = url;
-			link.download = filename;
-			document.body.appendChild(link);
-			link.click();
-			document.body.removeChild(link);
-			URL.revokeObjectURL(url);
+			exportToExcel(rows, columnDefs, `estudiantes_${courseName}`);
 		} catch (error) {
-			console.error('Error al exportar CSV:', error);
+			console.error('Error al exportar XLSX:', error);
 			alert('error', 'Ocurrió un error al generar el archivo');
 		} finally {
 			csvLoading = false;
@@ -518,35 +560,47 @@
 	}
 
 	function downloadTemplateCSV() {
-		// Fecha de Nacimiento se interpreta como DIA/MES/AÑO (no mes/dia como
-		// sugeriría un formato "mm/dd/aaaa" en inglés). Registro Académico es
-		// opcional: si se deja vacío, el sistema usa el Carnet de Identidad
-		// (sin el complemento tras el guion, si lo tuviera) como usuario/registro.
-		const headers = ["Nombre Completo", "Registro Academico (opcional)", "Carnet de Identidad", "Extension", "Email", "Celular", "Domicilio", "Fecha de Nacimiento (DD/MM/AAAA)", "Grupo Sanguineo"];
-		const sampleRow = ["Juan Perez Gomez", "", "1234567", "SC", "juan.perez@email.com", "77012345", "Calle Falsa 123", "15/08/1990", "A+"];
-		const csvContent = [headers, sampleRow].map(e => e.join(",")).join("\n");
-		const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement("a");
-		link.href = url;
-		link.download = "plantilla_estudiantes.csv";
-		document.body.appendChild(link);
-		link.click();
-		document.body.removeChild(link);
-		URL.revokeObjectURL(url);
+		// F-XXX (2026-07-29): XLSX en vez de CSV para la plantilla.
+		const columnDefs = [
+			{ header: 'Nombre Completo', key: 'nombre', width: 30 },
+			{ header: 'Registro Academico (opcional)', key: 'registro', width: 22 },
+			{ header: 'Carnet de Identidad', key: 'carnet', width: 16 },
+			{ header: 'Extension', key: 'extension', width: 10 },
+			{ header: 'Email', key: 'email', width: 28 },
+			{ header: 'Celular', key: 'celular', width: 14 },
+			{ header: 'Domicilio', key: 'domicilio', width: 32 },
+			{ header: 'Fecha de Nacimiento (DD/MM/AAAA)', key: 'fecha_nac', width: 22 },
+			{ header: 'Grupo Sanguineo', key: 'grupo_sang', width: 14 },
+		];
+		const rows = [{
+			nombre: 'Juan Perez Gomez',
+			registro: '',
+			carnet: '1234567',
+			extension: 'SC',
+			email: 'juan.perez@email.com',
+			celular: '77012345',
+			domicilio: 'Calle Falsa 123',
+			fecha_nac: '15/08/1990',
+			grupo_sang: 'A+',
+		}];
+		exportToExcel(rows, columnDefs, 'plantilla_estudiantes');
 		alert('success', 'Plantilla descargada. Rellénala y súbela en formato Excel o CSV.');
 	}
 </script>
 
+
+<svelte:head>
+	<title>Estudiantes · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
 		<Heading level="h1">Estudiantes</Heading>
 		<div class="flex flex-wrap gap-3 ml-auto w-full sm:w-auto justify-end">
-			<Button onclick={downloadStudentsCSV} variant="secondary" loading={csvLoading} aria-label="Descargar listado de estudiantes en CSV">
+			<Button onclick={downloadStudentsCSV} variant="secondary" loading={csvLoading} aria-label="Descargar listado de estudiantes en Excel">
 				{#snippet leftIcon()}
 					<DownloadIcon class="size-5" />
 				{/snippet}
-				Descargar CSV
+				Descargar Excel
 			</Button>
 
 			{#if canCreateStudent}
@@ -595,20 +649,23 @@
 				: canCreateStudent ? handleCreateStudent : undefined}
 		/>
 	{:else}
-		<!-- Componente de Tabla Modularizado -->
-		<StudentTable
-			{students}
-			{isSuperAdmin}
-			{canEditStudent}
-			{getDropdownOptions}
-			{toggleSelectAll}
-			{toggleSelectStudent}
-			{toggleDropdown}
-			onEdit={handleEdit}
-			onDelete={handleDeleteClick}
-			bind:selectedStudentIds={selectedStudentIds}
-			bind:openDropdownId={openDropdownId}
-		/>
+		<!-- Componente de Tabla Modularizado.
+		     MOBILE-002: en mobile, tirar hacia abajo desde el tope recarga la lista. -->
+		<PullToRefresh onRefresh={loadStudents}>
+			<StudentTable
+				{students}
+				{isSuperAdmin}
+				{canEditStudent}
+				{getDropdownOptions}
+				{toggleSelectAll}
+				{toggleSelectStudent}
+				{toggleDropdown}
+				onEdit={handleEdit}
+				onDelete={handleDeleteClick}
+				bind:selectedStudentIds={selectedStudentIds}
+				bind:openDropdownId={openDropdownId}
+			/>
+		</PullToRefresh>
 
 		<Pagination
 			currentPage={page}

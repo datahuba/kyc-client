@@ -36,3 +36,4 @@ export { default as SearchIcon } from './searchIcon.svelte';
 export { default as BellIcon } from './bellIcon.svelte';
 export * from './qrCodeIcon.svelte';
 export { default as QrCodeIcon } from './qrCodeIcon.svelte';
+export { default as ChartBarIcon } from './chartBarIcon.svelte'; // F-CUENTAS-POR-COBRAR (2026-07-29)

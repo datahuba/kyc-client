@@ -1,9 +1,37 @@
 import { apiKyC } from '$lib/config';
 import type { Course, CreateCourseRequest, UpdateCourseRequest } from '$lib/interfaces';
 
+export interface SupervisionEncargado {
+	id: string;
+	nombre: string;
+}
+
+export interface SupervisionPrograma {
+	curso_id: string;
+	codigo: string;
+	nombre_programa: string;
+	estado: string;
+	encargados: SupervisionEncargado[];
+	inscritos: number;
+	modulos_total: number;
+	modulos_ejecutados: number;
+	inscripciones_con_alguna_nota: number;
+	cobertura_notas_pct: number;
+}
+
 class CourseService {
 	async getById(id: string): Promise<Course> {
 		return await apiKyC.get<Course>(`/courses/${id}`);
+	}
+
+	/**
+	 * F-COORD-ACADEMICO-SUPERVISION (2026-08-19, Kevin): "mis Encargados de
+	 * Curso supervisados + estado academico consolidado de sus programas".
+	 * Segmentado en el backend igual que el resto del sistema: financiero ve
+	 * todo, academico/investigacion solo sus cursos_asignados.
+	 */
+	async getSupervisionAcademica(): Promise<SupervisionPrograma[]> {
+		return await apiKyC.get<SupervisionPrograma[]>('/courses/supervision-academica');
 	}
 
 	async getAll(
@@ -32,11 +60,22 @@ class CourseService {
 	}
 
 	async create(data: CreateCourseRequest): Promise<Course> {
-		return await apiKyC.post<Course>('/courses/', data);
+		// F-FIX-TIMEOUT-60S-CREATE (2026-08-09, Kevin): POST /courses/ puede
+		// tardar >30s cuando se crea con muchos módulos y se persisten todos
+		// los requisitos. customTimeout 60s para evitar cancelación.
+		return await apiKyC.post<Course>('/courses/', data, { customTimeout: 60000 });
 	}
 
 	async update(id: string, data: UpdateCourseRequest): Promise<Course> {
-		return await apiKyC.put<Course>(`/courses/${id}`, data);
+		// F-FIX-PUT-TIMEOUT-60S (2026-08-09, Kevin): el PUT /courses/{id} puede
+		// tardar >30s cuando el backend sincroniza requisitos con N inscripciones
+		// o cuando la latencia a MongoDB Atlas (Brazil, +150ms RTT) se suma a
+		// otras requests lentas del dashboard. El timeout default de 30s del
+		// apiKyC mata la request antes de que el backend responda, haciendo
+		// creer al usuario que la operacion fallo. Subimos a 60s como
+		// mitigacion rapida; la investigacion de la causa real va en
+		// F-INVESTIGAR-LENTITUD-BACKEND. El rollback es trivial: bajar a 30s.
+		return await apiKyC.put<Course>(`/courses/${id}`, data, { customTimeout: 60000 });
 	}
 
 	async delete(id: string): Promise<Course> {
@@ -63,6 +102,151 @@ class CourseService {
 	async assignEncargados(courseId: string, encargadosIds: string[]): Promise<{ success: boolean; detail: string }> {
 		return await apiKyC.put(`/courses/${courseId}/encargados`, { encargados_ids: encargadosIds });
 	}
+
+	// ============================================================================
+	// F-080 · Calendario de programas + estado
+	// ============================================================================
+
+	/**
+	 * F-080: Obtiene el calendario de programas (todos los estados, ordenados
+	 * cronológicamente). Pensado para alimentar la vista Timeline/Lista del
+	 * sidebar de administrativos.
+	 */
+	async getCalendario(
+		year?: number,
+		filters?: { tipo_curso?: string; estado?: string }
+	): Promise<{
+		success: boolean;
+		year: number | null;
+		total: number;
+		items: CalendarioItem[];
+	}> {
+		const params = new URLSearchParams();
+		if (year !== undefined && year !== null) params.append('year', year.toString());
+		if (filters?.tipo_curso) params.append('tipo_curso', filters.tipo_curso);
+		if (filters?.estado) params.append('estado', filters.estado);
+		return await apiKyC.get(`/courses/calendario?${params.toString()}`);
+	}
+
+	/**
+	 * F-080: Cursos en los que un estudiante PODRÍA pedir inscripción
+	 * (PROGRAMADO + EN_EJECUCION, sin CERRADOS). El dashboard del estudiante
+	 * consume este endpoint.
+	 */
+	async getDisponibles(): Promise<{
+		success: boolean;
+		total: number;
+		items: CursoDisponible[];
+	}> {
+		return await apiKyC.get('/courses/disponibles');
+	}
+
+	/**
+	 * F-080: Cambia el override manual del estado de un programa. Solo CPD.
+	 * `estado_override` puede ser null (volver al cálculo automático) o
+	 * uno de: 'programado', 'en_ejecucion', 'cerrado'.
+	 */
+	async cambiarEstadoOverride(
+		courseId: string,
+		estadoOverride: string | null
+	): Promise<Course> {
+		return await apiKyC.patch<Course>(`/courses/${courseId}/estado`, {
+			estado_override: estadoOverride
+		});
+	}
+
+	/**
+	 * F-080: Sube el PDF de la resolución de respaldo del programa.
+	 *
+	 * FIX 2026-07-31: el backend expone PUT /courses/{id}/resolucion (no POST).
+	 * El cliente debe usar PUT con `file` como multipart/form-data. Devuelve
+	 * el curso actualizado con la URL de la resolución ya persistida.
+	 */
+	async subirResolucion(courseId: string, file: File): Promise<Course> {
+		const form = new FormData();
+		form.append('file', file);
+		// F-FIX-TIMEOUT-60S-RESOLUCION (2026-08-09, Kevin): el upload de PDF
+		// puede tardar >30s si el PDF es pesado o el storage remoto (Cloudinary)
+		// está lento. customTimeout 60s.
+		return await apiKyC.put<Course>(`/courses/${courseId}/resolucion`, form, { customTimeout: 60000 });
+	}
+
+	/**
+	 * F-NOTAS-MODULOS-EJECUTADOS (2026-08-18, decisión de Kevin): carga notas
+	 * de módulos YA EJECUTADOS desde un Excel aparte (CI + "Nota Modulo N"),
+	 * para estudiantes que YA ESTÁN inscritos en el curso. No crea
+	 * estudiantes ni inscripciones — para eso está la carga inicial.
+	 */
+	async cargarNotasModulosExcel(
+		courseId: string,
+		file: File
+	): Promise<{ actualizados: number; fallidos: { fila: number; carnet: string; motivo: string }[] }> {
+		const form = new FormData();
+		form.append('file', file);
+		return await apiKyC.post(`/courses/${courseId}/notas-modulos-excel`, form, {
+			customTimeout: 60000
+		});
+	}
+
+	/**
+	 * F-2026-08-12-EC-RESOLUCION-OBLIGATORIA (Kevin 2026-08-12 post-reunion):
+	 * sube un PDF de resolucion a cloudinary SIN asociarlo a ningun curso.
+	 * Devuelve la URL temporal. El frontend usa esa URL al crear el curso
+	 * via POST /courses con resolucion_pdf_url=... Asi el backend puede
+	 * validar que para en_ejecucion la resolucion este presente.
+	 *
+	 * Para historicos y programados la resolucion es opcional.
+	 */
+	async uploadResolucionTemp(file: File): Promise<{ url: string }> {
+		const form = new FormData();
+		form.append('file', file);
+		return await apiKyC.post<{ url: string }>(`/courses/upload-resolucion-temp`, form, { customTimeout: 60000 });
+	}
+
+	/**
+	 * F-HISTORICO (2026-07-31): marca o desmarca un programa como histórico.
+	 * Útil para corregir un flag desde la vista del catálogo o editor sin
+	 * tener que enviar todo el payload de CourseUpdate.
+	 */
+	async setEsHistorico(courseId: string, es_historico: boolean): Promise<Course> {
+		return await apiKyC.put<Course>(`/courses/${courseId}`, { es_historico });
+	}
+}
+
+// ============================================================================
+// F-080 · Tipos para calendario y cursos disponibles
+// ============================================================================
+
+export interface CalendarioItem {
+	id: string;
+	codigo: string;
+	nombre_programa: string;
+	tipo_curso: string;
+	modalidad: string;
+	fecha_inicio: string | null;
+	fecha_fin: string | null;
+	estado_calculado: 'programado' | 'en_ejecucion' | 'cerrado';
+	estado_override: string | null;
+	resolucion_pdf_url: string | null;
+	activo: boolean;
+	costo_total_interno: number;
+	matricula_interno: number;
+	cantidad_modulos: number;
+	cantidad_inscritos: number;
+}
+
+export interface CursoDisponible {
+	id: string;
+	codigo: string;
+	nombre_programa: string;
+	tipo_curso: string;
+	modalidad: string;
+	fecha_inicio: string | null;
+	fecha_fin: string | null;
+	estado_calculado: 'programado' | 'en_ejecucion' | 'cerrado';
+	costo_total_interno: number;
+	matricula_interno: number;
+	cantidad_modulos: number;
 }
 
 export const courseService = new CourseService();

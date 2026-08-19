@@ -25,15 +25,21 @@
 		{ name: 'Aula', href: '/app/classroom', icon: BookIcon, roles: ['student', 'docente', 'admin', 'superadmin', 'cpd', 'mae', 'encargado_curso'], loginTypes: ['academic', 'admin'] },
 		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
 		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
-		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae', 'student'], loginTypes: ['admin', 'academic'] },
+		// F-EC-SIDEBAR-PROGRAMAS (2026-08-18, Kevin): mismo criterio que el
+		// sidebar de escritorio (sidebarItems.ts) — el encargado y el
+		// coordinador tambien acceden a Programas desde el menu.
+		{ name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		// F-2026-08-22-EC-PAGOS-READONLY (Kevin 2026-08-22): EC y COORDINADOR (financiero)
+		// acceden a Pagos en modo solo lectura. NO pueden editar nada, solo ver y
+		// descargar. Filtro automatico del backend por cursos_asignados.
+		{ name: 'Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae', 'encargado_curso', 'coordinador', 'student'], loginTypes: ['admin', 'academic'] },
 		{ name: 'Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'coordinador'], loginTypes: ['admin'] },
 		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
 		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
 		{ name: 'Perfil', href: '/app/profile', icon: UsersIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
 	];
 
-	let userRole = $derived($userStore?.role || $userStore?.user?.rol || 'student');
+	let userRole = $derived($userStore?.role || 'student');
 	let loginType = $derived($userStore?.loginType);
 	let academicRole = $derived($userStore?.academicRole);
 	let esCoordinadorFinanciero = $derived($userStore.user?.subtipo_coordinador === 'financiero');

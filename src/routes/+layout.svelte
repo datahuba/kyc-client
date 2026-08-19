@@ -12,6 +12,19 @@
 		initTheme();
 		setupPageTransitions();
 
+		// F-SW-AUTORELOAD (2026-07-30): cuando el Service Worker se actualiza y
+		// toma el control (controllerchange), recargamos la página para que
+		// el cliente use el bundle nuevo. Sin esto, el usuario podría seguir
+		// viendo la versión vieja de los JS en cache hasta que cierre la pestaña.
+		if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+			let isReloading = false;
+			navigator.serviceWorker.addEventListener('controllerchange', () => {
+				if (isReloading) return;
+				isReloading = true;
+				window.location.reload();
+			});
+		}
+
 		// KEYBOARD-001: En mobile, cuando el usuario hace focus en un input,
 		// el browser NO hace scrollIntoView automático al subir el keyboard.
 		// Este handler garantiza que el input quede visible sobre el keyboard.

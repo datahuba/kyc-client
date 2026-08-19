@@ -12,3 +12,6 @@ export * from "./response.interface"
 export * from "./classroom.interface"
 export * from "./bank-statement.interface"
 export * from "./admin.interface"  // F-044 (2026-07-22)
+export * from "./certificate.interface"  // F-CERTIFICADOS (2026-07-29)
+export * from "./certificate-request.interface"  // F-CERT-APROBACION (2026-07-30)
+export * from "./tramite-solicitud.interface"  // F-TRAMITES-SOLICITUD (2026-07-29)

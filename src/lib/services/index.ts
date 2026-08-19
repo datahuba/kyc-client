@@ -13,3 +13,9 @@ export * from './bank-statement.service';
 export * from './pre-registration.service';
 export * from './admin.service';  // F-044 (2026-07-22)
 export * from './grade-validation.service';  // F-070 (2026-07-22)
+export * from './certificate.service';       // F-CERTIFICADOS (2026-07-29)
+export * from './cuentas-por-cobrar.service'; // F-CUENTAS-POR-COBRAR (2026-07-29)
+export * from './cuentas-historicas.service'; // F-CUENTAS-HISTORICAS (2026-08-16)
+export * from './tramite-solicitud.service';  // F-TRAMITES-SOLICITUD (2026-07-29)
+export * from './bug-report.service';         // F-REPORTE-BUGS (2026-08-17)
+export * from './email-log.service';        // F-CORREOS-REGISTRO (2026-08-17)

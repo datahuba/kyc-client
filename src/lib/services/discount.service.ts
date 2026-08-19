@@ -39,7 +39,9 @@ class DiscountService {
 	async uploadResolucion(discountId: string, file: File): Promise<Discount> {
 		const formData = new FormData();
 		formData.append('file', file);
-		return await apiKyC.post<Discount>(`/discounts/${discountId}/resolucion`, formData);
+		// F-FIX-TIMEOUT-60S-DISCOUNT (2026-08-09, Kevin): upload de PDF a
+		// Cloudinary puede tardar >30s. customTimeout 60s.
+		return await apiKyC.post<Discount>(`/discounts/${discountId}/resolucion`, formData, { customTimeout: 60000 });
 	}
 }
 

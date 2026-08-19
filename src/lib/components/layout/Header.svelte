@@ -251,23 +251,31 @@
 		}
 	});
 
-	function setupNotificationStream() {
+	let sseReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+	let sseStopped = false;
+
+	async function setupNotificationStream() {
 		// TECH-003: conectar al endpoint SSE del backend. El server mantiene
 		// la conexión abierta y emite eventos 'notification' cada vez que
 		// llega una nueva notificación para este usuario. Reemplaza el
 		// polling cada 45s (50+ requests/hora por sesión).
+		//
+		// FIX-SSE-TOKEN-URL (2026-08-17): el JWT ya NO viaja en la query
+		// string (quedaba expuesto en historial del navegador, logs de
+		// Nginx y Referer). EventSource no soporta headers custom, así que
+		// primero pedimos un ticket de un solo uso vía POST autenticado
+		// normal, y lo usamos solo para el handshake inicial del stream.
 		try {
-			// BUG-SSE-001 FIX: usar URL relativa con el prefijo correcto /api/api/v1
-			// (antes se usaba (apiKyC as any).baseURL que no existe, daba '',
-			// y la URL quedaba como /notifications/stream → 404 en nginx)
-			// nginx: location /api/ → proxy_pass http://127.0.0.1:8000/;
-			// por eso el cliente manda doble /api/api/v1/
-			const streamURL = `/api/api/v1/notifications/stream`;
-			// Para SSE, no podemos usar el cliente HTTP normal (no soporta streaming).
-			// El browser añadirá el header Authorization automáticamente si la cookie
-			// está configurada. Si usamos Bearer token, hay que pasarlo via query.
-			const token = localStorage.getItem('kyc-auth_token');
-			const url = token ? `${streamURL}?token=${encodeURIComponent(token)}` : streamURL;
+			const { ticket } = await apiKyC.post<{ ticket: string }>(
+				'/notifications/stream-ticket',
+				{}
+			);
+			if (sseStopped) return;
+
+			// BUG-SSE-002 FIX (2026-08-12, Kevin): la URL debe ser SOLO
+			// /api/v1/notifications/stream. El doble /api/api/v1/ que estaba
+			// antes era incorrecto y daba 404 en nginx.
+			const url = `/api/v1/notifications/stream?ticket=${encodeURIComponent(ticket)}`;
 
 			notificationEventSource = new EventSource(url, { withCredentials: true });
 
@@ -289,9 +297,16 @@
 				} catch (_) { /* ignore */ }
 			});
 
-			// El browser reconecta automáticamente. Solo loggeamos errores.
+			// El ticket se consume una sola vez: si la conexión se cae (deploy,
+			// proxy, red), el reintento nativo de EventSource reusaría la misma
+			// URL con un ticket ya inválido. Por eso cerramos la conexión vieja
+			// y pedimos un ticket nuevo antes de reabrir.
 			notificationEventSource.onerror = () => {
-				// EventSource reintenta solo. No hacer nada aquí para evitar loops.
+				if (sseStopped) return;
+				notificationEventSource?.close();
+				notificationEventSource = null;
+				if (sseReconnectTimeout) clearTimeout(sseReconnectTimeout);
+				sseReconnectTimeout = setTimeout(() => setupNotificationStream(), 5000);
 			};
 		} catch (err) {
 			// Fallback silencioso a polling si SSE no se puede establecer
@@ -301,7 +316,9 @@
 	}
 
 	onDestroy(() => {
+		sseStopped = true;
 		if (pollInterval) clearInterval(pollInterval);
+		if (sseReconnectTimeout) clearTimeout(sseReconnectTimeout);
 		if (notificationEventSource) {
 			notificationEventSource.close();
 			notificationEventSource = null;

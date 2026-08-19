@@ -2,13 +2,14 @@
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/userStore';
 	import { activeClassroomStore } from '$lib/stores/activeClassroomStore';
-	import { UsersIcon, ClipboardIcon, TagIcon, XIcon, KeyIcon, QrCodeIcon, FileTextIcon, AcademicCapIcon, Menu2Icon } from '$lib/icons/outline'; // IMPORTACIÓN UNIFICADA DE MENU2ICON
+	import { XIcon, Menu2Icon, ChevronRightIcon, ClipboardIcon } from '$lib/icons/outline';
 	import { slide, fade } from 'svelte/transition';
-	import { BookIcon, CreditCardIcon, HomeIcon, LogoutIcon, ExclamationCircleIcon } from '$lib/icons/solid';  // F-044 (2026-07-22)
+	import { LogoutIcon, BookIcon } from '$lib/icons/solid';
 	import { goto } from '$app/navigation';
+	import { getAllNavItems, staffBugReportItem, type NavigationEntry } from '$lib/navigation/sidebarItems';
 	import CourseCatalogModal from './CourseCatalogModal.svelte';
 	import BenefitsModal from './BenefitsModal.svelte';
-	import DocumentValidationModal from '$lib/components/ui/DocumentValidationModal.svelte';
+	import DocumentValidationTable from '$lib/components/ui/DocumentValidationTable.svelte';
 
 	let isCatalogOpen = $state(false);
 	let isBenefitsOpen = $state(false);
@@ -23,17 +24,6 @@
 		{ id: 'estudiantes',    label: 'Estudiantes' },
 	];
 
-	interface NavigationItem {
-		name: string;
-		href: string;
-		icon: any;
-		roles: string[];
-		loginTypes: ('admin' | 'academic')[];
-		external?: boolean;
-		target?: string;
-		rel?: string;
-	}
-
 	interface Props {
 		isOpen: boolean;
 		onClose: () => void;
@@ -42,79 +32,99 @@
 	let { isOpen, onClose }: Props = $props();
 	let isCollapsed = $state(false);
 
-	const navigation: NavigationItem[] = [
-		{ name: 'Mi Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
-		{ name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon, roles: ['admin', 'superadmin', 'mae', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		
-		// ACCESO DIRECTO A INSCRIPCIONES
-		{ name: 'Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		
-		{ name: 'Estudiantes', href: '/app/students', icon: UsersIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ name: 'Solicitudes', href: '/app/account-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
-		{ name: 'Solicitudes de Pasivo', href: '/app/passive-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd'], loginTypes: ['admin'] },
-		{ name: 'Solicitudes de Inscripción', href: '/app/enrollment-requests', icon: ClipboardIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		// ISSUE-Q-PRE-REGISTRO-FORM: formularios dinámicos de pre-inscripción. Lo ven super admin,
-		// admin, cpd (para los formularios generales) y encargado/coordinador (los delegados a sus cursos).
-		{ name: 'Pre-inscripciones', href: '/app/pre-registros', icon: ClipboardIcon, roles: ['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ name: 'Docentes', href: '/app/teachers', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
-		{ name: 'Programas', href: '/app/courses', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae'], loginTypes: ['admin'] },
-		{ name: 'Gestión de Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['admin', 'superadmin', 'cpd', 'cobranza', 'mae'], loginTypes: ['admin'] },
-		{ name: 'Reportes de Caja', href: '/app/reports', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'mae', 'coordinador'], loginTypes: ['admin'] },
-		// F-075 (2026-07-23): nuevo item 'Informes' para informes administrativos
-		// (acta de notas, etc.). Diferente de "Reportes de Caja" que es para
-		// gestión financiera interna.
-		{ name: 'Informes', href: '/app/informes', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd', 'coordinador'], loginTypes: ['admin'] },
+	// F-REFACTOR-SIDEBAR (2026-07-31): los items ahora viven en
+	// lib/navigation/sidebarItems.ts. Este componente solo se ocupa
+	// del render + filtrado por rol.
+	const navItems: NavigationEntry[] = getAllNavItems();
 
-		{ name: 'Aula Virtual UAGRM', href: 'https://virtual.uagrm.edu.bo/postgrado/login/index.php', icon: AcademicCapIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
-		{ name: 'Perfil de Notas UAGRM', href: 'https://perfil.uagrm.edu.bo/estudiantes/default.php', icon: ClipboardIcon, roles: ['student', 'docente'], loginTypes: ['academic'], external: true, target: '_blank', rel: 'noopener noreferrer' },
+	// F-SIDEBAR-ORDER (2026-07-30): Dashboard primero SOLO, luego el resto
+	// en orden ALFABÉTICO. Los grupos se intercalan alfabéticamente también.
+	const navigation = $derived.by(() => {
+		const isStudent = isStudentUser;
+		const dashboardName = isStudent ? 'Mi Dashboard' : 'Dashboard';
+		const dashboardItem = navItems.find(
+			(e) => e.type === 'item' && e.name === dashboardName
+		);
+		const restItems = navItems
+			.filter((e) => e !== dashboardItem)
+			.sort((a, b) => {
+				const nameA = (a.type === 'item' || a.type === 'group') ? a.name : '';
+				const nameB = (b.type === 'item' || b.type === 'group') ? b.name : '';
+				return nameA.localeCompare(nameB, 'es');
+			});
+		const result: NavigationEntry[] = [];
+		if (dashboardItem) result.push(dashboardItem);
+		result.push({ type: 'spacer' });
+		result.push(...restItems);
+		return result;
+	});
 
-		{ name: 'Mis Inscripciones', href: '/app/enrollments', icon: FileTextIcon, roles: ['student'], loginTypes: ['academic'] },
-		{ name: 'Mis Pagos', href: '/app/payments', icon: CreditCardIcon, roles: ['student'], loginTypes: ['academic'] },
-		
-		{ name: 'Descuentos', href: '/app/discounts', icon: TagIcon, roles: ['admin', 'superadmin', 'cobranza', 'cpd'], loginTypes: ['admin'] },
-		{ name: 'Usuarios', href: '/app/users', icon: UsersIcon, roles: ['superadmin'], loginTypes: ['admin'] },
-		{ name: 'Info. Pagos', href: '/app/payment-config', icon: QrCodeIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-		{ name: 'Extracto Bancario', href: '/app/bank-statements', icon: FileTextIcon, roles: ['admin', 'superadmin', 'cobranza'], loginTypes: ['admin'] },
-		// F-044 (2026-07-22): visor de errores 500 (solo superadmin/admin)
-		{ name: 'Visor de Errores', href: '/app/admin/errors', icon: ExclamationCircleIcon, roles: ['admin', 'superadmin'], loginTypes: ['admin'] },
-		// F-070 (2026-07-22): validación de notas (CPD/Admin/Superadmin). Surge del
-		// bug urgente: Miguel (socio de Kevin) tenía 51 notas en pendiente_validacion
-		// y no había forma rápida de aprobarlas. Aquí CPD ve, aprueba, rechaza y edita.
-		{ name: 'Validación de Notas', href: '/app/admin/grade-validation', icon: AcademicCapIcon, roles: ['cpd', 'admin', 'superadmin'], loginTypes: ['admin'] },
-		{ name: 'Contraseña', href: '/app/change-password', icon: KeyIcon, roles: ['student', 'docente'], loginTypes: ['academic'] },
-	];
-
-	let userRole = $derived($userStore?.role || $userStore?.user?.rol || 'student');
+	let userRole = $derived($userStore?.role || 'student');
 	let loginType = $derived($userStore?.loginType);
 	let academicRole = $derived($userStore?.academicRole);
 
 	let isStudentUser = $derived(userRole === 'student' || academicRole === 'student');
 	let canValidateDocs = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(userRole));
 
+	// F-SIDEBAR-TECNICOS (Kevin 2026-08-17): "Reportar un Error" y "Validación
+	// de Documentos" van juntos al pie, separados del resto. Kevin: "son
+	// opciones y módulos más técnicos".
+	//
+	// Los roles se leen del propio item en sidebarItems.ts en vez de repetir la
+	// lista acá: si mañana cambia quién puede reportar, se toca en un solo lado.
+	let canReportBug = $derived(staffBugReportItem.roles.includes(userRole) && loginType === 'admin');
+
 	// ISSUE-R-PERFIL-GENERICO: solo el coordinador FINANCIERO ve las vistas económicas.
 	let esCoordinadorFinanciero = $derived($userStore.user?.subtipo_coordinador === 'financiero');
-	const ECONOMIC_HREFS = ['/app/reports', '/app/payments', '/app/payment-config', '/app/bank-statements', '/app/informes'];
+	const ECONOMIC_HREFS = ['/app/reports', '/app/reports/cuentas-historicas', '/app/payments', '/app/payment-config', '/app/bank-statements', '/app/informes'];
 
-	let filteredNavigation = $derived(navigation.filter(item => {
-		// ISSUE-R-ROLES: encargado_curso y coordinador son staff administrativo también
+	function entryAllowed(entry: NavigationEntry): boolean {
+		if (entry.type === 'spacer') return true;
+
 		const isStaff = ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'encargado_curso', 'coordinador'].includes(userRole);
 		const isTeacher = userRole === 'docente' || academicRole === 'teacher';
 		const isStudent = userRole === 'student' || academicRole === 'student';
 
 		if (isStaff) {
-			if (!(item.loginTypes.includes('admin') && item.roles.includes(userRole))) return false;
-			// Coordinador: solo el financiero ve vistas económicas
-			if (userRole === 'coordinador' && ECONOMIC_HREFS.includes(item.href) && !esCoordinadorFinanciero) return false;
+			if (!(entry.loginTypes.includes('admin') && entry.roles.includes(userRole))) return false;
+			if (entry.type === 'item' && userRole === 'coordinador' && ECONOMIC_HREFS.includes(entry.href) && !esCoordinadorFinanciero) return false;
 			return true;
 		}
 		if (loginType === 'academic' || isTeacher || isStudent) {
-			if (item.name === 'Aula Virtual UAGRM' || item.name === 'Perfil de Notas UAGRM') {
-				return isTeacher ? item.roles.includes('docente') : item.roles.includes('student');
+			if (entry.name === 'Aula Virtual UAGRM' || entry.name === 'Perfil de Notas UAGRM') {
+				return isTeacher ? entry.roles.includes('docente') : entry.roles.includes('student');
 			}
-			return isTeacher ? item.roles.includes('docente') : item.roles.includes('student');
+			return isTeacher ? entry.roles.includes('docente') : entry.roles.includes('student');
 		}
 		return false;
-	}));
+	}
+
+	let filteredNavigation = $derived(navigation
+		.map((entry): NavigationEntry | null => {
+			if (entry.type === 'spacer') return entry;
+			if (entry.type === 'group') {
+				const visibleChildren = entry.children.filter(c => entryAllowed(c));
+				if (visibleChildren.length === 0) return null;
+				if (entry.name === 'Financiero' && userRole === 'coordinador' && !esCoordinadorFinanciero) return null;
+				return { ...entry, children: visibleChildren };
+			}
+			return entryAllowed(entry) ? entry : null;
+		})
+		.filter((e): e is NavigationEntry => e !== null)
+	);
+
+	// F-074 / F-075 (2026-07-29): auto-expand del grupo si la ruta
+	// actual está dentro de sus hijos. Generico por nombre de grupo.
+	let expandedGroups = $state<Record<string, boolean>>({});
+	$effect(() => {
+		const path = $page.url.pathname;
+		for (const entry of filteredNavigation) {
+			if (entry.type === 'group') {
+				const isChildActive = entry.children.some(c => path.startsWith(c.href) && c.href !== '/app/dashboard');
+				expandedGroups[entry.name] = isChildActive;
+			}
+		}
+	});
 
 	function isCurrent(href: string) {
 		if (href.startsWith('http')) return false;
@@ -165,20 +175,72 @@
 			<ul role="list" class="flex flex-1 flex-col gap-y-7">
 				<li>
 					<ul role="list" class="-mx-2 space-y-1">
-						{#each filteredNavigation as item}
-							<li>
-								<a href={item.href} target={item.external ? (item.target ?? '_blank') : undefined} rel={item.external ? (item.rel ?? 'noopener noreferrer') : undefined} title={isCollapsed ? item.name : ''} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isCurrent(item.href) ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-50'}`}>
-									<!-- RENDIMIENTO DE ÍCONOS DINÁMICOS COMPATIBLE CON COMPILADOR ESTRICTO EN LINUX -->
-									{#snippet icon()}
-										<svelte:component 
-											this={item.icon} 
-											class={`size-6 shrink-0 ${isCurrent(item.href) ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 group-hover:text-primary-600'}`} 
-										/>
-									{/snippet}
-									{@render icon()}
-									{#if !isCollapsed}<span in:fade={{ duration: 100 }}>{item.name}</span>{/if}
-								</a>
-							</li>
+						{#each filteredNavigation as entry, idx (idx + '-' + ((entry as any).name ?? 'spacer-' + idx))}
+							{#if entry.type === 'spacer'}
+								<!-- F-XXX (2026-07-29): separador visual entre Dashboard y el resto -->
+								<li class="my-2 border-t border-gray-200 dark:border-gray-800" aria-hidden="true"></li>
+							{:else if entry.type === 'item'}
+								<li>
+									<a href={entry.href} target={entry.external ? (entry.target ?? '_blank') : undefined} rel={entry.external ? (entry.rel ?? 'noopener noreferrer') : undefined} title={isCollapsed ? entry.name : ''} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isCurrent(entry.href) ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-50'}`}>
+										<!-- RENDIMIENTO DE ÍCONOS DINÁMICOS COMPATIBLE CON COMPILADOR ESTRICTO EN LINUX -->
+										{#snippet icon()}
+											<svelte:component
+												this={entry.icon}
+												class={`size-6 shrink-0 ${isCurrent(entry.href) ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 group-hover:text-primary-600'}`}
+											/>
+										{/snippet}
+										{@render icon()}
+										{#if !isCollapsed}<span in:fade={{ duration: 100 }}>{entry.name}</span>{/if}
+									</a>
+								</li>
+							{:else if entry.type === 'group' && !isCollapsed}
+								<!-- F-074 / F-075 (2026-07-29): grupo "Financiero" — desplegable
+								     que agrupa Gestión de Pagos / Reportes de Caja / Informes. -->
+								<li>
+									<button
+										type="button"
+										onclick={() => expandedGroups[entry.name] = !expandedGroups[entry.name]}
+										aria-expanded={!!expandedGroups[entry.name]}
+										class="group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all px-2"
+									>
+										<svelte:component this={entry.icon} class="size-6 shrink-0 text-gray-400 group-hover:text-primary-600" />
+										<span class="flex-1 text-left">{entry.name}</span>
+										<svg
+											class={`size-4 shrink-0 text-gray-400 transition-transform ${expandedGroups[entry.name] ? 'rotate-180' : ''}`}
+											fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+										>
+											<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+										</svg>
+									</button>
+									{#if expandedGroups[entry.name]}
+										<ul role="list" class="mt-0.5 space-y-0.5 pl-4" transition:slide={{ duration: 150 }}>
+											{#each entry.children as child (child.href)}
+												<li>
+													<a
+														href={child.href}
+														title={child.name}
+														class={`group flex gap-x-3 rounded-md py-1.5 pl-3 pr-2 text-sm leading-6 font-medium transition-all ${
+															isCurrent(child.href)
+																? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400 border-l-2 border-primary-500 -ml-[2px] pl-[14px]'
+																: 'text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+														}`}
+													>
+														<span class="size-1.5 mt-2 rounded-full shrink-0 bg-gray-300 group-hover:bg-primary-400"></span>
+														<span>{child.name}</span>
+													</a>
+												</li>
+											{/each}
+										</ul>
+									{/if}
+								</li>
+							{:else if entry.type === 'group' && isCollapsed}
+								<!-- Modo colapsado: el grupo se ve como un solo item (el primero de sus hijos) -->
+								<li>
+									<a href={entry.children[0]?.href ?? '#'} title={entry.name} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all justify-center px-0 ${entry.children.some(c => isCurrent(c.href)) ? 'text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-400 hover:text-primary-600'}`}>
+										<svelte:component this={entry.icon} class="size-6 shrink-0" />
+									</a>
+								</li>
+							{/if}
 						{/each}
 					</ul>
 				</li>
@@ -230,21 +292,41 @@
 					</li>
 				{/if}
 
-				{#if canValidateDocs}
+				{#if canReportBug}
+					<!-- Componente directo en vez de <svelte:component>: en runes mode
+					     ese tag esta deprecado y sumaba un warning al baseline. El
+					     {@const} va aca porque Svelte solo lo admite como hijo
+					     inmediato de un bloque, no dentro del <a>. -->
+					{@const IconoBug = staffBugReportItem.icon}
 					<li class={isStudentUser ? '' : 'mt-auto border-t border-gray-200 dark:border-gray-800 pt-2'}>
+						<a
+							href={staffBugReportItem.href}
+							title={isCollapsed ? staffBugReportItem.name : ''}
+							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isCurrent(staffBugReportItem.href) ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600'}`}
+						>
+							<IconoBug
+								class={`size-6 shrink-0 ${isCurrent(staffBugReportItem.href) ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 group-hover:text-primary-600'}`}
+							/>
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>{staffBugReportItem.name}</span>{/if}
+						</a>
+					</li>
+				{/if}
+
+				{#if canValidateDocs}
+					<li class={isStudentUser || canReportBug ? '' : 'mt-auto border-t border-gray-200 dark:border-gray-800 pt-2'}>
 						<button
 							type="button"
 							onclick={() => isDocValidationOpen = true}
-							title={isCollapsed ? 'Validación de Docs' : ''}
+							title={isCollapsed ? 'Validación de Documentos' : ''}
 							class={`group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-primary-600 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}
 						>
 							<ClipboardIcon class="size-6 shrink-0 text-amber-600 dark:text-amber-400 group-hover:text-primary-600" />
-							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Validación de Docs</span>{/if}
+							{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Validación de Documentos</span>{/if}
 						</button>
 					</li>
 				{/if}
 
-				<li class={isStudentUser || canValidateDocs ? '' : 'mt-auto'}>
+				<li class={isStudentUser || canValidateDocs || canReportBug ? '' : 'mt-auto'}>
 					<button onclick={logout} title={isCollapsed ? 'Cerrar Sesión' : ''} class={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 hover:bg-gray-50 hover:text-red-600 w-full text-left transition-all ${isCollapsed ? 'justify-center px-0' : 'px-2'}`}>
 						<LogoutIcon class="size-6 shrink-0 text-gray-400 group-hover:text-red-600" />
 						{#if !isCollapsed}<span in:fade={{ duration: 100 }}>Cerrar Sesión</span>{/if}
@@ -261,7 +343,7 @@
 {/if}
 
 {#if canValidateDocs}
-	<DocumentValidationModal isOpen={isDocValidationOpen} onClose={() => isDocValidationOpen = false} />
+	<DocumentValidationTable isOpen={isDocValidationOpen} onClose={() => isDocValidationOpen = false} />
 {/if}
 
 <style>

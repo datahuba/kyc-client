@@ -45,7 +45,7 @@
 			
 			if (state.user) {
 				// Resolver rol de forma altamente defensiva
-				const userRole = state.role || state.user?.rol || state.user?.role || '';
+				const userRole = state.role || '';
 				const currentAcademicRole = state.academicRole || '';
 
 				// ISSUE M: Enrutador Conmutador Inteligente Post-Auth de la UAGRM

@@ -1,7 +1,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { enrollmentService, studentService, courseService, discountService } from '$lib/services';
+	import { enrollmentService, studentService, courseService, discountService, cuentasPorCobrarService, paymentService } from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
+	import {
+		hasRole,
+		STAFF_INSCRIPCION,
+		STAFF_INSCRIPCION_EDIT,
+		STAFF_INSCRIPCION_DELETE,
+		STAFF_SOLICITUD_PASIVO,
+		STAFF_REACTIVAR,
+		STAFF_BECA_RESPALDO,
+		STAFF_NOTAS_BORRADOR,
+		STAFF_MODULOS,
+		STAFF_REQUISITOS,
+		STAFF_MATRICULA_EXENTA
+	} from '$lib/auth/roles';
 	import type { Enrollment, Student, Course, Discount } from '$lib/interfaces';
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/ui/button.svelte';
@@ -10,6 +23,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
+	import GestionModulosModal from '$lib/components/ui/GestionModulosModal.svelte';
 	import Select from '$lib/components/ui/select.svelte';
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
 	import Skeleton from '$lib/components/ui/skeleton.svelte';
@@ -51,6 +65,9 @@
 	let showDeleteModal: boolean = $state(false);
 	let enrollmentToDelete: Enrollment | null = $state(null);
 	let deleteLoading: boolean = $state(false);
+	// F-MODULOS-MODAL (2026-07-31): modal centralizado de gestión de módulos
+	// (reemplaza los botones Iniciar/Revertir del kardex).
+	let isModulosModalOpen: boolean = $state(false);
 
 	// F-COBRANZA-041 (2026-07-22): resumen de inscritos (total/activos/pasivos)
 	// se movió al Dashboard. Se eliminó la carga acá. Endpoint sigue existiendo.
@@ -83,27 +100,32 @@
 	let discountsMap: Record<string, Discount> = $state({});
 
 	// ISSUE N: Control de Permisos Visuales (RBAC Frontend)
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let currentRole = $derived($userStore.role || '');
+	// F-REFACTOR-ROLES (2026-07-31): usar constantes de roles compartidas
+	// en vez de arrays inline duplicados. Source of truth: lib/auth/roles.ts
 	// ISSUE-R-ROLES (2026-07-10): encargado_curso/coordinador pueden crear inscripciones
 	// (el backend valida que el encargado solo inscriba en sus cursos asignados)
-	let canCreateEnrollment = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
-	let canEditEnrollment = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canCreateEnrollment = $derived(hasRole(currentRole, STAFF_INSCRIPCION));
+	let canEditEnrollment = $derived(hasRole(currentRole, STAFF_INSCRIPCION_EDIT));
 	let canDeleteEnrollment = $derived(currentRole === 'superadmin');
 	// ISSUE-R-SOLICITUD-PASIVO: quién puede solicitar/aprobar el pasivo de una inscripción
-	let canRequestPassive = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'student'].includes(currentRole));
-	let canReactivate = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let canRequestPassive = $derived(hasRole(currentRole, STAFF_SOLICITUD_PASIVO));
+	let canReactivate = $derived(hasRole(currentRole, STAFF_REACTIVAR));
 	// ISSUE-P-BECA-RESPALDO: quién puede subir/reemplazar el respaldo documental de una beca
-	let canManageBecaRespaldo = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
+	let canManageBecaRespaldo = $derived(hasRole(currentRole, STAFF_BECA_RESPALDO));
 	// ISSUE-Q-NOTA-BORRADOR: quién puede validar/rechazar el borrador de nota del docente
-	let canValidateNotaBorrador = $derived(['cpd', 'admin', 'superadmin'].includes(currentRole));
+	let canValidateNotaBorrador = $derived(hasRole(currentRole, STAFF_NOTAS_BORRADOR));
+	// F-CUENTAS-POR-COBRAR (2026-07-29): quién puede iniciar módulos manualmente.
+	// El backend valida que encargado_curso solo lo haga en sus cursos_asignados.
+	let canIniciarModulo = $derived(hasRole(currentRole, STAFF_MODULOS));
+	// Estado de loading por módulo al iniciar/deshacer
+	let moduloLoading = $state<Record<string, boolean>>({});
 
 	// ISSUE-Q-DOCUMENTOS-KYC (2026-07-09): quién puede aprobar/rechazar documentos
 	// subidos por el estudiante. Ampliado a Encargado de Curso/Coordinador (el
 	// backend restringe a Encargado de Curso solo sus cursos_asignados) para no
 	// sobrecargar solo a CPD -- explícitamente pedido por el usuario.
-	let canManageRequisitos = $derived(
-		['cpd', 'admin', 'superadmin', 'encargado_curso', 'coordinador'].includes(currentRole)
-	);
+	let canManageRequisitos = $derived(hasRole(currentRole, STAFF_REQUISITOS));
 
 	// ISSUE-R-ROLES (2026-07-10): filtrar cursos disponibles para el formulario
 	// de inscripción -- un Encargado de Curso solo ve sus cursos asignados.
@@ -127,7 +149,7 @@
 		return mod.estado === 'Pagado';
 	}
 	// ISSUE-M-EXENCION: botón exclusivo de MAE (también admin/superadmin, que ya tienen todo)
-	let canManageMatriculaExenta = $derived(['mae', 'admin', 'superadmin'].includes(currentRole));
+	let canManageMatriculaExenta = $derived(hasRole(currentRole, STAFF_MATRICULA_EXENTA));
 	let matriculaExentaLoading: boolean = $state(false);
 
 	// Modal de solicitud de pasivo
@@ -148,6 +170,17 @@
 			userStore.init();
 		}
 		loadData();
+		// F-FIX-SIDEBAR-INDIVIDUAL (2026-07-31): si la URL trae ?new=1
+		// (link "Inscripcion Individual" del sidebar), abrir el modal
+		// automaticamente. Asi la nueva entrada del grupo Inscripciones
+		// llega al formulario de nueva inscripcion en vez de solo a la
+		// lista.
+		const params = new URLSearchParams(window.location.search);
+		if (params.get('new') === '1' && canCreateEnrollment) {
+			// esperar a que carguen los estudiantes/cursos para que el form
+			// tenga las opciones listas
+			setTimeout(() => handleCreate(), 200);
+		}
 	});
 
 	async function loadData() {
@@ -270,6 +303,79 @@
 		selectedKardex = enrollment;
 		isKardexOpen = true;
 		openDropdownId = null;
+		cargarPagosKardex(enrollment);
+	}
+
+	// F-LIBRETA-IMPRIMIR (2026-08-18, Kevin en la capacitacion): la libreta
+	// muestra notas y estado de pago por modulo, pero NO el numero de
+	// comprobante ni la fecha — esos viven en los Payment, no en la
+	// inscripcion. Kevin los pidio explicitamente para el documento impreso:
+	// "la fecha en la que se subio y el numero de comprobante".
+	//
+	// Se filtra por estudiante + curso, que es exactamente esta inscripcion.
+	let pagosKardex: any[] = $state([]);
+	let cargandoPagosKardex = $state(false);
+
+	async function cargarPagosKardex(enrollment: Enrollment) {
+		pagosKardex = [];
+		const estudianteId = typeof enrollment.estudiante_id === 'object'
+			? (enrollment.estudiante_id as any)?._id
+			: enrollment.estudiante_id;
+		const cursoId = typeof enrollment.curso_id === 'object'
+			? (enrollment.curso_id as any)?._id
+			: enrollment.curso_id;
+		if (!estudianteId || !cursoId) return;
+
+		cargandoPagosKardex = true;
+		try {
+			// per_page alto: una inscripcion puede tener un pago por modulo mas
+			// la matricula, y el documento impreso tiene que traerlos todos.
+			const resp = await paymentService.getAll(1, 200, {
+				estudiante_id: String(estudianteId),
+				curso_id: String(cursoId)
+			});
+			pagosKardex = (resp as any)?.data ?? [];
+		} catch (e) {
+			// No romper la libreta si los pagos no cargan: el resto de la
+			// informacion (notas, costos, estados) sigue siendo util.
+			console.error('No se pudieron cargar los pagos de la libreta', e);
+			pagosKardex = [];
+		} finally {
+			cargandoPagosKardex = false;
+		}
+	}
+
+	/** Fecha en formato boliviano. Las ISO del backend vienen en UTC. */
+	function fechaCorta(valor: any): string {
+		if (!valor) return '--';
+		try {
+			// Mismo saneamiento que el resto del sistema: espacio -> T,
+			// microsegundos recortados y sufijo Z forzado.
+			let iso = String(valor).replace(' ', 'T');
+			iso = iso.replace(/\.\d+/, '');
+			if (!iso.endsWith('Z')) iso += 'Z';
+			const d = new Date(iso);
+			if (isNaN(d.getTime())) return '--';
+			return d.toLocaleDateString('es-BO', {
+				day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/La_Paz'
+			});
+		} catch {
+			return '--';
+		}
+	}
+
+	/** Dispara la impresion del navegador (el usuario elige "Guardar como PDF"). */
+	function imprimirLibreta() {
+		window.print();
+	}
+
+	// F-MODULOS-MODAL (2026-07-31): abre el modal centralizado de gestión
+	// de módulos. Este modal REEMPLAZA los botones Iniciar/Revertir que
+	// estaban en el kardex. Ahora TODO el ciclo (iniciar, cerrar, revertir)
+	// vive en un solo lugar.
+	function handleOpenModulosModal() {
+		if (!selectedKardex) return;
+		isModulosModalOpen = true;
 	}
 
 	// Atajo directo desde la Libreta: lleva a /app/payments con la
@@ -308,6 +414,26 @@
 	function handleFormSuccess() {
 		isFormOpen = false;
 		loadData();
+	}
+
+	// F-MODULOS-MODAL (2026-07-31): los handlers handleIniciarModulo y
+	// handleDeshacerInicioModulo ya NO viven aquí. Toda la lógica de
+	// gestión de módulos se centralizó en el componente ModulosModal.svelte
+	// (ver <ModulosModal/> al final del template). El kardex solo muestra
+	// el estado actual de cada módulo.
+
+	async function refreshKardex() {
+		if (!selectedKardex) return;
+		try {
+			const fresh = await enrollmentService.getById(String(selectedKardex._id));
+			if (fresh) {
+				selectedKardex = fresh;
+				// refrescar también el array principal para mantener consistencia
+				enrollments = enrollments.map(e => (e._id === fresh._id ? fresh : e));
+			}
+		} catch (e) {
+			console.error('Error refrescando kardex:', e);
+		}
 	}
 
 	// ISSUE-R-SOLICITUD-PASIVO
@@ -642,14 +768,21 @@
 		return options;
 	}
 
-	function getStudentName(id: string) {
+	// F-FIX-DESCONOCIDO-ENROLLMENTS (2026-08-09, Kevin): el backend ahora
+	// joinea estudiante_nombre y curso_nombre en /enrollments/. Usar esos
+	// campos directamente (con fallback al map local para retrocompat).
+	function getStudentName(id: string, enrollment?: any) {
 		if (currentRole === 'student' && $userStore.user) {
 			return $userStore.user.nombre || $userStore.user.username || $userStore.user.email || 'Mi Usuario';
 		}
+		// F-FIX-DESCONOCIDO-ENROLLMENTS: priorizar el campo joineado del backend
+		if (enrollment?.estudiante_nombre) return enrollment.estudiante_nombre;
 		return studentsMap[id]?.nombre || 'Desconocido';
 	}
-	
-	function getCourseName(id: string) {
+
+	function getCourseName(id: string, enrollment?: any) {
+		// F-FIX-DESCONOCIDO-ENROLLMENTS: priorizar el campo joineado del backend
+		if (enrollment?.curso_nombre) return enrollment.curso_nombre;
 		return coursesMap[id]?.nombre_programa || 'Desconocido';
 	}
 
@@ -665,6 +798,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Inscripciones · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<Heading level="h1">Inscripciones</Heading>
@@ -790,13 +927,13 @@
 					{#each enrollments as enrollment (enrollment._id)}
 						<tr class="align-top hover:bg-gray-50 dark:hover:bg-dark-background/40 transition-colors">
 							<td class="px-4 py-4">
-								<div class="text-sm font-medium text-gray-900 dark:text-white line-clamp-2" title={getStudentName(enrollment.estudiante_id)}>
-									{getStudentName(enrollment.estudiante_id)}
+								<div class="text-sm font-medium text-gray-900 dark:text-white line-clamp-2" title={getStudentName(enrollment.estudiante_id, enrollment)}>
+									{getStudentName(enrollment.estudiante_id, enrollment)}
 								</div>
 							</td>
 							<td class="px-4 py-4">
-								<div class="text-sm text-gray-900 dark:text-white line-clamp-2" title={getCourseName(enrollment.curso_id)}>
-									{getCourseName(enrollment.curso_id)}
+								<div class="text-sm text-gray-900 dark:text-white line-clamp-2" title={getCourseName(enrollment.curso_id, enrollment)}>
+									{getCourseName(enrollment.curso_id, enrollment)}
 								</div>
 							</td>
 							<td class="px-4 py-4">
@@ -884,8 +1021,8 @@
 				<Card>
 					<div class="flex items-center justify-between mb-4">
 						<div>
-							<h3 class="text-sm font-medium text-gray-900 dark:text-white">{getStudentName(enrollment.estudiante_id)}</h3>
-							<p class="text-xs text-gray-500 dark:text-gray-400">{getCourseName(enrollment.curso_id)}</p>
+							<h3 class="text-sm font-medium text-gray-900 dark:text-white">{getStudentName(enrollment.estudiante_id, enrollment)}</h3>
+							<p class="text-xs text-gray-500 dark:text-gray-400">{getCourseName(enrollment.curso_id, enrollment)}</p>
 						</div>
 						
 						<div class="relative">
@@ -993,14 +1130,14 @@
 		maxWidth="sm:max-w-5xl"
 	>
 		{#if selectedKardex}
-			<div class="p-6 space-y-6">
+			<div class="p-6 space-y-6 libreta-imprimible">
 				<!-- Cabecera de la Libreta -->
 				<div class="bg-gray-50 dark:bg-dark-background/40 p-5 rounded-2xl border border-gray-200 dark:border-dark-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 					<div>
 						<p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold mb-1">Programa</p>
-						<p class="text-lg font-bold text-slate-900 dark:text-white leading-tight">{getCourseName(selectedKardex.curso_id)}</p>
+						<p class="text-lg font-bold text-slate-900 dark:text-white leading-tight">{getCourseName(selectedKardex.curso_id, selectedKardex)}</p>
 						{#if currentRole !== 'student'}
-							<p class="text-sm text-blue-600 font-semibold mt-1">Estudiante: {getStudentName(selectedKardex.estudiante_id)}</p>
+							<p class="text-sm text-blue-600 font-semibold mt-1">Estudiante: {getStudentName(selectedKardex.estudiante_id, selectedKardex)}</p>
 						{/if}
 					</div>
 					<div class="text-left md:text-right bg-white dark:bg-dark-surface px-6 py-3 rounded-xl shadow-sm border border-gray-100 dark:border-dark-border">
@@ -1136,6 +1273,8 @@
 								<th class="px-4 py-3 text-center text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider bg-blue-50/50 dark:bg-blue-900/10">Situación</th>
 								<th class="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Costo (Bs)</th>
 								<th class="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Estado Pago</th>
+								<!-- F-CUENTAS-POR-COBRAR: estado del módulo en la CxC real. -->
+								<th class="px-4 py-3 text-center text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider bg-primary-50/50 dark:bg-primary-900/10">Módulo / CxC</th>
 							</tr>
 						</thead>
 						<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
@@ -1218,11 +1357,40 @@
 												{mod.estado || 'Pendiente'}
 											</span>
 										</td>
+										<!-- F-MODULOS-MODAL (2026-07-31): badge de estado. Los botones
+										     "Iniciar/Revertir/Cerrar" ya NO viven en el kardex.
+										     Se centralizaron en el modal ModulosModal que se abre
+										     desde el botón "Gestionar Módulos" debajo de la tabla. -->
+										<td class="px-4 py-4 text-center">
+											{#if mod.finalizado_en}
+												<div class="flex flex-col items-center gap-1">
+													<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" title={mod.finalizado_en}>
+														✓ Finalizado
+													</span>
+													<span class="text-[10px] text-gray-500 dark:text-gray-400">
+														{formatDate(mod.finalizado_en)}
+													</span>
+												</div>
+											{:else if mod.iniciado_en}
+												<div class="flex flex-col items-center gap-1">
+													<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300" title={mod.iniciado_en}>
+														◐ En curso
+													</span>
+													<span class="text-[10px] text-gray-500 dark:text-gray-400">
+														{formatDate(mod.iniciado_en)}
+													</span>
+												</div>
+											{:else}
+												<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+													○ No iniciado
+												</span>
+											{/if}
+										</td>
 									</tr>
 								{/each}
 							{:else}
 								<tr>
-									<td colspan="5" class="px-4 py-8 text-center text-slate-500">
+									<td colspan="6" class="px-4 py-8 text-center text-slate-500">
 										No hay módulos registrados en esta inscripción.
 									</td>
 								</tr>
@@ -1230,6 +1398,21 @@
 						</tbody>
 					</table>
 				</div>
+
+				<!-- F-MODULOS-MODAL (2026-07-31): botón que abre el modal
+				     centralizado de gestión de módulos. Reemplaza los botones
+				     Iniciar/Revertir que estaban antes en cada fila. -->
+				{#if canIniciarModulo}
+					<div class="flex justify-end">
+						<Button
+							size="sm"
+							variant="secondary"
+							onclick={handleOpenModulosModal}
+						>
+							Gestionar Módulos (Iniciar / Cerrar)
+						</Button>
+					</div>
+				{/if}
 
 				<!-- Resumen Financiero de la inscripción (visible para todos los roles).
 				     El SALDO A FAVOR se calcula en el cliente como max(0, total_pagado -
@@ -1256,6 +1439,72 @@
 					</div>
 				</div>
 
+				<!-- ================================================================
+				     F-LIBRETA-IMPRIMIR (2026-08-18, Kevin en la capacitación)
+				     ================================================================
+				     "el nombre, dirá el pago, la nota, y te dije si podía agregar
+				     el número de comprobante (...) y la fecha en la que se subió".
+
+				     La tabla de módulos de arriba muestra el ESTADO del pago, pero
+				     no con qué comprobante se pagó. Ese dato vive en los Payment,
+				     no en la inscripción, y es justo lo que la coordinadora
+				     necesita para verificar contra el banco antes de firmar.
+				-->
+				<div class="border border-gray-200 dark:border-dark-border rounded-xl shadow-sm overflow-hidden">
+					<div class="bg-gray-100 dark:bg-dark-background px-4 py-3">
+						<p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Comprobantes de pago</p>
+					</div>
+					{#if cargandoPagosKardex}
+						<p class="px-4 py-4 text-sm text-slate-500">Cargando comprobantes…</p>
+					{:else if pagosKardex.length === 0}
+						<p class="px-4 py-4 text-sm text-slate-500">
+							No hay pagos registrados para esta inscripción.
+						</p>
+					{:else}
+						<div class="overflow-x-auto">
+							<table class="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
+								<thead class="bg-gray-50 dark:bg-dark-background/60">
+									<tr>
+										<th class="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Concepto</th>
+										<th class="px-4 py-2 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Monto (Bs)</th>
+										<th class="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">N° Comprobante</th>
+										<th class="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
+										<th class="px-4 py-2 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+									</tr>
+								</thead>
+								<tbody class="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
+									{#each pagosKardex as pago}
+										<tr>
+											<td class="px-4 py-3 text-sm text-slate-900 dark:text-white">
+												{pago.concepto || '--'}
+												{#if pago.numero_cuota}
+													<span class="text-xs text-slate-500"> (cuota {pago.numero_cuota})</span>
+												{/if}
+											</td>
+											<td class="px-4 py-3 text-sm text-right font-semibold text-slate-900 dark:text-white">
+												{formatCurrency(pago.cantidad_pago ?? 0)}
+											</td>
+											<td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
+												<!-- En caja física no existe número de transferencia: se
+												     dice "Caja" en vez de dejarlo como un dato faltante. -->
+												{pago.numero_transaccion || (pago.metodo_pago === 'Caja' ? 'Caja' : '--')}
+											</td>
+											<td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
+												{fechaCorta(pago.fecha_comprobante || pago.created_at)}
+											</td>
+											<td class="px-4 py-3 text-center">
+												<span class="px-2 py-1 text-[11px] font-bold rounded-full uppercase tracking-wide {pago.estado_pago === 'Aprobado' ? 'bg-green-100 text-green-700' : pago.estado_pago === 'Rechazado' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}">
+													{pago.estado_pago || '--'}
+												</span>
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					{/if}
+				</div>
+
 				<div class="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
 					<!-- Si es estudiante y debe dinero, mostrar atajo rápido al pago -->
 					{#if currentRole === 'student' && selectedKardex.saldo_pendiente > 0}
@@ -1263,7 +1512,14 @@
 							Pagar Saldo Pendiente
 						</Button>
 					{/if}
-					<Button variant="secondary" onclick={() => isKardexOpen = false}>Cerrar Libreta</Button>
+					<!-- F-LIBRETA-IMPRIMIR (2026-08-18, Kevin): "un recuadro que diga
+					     imprimir y te imprima solamente esto". El flujo real es:
+					     la coordinadora verifica, imprime, se lo lleva al firmante
+					     y recién con la firma física aprueba. -->
+					<Button onclick={imprimirLibreta} class="bg-primary-600 hover:bg-primary-700 text-white no-print">
+						Imprimir
+					</Button>
+					<Button variant="secondary" onclick={() => isKardexOpen = false} class="no-print">Cerrar Libreta</Button>
 				</div>
 			</div>
 		{/if}
@@ -1364,4 +1620,81 @@
 			</div>
 		</div>
 	</Modal>
+
+	<!-- F-MODAL-GESTION-MODULOS (2026-08-03, Kevin): modal centralizado de gestión
+	     de módulos (reemplaza al antiguo ModulosModal). Accesible también desde
+	     Cuentas por Cobrar y ficha del estudiante. -->
+	<GestionModulosModal
+		isOpen={isModulosModalOpen}
+		enrollment={selectedKardex}
+		onClose={() => isModulosModalOpen = false}
+		onUpdated={(updated) => {
+			selectedKardex = updated;
+			enrollments = enrollments.map((e) => (e._id === updated._id ? updated : e));
+		}}
+	/>
 </div>
+
+<!-- ============================================================================
+     F-LIBRETA-IMPRIMIR (2026-08-18, Kevin en la capacitación)
+     ============================================================================
+     Kevin: "algo que ya te muestra (...) lo que yo quiero es que se imprima
+     así, que se vea así la impresión". Por eso NO se construye un documento
+     aparte: se imprime la libreta que ya existe, ocultando todo lo demás.
+
+     Se usa la impresión del navegador en vez de generar el PDF en el backend
+     porque el destino real es papel — la coordinadora imprime, se lo lleva al
+     firmante, y recién con la firma física aprueba. Quien prefiera el archivo
+     elige "Guardar como PDF" en el mismo diálogo.
+============================================================================ -->
+<style>
+	@media print {
+		/* Solo la libreta va al papel. El resto de la página (tabla de
+		   inscripciones, filtros, menús) se oculta. */
+		:global(body * ) {
+			visibility: hidden;
+		}
+		:global(.libreta-imprimible),
+		:global(.libreta-imprimible *) {
+			visibility: visible;
+		}
+		:global(.libreta-imprimible) {
+			position: absolute;
+			left: 0;
+			top: 0;
+			width: 100%;
+			padding: 0;
+		}
+
+		/* Botones y controles no se imprimen: en el papel no sirven y
+		   además desplazan el contenido. */
+		:global(.no-print) {
+			display: none !important;
+		}
+
+		/* El modal recorta con scroll en pantalla; en papel tiene que fluir
+		   completo, si no se imprime solo lo visible. */
+		:global(.libreta-imprimible .overflow-x-auto),
+		:global(.libreta-imprimible .overflow-y-auto) {
+			overflow: visible !important;
+		}
+
+		/* Fondo blanco y texto negro: los fondos de color no se imprimen por
+		   defecto y dejarían texto claro sobre papel blanco. */
+		:global(.libreta-imprimible),
+		:global(.libreta-imprimible *) {
+			background: #fff !important;
+			color: #000 !important;
+			box-shadow: none !important;
+		}
+
+		/* Las tablas no se parten por la mitad entre páginas. */
+		:global(.libreta-imprimible table) {
+			page-break-inside: auto;
+		}
+		:global(.libreta-imprimible tr) {
+			page-break-inside: avoid;
+			page-break-after: auto;
+		}
+	}
+</style>

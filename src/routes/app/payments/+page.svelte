@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { page as appPage } from '$app/stores';
 	import { paymentService, studentService, courseService } from '$lib/services';
 	import type { Payment, Student, Course } from '$lib/interfaces';
@@ -33,23 +33,41 @@
 	let payments: Payment[] = $state([]);
 	let loading = $state(true);
 
-	// F-074 (2026-07-23): Toggle entre vista Lista (actual) y Matriz (estilo Excel de Sandra)
+	// F-074 (2026-07-23) + F-087 (2026-07-28): Toggle entre 3 vistas:
+	//   - 'lista'   : vista tradicional (cada pago con su dropdown de acciones)
+	//   - 'matriz'  : estilo Excel de Sandra, una fila por estudiante
+	//   - 'porpago' : estilo auditoría, una fila por cada pago individual
 	// Persistimos la elección en localStorage para que no se pierda al recargar.
 	// FIX: estudiantes SIEMPRE ven 'lista' — ignorar localStorage para no-staff,
-	// porque si un staff dejó 'matriz' el estudiante dispararía endpoints 403.
-	let viewMode: 'lista' | 'matriz' = $state('lista');
+	// porque si un staff dejó 'matriz' o 'porpago' el estudiante dispararía endpoints 403.
+	let viewMode: 'lista' | 'matriz' | 'porpago' = $state('lista');
 	function initViewMode() {
 		if (!isStaff) { viewMode = 'lista'; return; }
 		if (typeof localStorage !== 'undefined') {
 			const saved = localStorage.getItem('payments_view');
-			if (saved === 'matriz' || saved === 'lista') viewMode = saved;
+			if (saved === 'matriz' || saved === 'lista' || saved === 'porpago') viewMode = saved;
+		}
+		// FIX (2026-07-28): si la vista restaurada es 'porpago', cargar datos
+		if (viewMode === 'porpago') {
+			loadPorPago();
 		}
 	}
-	function setViewMode(mode: 'lista' | 'matriz') {
-		if (!isStaff && mode === 'matriz') return; // estudiante no puede activar matriz
+	function setViewMode(mode: 'lista' | 'matriz' | 'porpago') {
+		if (!isStaff && mode !== 'lista') return; // estudiante solo puede estar en 'lista'
 		viewMode = mode;
 		try { localStorage.setItem('payments_view', mode); } catch {}
-		if (mode === 'matriz') loadMatriz();
+		// F-COBRANZA-MATRIZ-POR-PROGRAMA (2026-08-08, Kevin): la vista Matriz
+		// muestra datos de un SOLO programa a la vez. Si el usuario entra a
+		// Matriz sin filtro, auto-seleccionamos el primer programa disponible
+		// (no la opcion "Todos") porque mezclar programas no tiene sentido
+		// (M6-M15 de maestria + M1-M5 de diplomado en la misma tabla).
+		if (mode === 'matriz') {
+			if (!filters.curso_id && coursesListFiltrada.length > 0) {
+				filters.curso_id = coursesListFiltrada[0]._id;
+			}
+			loadMatriz();
+		}
+		if (mode === 'porpago') loadPorPago();
 	}
 
 	// Estado de la vista Matriz
@@ -57,6 +75,24 @@
 	let matrizResumen: ResumenModulosResponse | null = $state(null);
 	let matrizLoading = $state(false);
 	let matrizFiltroModulo: number | '' = $state(''); // '' = todos, 0..N = módulo específico
+
+	// F-087: Estado de la vista "Por Pago"
+	import type { PorPagoResponse, PorPagoItem, PorPagoFiltros } from '$lib/services/payment.service';
+	// F-087-FIX9 (2026-07-28): fmt movido del template al script. El {@const fmt} dentro
+	// del {:else} de la tabla no era accesible desde las cards de resumen (que están
+	// ANTES en el DOM). Svelte 5 no hace hoist de {@const}, así que el render de las
+	// cards fallaba con "fmt is not defined", ocultando Aprobado/Pendiente/etc.
+	const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+	let porPagoData: PorPagoResponse | null = $state(null);
+	let porPagoLoading = $state(false);
+	let porPagoFiltros: PorPagoFiltros = $state({
+		curso_id: '',
+		modulo_index: null,
+		estado_pago: '',
+		subido_por: '',
+		page: 1,
+		per_page: 50,
+	});
 
 	// Pagination
 	let page = $state(1);
@@ -113,7 +149,40 @@
 	let isStudent = $derived(($userStore.role as string) === 'student');
 	let isCPD = $derived($userStore.role === 'cpd');
 	let isCobranza = $derived($userStore.role === 'cobranza');
-	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae'].includes($userStore.role || ''));
+	// F-2026-08-22-EC-PAGOS-READONLY (Kevin 2026-08-22): encargado_curso y
+	// coordinador (financiero) ahora son isStaff (pueden ver Gestion de Pagos).
+	// Eso les da acceso al toggle Lista/Matriz/PorPago, a los filtros, y al
+	// boton "Excel" de descarga. PERO no pueden crear/editar/eliminar pagos
+	// (esos botones siguen restringidos por canEditPayments mas abajo).
+	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae', 'encargado_curso', 'coordinador'].includes($userStore.role || ''));
+
+	// F-FIX-PAGOS-EC-EN-BLANCO (2026-08-18/19, Kevin: "hoy le sale en
+	// blanco"). Causa: `GET /students/` exige `require_staff` en el backend,
+	// que deliberadamente EXCLUYE a encargado_curso y coordinador ("Permite
+	// el acceso a: ADMIN, SUPERADMIN, MAE, CPD y COBRANZA" — ver
+	// api/dependencies.py). Pero `isStaff` en este archivo SI los incluye
+	// (para el resto de la pantalla, correctamente: list_payments SI les
+	// permite ver pagos de sus cursos desde F-FIX-RBAC-PAGOS-ENCARGADO,
+	// 2026-08-10).
+	//
+	// El onMount llamaba `studentService.getAll()` dentro de un
+	// `Promise.all` sin try/catch cada vez que `isStaff` era true. Para un
+	// encargado eso disparaba un 403 que tumbaba TODO el Promise.all antes
+	// de llegar a pedir los pagos — coursesList nunca se seteaba, loadPayments
+	// nunca corria, y la pantalla quedaba vacia sin ningun error visible para
+	// el usuario.
+	//
+	// Esta lista SOLO gatea esas dos llamadas a studentService.getAll(); el
+	// resto de la pantalla (filtros, toggle de vistas, boton Excel) sigue
+	// usando `isStaff` como corresponde, porque list_payments si los
+	// autoriza.
+	let puedeListarTodosLosEstudiantes = $derived(
+		['admin', 'superadmin', 'cpd', 'cobranza', 'mae'].includes($userStore.role || '')
+	);
+	// F-2026-08-22-EC-PAGOS-READONLY: solo los roles ECONOMICOS pueden crear,
+	// aprobar, rechazar, eliminar, subir comprobante, revertir pagos. EC y
+	// COORDINADOR quedan en modo SOLO LECTURA (solo pueden ver y descargar).
+	let canEditPayments = $derived(['admin', 'superadmin', 'cpd', 'cobranza'].includes($userStore.role || ''));
 	let coursesMap = $derived(
 		coursesList.reduce((acc, c) => ({ ...acc, [c._id]: c }), {} as Record<string, typeof coursesList[0]>)
 	);
@@ -153,7 +222,7 @@
 	async function loadPayments() {
 		loading = true;
 		try {
-			if (isStaff && studentsList.length === 0) {
+			if (puedeListarTodosLosEstudiantes && studentsList.length === 0) {
 				const studentsRes = await studentService.getAll(1, 100);
 				studentsList = studentsRes.data;
 			}
@@ -195,7 +264,16 @@
 
 	function handleFilterChange() {
 		page = 1;
-		loadPayments();
+		// F-CXC-FILTRO-PROGRAMA (2026-08-04, Kevin): recargar la vista que esta
+		// activa. Antes SOLO llamaba loadPayments() y si estabas en Matriz o
+		// Por Pago la pantalla no se actualizaba al cambiar el programa.
+		if (viewMode === 'matriz') {
+			loadMatriz();
+		} else if (viewMode === 'porpago') {
+			loadPorPago();
+		} else {
+			loadPayments();
+		}
 	}
 
 	function handleSearchInput() {
@@ -218,13 +296,17 @@
 	}
 
 	// F-074 (2026-07-23): Carga la matriz de pagos desde el backend.
+	// F-CXC-FILTRO-PROGRAMA (2026-08-04, Kevin): ahora respeta el filtro
+	// filters.curso_id (selector de programa arriba) para que cambiar de
+	// programa recargue la matriz y las KPI cards.
 	async function loadMatriz() {
 		matrizLoading = true;
 		try {
 			const moduloIdx = matrizFiltroModulo === '' ? null : (matrizFiltroModulo as number);
+			const cursoId = filters.curso_id || null;
 			const [mat, res] = await Promise.all([
-				paymentService.getMatriz(moduloIdx),
-				paymentService.getResumenModulos(),
+				paymentService.getMatriz(moduloIdx, cursoId),
+				paymentService.getResumenModulos(cursoId),
 			]);
 			matrizData = mat;
 			matrizResumen = res;
@@ -238,21 +320,128 @@
 		}
 	}
 
-	// F-074: cuando cambia el filtro de módulo, recargar
+	// F-074: cuando cambia el filtro de módulo O el filtro de programa, recargar
 	// FIX: solo staff puede usar la vista matriz (estudiantes obtendrían 403)
+	// F-CXC-FILTRO-PROGRAMA (2026-08-04): agregamos filters.curso_id a las
+	// dependencias del effect para que cambiar el programa recargue la matriz.
+	// F-COBRANZA-MATRIZ-POR-PROGRAMA (2026-08-08, Kevin): si viewMode es 'matriz'
+	// y todavia no hay programa seleccionado, auto-seleccionar el primero de
+	// coursesListFiltrada (si ya esta cargada). Asi cuando el usuario entra a
+	// /app/payments con la vista Matriz persistida en localStorage, ve un
+	// programa real, no la mezcla confusa de todos los programas.
+	// F-FIX-MATRIZ-RACE-CONDITION (2026-08-11, Kevin): el effect original
+	// MUTABA `filters.curso_id` dentro del effect para auto-seleccionar el
+	// primer programa. Eso causaba 2 problemas:
+	//   1. Svelte 5 lanza TypeError "Cannot read properties of undefined
+	//      (reading 'prev')" en runtime cuando se muta $state dentro de un
+	//      effect derivado (visto en consola del navegador el 2026-08-11).
+	//   2. Race condition: la 1ra request sin filtro (17s) se iniciaba antes
+	//      de que la URL ?curso_id=X se procesara, y al terminar sobrescribía
+	//      la respuesta correcta del filtro.
+	// Fix: la auto-seleccion del primer curso se hace en setViewMode() y en
+	// onMount() (que ya estaba parcial). El effect SOLO reacciona a cambios
+	// de filtros ya seteados y dispara loadMatriz(). Sin mutaciones.
 	$effect(() => {
-		if (isStaff && viewMode === 'matriz') {
-			// Dependencia explícita: matrizFiltroModulo
+		if (isStaff && viewMode === 'matriz' && filters.curso_id) {
+			// Dependencias explicitas: el effect se re-ejecuta si cambia
+			// el modulo o el curso seleccionado
 			matrizFiltroModulo;
+			filters.curso_id;
 			loadMatriz();
 		}
 	});
+
+	// F-087 (2026-07-28): Carga la vista "Por Pago" desde el backend.
+	// 1 fila por cada pago individual, sin agrupar por módulo/estudiante.
+	// FIX 8 (2026-07-28): usar await + tick() para que Svelte 5 re-renderice el cambio
+	// de porPagoLoading=false al terminar la carga. Con .then/.catch/.finally (FIX 5/6/7)
+	// el spinner quedaba pegado en "Cargando pagos..." aunque porPagoData ya tenía datos.
+	// Causa raíz: Svelte 5 a veces NO propaga re-renders cuando se asigna un $state dentro
+	// de un .finally() que se ejecuta en un microtask separado del .then(). Solución: usar
+	// await (microtask unificado) + await tick() para forzar el flush del DOM.
+	// FIX 8b: dedupe con _porPagoCallId — si llega una llamada nueva mientras hay una en
+	// vuelo, la vieja se ignora (stale). Esto previene el escenario donde 2 fetches en
+	// paralelo dejan porPagoLoading pegado en true si la 2da tarda más que la 1ra.
+	let _porPagoCallId = 0;
+	// F-FIX-DEBUG-TITLE (2026-08-16): esta funcion pisaba `document.title` con
+	// cadenas de depuracion en 5 puntos, asi que la PESTANA DEL NAVEGADOR mostraba
+	// cosas como "[F-087] call#1 FINALLY loading=false hasData=true" en produccion.
+	// Eran rastros de la investigacion del spinner pegado (FIX 8/8b) que nunca se
+	// limpiaron. La logica de dedupe por _porPagoCallId SI es necesaria y se conserva.
+	async function loadPorPago() {
+		const myCallId = ++_porPagoCallId;
+		porPagoLoading = true;
+		// Forzar re-render para que aparezca el spinner
+		await tick();
+
+		const filtrosLimpios: PorPagoFiltros = {
+			page: porPagoFiltros.page || 1,
+			per_page: porPagoFiltros.per_page || 50,
+		};
+		if (porPagoFiltros.curso_id) filtrosLimpios.curso_id = porPagoFiltros.curso_id;
+		if (porPagoFiltros.modulo_index !== null && porPagoFiltros.modulo_index !== undefined) {
+			filtrosLimpios.modulo_index = porPagoFiltros.modulo_index;
+		}
+		if (porPagoFiltros.estado_pago) filtrosLimpios.estado_pago = porPagoFiltros.estado_pago;
+		if (porPagoFiltros.subido_por) filtrosLimpios.subido_por = porPagoFiltros.subido_por;
+
+		try {
+			const data = await paymentService.getMatrizPorPago(filtrosLimpios);
+			// Si una llamada más nueva llegó mientras esperábamos, ignorar este resultado (stale)
+			if (myCallId !== _porPagoCallId) return;
+			porPagoData = data;
+		} catch (error: any) {
+			if (myCallId !== _porPagoCallId) return;
+			console.error('[F-087] error cargando vista por-pago:', error);
+			alert('error', error?.message || 'Error al cargar la vista por-pago');
+			porPagoData = null;
+		} finally {
+			// Solo la última llamada en vuelo es dueña del estado de loading
+			if (myCallId === _porPagoCallId) {
+				porPagoLoading = false;
+				// Forzar re-render para que desaparezca el spinner
+				await tick();
+			}
+		}
+	}
+
+	// F-087: cuando cambian los filtros de por-pago, recargar
+	// FIX (2026-07-28): el $effect con Svelte 5 estaba causando loop infinito
+	// porque re-tracking implícito disparaba loadPorPago múltiples veces.
+	// Solución: NO usar $effect. Cargar manualmente cuando se entra a la vista
+	// (en setViewMode) y en cada onchange de los filtros.
+	// (El watcher implícito que hacía era trampa.)
+
+	// Función pública para recargar la vista por-pago (llamada desde handlers y desde el botón Recargar)
+	function recargarPorPago() {
+		if (isStaff && viewMode === 'porpago') {
+			loadPorPago();
+		}
+	}
+
+	// Wrapper para onchange de filtros: setea el valor Y recarga
+	function onPorPagoFiltroChange(key: 'curso_id' | 'estado_pago' | 'subido_por', value: string) {
+		(porPagoFiltros as any)[key] = value;
+		porPagoFiltros.page = 1;
+		recargarPorPago();
+	}
+
+	function onPorPagoModuloChange(v: string) {
+		porPagoFiltros.modulo_index = v === '' ? null : Number(v);
+		porPagoFiltros.page = 1;
+		recargarPorPago();
+	}
+
+	function onPorPagoPageChange(newPage: number) {
+		porPagoFiltros.page = newPage;
+		recargarPorPago();
+	}
 
 	onMount(async () => {
 		initViewMode(); // FIX: restaurar viewMode desde localStorage solo si es staff
 		const results = await Promise.all([
 			courseService.getAll(1, 100),
-			isStaff ? studentService.getAll(1, 100) : Promise.resolve(null)
+			puedeListarTodosLosEstudiantes ? studentService.getAll(1, 100) : Promise.resolve(null)
 		]);
 		coursesList = results[0].data;
 		if (results[1]) studentsList = (results[1] as any).data;
@@ -260,6 +449,29 @@
 		const cursoIdParam = $appPage.url.searchParams.get('curso_id');
 		if (cursoIdParam) {
 			filters.curso_id = cursoIdParam;
+		}
+
+		// F-CERT-NO-DEUDOR-COBRO (2026-08-17): el botón "Verificar pagos" del
+		// panel de Solicitudes de Certificado abre esta pantalla ya filtrada
+		// por estudiante y programa, para que el coordinador confirme que no
+		// hay deuda sin perder la solicitud que estaba mirando.
+		//
+		// Se fuerza la vista de lista: la Matriz ignora `estudiante_id`, así
+		// que sin esto el coordinador vería el programa completo y creería que
+		// el filtro no funcionó.
+		const estudianteIdParam = $appPage.url.searchParams.get('estudiante_id');
+		if (estudianteIdParam && isStaff) {
+			filters.estudiante_id = estudianteIdParam;
+			viewMode = 'lista';
+		}
+
+		// F-FIX-MATRIZ-RACE-CONDITION (2026-08-11, Kevin): si la vista activa
+		// es Matriz y todavia no hay curso seleccionado (no vino en URL, no
+		// quedo de una sesion previa), auto-seleccionar el primer programa
+		// disponible. Esto se hace ACA (no en el $effect) para evitar la
+		// mutacion de $state dentro de un effect derivado que rompe Svelte 5.
+		if (viewMode === 'matriz' && !filters.curso_id && coursesListFiltrada.length > 0) {
+			filters.curso_id = coursesListFiltrada[0]._id;
 		}
 
 		// Atajo directo desde "Ver Libreta -> Pagar Saldo Pendiente": abre el
@@ -271,7 +483,18 @@
 			isCreateModalOpen = true;
 		}
 
-		loadPayments();
+		// F-CXC-FILTRO-PROGRAMA (2026-08-04, Kevin): cargar la vista que el
+		// usuario dejó activa (matriz/porpago/lista). Antes SIEMPRE llamaba
+		// loadPayments() y si estabas en Matriz veias la vista lista unos ms.
+		if (viewMode === 'matriz') {
+			await tick(); // asegurar que el effect ya seteo matrizFiltroModulo
+			loadMatriz();
+		} else if (viewMode === 'porpago') {
+			await tick();
+			loadPorPago();
+		} else {
+			loadPayments();
+		}
 	});
 
 	function toggleDropdown(id: string) {
@@ -623,6 +846,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Gestión de Pagos · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6 relative z-10">
 	<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 		<div>
@@ -633,13 +860,24 @@
 			<!-- ISSUE-P-SEGMENTACION: aviso visible de por qué solo se ven ciertos cursos -->
 			{#if isCobranza && cursosAsignadosUsuario.length > 0}
 				<p class="mt-1 text-xs font-medium text-uagrm-sky">
-					Vista segmentada: solo se muestran pagos de los {cursosAsignadosUsuario.length} curso(s) asignado(s) a tu cuenta.
+					Vista segmentada: solo se muestran pagos de los {cursosAsignadosUsuario.length} programa(s) asignado(s) a tu cuenta.
+				</p>
+			{/if}
+			<!-- F-2026-08-22-EC-PAGOS-READONLY (Kevin 2026-08-22): banner para que
+			     EC y COORDINADOR (financiero) sepan que están en modo SOLO LECTURA.
+			     Pueden ver y descargar, pero no editar/crear/aprobar/rechazar/eliminar. -->
+			{#if ($userStore.role === 'encargado_curso' || $userStore.role === 'coordinador') && !canEditPayments}
+				<p class="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+					<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+					</svg>
+					Modo lectura: solo puedes ver y descargar los pagos de tus programas asignados.
 				</p>
 			{/if}
 		</div>
 		
 		<div class="flex flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
-			<!-- F-074: Toggle vista Lista ⇄ Matriz (estilo Excel de Sandra) -->
+			<!-- F-074 + F-087: Toggle vista Lista ⇄ Matriz ⇄ Por Pago (estilo Excel de Sandra / auditoría) -->
 			{#if isStaff}
 				<div class="inline-flex rounded-md shadow-sm border border-gray-300 dark:border-gray-600 overflow-hidden" role="group" aria-label="Modo de vista">
 					<button
@@ -658,9 +896,18 @@
 					>
 						▦ Matriz
 					</button>
+					<button
+						type="button"
+						onclick={() => setViewMode('porpago')}
+						class="px-3 py-1.5 text-sm font-medium transition-colors border-l border-gray-300 dark:border-gray-600 {viewMode === 'porpago' ? 'bg-primary-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'}"
+						aria-pressed={viewMode === 'porpago'}
+						title="Vista de auditoría: 1 fila por cada pago individual (F-087)"
+					>
+						🧾 Por Pago
+					</button>
 				</div>
 			{/if}
-			<Button variant="secondary" onclick={isStaff && viewMode === 'matriz' ? loadMatriz : loadPayments} loading={loading || matrizLoading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
+			<Button variant="secondary" onclick={isStaff && viewMode === 'matriz' ? loadMatriz : (isStaff && viewMode === 'porpago' ? loadPorPago : loadPayments)} loading={loading || matrizLoading || porPagoLoading} aria-label="Recargar lista de pagos" class="flex-1 sm:flex-none justify-center">
 				{#snippet leftIcon()} <RefreshIcon class="size-5" /> {/snippet}
 				<span class="sm:hidden">Recargar</span>
 			</Button>
@@ -677,8 +924,10 @@
 				</Button>
 			{/if}
 			<!-- F-COBRANZA-017 (2026-07-22): cobranza/admin/superadmin registran
-			     pagos en nombre del estudiante cuando este no pudo subirlos. -->
-			{#if isStaff}
+			     pagos en nombre del estudiante cuando este no pudo subirlos.
+			     F-2026-08-22-EC-PAGOS-READONLY (Kevin 2026-08-22): EC y COORD
+			     quedan en modo SOLO LECTURA, no ven este boton. -->
+			{#if canEditPayments}
 				<Button onclick={() => isAddByStaffModalOpen = true} class="flex-1 sm:flex-none justify-center">
 					{#snippet leftIcon()} <PlusIcon class="size-5" /> {/snippet}
 					<span class="whitespace-nowrap">Añadir Pago</span>
@@ -735,17 +984,25 @@
 								? 'ring-2 ring-inset ring-primary-500 bg-primary-50 font-medium text-primary-900 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500'
 								: 'ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-white dark:ring-gray-600'}"
 					>
-						<option value="">Todos los cursos</option>
+						<!-- F-COBRANZA-MATRIZ-POR-PROGRAMA (2026-08-08, Kevin): en vista Matriz
+							 la opcion "Todos los programas" NO se muestra porque mezclar
+							 modulos de distintos cursos no tiene sentido. -->
+						{#if viewMode !== 'matriz'}
+							<option value="">Todos los programas</option>
+						{/if}
 						{#each coursesListFiltrada as course (course._id)}
 							<option value={course._id}>{course.nombre_programa}</option>
 						{/each}
 						</select>
-					{#if filters.curso_id}
+					<!-- F-COBRANZA-MATRIZ-POR-PROGRAMA (2026-08-08, Kevin): en vista Matriz
+						 el boton "X" de quitar filtro esta oculto. La Matriz SIEMPRE
+						 debe mostrar un programa especifico. -->
+					{#if filters.curso_id && viewMode !== 'matriz'}
 						<button
 							type="button"
 							onclick={() => { filters.curso_id = ''; page = 1; handleFilterChange(); }}
 							class="absolute right-7 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors z-10"
-							title="Quitar filtro de curso"
+							title="Quitar filtro de programa"
 						>
 							<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
 						</button>
@@ -753,18 +1010,26 @@
 				</div>
 			</div>
 
-			<div>
-				<select
-					bind:value={filters.estudiante_id}
-					onchange={handleFilterChange}
-					class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-				>
-					<option value="">Todos los estudiantes</option>
-					{#each studentsList as student (student._id)}
-						<option value={student._id}>{student.nombre}</option>
-					{/each}
-				</select>
-			</div>
+			{#if puedeListarTodosLosEstudiantes}
+				<div>
+					<select
+						bind:value={filters.estudiante_id}
+						onchange={handleFilterChange}
+						class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+					>
+						<option value="">Todos los estudiantes</option>
+						{#each studentsList as student (student._id)}
+							<option value={student._id}>{student.nombre}</option>
+						{/each}
+					</select>
+				</div>
+			{/if}
+			<!-- F-FIX-PAGOS-EC-EN-BLANCO: el encargado/coordinador no puede
+			     listar TODOS los estudiantes del sistema (require_staff los
+			     excluye), asi que no tienen el dropdown de arriba. Filtran por
+			     programa (ya disponible) y por texto libre (buscador de la
+			     parte superior de la pantalla), que alcanza para encontrar a
+			     un estudiante puntual dentro de sus propios cursos. -->
 		{/if}
 	</div>
 
@@ -782,7 +1047,7 @@
 					<tr>
 						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transacción</th>
 						<th scope="col" class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
-						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
+						<th scope="col" class="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Programa</th>
 						<th scope="col" class="w-[14%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remitente</th>
 						<th scope="col" class="w-[16%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto / Fecha</th>
 						<th scope="col" class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
@@ -817,7 +1082,7 @@
 										type="button"
 										onclick={() => { filters.curso_id = payment.curso_id; page = 1; handleFilterChange(); }}
 										class="text-left group w-full"
-										title="Filtrar por este curso"
+										title="Filtrar por este programa"
 									>
 										<span class="block text-gray-900 dark:text-white font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight line-clamp-2">{coursesMap[payment.curso_id].nombre_programa}</span>
 										<span class="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">{coursesMap[payment.curso_id].codigo}</span>
@@ -1146,6 +1411,265 @@
 				</table>
 			</div>
 		{/if}
+	{/if}
+
+	<!-- ============================================================== -->
+	<!-- F-087 (2026-07-28): Vista "Por Pago" - 1 fila por cada pago    -->
+	<!-- individual. Auditoría: cada Bs queda trazado a su comprobante,  -->
+	<!-- transacción, fecha y responsable de subida.                     -->
+	<!-- ============================================================== -->
+	{#if viewMode === 'porpago' && isStaff}
+		<!-- Filtros de la vista Por Pago -->
+		<div class="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+			<!-- Programa -->
+			<label class="text-xs text-gray-600 dark:text-gray-400">Programa:</label>
+			<select
+				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+				value={porPagoFiltros.curso_id}
+				onchange={(e) => onPorPagoFiltroChange('curso_id', (e.currentTarget as HTMLSelectElement).value)}
+			>
+				<option value="">Todos</option>
+				{#each coursesListFiltrada as c}
+					<option value={c._id}>{c.codigo} — {c.nombre_programa}</option>
+				{/each}
+			</select>
+
+			<!-- Módulo -->
+			<label class="text-xs text-gray-600 dark:text-gray-400">Módulo:</label>
+			<select
+				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+				value={porPagoFiltros.modulo_index === null || porPagoFiltros.modulo_index === undefined ? '' : String(porPagoFiltros.modulo_index)}
+				onchange={(e) => onPorPagoModuloChange((e.currentTarget as HTMLSelectElement).value)}
+			>
+				<option value="">Todos</option>
+				<option value="0">Matrícula</option>
+				{#if porPagoData && porPagoData.estudiantes.length > 0}
+					{@const modulosUnicos = Array.from(new Set(porPagoData.estudiantes.flatMap((e) => e.pagos).filter((p) => (p.modulo_index ?? -1) > 0).map((p) => p.modulo_index)))}
+					{#each modulosUnicos as mi}
+						<option value={String(mi)}>Módulo {mi}</option>
+					{/each}
+				{/if}
+			</select>
+
+			<!-- Estado -->
+			<label class="text-xs text-gray-600 dark:text-gray-400">Estado:</label>
+			<select
+				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+				value={porPagoFiltros.estado_pago}
+				onchange={(e) => onPorPagoFiltroChange('estado_pago', (e.currentTarget as HTMLSelectElement).value)}
+			>
+				<option value="">Todos</option>
+				<option value="aprobado">Aprobado</option>
+				<option value="pendiente">Pendiente</option>
+				<option value="rechazado">Rechazado</option>
+				<option value="anulado">Anulado</option>
+			</select>
+
+			<!-- Subido por -->
+			<label class="text-xs text-gray-600 dark:text-gray-400">Subido por:</label>
+			<select
+				class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+				value={porPagoFiltros.subido_por}
+				onchange={(e) => onPorPagoFiltroChange('subido_por', (e.currentTarget as HTMLSelectElement).value)}
+			>
+				<option value="">Todos</option>
+				<option value="estudiante">Estudiante</option>
+				<option value="encargado">Encargado (Cobranza)</option>
+			</select>
+
+			{#if porPagoData}
+				<span class="text-xs text-gray-500 dark:text-gray-400 ml-auto">
+					{porPagoData.total} pago(s) · {porPagoData.resumen.pagos_con_comprobante} con comprobante
+				</span>
+			{/if}
+		</div>
+
+		<!-- Resumen KPI -->
+		{#if porPagoData}
+			<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+				<div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
+					<div class="text-xs text-emerald-700 dark:text-emerald-300 font-medium">Aprobado</div>
+					<div class="text-lg font-bold text-emerald-900 dark:text-emerald-100">Bs {fmt(porPagoData.resumen.total_aprobado)}</div>
+				</div>
+				<div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+					<div class="text-xs text-amber-700 dark:text-amber-300 font-medium">Pendiente</div>
+					<div class="text-lg font-bold text-amber-900 dark:text-amber-100">Bs {fmt(porPagoData.resumen.total_pendiente)}</div>
+				</div>
+				<div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+					<div class="text-xs text-red-700 dark:text-red-300 font-medium">Anulado</div>
+					<div class="text-lg font-bold text-red-900 dark:text-red-100">Bs {fmt(porPagoData.resumen.total_anulado)}</div>
+				</div>
+				<div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+					<div class="text-xs text-gray-700 dark:text-gray-300 font-medium">Rechazado</div>
+					<div class="text-lg font-bold text-gray-900 dark:text-gray-100">Bs {fmt(porPagoData.resumen.total_rechazado)}</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Tabla MATRIZ: F-087-FIX2. Estudiantes como filas, cada pago como columna horizontal. -->
+		<div class="mt-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto">
+			{#if porPagoLoading}
+				<div class="p-8 text-center text-gray-500 dark:text-gray-400">Cargando pagos...</div>
+			{:else if !porPagoData || porPagoData.estudiantes.length === 0}
+				<EmptyState
+					title="Sin pagos"
+					description="No hay pagos que coincidan con los filtros actuales."
+					icon="payment"
+				/>
+			{:else}
+				{@const maxCols = Math.min(porPagoData.max_pagos || 0, 20)}
+				<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+					<thead class="bg-gray-50 dark:bg-gray-900/40">
+						<tr>
+							<th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap sticky left-0 bg-gray-50 dark:bg-gray-900/40 z-10">Estudiante</th>
+							<th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap sticky left-[180px] bg-gray-50 dark:bg-gray-900/40 z-10">CI</th>
+							<th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap">Programa</th>
+							{#each Array(maxCols) as _, i}
+								<th class="px-2 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase whitespace-nowrap min-w-[110px]">
+									Pago {i + 1}
+								</th>
+							{/each}
+							{#if porPagoData.max_pagos > maxCols}
+								<th class="px-2 py-2 text-center text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap min-w-[60px]">+{porPagoData.max_pagos - maxCols} más</th>
+							{/if}
+							<th class="px-3 py-2 text-right text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 uppercase whitespace-nowrap min-w-[100px] sticky right-0 bg-gray-50 dark:bg-gray-900/40 z-10">Total Aprobado</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+						{#each porPagoData.estudiantes as est (est.estudiante_id)}
+							<tr class="hover:bg-gray-50 dark:hover:bg-gray-900/30">
+								<!-- Estudiante (sticky left) -->
+								<td class="px-3 py-2 sticky left-0 bg-white dark:bg-gray-800 z-10 border-r border-gray-100 dark:border-gray-700">
+									<div class="text-gray-900 dark:text-white font-medium text-xs whitespace-nowrap">{est.estudiante_nombre || '—'}</div>
+									<div class="text-[10px] text-gray-500 dark:text-gray-400 font-mono">{est.estudiante_registro || ''}</div>
+								</td>
+								<!-- CI (sticky left) -->
+								<td class="px-3 py-2 font-mono text-[11px] whitespace-nowrap sticky left-[180px] bg-white dark:bg-gray-800 z-10 border-r border-gray-100 dark:border-gray-700">
+									{est.estudiante_ci || '—'}
+								</td>
+								<!-- Curso -->
+								<td class="px-3 py-2">
+									{#if est.curso_codigo}
+										<span class="font-mono text-[11px] whitespace-nowrap">{est.curso_codigo}</span>
+									{:else}
+										<span class="text-gray-400 text-[11px]">—</span>
+									{/if}
+								</td>
+								<!-- Pagos (columnas horizontales) -->
+								{#each Array(maxCols) as _, i}
+									{@const pago = est.pagos[i]}
+									<td class="px-2 py-2 text-center align-top">
+										{#if pago}
+											<!-- Card del pago -->
+											<div class="inline-flex flex-col items-center gap-0.5 px-1.5 py-1 rounded min-w-[90px]
+												{pago.estado_pago === 'aprobado' ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800' :
+												 pago.estado_pago === 'pendiente' ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' :
+												 pago.estado_pago === 'anulado' ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 line-through opacity-60' :
+												 pago.estado_pago === 'rechazado' ? 'bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600' :
+												 'bg-white border border-gray-200'}
+											">
+												<div class="font-mono font-bold text-gray-900 dark:text-white text-xs whitespace-nowrap" title={pago.concepto || ''}>
+													{fmt(pago.monto)}
+												</div>
+												<!-- Módulos cubiertos -->
+												<div class="text-[9px] text-gray-600 dark:text-gray-300 whitespace-nowrap">
+													{#if pago.modulo_index === 0 || pago.modulo_index === null || (pago.concepto && pago.concepto.toLowerCase().includes('matrícula'))}
+														Matrícula
+													{:else if pago.modulos_cubiertos && pago.modulos_cubiertos.length > 1}
+														M{pago.modulos_cubiertos[0]}-{pago.modulos_cubiertos[pago.modulos_cubiertos.length - 1]}
+														<span class="opacity-70">({pago.modulos_cubiertos.length})</span>
+													{:else if pago.modulos_cubiertos && pago.modulos_cubiertos.length === 1}
+														M{pago.modulos_cubiertos[0]}
+													{:else}
+														—
+													{/if}
+												</div>
+												<!-- Fecha + estado -->
+												<div class="text-[9px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
+													{pago.fecha_comprobante ? new Date(pago.fecha_comprobante).toLocaleDateString('es-BO', {day: '2-digit', month: 'short'}) :
+													 pago.fecha_subida ? new Date(pago.fecha_subida).toLocaleDateString('es-BO', {day: '2-digit', month: 'short'}) : '—'}
+												</div>
+												<!-- Comprobante: botón SIEMPRE visible (deshabilitado si no hay URL) -->
+												{#if pago.comprobante_url}
+													<a href={pago.comprobante_url} target="_blank" rel="noopener" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-white bg-primary-600 hover:bg-primary-700 rounded whitespace-nowrap" title="Ver comprobante: {pago.comprobante_url}">
+														📎 Comprobante
+													</a>
+												{:else}
+													<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 bg-gray-100 dark:bg-gray-700 rounded whitespace-nowrap" title="Este pago no tiene comprobante adjunto">
+														📎 Sin comprobante
+													</span>
+												{/if}
+											</div>
+										{:else}
+											<span class="text-gray-300 dark:text-gray-600 text-xs">—</span>
+										{/if}
+									</td>
+								{/each}
+								{#if porPagoData.max_pagos > maxCols}
+									<td class="px-2 py-2 text-center text-xs text-gray-500 dark:text-gray-400">
+										+{est.cantidad_pagos - maxCols}
+									</td>
+								{/if}
+								<!-- Total Aprobado (sticky right) -->
+								<td class="px-3 py-2 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm whitespace-nowrap sticky right-0 bg-white dark:bg-gray-800 z-10 border-l border-gray-100 dark:border-gray-700">
+									{fmt(est.total_pagado_aprobado)}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+					<tfoot class="bg-gray-100 dark:bg-gray-900/60 border-t-2 border-gray-300 dark:border-gray-600">
+						<tr>
+							<td colspan="3" class="px-3 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase">
+								Totales ({porPagoData.total} estudiantes · {porPagoData.resumen.total_pagos} pagos):
+							</td>
+							{#each Array(maxCols) as _, i}
+								{@const colSum = porPagoData.estudiantes.reduce((acc, e) => acc + (e.pagos[i]?.monto || 0), 0)}
+								<td class="px-2 py-2 text-center text-[10px] text-gray-600 dark:text-gray-300 font-mono">
+									{#if colSum > 0}
+										<span class="font-semibold text-gray-700 dark:text-gray-200">{fmt(colSum)}</span>
+									{:else}
+										<span class="text-gray-400">—</span>
+									{/if}
+								</td>
+							{/each}
+							{#if porPagoData.max_pagos > maxCols}
+								<td class="px-2 py-2"></td>
+							{/if}
+							<td class="px-3 py-2 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm sticky right-0 bg-gray-100 dark:bg-gray-900/60 z-10 border-l border-gray-100 dark:border-gray-700">
+								{fmt(porPagoData.resumen.total_aprobado)}
+							</td>
+						</tr>
+					</tfoot>
+				</table>
+
+				<!-- Paginación -->
+				{#if porPagoData.total_pages > 1}
+					<div class="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+						<div class="text-xs text-gray-600 dark:text-gray-400">
+							Página {porPagoData.page} de {porPagoData.total_pages} · {porPagoData.total} estudiantes
+						</div>
+						<div class="flex gap-2">
+							<button
+								type="button"
+								disabled={porPagoData.page <= 1}
+								onclick={() => onPorPagoPageChange(Math.max(1, porPagoData!.page - 1))}
+								class="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700"
+							>
+								← Anterior
+							</button>
+							<button
+								type="button"
+								disabled={porPagoData.page >= porPagoData.total_pages}
+								onclick={() => onPorPagoPageChange(porPagoData!.page + 1)}
+								class="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700"
+							>
+								Siguiente →
+							</button>
+						</div>
+					</div>
+				{/if}
+			{/if}
+		</div>
 	{/if}
 
 	<!-- Create Payment Modal -->

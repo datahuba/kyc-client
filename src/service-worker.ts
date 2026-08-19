@@ -6,73 +6,87 @@ declare let self: ServiceWorkerGlobalScope;
 
 import { build, files, version } from '$service-worker';
 
-// Crea un nombre de caché único para esta versión
+// Cache unico para esta version
 const CACHE = `cache-${version}`;
+const STATIC_ASSETS = [...files];
 
-// Construimos el array de assets que vamos a cachear inicialmente
-const ASSETS = [
-	...build, // Los archivos generados por SvelteKit
-	...files  // Todos los archivos estáticos de la carpeta /static
-];
-
+// F-FIX-SW-SAFE (2026-08-07, Kevin): el SW anterior (F-LOADING-RETRY)
+// hacia fetch con retry y backoff en TODAS las requests no-/api. Esto
+// causaba 'Uncaught (in promise) TypeError: Failed to fetch' en el SW
+// cuando el server tardaba o el browser cancelaba la request. El error
+// se propagaba a la app y bloqueaba el render.
+//
+// Solucion: SW minimal que SOLO cachea assets estaticos. NO intercepta
+// /api/. NO hace retry. NO bloquea el flujo. Si algo falla, el browser
+// hace fetch normal sin SW.
 self.addEventListener('install', (event) => {
-	// Crea una nueva caché y agrega todos los archivos de la app
 	async function addFilesToCache() {
 		const cache = await caches.open(CACHE);
-		await cache.addAll(ASSETS);
+		try {
+			await cache.addAll(STATIC_ASSETS);
+		} catch (e) {
+			console.warn('[SW] cache.addAll failed:', e?.message);
+		}
 	}
-
 	event.waitUntil(addFilesToCache());
-	// Tomar control inmediatamente sin esperar a que se cierre la pestaña
 	self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-	// Limpia cachés de versiones anteriores cuando se activa el nuevo SW
 	async function deleteOldCaches() {
-		for (const key of await caches.keys()) {
-			if (key !== CACHE) await caches.delete(key);
-		}
+		const keys = await caches.keys();
+		await Promise.all(
+			keys
+				.filter((key) => key !== CACHE)
+				.map((key) => caches.delete(key))
+		);
 	}
-
 	event.waitUntil(deleteOldCaches());
-	// Tomar control de todos los clientes abiertos inmediatamente
 	self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-	// Ignorar peticiones que no sean GET o que sean a /api/ (backend de la app, que no debe cachearse)
+	// Solo interceptar GET a assets del build (cache-first)
+	if (event.request.method !== 'GET') return;
 	const url = new URL(event.request.url);
-	if (event.request.method !== 'GET' || url.pathname.startsWith('/api/')) return;
 
-	async function respond() {
-		const cache = await caches.open(CACHE);
+	// NO interceptar APIs (dejar pasar al network directo)
+	if (url.pathname.startsWith('/api/')) return;
 
-		// Si el archivo está en la lista de assets iniciales (build o static), servir directo de caché
-		if (ASSETS.includes(url.pathname)) {
-			const cachedResponse = await cache.match(event.request);
-			if (cachedResponse) return cachedResponse;
-		}
-
-		// Para otras peticiones, intentamos ir por red primero
-		try {
-			const response = await fetch(event.request);
-
-			// Si estamos offline, fetch puede fallar, pero si responde un 200 lo guardamos
-			if (response.status === 200) {
-				cache.put(event.request, response.clone());
-			}
-
-			return response;
-		} catch (err) {
-			// Si falla la red (offline), intentamos buscar en la caché
-			const cachedResponse = await cache.match(event.request);
-			if (cachedResponse) return cachedResponse;
-
-			// Si todo falla, SvelteKit por defecto maneja offline como puede, pero tiramos error.
-			throw err;
-		}
+	// Solo cachear assets estaticos del build
+	if (!url.pathname.startsWith('/_app/immutable/') &&
+	    !url.pathname.startsWith('/static/') &&
+	    !url.pathname.startsWith('/images/')) {
+		return; // no interceptar otras requests (deja al browser hacer fetch normal)
 	}
 
-	event.respondWith(respond());
+	event.respondWith(
+		(async () => {
+			try {
+				const cache = await caches.open(CACHE);
+				const cached = await cache.match(event.request);
+				if (cached) {
+					// Cache hit: responder inmediatamente y refrescar en background
+					event.waitUntil(
+						fetch(event.request).then((response) => {
+							if (response && response.ok) {
+								cache.put(event.request, response.clone());
+							}
+						}).catch(() => {})
+					);
+					return cached;
+				}
+				// Cache miss: fetch al network
+				const response = await fetch(event.request);
+				if (response && response.ok) {
+					try { cache.put(event.request, response.clone()); } catch (e) {}
+				}
+				return response;
+			} catch (err) {
+				// Si todo falla, retornar Response vacia para que el browser no quede colgado
+				console.warn('[SW] fetch failed for:', event.request.url, err?.message);
+				return new Response('', { status: 503, statusText: 'SW fetch failed' });
+			}
+		})()
+	);
 });

@@ -23,3 +23,8 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Scripts de auditoria/audit efimeros (Playwright, deep-tests, etc.)
+_audit_*.mjs
+_audit_*.ps1
+_test_*.mjs

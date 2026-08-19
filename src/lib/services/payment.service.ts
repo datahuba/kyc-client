@@ -53,12 +53,16 @@ class PaymentService {
 			formData.append('file', data.file);
 		}
 
-		return await apiKyC.post<Payment>('/payments/', formData);
+		// F-FIX-TIMEOUT-60S-PAYMENT (2026-08-09, Kevin): POST /payments/ sube
+		// un comprobante (foto/PDF) a Cloudinary. Upload a storage remoto puede
+		// tardar >30s. customTimeout 60s.
+		return await apiKyC.post<Payment>('/payments/', formData, { customTimeout: 60000 });
 	}
 
-	async update(id: string, data: UpdatePaymentRequest): Promise<Payment> {
-		return await apiKyC.put<Payment>(`/payments/${id}`, data);
-	}
+	// F-FIX-CONTRATO (2026-08-16): se elimino `update()`. Hacia
+	// PUT /payments/{id}, que NO existe en el backend — los unicos PUT de
+	// payments son /{id}/aprobar, /{id}/rechazar y /{id}/anular. No lo
+	// llamaba nadie en la UI, pero cualquier uso futuro habria dado 404.
 
 	async delete(id: string): Promise<Payment> {
 		return await apiKyC.delete<Payment>(`/payments/${id}`);
@@ -91,7 +95,9 @@ class PaymentService {
 		if (opts?.numero_transaccion) formData.append('numero_transaccion', opts.numero_transaccion);
 		if (opts?.remitente) formData.append('remitente', opts.remitente);
 		if (opts?.fecha_comprobante) formData.append('fecha_comprobante', opts.fecha_comprobante);
-		return await apiKyC.post<Payment>(`/payments/${paymentId}/upload-by-encargado`, formData);
+		// F-FIX-TIMEOUT-60S-PAYMENT (2026-08-09, Kevin): upload de comprobante
+		// a Cloudinary. customTimeout 60s.
+		return await apiKyC.post<Payment>(`/payments/${paymentId}/upload-by-encargado`, formData, { customTimeout: 60000 });
 	}
 
 	// F-COBRANZA-017 (2026-07-22): Cobranza REGISTRA un pago COMPLETO en
@@ -127,7 +133,9 @@ class PaymentService {
 		if (data.fecha_comprobante) formData.append('fecha_comprobante', data.fecha_comprobante);
 		if (data.cuenta_destino) formData.append('cuenta_destino', data.cuenta_destino);
 		if (data.file) formData.append('file', data.file);
-		return await apiKyC.post<Payment>('/payments/by-staff', formData);
+		// F-FIX-TIMEOUT-60S-PAYMENT (2026-08-09, Kevin): cobro completo por staff,
+		// incluye upload. customTimeout 60s.
+		return await apiKyC.post<Payment>('/payments/by-staff', formData, { customTimeout: 60000 });
 	}
 
 	// ISSUE-P-DASHBOARD-COBRANZA: resumen económico agregado (incluye matrícula
@@ -245,18 +253,78 @@ class PaymentService {
 
 	// F-074 (2026-07-23): Vista Matricial de Pagos (estilo Excel de Sandra)
 	// Filas = estudiantes, columnas = MATRÍCULA | MODULO 1..N | TOTAL INGRESOS | POR COBRAR
-	async getMatriz(moduloIndex?: number | null): Promise<MatrizPagosResponse> {
+	// F-CXC-FILTRO-PROGRAMA (2026-08-04, Kevin): ahora acepta `cursoId` para
+	// que cambiar el filtro de programa en /app/payments recargue la matriz.
+	// Antes: solo aceptaba moduloIndex, por eso al cambiar el programa la
+	// pantalla NO se actualizaba (se veian los datos del programa anterior).
+	async getMatriz(moduloIndex?: number | null, cursoId?: string | null): Promise<MatrizPagosResponse> {
 		const params = new URLSearchParams();
 		if (moduloIndex !== null && moduloIndex !== undefined) {
 			params.append('modulo_index', String(moduloIndex));
+		}
+		if (cursoId) {
+			params.append('curso_id', cursoId);
 		}
 		const qs = params.toString();
 		const url = qs ? `/payments/matriz?${qs}` : '/payments/matriz';
 		return await apiKyC.get<MatrizPagosResponse>(url);
 	}
 
-	async getResumenModulos(): Promise<ResumenModulosResponse> {
-		return await apiKyC.get<ResumenModulosResponse>('/payments/resumen-modulos');
+	// F-CXC-FILTRO-PROGRAMA (2026-08-04, Kevin): mismo cambio, getResumenModulos
+	// ahora acepta `cursoId` para que las tarjetas de resumen (matricula, modulos,
+	// por cobrar, etc.) reflejen el programa actualmente filtrado.
+	async getResumenModulos(cursoId?: string | null): Promise<ResumenModulosResponse> {
+		const qs = cursoId ? `?curso_id=${encodeURIComponent(cursoId)}` : '';
+		return await apiKyC.get<ResumenModulosResponse>(`/payments/resumen-modulos${qs}`);
+	}
+
+	// F-088 (2026-07-29): Vista "Deudores" unificada para Cobranza.
+	// Estudiantes como filas, módulos como columnas, con estado por celda
+	// (pagado / debe / no_le_toca). Sandra pidió en reunión poder ver a un
+	// solo golpe visual qué módulos debe cada estudiante.
+	async getDeudores(cursoId: string, soloDeudores = true): Promise<DeudoresResponse> {
+		const params = new URLSearchParams();
+		params.append('curso_id', cursoId);
+		params.append('solo_deudores', soloDeudores ? 'true' : 'false');
+		return await apiKyC.get<DeudoresResponse>(`/payments/deudores?${params.toString()}`);
+	}
+
+	// F-088 (2026-07-29): Exportar deudores a XLSX (mismo layout que la vista).
+	// Devuelve un Blob con el archivo XLSX. La vista se encarga de descargarlo.
+	async getDeudoresXLSX(cursoId: string, soloDeudores = true): Promise<Blob> {
+		const params = new URLSearchParams();
+		params.append('curso_id', cursoId);
+		params.append('solo_deudores', soloDeudores ? 'true' : 'false');
+		return await apiKyC.getBlob(`/payments/deudores/export-excel?${params.toString()}`);
+	}
+
+	// F-087 (2026-07-28): Vista "Por Pago" - 1 fila por cada pago individual
+	// (a diferencia de la matriz que agrupa por estudiante/módulo).
+	// Permite auditar cada Bs: cada pago lleva su comprobante, su número de
+	// transacción, su fecha, y quién lo subió.
+	async getMatrizPorPago(filtros: PorPagoFiltros = {}): Promise<PorPagoResponse> {
+		const params = new URLSearchParams();
+		if (filtros.curso_id) params.append('curso_id', filtros.curso_id);
+		if (filtros.modulo_index !== null && filtros.modulo_index !== undefined) {
+			params.append('modulo_index', String(filtros.modulo_index));
+		}
+		if (filtros.estado_pago) params.append('estado_pago', filtros.estado_pago);
+		if (filtros.subido_por) params.append('subido_por', filtros.subido_por);
+		if (filtros.page) params.append('page', String(filtros.page));
+		if (filtros.per_page) params.append('per_page', String(filtros.per_page));
+		const qs = params.toString();
+		const url = qs ? '/payments/matriz/por-pago?' + qs : '/payments/matriz/por-pago';
+		return await apiKyC.get<PorPagoResponse>(url);
+	}
+
+	// F-049 (2026-07-28): Resumen enriquecido de pagos por enrollment.
+	// Retorna desglose por módulo, total a pagar, total pagado, saldo a favor
+	// y saldo pendiente. Usado por cobranza para ver el desglose que el
+	// estudiante ya veia (cuando paga de más, ej: 300 en lugar de 294).
+	async getResumenPagosEnrollment(enrollmentId: string): Promise<ResumenPagosEnrollment> {
+		return await apiKyC.get<ResumenPagosEnrollment>(
+			`/payments/enrollment/${enrollmentId}/resumen`
+		);
 	}
 
 	// F-075 (2026-07-23): Lista de Postgraduantes Habilitados (informe acta de notas).
@@ -412,6 +480,157 @@ export interface ResumenModulosResponse {
 		monto_pendiente: number;
 		estudiantes_cursando: number;
 	}>;
+}
+
+// F-087 (2026-07-28): Vista "Por Pago" - 1 fila por cada pago individual
+export interface PorPagoFiltros {
+	curso_id?: string;
+	modulo_index?: number | null;
+	estado_pago?: string;
+	subido_por?: string;
+	page?: number;
+	per_page?: number;
+}
+
+export interface PorPagoItem {
+	payment_id: string;
+	monto: number;
+	concepto: string | null;
+	modulo_index: number | null;
+	modulos_cubiertos: number[];     // ej: [1,2,3,4]
+	estado_pago: string;
+	subido_por: string | null;
+	verificado_por: string | null;
+	comprobante_url: string | null;
+	numero_transaccion: string | null;
+	fecha_subida: string | null;
+	fecha_comprobante: string | null;
+	banco: string | null;
+	metodo_pago: string | null;
+	remitente: string | null;
+}
+
+export interface PorPagoEstudiante {
+	estudiante_id: string;
+	estudiante_nombre: string | null;
+	estudiante_ci: string | null;
+	estudiante_registro: string | null;
+	curso_id: string | null;
+	curso_codigo: string | null;
+	curso_nombre: string | null;
+	pagos: PorPagoItem[];            // F-087-FIX2: lista de pagos del estudiante
+	total_pagado_aprobado: number;
+	total_pagado_anulado: number;
+	total_pagado_pendiente: number;
+	total_pagado_rechazado: number;
+	total_a_pagar: number | null;
+	saldo_pendiente: number | null;
+	cantidad_pagos: number;
+}
+
+export interface PorPagoResumen {
+	total_aprobado: number;
+	total_anulado: number;
+	total_pendiente: number;
+	total_rechazado: number;
+	total_pagos: number;
+	pagos_con_comprobante: number;
+	total_estudiantes: number;
+}
+
+export interface PorPagoResponse {
+	estudiantes: PorPagoEstudiante[];  // F-087-FIX2: estructura tipo matriz
+	total: number;
+	page: number;
+	per_page: number;
+	total_pages: number;
+	max_pagos: number;                  // max de pagos por estudiante (para # columnas)
+	resumen: PorPagoResumen;
+	filtros_aplicados: PorPagoFiltros;
+}
+
+// F-049 (2026-07-28): resumen enriquecido de pagos de un enrollment
+export interface ResumenPagosEnrollment {
+	total_pagos: number;
+	pendientes: number;
+	aprobados: number;
+	rechazados: number;
+	anulados: number;
+	monto_total_aprobado: number;
+	// Enriquecido (F-049)
+	modulos: Array<{
+		index: number;
+		nombre: string;
+		monto: number;
+		monto_pagado: number;
+		saldo_modulo: number;
+		pagado: boolean;
+	}>;
+	total_a_pagar: number;
+	total_pagado: number;
+	saldo_a_favor: number;
+	saldo_pendiente: number;
+}
+
+// =============================================================================
+// F-088 (2026-07-29): Interfaces de la vista "Deudores"
+// =============================================================================
+// Sandra pidió en reunión 2026-07-29: vista a un solo golpe visual con
+// estudiantes como filas y módulos como columnas. Verde = pagado, rojo = debe,
+// gris = no_le_toca. Filtro "solo deudores" y export Excel.
+export interface DeudoresModulo {
+	i: number;
+	nombre: string;
+	costo: number;
+	pagado: number;
+	pendiente: number;
+	estado: 'pagado' | 'debe' | 'no_le_toca';
+}
+
+export interface DeudoresMatricula {
+	costo: number;
+	pagado: number;
+	pendiente: number;
+	estado: 'pagado' | 'debe' | 'no_le_toca';
+}
+
+export interface DeudoresEstudiante {
+	estudiante_id: string;
+	registro: string;
+	nombre: string;
+	ci: string;
+	email: string;
+	celular: string;
+	estado_inscripcion: string;
+	matricula: DeudoresMatricula;
+	modulos: DeudoresModulo[];
+	deuda_total: number;
+	modulos_pendientes: number[];  // 1-based
+}
+
+export interface DeudoresResumen {
+	total_estudiantes: number;
+	total_deudores: number;
+	deuda_total_curso: number;
+	por_columna: {
+		matricula: { deben: number; monto_pendiente: number };
+		modulos: Array<{ i: number; deben: number; monto_pendiente: number }>;
+	};
+}
+
+export interface DeudoresCurso {
+	_id: string;
+	nombre: string;
+	codigo: string;
+	modulos: string[];
+	matricula_monto: number;
+}
+
+export interface DeudoresResponse {
+	curso: DeudoresCurso;
+	estudiantes: DeudoresEstudiante[];
+	resumen: DeudoresResumen;
+	filtros_aplicados: { curso_id: string; solo_deudores: boolean };
 }
 
 export const paymentService = new PaymentService();

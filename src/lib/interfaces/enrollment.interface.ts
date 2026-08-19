@@ -14,6 +14,13 @@ export interface Enrollment {
 	_id: string;
 	// Fallback defensivo de `._id` usado en algunos componentes (ej. cobro en Caja).
 	id?: string;
+	// Campos joineados que el backend adjunta en GET /enrollments/ para que el
+	// frontend no muestre "Desconocido" (ver F-FIX-DESCONOCIDO-ENROLLMENTS en
+	// schemas/enrollment.py). Son PLANOS — no hay un objeto anidado `estudiante`.
+	estudiante_nombre?: string | null;
+	estudiante_registro?: string | null;
+	estudiante_ci?: string | null;
+	curso_codigo?: string | null;
 	requisitos?: Requisito[]; // ISSUE-Q-DOCUMENTOS-KYC
 	cantidad_cuotas: number;
 	costo_matricula: number;
@@ -71,6 +78,30 @@ export interface UpdateEnrollmentRequest {
 	saldo_pendiente?: number;
 }
 
+// F-INSCRIPCION-LOTE (2026-07-31): shape del request y response del
+// endpoint POST /enrollments/bulk. Permite inscribir hasta 200
+// estudiantes a un mismo programa en una sola operación.
+export interface BulkEnrollmentRequest {
+	curso_id: string;
+	estudiantes_ids: string[];
+	descuento_id?: string;
+	descuento_personalizado?: number;
+}
+
+export interface BulkEnrollmentErrorItem {
+	estudiante_id: string;
+	error: string;
+}
+
+export interface BulkEnrollmentResponse {
+	total_solicitados: number;
+	exitosos: number;
+	ya_inscritos: number;
+	fallidos: number;
+	enrollments_creados: Enrollment[];
+	errores: BulkEnrollmentErrorItem[];
+}
+
 // F-COBRANZA-035 (2026-07-22): resumen de inscritos para vista KPI.
 // Pedido Lic. Sandra Zabala: "diferencia del total de inscritos
 // inicialmente, cuantos son los activo y cuantos los pasivos".
@@ -89,4 +120,40 @@ export interface EnrollmentResumen {
 	completados: number;
 	cancelados: number;      // NO cuentan como inscritos
 	curso_id: string | null;
+}
+
+// F-087-CAL · Resumen de cursos del estudiante para el dashboard.
+// Cada item es la combinación enrollment + curso + estado calculado del
+// programa. Permite al estudiante ver de un vistazo "Mis cursos activos"
+// (en ejecución / por iniciar / finalizados) sin hacer N requests.
+export interface MyCourseResumenItem {
+	enrollment_id: string;
+	curso_id: string;
+	curso_codigo: string;
+	curso_nombre: string;
+	curso_tipo: string;
+	curso_modalidad: string;
+	fecha_inicio: string | null;
+	fecha_fin: string | null;
+	estado_programa: 'programado' | 'en_ejecucion' | 'cerrado';
+	estado_inscripcion: string;
+	motivo_suspension?: string | null;
+	total_a_pagar: number;
+	total_pagado: number;
+	saldo_pendiente: number;
+	modulos_total: number;
+	modulos_pagados: number;
+	matricula_pagada: boolean;
+	fecha_inscripcion: string | null;
+}
+
+export interface MyCoursesResumen {
+	items: MyCourseResumenItem[];
+	resumen: {
+		total_cursos: number;
+		en_ejecucion: number;
+		programado: number;
+		cerrado: number;
+		saldo_pendiente_total: number;
+	};
 }

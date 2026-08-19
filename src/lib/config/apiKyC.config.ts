@@ -81,7 +81,18 @@ class ApiKyC {
 		const controller = new AbortController();
 		// ISSUE J: Usar timeout customizado si se especifica, de lo contrario usar el por defecto
 		const timeoutDuration = options.customTimeout ?? API_CONFIG.TIMEOUT;
-		const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
+		// F-FIX-TIMEOUT-TOAST (2026-08-09, Kevin): distinguir entre cancelacion
+		// por timeout real vs cancelacion manual (navegacion, componente
+		// desmontado, etc). Antes ambos casos mostraban el mismo toast
+		// "Solicitud cancelada por timeout" que era engañoso: si el browser
+		// cancelaba una request paralela (ej. refresh de lista al cerrar un
+		// modal), el toast parecia un error de la operacion principal cuando
+		// en realidad el PUT/POST si se habia aplicado.
+		let isTimeout = false;
+		const timeoutId = setTimeout(() => {
+			isTimeout = true;
+			controller.abort();
+		}, timeoutDuration);
 
 		try {
 			const isFormData = data instanceof FormData;
@@ -137,7 +148,14 @@ class ApiKyC {
 			clearTimeout(timeoutId);
 
 			if (error instanceof DOMException && error.name === 'AbortError') {
-				throw new AppError('Solicitud cancelada por timeout', ErrorType.NETWORK, 408);
+				// F-FIX-TIMEOUT-TOAST (2026-08-09, Kevin): solo mostrar toast
+				// de timeout si el timer realmente disparo. Si el browser cancelo
+				// la request (navegacion, componente desmontado, race condition
+				// con otra request), mostrar un mensaje neutro sin alarma.
+				if (isTimeout) {
+					throw new AppError('Solicitud cancelada por timeout', ErrorType.NETWORK, 408);
+				}
+				throw new AppError('Solicitud cancelada', ErrorType.NETWORK, 0);
 			}
 
 			if (error instanceof AppError) {
@@ -181,6 +199,64 @@ class ApiKyC {
 
 	async postPublic<T>(endpoint: string, data: unknown): Promise<T> {
 		return this.post<T>(endpoint, data, { requireAuth: false });
+	}
+
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD-FILE: multipart upload sin Content-Type
+	// (el browser lo setea automaticamente con el boundary). Funciona con
+	// requireAuth: false para endpoints publicos (ej. upload de carta firmada
+	// del wizard) o true para endpoints con auth (ej. subir CV del estudiante).
+	async postFormData<T>(endpoint: string, form: FormData, options: RequestOptions = {}): Promise<T> {
+		const headers = this.buildHeaders(options);
+		// Eliminar Content-Type para que el browser ponga el boundary correcto
+		const headersObj = headers as Record<string, string>;
+		delete headersObj['Content-Type'];
+
+		const controller = new AbortController();
+		const timeoutDuration = options.customTimeout ?? API_CONFIG.TIMEOUT;
+		const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
+
+		try {
+			const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1${endpoint}`, {
+				method: 'POST',
+				headers,
+				body: form,
+				signal: controller.signal
+			});
+
+			clearTimeout(timeoutId);
+
+			if (response.status === 204) {
+				return {} as T;
+			}
+
+			if (!response.ok) {
+				const errorBody = await response.json().catch(() => ({}));
+				const errorType = errorService.mapHttpToErrorType(response.status);
+
+				if (response.status === 401 && browser) {
+					localStorage.removeItem(AUTH_TOKEN_KEY);
+					localStorage.removeItem(USER_DATA_KEY);
+					localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
+					const path = window.location.pathname;
+					if (!path.startsWith('/auth') && path !== '/') {
+						window.location.href = '/auth/sign-in';
+					}
+				}
+
+				throw new AppError(extractErrorMessage(errorBody), errorType, response.status);
+			}
+
+			return response.json();
+		} catch (error) {
+			clearTimeout(timeoutId);
+			if (error instanceof DOMException && error.name === 'AbortError') {
+				throw new AppError('Solicitud cancelada por timeout', ErrorType.NETWORK, 408);
+			}
+			if (error instanceof AppError) {
+				throw error;
+			}
+			throw new AppError('Error de red', ErrorType.NETWORK, undefined, error instanceof Error ? error : undefined);
+		}
 	}
 
 	// ISSUE-P-REPORTE: descarga de archivos binarios autenticados (Excel/PDF).

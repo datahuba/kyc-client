@@ -6,27 +6,43 @@
 	 * Página que muestra los errores 500 capturados en producción
 	 * (almacenados en MongoDB con TTL 7 días).
 	 *
+	 * F-REFACTOR-ERRORS (2026-07-31): el modal de detalle y los helpers
+	 * de formato se extrajeron a componentes/utils separados:
+	 *   - lib/components/admin/ErrorDetailModal.svelte
+	 *   - lib/utils/errorFormatters.ts
+	 *
 	 * Solo accesible para superadmin/admin.
 	 */
 
-	import { onMount } from 'svelte';
 	import { adminService } from '$lib/services';
 	import { userStore } from '$lib/stores/userStore';
 	import { alert } from '$lib/utils';
-	import type { ErrorLogItem, ErrorLogDetail, ErrorLogsListResponse } from '$lib/interfaces';
+	import {
+		formatErrorTimestamp,
+		getMethodBadgeClass,
+		getStatusBadgeClass
+	} from '$lib/utils/errorFormatters';
+	import type { ErrorLogDetail, ErrorLogsListResponse } from '$lib/interfaces';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Button from '$lib/components/ui/button.svelte';
+	import ErrorDetailModal from '$lib/components/admin/ErrorDetailModal.svelte';
+	import { slide } from 'svelte/transition';
 
 	let loading = $state(true);
 	let data: ErrorLogsListResponse | null = $state(null);
 	let selectedError: ErrorLogDetail | null = $state(null);
 	let loadingDetail = $state(false);
+	let resolvingId = $state<string | null>(null);
+	let showResolveInput = $state<string | null>(null);
+	let resolveNote = $state('');
 
 	// Filtros
 	let hours = $state(24);
 	let limit = $state(100);
 	let pathFilter = $state('');
 	let statusCodeFilter = $state<number | ''>('');
+	// F-XXX (2026-07-29): por default solo muestra errores NO resueltos
+	let unresolvedOnly = $state(true);
 
 	// Solo superadmin/admin pueden ver esto
 	// F-069 (2026-07-22): bug era `$userStore.user?.rol` (no existe) en vez de
@@ -37,23 +53,89 @@
 		$userStore.user?.role === 'superadmin' || $userStore.user?.role === 'admin'
 	);
 
-	onMount(async () => {
-		if (!isAllowed) {
+	// F-XXX (2026-07-29): usar $effect en vez de onMount porque al momento
+	// del onMount, `$userStore.user` puede aún no estar cargado. El $effect
+	// se re-ejecuta cuando cambia `isAllowed` y vuelve a llamar load().
+	let hasLoaded = $state(false);
+	$effect(() => {
+		if (isAllowed && !hasLoaded) {
+			hasLoaded = true;
+			load();
+		} else if (!isAllowed) {
 			loading = false;
-			return;
 		}
-		await load();
 	});
 
 	async function load() {
 		loading = true;
 		try {
 			const sc = typeof statusCodeFilter === 'number' ? statusCodeFilter : undefined;
-			data = await adminService.getRecentErrors(hours, limit, sc, pathFilter || undefined);
+			data = await adminService.getRecentErrors(
+				hours,
+				limit,
+				sc,
+				pathFilter || undefined,
+				unresolvedOnly
+			);
 		} catch (error: any) {
 			alert('error', error.message || 'Error al cargar el visor de errores');
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function resolveError(errorId: string, note: string) {
+		resolvingId = errorId;
+		try {
+			// F-ERROR-VIEWER-FIX (2026-07-31): el endpoint ahora hace
+			// HARD DELETE en lugar de soft delete. Kevin: "cuando se
+			// solucionan eliminarse de la pagina".
+			await adminService.resolveError(errorId, note || undefined);
+			await load();
+			alert('success', 'Error eliminado de la lista.');
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo eliminar el error');
+		} finally {
+			resolvingId = null;
+			showResolveInput = null;
+			resolveNote = '';
+		}
+	}
+
+	// F-ERROR-VIEWER-FIX (2026-07-31): unresolveError eliminado.
+	// El endpoint unresolve ya no existe en el backend (hemos pasado
+	// a hard delete). El boton "Reabrir" del template tambien se quito.
+
+	// F-XXX (2026-07-29): bulk resolve para errores esperados.
+	async function autoResolveErrors() {
+		// Patrones predefinidos que matchean errores esperados del sistema.
+		// El admin puede ejecutarlos todos o uno por uno.
+		const patterns = [
+			{ label: '401 Token expirado', pattern: 'Token.*inválido|expirado', status: 401, note: 'Auto-resuelto: token expirado (esperado)' },
+			{ label: '401 Credenciales incorrectas', pattern: 'Credenciales incorrectas|Se requiere autenticación', status: 401, note: 'Auto-resuelto: login fallido (esperado)' },
+			{ label: '422 JSON inválido', pattern: 'JSON (inválido|decode)', status: 422, note: 'Auto-resuelto: cliente envió JSON malformado' },
+			{ label: '429 Demasiados intentos', pattern: 'Demasiados intentos', status: 429, note: 'Auto-resuelto: rate limit (esperado)' },
+			{ label: '400 imagen >5MB', pattern: 'imagen es demasiado grande', status: 400, note: 'Auto-resuelto: imagen excede límite (validación cliente)' },
+		];
+		// Construir mensaje con la lista
+		const list = patterns.map((p, i) => `${i + 1}. ${p.label}`).join('\n');
+		const choice = prompt(
+			`¿Qué tipo de errores esperados querés marcar como resueltos?\n\n${list}\n\nIngresá el número (1-${patterns.length}) o Cancelar:`
+		);
+		if (!choice) return;
+		const idx = parseInt(choice) - 1;
+		if (isNaN(idx) || idx < 0 || idx >= patterns.length) {
+			alert('error', 'Opción inválida');
+			return;
+		}
+		const p = patterns[idx];
+		if (!confirm(`¿Marcar como resueltos todos los "${p.label}" en la ventana actual?`)) return;
+		try {
+			const res = await adminService.autoResolveErrors(hours, p.pattern, p.status, p.note);
+			alert('success', `Se marcaron ${res.resolved_count} errores como resueltos.`);
+			await load();
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo auto-resolver');
 		}
 	}
 
@@ -71,40 +153,12 @@
 	function closeDetail() {
 		selectedError = null;
 	}
-
-	function formatTimestamp(iso: string): string {
-		try {
-			const d = new Date(iso);
-			return d.toLocaleString('es-BO', {
-				year: 'numeric',
-				month: '2-digit',
-				day: '2-digit',
-				hour: '2-digit',
-				minute: '2-digit',
-				second: '2-digit',
-			});
-		} catch {
-			return iso;
-		}
-	}
-
-	function getMethodBadgeClass(method: string): string {
-		const m = method.toUpperCase();
-		if (m === 'GET') return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
-		if (m === 'POST') return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-		if (m === 'PATCH' || m === 'PUT')
-			return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
-		if (m === 'DELETE') return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-		return 'bg-gray-100 text-gray-800';
-	}
-
-	function getStatusBadgeClass(status: number): string {
-		if (status >= 500) return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-		if (status >= 400) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
-		return 'bg-green-100 text-green-800';
-	}
 </script>
 
+
+<svelte:head>
+	<title>Visor de Errores · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6 max-w-7xl mx-auto">
 	<div class="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
 		<div>
@@ -121,7 +175,7 @@
 				⚠️ Esta página solo está disponible para superadmin/admin.
 			</p>
 			<p class="text-sm text-amber-700 dark:text-amber-300 mt-2">
-				Tu rol actual: <strong>{$userStore.user?.role || $userStore.user?.rol || 'desconocido'}</strong>
+				Tu rol actual: <strong>{$userStore.user?.role || 'desconocido'}</strong>
 			</p>
 		</div>
 	{:else}
@@ -171,6 +225,20 @@
 						class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm"
 					/>
 				</div>
+				<!-- F-XXX (2026-07-29): toggle "Solo no resueltos" -->
+				<label class="inline-flex items-center gap-2 cursor-pointer select-none pb-1">
+					<input
+						type="checkbox"
+						bind:checked={unresolvedOnly}
+						class="size-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+					/>
+					<span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+						Solo no resueltos
+					</span>
+				</label>
+				<Button variant="secondary" onclick={autoResolveErrors} disabled={loading}>
+					🧹 Auto-resolver errores esperados
+				</Button>
 				<Button variant="primary" onclick={load} loading={loading}>
 					🔄 Refrescar
 				</Button>
@@ -239,14 +307,15 @@
 								<th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Path</th>
 								<th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Error</th>
 								<th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">User</th>
+								<th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Resuelto</th>
 								<th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Acción</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
 							{#each data.items as err (err.id)}
-								<tr class="hover:bg-gray-50/50 dark:hover:bg-gray-700/30">
+								<tr class={`hover:bg-gray-50/50 dark:hover:bg-gray-700/30 ${err.resolved ? 'opacity-60' : ''}`}>
 									<td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
-										{formatTimestamp(err.timestamp)}
+										{formatErrorTimestamp(err.timestamp)}
 									</td>
 									<td class="px-4 py-3">
 										<span class={`inline-flex text-xs font-medium px-2 py-0.5 rounded-full ${getMethodBadgeClass(err.method)}`}>
@@ -274,13 +343,68 @@
 									<td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
 										{err.user_email || '—'}
 									</td>
+									<td class="px-4 py-3 text-xs">
+										{#if err.resolved}
+											<span class="inline-flex items-center gap-1 text-green-700 dark:text-green-400 font-semibold" title={`Resuelto por ${err.resolved_by || '?'} el ${err.resolved_at ? formatErrorTimestamp(err.resolved_at) : ''}`}>
+												✓ Resuelto
+											</span>
+										{:else}
+											<span class="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold">
+												⏳ Pendiente
+											</span>
+										{/if}
+									</td>
 									<td class="px-4 py-3 text-right">
-										<button
-											onclick={() => viewDetail(err.id)}
-											class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium"
-										>
-											Ver detalle →
-										</button>
+										<div class="flex items-center justify-end gap-2">
+											{#if !err.resolved && showResolveInput === err.id}
+												<!-- F-XXX (2026-07-29): input inline para resolver con nota -->
+												<div class="flex items-center gap-1" transition:slide={{ duration: 150 }}>
+													<input
+														type="text"
+														bind:value={resolveNote}
+														placeholder="Nota opcional..."
+														class="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-900 w-40"
+													/>
+													<button
+														onclick={() => resolveError(err.id, resolveNote)}
+														disabled={resolvingId === err.id}
+														class="text-xs bg-green-600 hover:bg-green-700 text-white font-semibold rounded px-2 py-1 disabled:opacity-50"
+														title="Confirmar resolución"
+													>
+														✓
+													</button>
+													<button
+														onclick={() => { showResolveInput = null; resolveNote = ''; }}
+														class="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1"
+														title="Cancelar"
+													>
+														✗
+													</button>
+												</div>
+											{:else if !err.resolved}
+												<button
+													onclick={() => { showResolveInput = err.id; resolveNote = ''; }}
+													disabled={resolvingId === err.id}
+													class="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 dark:text-emerald-300 font-semibold rounded px-2 py-1 disabled:opacity-50"
+													title="Marcar como resuelto"
+												>
+													✓ Resolver
+												</button>
+											{:else}
+												<!-- F-ERROR-VIEWER-FIX: ya no hay opcion "Reabrir"
+												     porque con hard delete los resueltos se
+												     borran. Si por migracion quedan algunos
+												     con resolved=true, los dejamos como
+												     solo-lectura. -->
+												<span class="text-xs text-gray-500 italic">Resuelto</span>
+											{/if}
+											<button
+												onclick={() => viewDetail(err.id)}
+												class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium"
+											>
+												Detalle →
+											</button>
+										</div>
 									</td>
 								</tr>
 							{/each}
@@ -292,82 +416,8 @@
 	{/if}
 </div>
 
-<!-- Modal de detalle -->
-{#if selectedError}
-	<div
-		class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-		role="dialog"
-		aria-modal="true"
-	>
-		<div class="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-			<div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-				<h2 class="text-lg font-bold text-gray-900 dark:text-white">
-					Detalle del error {selectedError.error_type}
-				</h2>
-				<button
-					onclick={closeDetail}
-					class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-				>
-					✕
-				</button>
-			</div>
-			<div class="overflow-y-auto p-6 space-y-4">
-				<div class="grid grid-cols-2 gap-4 text-sm">
-					<div>
-						<p class="text-xs text-gray-500 uppercase">Timestamp</p>
-						<p>{formatTimestamp(selectedError.timestamp)}</p>
-					</div>
-					<div>
-						<p class="text-xs text-gray-500 uppercase">Status</p>
-						<p class="font-bold text-red-600">{selectedError.status_code}</p>
-					</div>
-					<div>
-						<p class="text-xs text-gray-500 uppercase">Method</p>
-						<p>{selectedError.method}</p>
-					</div>
-					<div>
-						<p class="text-xs text-gray-500 uppercase">Path</p>
-						<code class="text-xs">{selectedError.path}</code>
-					</div>
-					<div>
-						<p class="text-xs text-gray-500 uppercase">User</p>
-						<p class="text-xs">
-							{selectedError.user_email || '—'}
-							{#if selectedError.user_type}
-								<span class="text-gray-500">({selectedError.user_type})</span>
-							{/if}
-						</p>
-					</div>
-					<div>
-						<p class="text-xs text-gray-500 uppercase">Environment</p>
-						<p>{selectedError.environment}</p>
-					</div>
-				</div>
-
-				<div>
-					<p class="text-xs text-gray-500 uppercase mb-1">Mensaje</p>
-					<pre class="bg-gray-50 dark:bg-gray-900 p-3 rounded text-xs overflow-x-auto">{selectedError.message}</pre>
-				</div>
-
-				{#if selectedError.query_params}
-					<div>
-						<p class="text-xs text-gray-500 uppercase mb-1">Query params</p>
-						<pre class="bg-gray-50 dark:bg-gray-900 p-3 rounded text-xs overflow-x-auto">{selectedError.query_params}</pre>
-					</div>
-				{/if}
-
-				{#if selectedError.request_body}
-					<div>
-						<p class="text-xs text-gray-500 uppercase mb-1">Request body</p>
-						<pre class="bg-gray-50 dark:bg-gray-900 p-3 rounded text-xs overflow-x-auto">{selectedError.request_body}</pre>
-					</div>
-				{/if}
-
-				<div>
-					<p class="text-xs text-gray-500 uppercase mb-1">Stack trace</p>
-					<pre class="bg-gray-900 text-green-300 dark:bg-black p-3 rounded text-xs overflow-x-auto max-h-96">{selectedError.stack_trace || 'No disponible'}</pre>
-				</div>
-			</div>
-		</div>
-	</div>
-{/if}
+<!-- Modal de detalle (F-REFACTOR-ERRORS 2026-07-31: extraido a componente) -->
+<ErrorDetailModal
+	error={selectedError}
+	onClose={closeDetail}
+/>

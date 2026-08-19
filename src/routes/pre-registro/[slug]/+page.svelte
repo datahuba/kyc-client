@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
-	import { getPublicForm, submitPublicForm } from '$lib/services/pre-registration.service';
+	import { getPublicForm, submitPublicForm, uploadCartaFirmada, uploadResolucion, uploadTituloProfesional } from '$lib/services/pre-registration.service';
 	import type { PreRegistrationForm } from '$lib/services/pre-registration.service';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 	import { ExclamationCircleIcon } from '$lib/icons/solid';
@@ -13,7 +13,9 @@
 		IdentificationIcon,
 		StopwatchIcon,
 		CircleCheckIcon,
-		CopyIcon
+		CopyIcon,
+		UploadIcon,
+		XIcon
 	} from '$lib/icons/outline';
 	import { fly, fade, slide, scale } from 'svelte/transition';
 	import { cubicOut, quintOut } from 'svelte/easing';
@@ -42,13 +44,72 @@
 	let domicilio = $state('');
 	let mensaje = $state('');
 
+	// F-2026-08-12-DESCUENTO-BECA-V3 (Kevin 2026-08-12): declaracion jurada
+	// de veracidad. El estudiante debe confirmar explicitamente que los
+	// datos son verdaderos, con enfasis en los relacionados a beca,
+	// descuento y condicion de primera carrera. Si no declara la
+	// veracidad, no puede enviar la pre-inscripcion.
+	let declaracionVeracidad = $state(false);
+
+	// F-2026-08-11-CAMPOS-EC: campos opcionales del Diplomado Gestión Tributaria
+	// y demás programas de educación continua (planilla de Lisa). Si el
+	// estudiante NO se inscribe a un diplomado EC, simplemente los deja vacíos.
+	let registroUniversitario = $state('');
+	let avanceAcademicoCodigo = $state('');
+	let formularioDescuentoNumero = $state('');
+	let carreraCodigo = $state('');
+	let descuentoPorcentaje = $state(''); // en %, se convierte a 0-1 al enviar
+
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD: campos adicionales requeridos por
+	// la reunión UAGRM 2026-08-11 (sección 4: presencial vs virtual).
+	// - procedencia: departamento de Bolivia (SCZ, LPZ, CBA, TJA, CHS, POT, BEN, ORU, PND).
+	//   Distinto de `departamento` que es texto libre: este es codigo oficial.
+	// - modalidad: presencial o virtual. Si el estudiante es de PROVINCIA
+	//   o elige VIRTUAL, debe subir la carta firmada por el director.
+	// - carta_firmada_url: URL/identificador del documento firmado. Validamos
+	//   que no este vacio cuando aplica la regla.
+	let procedencia = $state('');
+	let modalidad = $state<'' | 'presencial' | 'virtual'>('');
+
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD-FILE (Kevin 22:17): cambio de input
+	// type="url" a type="file" para subir la carta directamente. La URL
+	// devuelta por Cloudinary (post-upload) se guarda en cartaFirmadaUrl.
+	let cartaFirmadaUrl = $state('');
+	let cartaFirmadaNombre = $state(''); // nombre del archivo para mostrar al usuario
+	let cartaFirmadaSubiendo = $state(false);
+	let cartaFirmadaError = $state('');
+
+	// F-2026-08-11-CAMPOS-EC-RESOLUCION (Kevin 22:37): resolucion del programa
+	// OPCIONAL. Misma mecanica de file upload que la carta firmada.
+	let resolucionUrl = $state('');
+	let resolucionNombre = $state('');
+	let resolucionSubiendo = $state(false);
+	let resolucionError = $state('');
+
+	// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+	// Discriminacion PRIMERA CARRERA vs PROFESIONAL CON TITULO.
+	// - esPrimerCarrera=true: cobra matricula primer carrera (default 200 Bs)
+	// - esPrimerCarrera=false: cobra matricula profesional (default 500 Bs)
+	//   Y debe subir foto del titulo profesional (tituloProfesionalUrl).
+	// Default true por seguridad: si el visitante no contesta, cobra menos.
+	let esPrimerCarrera = $state(true);
+
+	// Foto del titulo profesional (PDF/JPG/PNG). OBLIGATORIA si
+	// esPrimerCarrera=false. Misma mecanica de file upload que la carta.
+	let tituloProfesionalUrl = $state('');
+	let tituloProfesionalNombre = $state('');
+	let tituloProfesionalSubiendo = $state(false);
+	let tituloProfesionalError = $state('');
+
 	let fieldErrors = $state<Record<string, string>>({});
 
 	// Wizard state
 	const STEPS = [
 		{ id: 1, title: 'Identidad', subtitle: '¿Quién eres?', icon: UserIcon, fields: ['nombre', 'email', 'carnet', 'extension'] },
 		{ id: 2, title: 'Contacto', subtitle: '¿Cómo te ubicamos?', icon: IdentificationIcon, fields: ['celular', 'fechaNacimiento', 'sexo', 'domicilio'] },
-		{ id: 3, title: 'Confirmar', subtitle: 'Revisa y envía', icon: CircleCheckIcon, fields: ['mensaje'] }
+		{ id: 3, title: 'Datos EC', subtitle: 'Educación continua (opcional)', icon: IdentificationIcon, fields: ['registroUniversitario', 'avanceAcademicoCodigo', 'formularioDescuentoNumero', 'carreraCodigo', 'descuentoPorcentaje', 'procedencia', 'modalidad', 'cartaFirmadaUrl', 'resolucionUrl'] },
+		{ id: 4, title: 'Título profesional', subtitle: '¿Tienes título profesional?', icon: IdentificationIcon, fields: ['esPrimerCarrera', 'tituloProfesionalUrl'] },
+		{ id: 5, title: 'Confirmar', subtitle: 'Revisa y envía', icon: CircleCheckIcon, fields: ['mensaje'] }
 	] as const;
 	let currentStep = $state(1);
 	let highestStepReached = $state(1);
@@ -106,7 +167,7 @@
 	function saveAutosave() {
 		if (success) return;
 		try {
-			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, currentStep, savedAt: Date.now() };
+			const data = { nombre, email, carnet, extension, celular, fechaNacimiento, sexo, domicilio, mensaje, registroUniversitario, avanceAcademicoCodigo, formularioDescuentoNumero, carreraCodigo, descuentoPorcentaje, procedencia, modalidad, cartaFirmadaUrl, cartaFirmadaNombre, resolucionUrl, resolucionNombre, esPrimerCarrera, tituloProfesionalUrl, tituloProfesionalNombre, declaracionVeracidad, currentStep, savedAt: Date.now() };
 			localStorage.setItem(autosaveKey(), JSON.stringify(data));
 			// indicador "guardado"
 			justSaved = true;
@@ -146,6 +207,23 @@
 			sexo = data.sexo || '';
 			domicilio = data.domicilio || '';
 			mensaje = data.mensaje || '';
+			registroUniversitario = data.registroUniversitario || '';
+			avanceAcademicoCodigo = data.avanceAcademicoCodigo || '';
+			formularioDescuentoNumero = data.formularioDescuentoNumero || '';
+			carreraCodigo = data.carreraCodigo || '';
+			descuentoPorcentaje = data.descuentoPorcentaje || '';
+			procedencia = data.procedencia || '';
+			modalidad = data.modalidad || '';
+			cartaFirmadaUrl = data.cartaFirmadaUrl || '';
+			cartaFirmadaNombre = data.cartaFirmadaNombre || '';
+			resolucionUrl = data.resolucionUrl || '';
+			resolucionNombre = data.resolucionNombre || '';
+			// F-2026-08-12-DESCUENTO-BECA: default true si no estaba en autosave
+			esPrimerCarrera = data.esPrimerCarrera === false ? false : true;
+			tituloProfesionalUrl = data.tituloProfesionalUrl || '';
+			tituloProfesionalNombre = data.tituloProfesionalNombre || '';
+			// F-2026-08-12-DESCUENTO-BECA-V3: declaracion jurada (boolean, default false)
+			declaracionVeracidad = data.declaracionVeracidad === true;
 			if (data.currentStep) {
 				currentStep = data.currentStep;
 				highestStepReached = data.currentStep;
@@ -161,20 +239,36 @@
 	}
 
 	// ---- Validation ----
+	// F-FIX-TRIM-NUMBER (2026-08-11): bug en consola "r(...).trim is not a function"
+	// cuando el usuario tipeaba en el input de descuentoPorcentaje. Causa raiz:
+	// bind:value en <input type="number"> coerce el state a `number | null`,
+	// y Number.prototype no tiene .trim(). Fix: usar String(v ?? '').trim() en
+	// TODOS los cases (defense in depth, no solo en el que falla).
 	function validateField(key: string): string | null {
-		const v = (() => {
+		const raw = (() => {
 			switch (key) {
-				case 'nombre': return nombre.trim();
-				case 'email': return email.trim();
-				case 'carnet': return carnet.trim();
-				case 'extension': return extension.trim();
-				case 'celular': return celular.trim();
-				case 'fechaNacimiento': return fechaNacimiento.trim();
-				case 'domicilio': return domicilio.trim();
-				case 'mensaje': return mensaje.trim();
+				case 'nombre': return nombre;
+				case 'email': return email;
+				case 'carnet': return carnet;
+				case 'extension': return extension;
+				case 'celular': return celular;
+				case 'fechaNacimiento': return fechaNacimiento;
+				case 'domicilio': return domicilio;
+				case 'mensaje': return mensaje;
+				case 'registroUniversitario': return registroUniversitario;
+				case 'avanceAcademicoCodigo': return avanceAcademicoCodigo;
+				case 'formularioDescuentoNumero': return formularioDescuentoNumero;
+				case 'carreraCodigo': return carreraCodigo;
+				case 'descuentoPorcentaje': return descuentoPorcentaje;
+				case 'procedencia': return procedencia;
+				case 'modalidad': return modalidad;
+				case 'cartaFirmadaUrl': return cartaFirmadaUrl;
+				case 'resolucionUrl': return resolucionUrl;
+				case 'tituloProfesionalUrl': return tituloProfesionalUrl;
 				default: return '';
 			}
 		})();
+		const v = String(raw ?? '').trim();
 
 		if (key === 'nombre') {
 			if (v.length < 3) return 'Ingresa tu nombre completo (mínimo 3 caracteres).';
@@ -193,6 +287,35 @@
 		}
 		if (key === 'fechaNacimiento' && v) {
 			if (!/^(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})$/.test(v)) return 'Formato: DD/MM/AAAA o AAAA-MM-DD.';
+		}
+		// F-2026-08-11-CAMPOS-EC: campos opcionales, validar formato solo si se lleno algo
+		if (v && key === 'avanceAcademicoCodigo' && !/^\d+$/.test(v)) {
+			return 'Solo dígitos (código numérico).';
+		}
+		if (v && key === 'formularioDescuentoNumero' && !/^\d+$/.test(v)) {
+			return 'Solo dígitos (número de formulario).';
+		}
+		if (v && key === 'descuentoPorcentaje') {
+			const n = Number(v);
+			if (Number.isNaN(n) || n < 0 || n > 100) {
+				return 'Debe ser un número entre 0 y 100 (porcentaje).';
+			}
+		}
+		// F-2026-08-11-CAMPOS-EC-MODALIDAD: la carta firmada es OBLIGATORIA
+		// si el estudiante es de PROVINCIA (procedencia != SCZ) o si eligió
+		// modalidad virtual. Decision reunion UAGRM 2026-08-11.
+		if (key === 'cartaFirmadaUrl' && !v) {
+			const prov = String(procedencia ?? '').trim().toUpperCase();
+			const mod = String(modalidad ?? '').trim();
+			if (mod === 'virtual' || (prov && prov !== 'SCZ')) {
+				return 'La carta firmada por el director es obligatoria para estudiantes de provincia o modalidad virtual.';
+			}
+		}
+		// F-2026-08-12-DESCUENTO-BECA: si el estudiante declaro tener
+		// titulo profesional (esPrimerCarrera=false), debe subir el documento.
+		// El equipo de postgrado lo valida al aprobar la pre-inscripcion.
+		if (key === 'tituloProfesionalUrl' && !v && esPrimerCarrera === false) {
+			return 'Indicaste que tienes un título profesional. Sube una foto o escaneo del documento para continuar.';
 		}
 		return null;
 	}
@@ -252,6 +375,12 @@
 			alert('error', 'La fecha límite de este formulario ya pasó.');
 			return;
 		}
+		// F-2026-08-12-DESCUENTO-BECA-V3 (Kevin 2026-08-12): la declaracion
+		// jurada de veracidad es OBLIGATORIA. Sin ella no se puede enviar.
+		if (!declaracionVeracidad) {
+			alert('error', 'Debes confirmar la declaración de veracidad de los datos para enviar la pre-inscripción.');
+			return;
+		}
 		// Validar todos los pasos antes de enviar
 		for (let s = 1; s <= TOTAL_STEPS; s++) {
 			if (!validateStep(s)) {
@@ -270,7 +399,23 @@
 				fecha_nacimiento: fechaNacimiento.trim() || undefined,
 				sexo: (sexo || undefined) as 'masculino' | 'femenino' | undefined,
 				domicilio: domicilio.trim() || undefined,
-				mensaje: mensaje.trim() || undefined
+				mensaje: mensaje.trim() || undefined,
+				// F-2026-08-11-CAMPOS-EC: solo enviar si tienen contenido
+				registro_universitario: String(registroUniversitario ?? '').trim() || undefined,
+				avance_academico_codigo: String(avanceAcademicoCodigo ?? '').trim() ? Number(String(avanceAcademicoCodigo ?? '').trim()) : undefined,
+				formulario_descuento_numero: String(formularioDescuentoNumero ?? '').trim() ? Number(String(formularioDescuentoNumero ?? '').trim()) : undefined,
+				carrera_codigo: String(carreraCodigo ?? '').trim() || undefined,
+				descuento_porcentaje: String(descuentoPorcentaje ?? '').trim() ? Number(String(descuentoPorcentaje ?? '').trim()) / 100 : undefined,
+				// F-2026-08-11-CAMPOS-EC-MODALIDAD: procedencia/modalidad/carta
+				// Cast al tipo literal porque String() devuelve string generica, no la union.
+				procedencia: (String(procedencia ?? '').trim() || undefined) as 'SCZ' | 'LPZ' | 'CBA' | 'TJA' | 'CHS' | 'POT' | 'ORU' | 'BEN' | 'PND' | undefined,
+				modalidad: (String(modalidad ?? '').trim() || undefined) as 'presencial' | 'virtual' | undefined,
+				carta_firmada_url: String(cartaFirmadaUrl ?? '').trim() || undefined,
+				// F-2026-08-11-CAMPOS-EC-RESOLUCION: resolucion del programa (opcional)
+				resolucion_url: String(resolucionUrl ?? '').trim() || undefined,
+				// F-2026-08-12-DESCUENTO-BECA: discriminacion primera carrera
+				es_primer_carrera: esPrimerCarrera,
+				titulo_profesional_url: String(tituloProfesionalUrl ?? '').trim() || undefined
 			});
 			// ISSUE-PRE-WIZARD-002: capturar el ID de submission para mostrar al usuario
 			submissionId = (result as any)?.id || (result as any)?._id || '';
@@ -309,6 +454,144 @@
 		if (m) return `${m[3]}/${m[2]}/${m[1]}`;
 		return value;
 	}
+
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD-FILE (Kevin 22:17): handlers para
+	// subir y quitar la carta firmada via input file.
+	async function handleCartaSelected(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		// Validacion local basica (la validacion final la hace el backend)
+		const MAX_SIZE = 20 * 1024 * 1024; // 20MB
+		if (file.size > MAX_SIZE) {
+			cartaFirmadaError = 'El archivo es demasiado grande (maximo 20MB).';
+			input.value = '';
+			return;
+		}
+		const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+		if (!allowed.includes(file.type)) {
+			cartaFirmadaError = 'Tipo de archivo no permitido. Usa PDF, JPG o PNG.';
+			input.value = '';
+			return;
+		}
+
+		cartaFirmadaError = '';
+		cartaFirmadaSubiendo = true;
+		try {
+			const result = await uploadCartaFirmada(slug || '', file);
+			cartaFirmadaUrl = result.url;
+			cartaFirmadaNombre = file.name;
+			clearError('cartaFirmadaUrl');
+			saveAutosave();
+		} catch (e: any) {
+			cartaFirmadaError = e?.message || 'No se pudo subir el archivo. Intentalo de nuevo.';
+			cartaFirmadaUrl = '';
+			cartaFirmadaNombre = '';
+		} finally {
+			cartaFirmadaSubiendo = false;
+			input.value = ''; // reset para permitir resubir el mismo archivo
+		}
+	}
+
+	function removeCarta() {
+		cartaFirmadaUrl = '';
+		cartaFirmadaNombre = '';
+		cartaFirmadaError = '';
+		clearError('cartaFirmadaUrl');
+		saveAutosave();
+	}
+
+	// F-2026-08-11-CAMPOS-EC-RESOLUCION: handlers para la resolucion (mismo
+	// patron que handleCartaSelected pero con uploadResolucion y state vars
+	// propios). OPCIONAL: no hay validacion obligatoria, solo subida libre.
+	async function handleResolucionSelected(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		const MAX_SIZE = 20 * 1024 * 1024;
+		if (file.size > MAX_SIZE) {
+			resolucionError = 'El archivo es demasiado grande (maximo 20MB).';
+			input.value = '';
+			return;
+		}
+		const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+		if (!allowed.includes(file.type)) {
+			resolucionError = 'Tipo de archivo no permitido. Usa PDF, JPG o PNG.';
+			input.value = '';
+			return;
+		}
+
+		resolucionError = '';
+		resolucionSubiendo = true;
+		try {
+			const result = await uploadResolucion(slug || '', file);
+			resolucionUrl = result.url;
+			resolucionNombre = file.name;
+			saveAutosave();
+		} catch (e: any) {
+			resolucionError = e?.message || 'No se pudo subir el archivo. Intentalo de nuevo.';
+			resolucionUrl = '';
+			resolucionNombre = '';
+		} finally {
+			resolucionSubiendo = false;
+			input.value = '';
+		}
+	}
+
+	function removeResolucion() {
+		resolucionUrl = '';
+		resolucionNombre = '';
+		resolucionError = '';
+		saveAutosave();
+	}
+
+	// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+	// handlers para subir la foto del titulo profesional via input file.
+	// Misma mecanica que handleCartaSelected / handleResolucionSelected, pero
+	// se valida que SOLO se suba si esPrimerCarrera=false (es requerido en ese caso).
+	async function handleTituloSelected(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		const MAX_SIZE = 20 * 1024 * 1024;
+		if (file.size > MAX_SIZE) {
+			tituloProfesionalError = 'El archivo es demasiado grande (maximo 20MB).';
+			input.value = '';
+			return;
+		}
+		const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+		if (!allowed.includes(file.type)) {
+			tituloProfesionalError = 'Tipo de archivo no permitido. Usa PDF, JPG o PNG.';
+			input.value = '';
+			return;
+		}
+
+		tituloProfesionalError = '';
+		tituloProfesionalSubiendo = true;
+		try {
+			const result = await uploadTituloProfesional(slug || '', file);
+			tituloProfesionalUrl = result.url;
+			tituloProfesionalNombre = file.name;
+			saveAutosave();
+		} catch (e: any) {
+			tituloProfesionalError = e?.message || 'No se pudo subir el archivo. Intentalo de nuevo.';
+			tituloProfesionalUrl = '';
+			tituloProfesionalNombre = '';
+		} finally {
+			tituloProfesionalSubiendo = false;
+			input.value = '';
+		}
+	}
+
+	function removeTituloProfesional() {
+		tituloProfesionalUrl = '';
+		tituloProfesionalNombre = '';
+		tituloProfesionalError = '';
+		saveAutosave();
+	}
 </script>
 
 <div
@@ -333,7 +616,7 @@
 	</div>
 
 	<div class="relative z-10 flex min-h-dvh flex-col items-center justify-start px-4 py-10 sm:px-6 sm:py-12">
-		<div class="w-full max-w-2xl">
+		<div class="w-full max-w-2xl lg:max-w-6xl">
 			<!-- Header -->
 			<div class="mb-6 flex flex-col items-center text-center">
 				<div class="mb-3 flex items-center gap-3 sm:gap-4">
@@ -439,9 +722,119 @@
 					</div>
 				{/if}
 
+				<!-- F-2026-08-12-WIZARD-SPLIT-SCREEN (Kevin 2026-08-22): wrapper
+				     grid para split-screen 2 columnas en desktop. Sidebar sticky
+				     a la izquierda con stepper vertical, form a la derecha. En
+				     mobile/tablet el grid se desactiva y todo va en una columna. -->
+				<div class="lg:grid lg:grid-cols-[280px_1fr] lg:gap-8 lg:items-start">
+					<!-- Sidebar desktop: stepper vertical + info programa -->
+					<aside class="hidden lg:block lg:sticky lg:top-8 self-start space-y-4">
+						{#if !isExpired}
+							<div class="rounded-2xl border border-gray-200/60 bg-white/95 p-5 shadow-lg shadow-primary-900/5 backdrop-blur-md dark:border-dark-border/60 dark:bg-dark-surface/95 dark:shadow-black/20">
+								<h2 class="mb-1 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+									Progreso
+								</h2>
+								<p class="mb-4 text-2xl font-extrabold text-primary-700 dark:text-dark-tertiary">
+									{progressPct}<span class="text-base">%</span>
+								</p>
+								<!-- Progress bar -->
+								<div class="mb-5 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-border">
+									<div
+										class="h-full rounded-full bg-gradient-to-r from-primary-500 to-primary-600 transition-all duration-500 ease-out"
+										style="width: {progressPct}%"
+									></div>
+								</div>
+								<!-- Stepper vertical -->
+								<ol class="space-y-1" aria-label="Pasos del formulario">
+									{#each STEPS as step, i}
+										{@const isActive = currentStep === step.id}
+										{@const isComplete = currentStep > step.id}
+										{@const isReachable = step.id <= highestStepReached}
+										{@const isLast = i === STEPS.length - 1}
+										<li>
+											<button
+												type="button"
+												onclick={() => goToStep(step.id)}
+												disabled={!isReachable}
+												class="group flex w-full items-start gap-3 rounded-lg p-2.5 text-left transition-all
+													{isActive ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
+													{!isReachable ? 'cursor-not-allowed opacity-60' : 'hover:bg-gray-50 dark:hover:bg-dark-surface/60'}
+													{isComplete ? 'cursor-pointer' : ''}"
+												aria-current={isActive ? 'step' : undefined}
+											>
+												<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all
+													{isComplete ? 'bg-primary-600 text-white' : ''}
+													{isActive ? 'bg-primary-600 text-white ring-4 ring-primary-200 dark:ring-primary-900/40' : ''}
+													{!isComplete && !isActive ? 'bg-gray-200 text-gray-500 dark:bg-dark-border dark:text-gray-400' : ''}">
+													{#if isComplete}
+														<CheckIcon class="size-4" />
+													{:else}
+														{step.id}
+													{/if}
+												</span>
+												<span class="min-w-0 flex-1 pt-0.5">
+													<span class="block text-sm font-semibold
+														{isActive ? 'text-primary-700 dark:text-dark-tertiary' : isComplete ? 'text-primary-600 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400'}">
+														{step.title}
+													</span>
+													<span class="mt-0.5 block text-[11px] text-gray-500 dark:text-gray-400">
+														{step.subtitle}
+													</span>
+												</span>
+											</button>
+											{#if !isLast}
+												<div class="ml-[1.4rem] my-0.5 h-3 w-0.5 rounded-full transition-all
+													{isComplete ? 'bg-primary-500' : 'bg-gray-200 dark:bg-dark-border'}"></div>
+											{/if}
+										</li>
+									{/each}
+								</ol>
+							</div>
+						{/if}
+						<!-- Info del programa (si hay) -->
+						{#if form}
+							<div class="rounded-2xl border border-primary-200/60 bg-primary-50/50 p-5 backdrop-blur-md dark:border-primary-900/30 dark:bg-primary-900/10">
+								<h3 class="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary-700 dark:text-dark-tertiary">
+									<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+									</svg>
+									Sobre este programa
+								</h3>
+								<dl class="space-y-2 text-xs text-gray-700 dark:text-gray-300">
+									{#if form.fecha_inicio || form.fecha_fin}
+										<div>
+											<dt class="font-semibold text-gray-500 dark:text-gray-400">Vigencia</dt>
+											<dd class="mt-0.5">
+												{#if form.fecha_inicio}
+													{new Date(form.fecha_inicio).toLocaleDateString('es-BO', { day: '2-digit', month: 'short' })}
+												{/if}
+												{#if form.fecha_inicio && form.fecha_fin}
+													—
+												{/if}
+												{#if form.fecha_fin}
+													{new Date(form.fecha_fin).toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' })}
+												{/if}
+											</dd>
+										</div>
+									{/if}
+									<div>
+										<dt class="font-semibold text-gray-500 dark:text-gray-400">Plazo de revisión</dt>
+										<dd class="mt-0.5">Aprox. 2-3 días hábiles</dd>
+									</div>
+								</dl>
+							</div>
+						{/if}
+					</aside>
+					<!-- Contenido principal: form (con stepper horizontal solo mobile) -->
+					<div class="min-w-0">
+
 				<!-- Wizard Stepper (ActivePill pattern) -->
+				<!-- F-2026-08-12-WIZARD-SPLIT-SCREEN (Kevin 2026-08-22): en desktop el
+				     stepper horizontal se oculta (lg:hidden) y se muestra un stepper
+				     vertical en una sidebar sticky a la izquierda. En mobile/tablet
+				     se mantiene el stepper horizontal (que es mas compacto). -->
 				{#if !isExpired}
-					<div class="mb-5">
+					<div class="mb-5 lg:hidden">
 						<ol class="flex items-center gap-2 sm:gap-3" aria-label="Pasos del formulario">
 							{#each STEPS as step, i}
 								{@const isActive = currentStep === step.id}
@@ -710,8 +1103,460 @@
 						</div>
 						{/if}
 
-						<!-- ============== PASO 3: Confirmar ============== -->
+						<!-- ============== PASO 3: Datos EC (opcional) ==============
+						     F-2026-08-11-CAMPOS-EC: campos del Diplomado Gestión Tributaria y demás
+						     programas de educación continua (planilla de Lisa). Si NO es EC, dejar vacíos. -->
 						{#if currentStep === 3}
+						<div in:fly={{ x: 20, duration: 350, easing: cubicOut }} out:fly={{ x: -20, duration: 200, easing: cubicOut }}>
+							<div class="rounded-xl border border-primary-200 bg-primary-50/50 p-3 dark:border-primary-900/50 dark:bg-primary-900/10">
+								<p class="text-xs text-primary-800 dark:text-dark-tertiary">
+									<strong>¿Te inscribes a un diplomado de educación continua?</strong> Si es así, completa estos datos. Si no, déjalos vacíos y continúa.
+								</p>
+							</div>
+
+							<!-- Registro Universitario -->
+							<div>
+								<label for="pr-registro" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+									Registro Universitario <span class="text-xs font-normal text-gray-400">(opcional)</span>
+								</label>
+								<input
+									id="pr-registro"
+									type="text"
+									bind:value={registroUniversitario}
+									oninput={() => { clearError('registroUniversitario'); saveAutosave(); }}
+									class="w-full rounded-xl border-2 border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+									placeholder="Ej: 219012345"
+									maxlength="30"
+									disabled={isExpired}
+									aria-invalid={!!fieldErrors.registroUniversitario}
+									aria-describedby={fieldErrors.registroUniversitario ? 'pr-registro-error' : undefined}
+								/>
+								{#if fieldErrors.registroUniversitario}
+									<p id="pr-registro-error" class="mt-1 text-xs font-medium text-red-600">{fieldErrors.registroUniversitario}</p>
+								{:else}
+									<p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Si ya eres egresado de la UAGRM, ingresa tu número de registro</p>
+								{/if}
+							</div>
+
+							<!-- Avance Académico (código) + Formulario de Descuento (número) -->
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								<div>
+									<label for="pr-avance" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Código de avance académico <span class="text-xs font-normal text-gray-400">(opcional)</span>
+									</label>
+									<input
+										id="pr-avance"
+										type="text"
+										inputmode="numeric"
+										bind:value={avanceAcademicoCodigo}
+										oninput={() => { clearError('avanceAcademicoCodigo'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
+											{fieldErrors.avanceAcademicoCodigo ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
+										placeholder="Solo dígitos"
+										disabled={isExpired}
+										aria-invalid={!!fieldErrors.avanceAcademicoCodigo}
+										aria-describedby={fieldErrors.avanceAcademicoCodigo ? 'pr-avance-error' : undefined}
+									/>
+									{#if fieldErrors.avanceAcademicoCodigo}
+										<p id="pr-avance-error" class="mt-1 text-xs font-medium text-red-600">{fieldErrors.avanceAcademicoCodigo}</p>
+									{/if}
+								</div>
+								<div>
+									<label for="pr-formdesc" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Nº de Formulario de Descuento <span class="text-xs font-normal text-gray-400">(opcional)</span>
+									</label>
+									<input
+										id="pr-formdesc"
+										type="text"
+										inputmode="numeric"
+										bind:value={formularioDescuentoNumero}
+										oninput={() => { clearError('formularioDescuentoNumero'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
+											{fieldErrors.formularioDescuentoNumero ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
+										placeholder="Solo dígitos"
+										disabled={isExpired}
+										aria-invalid={!!fieldErrors.formularioDescuentoNumero}
+										aria-describedby={fieldErrors.formularioDescuentoNumero ? 'pr-formdesc-error' : undefined}
+									/>
+									{#if fieldErrors.formularioDescuentoNumero}
+										<p id="pr-formdesc-error" class="mt-1 text-xs font-medium text-red-600">{fieldErrors.formularioDescuentoNumero}</p>
+									{/if}
+								</div>
+							</div>
+
+							<!-- Carrera (código) + Descuento (%) -->
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								<div>
+									<label for="pr-carrera" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Código de carrera <span class="text-xs font-normal text-gray-400">(opcional)</span>
+									</label>
+									<input
+										id="pr-carrera"
+										type="text"
+										bind:value={carreraCodigo}
+										oninput={() => { clearError('carreraCodigo'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+										placeholder="Ej: CONT-2024"
+										maxlength="20"
+										disabled={isExpired}
+										aria-invalid={!!fieldErrors.carreraCodigo}
+									/>
+									<p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Si vienes de otra carrera, indica el código</p>
+								</div>
+								<div>
+									<label for="pr-descuento" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Descuento <span class="text-xs font-normal text-gray-400">(opcional, 0-100%)</span>
+									</label>
+									<!-- F-FIX-TRIM-NUMBER (2026-08-11): type="text" + inputmode="decimal"
+									     para que el state SIEMPRE sea string. type="number" coerce a
+									     number|null y rompia .trim() en validacion. UX equivalente
+									     en mobile (teclado numerico via inputmode). -->
+									<input
+										id="pr-descuento"
+										type="text"
+										inputmode="decimal"
+										bind:value={descuentoPorcentaje}
+										oninput={() => { clearError('descuentoPorcentaje'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
+											{fieldErrors.descuentoPorcentaje ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
+										placeholder="Ej: 50"
+										disabled={isExpired}
+										aria-invalid={!!fieldErrors.descuentoPorcentaje}
+										aria-describedby={fieldErrors.descuentoPorcentaje ? 'pr-descuento-error' : undefined}
+									/>
+									{#if fieldErrors.descuentoPorcentaje}
+										<p id="pr-descuento-error" class="mt-1 text-xs font-medium text-red-600">{fieldErrors.descuentoPorcentaje}</p>
+									{:else}
+										<p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Aplica a módulos, no a matrícula</p>
+									{/if}
+								</div>
+							</div>
+
+							<!-- F-2026-08-11-CAMPOS-EC-MODALIDAD (reunion UAGRM 2026-08-11):
+							     Procedencia + Modalidad + Carta firmada por el director.
+							     Si el estudiante es de PROVINCIA (procedencia != SCZ) o elige
+							     modalidad VIRTUAL, debe subir carta firmada (decision reunion). -->
+
+							<!-- Procedencia (codigo departamento Bolivia) + Modalidad (presencial/virtual) -->
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								<div>
+									<label for="pr-procedencia" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Procedencia <span class="text-xs font-normal text-gray-400">(opcional)</span>
+									</label>
+									<select
+										id="pr-procedencia"
+										bind:value={procedencia}
+										onchange={() => { clearError('procedencia'); clearError('cartaFirmadaUrl'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
+											{fieldErrors.procedencia ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
+										disabled={isExpired}
+									>
+										<option value="">— Selecciona tu departamento —</option>
+										<option value="SCZ">Santa Cruz (SCZ)</option>
+										<option value="LPZ">La Paz (LPZ)</option>
+										<option value="CBA">Cochabamba (CBA)</option>
+										<option value="TJA">Tarija (TJA)</option>
+										<option value="CHS">Chuquisaca (CHS)</option>
+										<option value="POT">Potosí (POT)</option>
+										<option value="ORU">Oruro (ORU)</option>
+										<option value="BEN">Beni (BEN)</option>
+										<option value="PND">Pando (PND)</option>
+									</select>
+									<p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Si no eres de Santa Cruz, se requerirá carta firmada</p>
+								</div>
+								<div>
+									<label for="pr-modalidad" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+										Modalidad <span class="text-xs font-normal text-gray-400">(opcional)</span>
+									</label>
+									<select
+										id="pr-modalidad"
+										bind:value={modalidad}
+										onchange={() => { clearError('modalidad'); clearError('cartaFirmadaUrl'); saveAutosave(); }}
+										class="w-full rounded-xl border-2 bg-white dark:bg-dark-surface py-3 px-3 text-base text-gray-900 dark:text-white outline-none transition-all
+											{fieldErrors.modalidad ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10'}"
+										disabled={isExpired}
+									>
+										<option value="">— Selecciona —</option>
+										<option value="presencial">Presencial</option>
+										<option value="virtual">Virtual</option>
+									</select>
+									<p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Si elegís virtual, se requerirá carta firmada</p>
+								</div>
+							</div>
+
+							<!-- Carta firmada por el director (file upload directo a Cloudinary) -->
+							<div>
+								<label for="pr-carta" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+									Carta firmada por el director
+									{#if procedencia && procedencia !== 'SCZ'}
+										<span class="text-red-500">*</span>
+									{:else if modalidad === 'virtual'}
+										<span class="text-red-500">*</span>
+									{:else}
+										<span class="text-xs font-normal text-gray-400">(opcional)</span>
+									{/if}
+								</label>
+
+								<!-- F-2026-08-11-CAMPOS-EC-MODALIDAD-FILE: input file en vez de URL.
+								     El usuario elige el archivo de su maquina, se sube automaticamente
+								     a Cloudinary y la URL resultante se guarda en cartaFirmadaUrl. -->
+
+								{#if cartaFirmadaUrl}
+									<!-- Preview del archivo ya subido -->
+									<div class="flex items-center gap-3 rounded-xl border-2 border-green-300 bg-green-50/50 p-3 dark:border-green-800/60 dark:bg-green-900/20">
+										<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/40">
+											<CheckIcon class="size-5 text-green-600 dark:text-green-400" />
+										</div>
+										<div class="min-w-0 flex-1">
+											<p class="truncate text-sm font-semibold text-gray-900 dark:text-white">{cartaFirmadaNombre || 'Carta firmada.pdf'}</p>
+											<p class="text-xs text-gray-500 dark:text-gray-400 truncate">{cartaFirmadaUrl}</p>
+										</div>
+										<button
+											type="button"
+											onclick={removeCarta}
+											disabled={isExpired}
+											class="shrink-0 rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 active:scale-95 dark:hover:bg-red-900/30"
+											aria-label="Quitar carta firmada"
+										>
+											<svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+								{:else}
+									<!-- Input file con preview del nombre antes de subir -->
+									<label
+										class="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed bg-white dark:bg-dark-surface py-3 px-3 text-base transition-all
+											{fieldErrors.cartaFirmadaUrl ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border hover:border-primary-500 hover:bg-primary-50/30 dark:hover:bg-primary-900/10'}
+											{isExpired ? 'cursor-not-allowed opacity-60' : ''}"
+									>
+										<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-100 dark:bg-primary-900/40">
+											{#if cartaFirmadaSubiendo}
+												<div class="h-5 w-5 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600"></div>
+											{:else}
+												<svg class="size-5 text-primary-600 dark:text-primary-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+												</svg>
+											{/if}
+										</div>
+										<div class="min-w-0 flex-1">
+											<p class="text-sm font-semibold text-gray-900 dark:text-white">
+												{cartaFirmadaSubiendo ? 'Subiendo...' : 'Subir archivo (PDF, JPG, PNG)'}
+											</p>
+											<p class="truncate text-xs text-gray-500 dark:text-gray-400">
+												{cartaFirmadaSubiendo
+													? 'Por favor espera unos segundos'
+													: 'Hacé click para elegir el archivo de tu maquina (max 20MB)'}
+											</p>
+										</div>
+										<input
+											id="pr-carta"
+											type="file"
+											accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+											onchange={handleCartaSelected}
+											disabled={isExpired || cartaFirmadaSubiendo}
+											class="sr-only"
+											aria-invalid={!!fieldErrors.cartaFirmadaUrl}
+											aria-describedby={fieldErrors.cartaFirmadaUrl ? 'pr-carta-error' : 'pr-carta-help'}
+										/>
+									</label>
+								{/if}
+
+								{#if cartaFirmadaError}
+									<p class="mt-1 text-xs font-medium text-red-600">{cartaFirmadaError}</p>
+								{:else if fieldErrors.cartaFirmadaUrl}
+									<p id="pr-carta-error" class="mt-1 text-xs font-medium text-red-600">{fieldErrors.cartaFirmadaUrl}</p>
+								{:else}
+									<p id="pr-carta-help" class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+										Requerida si sos de provincia o elegiste modalidad virtual. Podes subir un PDF, JPG o PNG de hasta 20MB.
+									</p>
+								{/if}
+							</div>
+
+							<!-- F-2026-08-11-CAMPOS-EC-RESOLUCION (Kevin 22:37): resolucion del programa
+							     OPCIONAL. Misma UI que la carta firmada pero sin asterisco rojo (no es obligatoria). -->
+							<div class="mt-4">
+								<label for="pr-resolucion" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+									Resolución de beca / descuento <span class="text-xs font-normal text-gray-400">(opcional, emitida por Vicerrectorado)</span>
+								</label>
+
+								{#if resolucionUrl}
+									<div class="flex items-center gap-3 rounded-xl border-2 border-green-300 bg-green-50/50 p-3 dark:border-green-800/60 dark:bg-green-900/20">
+										<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/40">
+											<CheckIcon class="size-5 text-green-600 dark:text-green-400" />
+										</div>
+										<div class="min-w-0 flex-1">
+											<p class="truncate text-sm font-semibold text-gray-900 dark:text-white">{resolucionNombre || 'Resolucion-de-beca.pdf'}</p>
+											<p class="text-xs text-gray-500 dark:text-gray-400 truncate">{resolucionUrl}</p>
+										</div>
+										<button
+											type="button"
+											onclick={removeResolucion}
+											disabled={isExpired}
+											class="shrink-0 rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 active:scale-95 dark:hover:bg-red-900/30"
+											aria-label="Quitar resolucion"
+										>
+											<svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+								{:else}
+									<label
+										class="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed bg-white dark:bg-dark-surface py-3 px-3 text-base transition-all
+											{resolucionError ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-300 dark:border-dark-border hover:border-primary-500 hover:bg-primary-50/30 dark:hover:bg-primary-900/10'}
+											{isExpired ? 'cursor-not-allowed opacity-60' : ''}"
+									>
+										<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-100 dark:bg-primary-900/40">
+											{#if resolucionSubiendo}
+												<div class="h-5 w-5 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600"></div>
+											{:else}
+												<svg class="size-5 text-primary-600 dark:text-primary-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+												</svg>
+											{/if}
+										</div>
+										<div class="min-w-0 flex-1">
+											<p class="text-sm font-semibold text-gray-900 dark:text-white">
+												{resolucionSubiendo ? 'Subiendo...' : 'Subir resolución de beca (PDF, JPG, PNG)'}
+											</p>
+											<p class="text-xs text-gray-500 dark:text-gray-400">
+												{resolucionSubiendo ? 'Por favor espera unos segundos' : 'Opcional — si ya tenes la resolucion, subila aca (max 20MB)'}
+											</p>
+										</div>
+										<input
+											id="pr-resolucion"
+											type="file"
+											accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+											onchange={handleResolucionSelected}
+											disabled={isExpired || resolucionSubiendo}
+											class="sr-only"
+										/>
+									</label>
+								{/if}
+
+								{#if resolucionError}
+									<p class="mt-1 text-xs font-medium text-red-600">{resolucionError}</p>
+								{/if}
+							</div>
+						</div>
+						{/if}
+
+						<!-- ============== PASO 4: Título profesional (F-2026-08-12-DESCUENTO-BECA-V2) ============== -->
+						{#if currentStep === 4}
+						<div in:fly={{ x: 20, duration: 350, easing: cubicOut }} out:fly={{ x: -20, duration: 200, easing: cubicOut }}>
+							<div class="rounded-xl border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
+								<h3 class="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-primary-700 dark:text-dark-tertiary">
+									<IdentificationIcon class="size-4" />
+									¿Tienes título profesional?
+								</h3>
+								<p class="text-xs text-gray-600 dark:text-gray-400 mb-4">
+									Si ya cuentas con un título profesional, adjunta una foto o escaneo. Si aún no lo tienes, deja esta sección en blanco y continúa.
+									{#if descuentoPorcentaje}
+										<br><span class="text-amber-700 dark:text-amber-300">El descuento del {descuentoPorcentaje}% que cargaste se aplica a los módulos, no a la matrícula.</span>
+									{/if}
+								</p>
+
+								<!-- Radio Sí/No - wording neutral (no dice "primera carrera" ni "profesional") -->
+								<div class="space-y-2 mb-4">
+									<label class="flex items-start gap-3 rounded-xl border-2 p-3 cursor-pointer transition-all
+										{!esPrimerCarrera ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-border hover:border-primary-300'}"
+									>
+										<input
+											type="radio"
+											name="esPrimerCarrera"
+											value="false"
+											checked={!esPrimerCarrera}
+											onchange={() => { esPrimerCarrera = false; saveAutosave(); }}
+											class="mt-1 size-4 text-primary-600 focus:ring-primary-500"
+										/>
+										<div class="flex-1">
+											<div class="font-semibold text-sm text-gray-900 dark:text-white">Sí, tengo un título profesional</div>
+											<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Lo subiré a continuación.</div>
+										</div>
+									</label>
+									<label class="flex items-start gap-3 rounded-xl border-2 p-3 cursor-pointer transition-all
+										{esPrimerCarrera ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-border hover:border-primary-300'}"
+									>
+										<input
+											type="radio"
+											name="esPrimerCarrera"
+											value="true"
+											checked={esPrimerCarrera}
+											onchange={() => { esPrimerCarrera = true; tituloProfesionalUrl = ''; tituloProfesionalNombre = ''; tituloProfesionalError = ''; saveAutosave(); }}
+											class="mt-1 size-4 text-primary-600 focus:ring-primary-500"
+										/>
+										<div class="flex-1">
+											<div class="font-semibold text-sm text-gray-900 dark:text-white">No, aún no tengo título profesional</div>
+											<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Podrás continuar sin adjuntar ningún documento.</div>
+										</div>
+									</label>
+								</div>
+
+								<!-- Input de título profesional: SOLO si el estudiante dice que SÍ tiene -->
+								{#if !esPrimerCarrera}
+									<div class="rounded-xl border-2 border-amber-300 bg-amber-50/50 dark:border-amber-700/50 dark:bg-amber-900/10 p-3">
+										<label for="pr-titulo" class="block text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2">
+											Sube tu título profesional <span class="text-red-600">*</span>
+										</label>
+										{#if tituloProfesionalUrl}
+											<div class="flex items-center gap-3 rounded-lg border border-green-300 bg-white dark:bg-dark-surface p-2">
+												<CheckIcon class="size-5 text-green-600 flex-shrink-0" />
+												<div class="flex-1 min-w-0">
+													<p class="text-xs font-semibold text-gray-900 dark:text-white truncate">{tituloProfesionalNombre}</p>
+													<a href={tituloProfesionalUrl} target="_blank" rel="noopener" class="text-[10px] text-primary-600 hover:underline">Ver archivo</a>
+												</div>
+												<button
+													type="button"
+													onclick={removeTituloProfesional}
+													class="flex-shrink-0 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-dark-border"
+													aria-label="Quitar título"
+												>
+													<XIcon class="size-4" />
+												</button>
+											</div>
+										{:else}
+											<label
+												class="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed bg-white dark:bg-dark-surface py-3 px-3 text-base transition-all
+													{tituloProfesionalError ? 'border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-amber-400 dark:border-amber-700 hover:border-amber-500 hover:bg-amber-50/30 dark:hover:bg-amber-900/10'}
+													{isExpired || tituloProfesionalSubiendo ? 'cursor-not-allowed opacity-60' : ''}"
+											>
+												<input
+													id="pr-titulo"
+													type="file"
+													accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+													onchange={handleTituloSelected}
+													disabled={isExpired || tituloProfesionalSubiendo}
+													class="sr-only"
+												/>
+												{#if tituloProfesionalSubiendo}
+													<svg class="size-5 animate-spin text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+														<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+														<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+													</svg>
+													<span class="text-sm text-gray-700 dark:text-gray-300">Subiendo…</span>
+												{:else}
+													<UploadIcon class="size-5 text-amber-600" />
+													<span class="text-sm text-gray-700 dark:text-gray-300">Subir foto o PDF del título (max 20MB)</span>
+												{/if}
+											</label>
+										{/if}
+										{#if tituloProfesionalError}
+											<p class="mt-1 text-xs font-medium text-red-600">{tituloProfesionalError}</p>
+										{:else if fieldErrors.tituloProfesionalUrl}
+											<p class="mt-1 text-xs font-medium text-red-600">{fieldErrors.tituloProfesionalUrl}</p>
+										{/if}
+										<p class="mt-2 text-[10px] text-amber-800 dark:text-amber-300">
+											💡 El documento será revisado por el equipo de postgrado como parte de tu postulación.
+										</p>
+									</div>
+								{/if}
+							</div>
+						</div>
+						{/if}
+
+						<!-- ============== PASO 5: Confirmar ============== -->
+						{#if currentStep === 5}
 						<div in:fly={{ x: 20, duration: 350, easing: cubicOut }} out:fly={{ x: -20, duration: 200, easing: cubicOut }}>
 							<div class="rounded-xl border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-900/50 dark:bg-primary-900/10">
 								<h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-primary-700 dark:text-dark-tertiary">
@@ -750,6 +1595,113 @@
 								</dl>
 							</div>
 
+							<!-- F-2026-08-11-CAMPOS-EC: resumen de datos EC (solo si alguno está lleno) -->
+							{#if registroUniversitario || avanceAcademicoCodigo || formularioDescuentoNumero || carreraCodigo || descuentoPorcentaje || procedencia || modalidad || cartaFirmadaUrl || resolucionUrl}
+								<div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-900/50 dark:bg-indigo-900/10">
+									<h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+										<IdentificationIcon class="size-4" />
+										Datos de educación continua
+									</h3>
+									<dl class="space-y-2 text-sm">
+										{#if registroUniversitario}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Registro Univ.</dt>
+												<dd class="font-mono text-gray-900 dark:text-white text-right">{registroUniversitario}</dd>
+											</div>
+										{/if}
+										{#if avanceAcademicoCodigo}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Avance académico</dt>
+												<dd class="font-mono text-gray-900 dark:text-white text-right">{avanceAcademicoCodigo}</dd>
+											</div>
+										{/if}
+										{#if formularioDescuentoNumero}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Nº Form. Descuento</dt>
+												<dd class="font-mono text-gray-900 dark:text-white text-right">{formularioDescuentoNumero}</dd>
+											</div>
+										{/if}
+										{#if carreraCodigo}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Carrera</dt>
+												<dd class="font-mono text-gray-900 dark:text-white text-right">{carreraCodigo}</dd>
+											</div>
+										{/if}
+										{#if descuentoPorcentaje}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Descuento</dt>
+												<dd class="font-semibold text-gray-900 dark:text-white text-right">{descuentoPorcentaje}%</dd>
+											</div>
+										{/if}
+										{#if procedencia}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Procedencia</dt>
+												<dd class="font-mono text-gray-900 dark:text-white text-right">{procedencia}</dd>
+											</div>
+										{/if}
+										{#if modalidad}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Modalidad</dt>
+												<dd class="font-semibold text-gray-900 dark:text-white text-right capitalize">{modalidad}</dd>
+											</div>
+										{/if}
+										{#if cartaFirmadaUrl}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Carta firmada</dt>
+												<dd class="font-mono text-xs text-gray-900 dark:text-white text-right break-all max-w-[60%]">{cartaFirmadaUrl}</dd>
+											</div>
+										{/if}
+										{#if resolucionUrl}
+											<div class="flex justify-between gap-3">
+												<dt class="text-gray-500 dark:text-gray-400">Resolución de beca</dt>
+												<dd class="font-mono text-xs text-gray-900 dark:text-white text-right break-all max-w-[60%]">{resolucionUrl}</dd>
+											</div>
+										{/if}
+									</dl>
+								</div>
+							{/if}
+
+							<!-- F-2026-08-12-DESCUENTO-BECA-V2: resumen neutral (sin mencionar
+							     "primera carrera" ni "profesional con título" al estudiante).
+							     Solo indica si el estudiante declaró tener título y, si lo
+							     subió, muestra el archivo. La categoria real (es_primer_carrera)
+							     la decide el equipo de postgrado internamente. -->
+							<div class="rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-900/10">
+								<h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+									<IdentificationIcon class="size-4" />
+									Título profesional
+								</h3>
+								<dl class="space-y-2 text-sm">
+									<div class="flex justify-between gap-3">
+										<dt class="text-gray-500 dark:text-gray-400">¿Tienes título?</dt>
+										<dd class="text-right">
+											{#if esPrimerCarrera}
+												<span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-700/40 dark:text-gray-300">
+													No
+												</span>
+												<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">No se adjuntó documento</p>
+											{:else}
+												<span class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-300">
+													<CheckIcon class="size-3" />
+													Sí
+												</span>
+												<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Documento adjunto</p>
+											{/if}
+										</dd>
+									</div>
+									{#if !esPrimerCarrera && tituloProfesionalNombre}
+										<div class="flex justify-between gap-3">
+											<dt class="text-gray-500 dark:text-gray-400">Archivo</dt>
+											<dd class="text-right max-w-[60%]">
+												<p class="font-mono text-xs text-gray-900 dark:text-white break-all">{tituloProfesionalNombre}</p>
+												<a href={tituloProfesionalUrl} target="_blank" rel="noopener" class="text-[10px] text-primary-600 hover:underline">Ver archivo</a>
+												<p class="mt-1 text-[10px] italic text-amber-700 dark:text-amber-300">Pendiente de revisión por el equipo de postgrado</p>
+											</dd>
+										</div>
+									{/if}
+								</dl>
+							</div>
+
 							<!-- Mensaje -->
 							<div>
 								<label for="pr-mensaje" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -764,6 +1716,31 @@
 									placeholder="Cuéntanos brevemente por qué te interesa el programa..."
 									disabled={isExpired}
 								></textarea>
+							</div>
+
+							<!-- F-2026-08-12-DESCUENTO-BECA-V3 (Kevin 2026-08-12): declaracion
+							     jurada de veracidad. El estudiante debe confirmar que los datos
+							     son verdaderos. En caso de falsedad (sobre todo en beca, descuento
+							     y condicion de primera carrera), el diplomado podria ser anulado.
+							     Sin este checkbox marcado, no se puede enviar. -->
+							<div class="rounded-xl border-2 border-red-200 bg-red-50/40 p-4 dark:border-red-900/50 dark:bg-red-900/10">
+								<label class="flex items-start gap-3 cursor-pointer">
+									<input
+										id="pr-declaracion"
+										type="checkbox"
+										bind:checked={declaracionVeracidad}
+										onchange={saveAutosave}
+										disabled={isExpired}
+										class="mt-1 size-5 rounded border-2 border-gray-300 text-red-600 focus:ring-2 focus:ring-red-500/30 dark:border-dark-border"
+									/>
+									<span class="text-sm text-gray-800 dark:text-gray-200">
+										<strong class="text-red-700 dark:text-red-400">Declaración jurada de veracidad.</strong>
+										Declaro bajo juramento que todos los datos y documentos proporcionados en esta pre-inscripción son verdaderos, especialmente los relacionados con
+										<strong>beca, descuento y mi condición de primera carrera</strong>.
+										Entiendo que la falsedad, omisión o alteración de estos datos puede derivar en la
+										<strong>anulación de mi diplomado</strong> y las sanciones académicas correspondientes.
+									</span>
+								</label>
 							</div>
 
 							<div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200">
@@ -802,8 +1779,9 @@
 								<button
 									type="button"
 									onclick={handleSubmit}
-									disabled={submitting}
-									class="inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-green-600/20 transition-all hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/30 active:scale-95 disabled:opacity-60"
+									disabled={submitting || !declaracionVeracidad}
+									title={!declaracionVeracidad ? 'Marca la declaración de veracidad para enviar' : ''}
+									class="inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-green-600/20 transition-all hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/30 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
 								>
 									{#if submitting}
 										<span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
@@ -821,6 +1799,8 @@
 				<p class="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
 					Sistema de Gestión Académica y Financiera · © {new Date().getFullYear()} Unidad de Postgrado · UAGRM
 				</p>
+					</div><!-- /min-w-0 (columna derecha del split-screen desktop) -->
+				</div><!-- /lg:grid lg:grid-cols-[280px_1fr] (F-2026-08-12-WIZARD-SPLIT-SCREEN) -->
 			{/if}
 		</div>
 	</div>

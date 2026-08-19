@@ -187,6 +187,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Informes · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6 pb-8">
 	<div class="flex items-center justify-between">
 		<Heading level="h1">Informes</Heading>

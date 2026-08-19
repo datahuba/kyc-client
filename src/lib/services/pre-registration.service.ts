@@ -89,12 +89,43 @@ export interface PreRegistrationSubmit {
 	sexo?: 'masculino' | 'femenino';
 	domicilio?: string;
 	mensaje?: string;
+	// F-2026-08-11-CAMPOS-EC: campos opcionales del Diplomado Gestión
+	// Tributaria y demás programas de educación continua. Si el estudiante
+	// se inscribe a un diplomado EC, los llena desde la planilla de Lisa.
+	registro_universitario?: string;
+	avance_academico_codigo?: number;
+	formulario_descuento_numero?: number;
+	carrera_codigo?: string;
+	descuento_porcentaje?: number; // 0.0 - 1.0
+	// F-2026-08-11-CAMPOS-EC-MODALIDAD (reunion UAGRM 2026-08-11, seccion 4):
+	// procedencia (codigo departamento Bolivia) + modalidad (presencial/virtual)
+	// + carta_firmada_url (URL del PDF firmado por el director). El backend
+	// rechaza la submission si modalidad='virtual' o procedencia != 'SCZ' y
+	// carta_firmada_url esta vacia (regla de la reunion).
+	procedencia?: 'SCZ' | 'LPZ' | 'CBA' | 'TJA' | 'CHS' | 'POT' | 'ORU' | 'BEN' | 'PND';
+	modalidad?: 'presencial' | 'virtual';
+	carta_firmada_url?: string;
+	// F-2026-08-11-CAMPOS-EC-RESOLUCION (Kevin 22:37): OPCIONAL.
+	// URL de la resolucion del programa que el estudiante subio.
+	resolucion_url?: string;
+	// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+	// discriminacion PRIMERA CARRERA vs PROFESIONAL CON TITULO.
+	// - es_primer_carrera=true: cobra matricula primer carrera (default 200 Bs)
+	// - es_primer_carrera=false: cobra matricula profesional (default 500 Bs)
+	//   Y titulo_profesional_url es OBLIGATORIA (validado por el encargado EC)
+	// Default true por seguridad: si el visitante no contesta, cobra menos.
+	es_primer_carrera?: boolean;
+	titulo_profesional_url?: string;
 }
 
 export interface PreRegistrationCounters {
 	forms_total: number;
 	forms_activos: number;
 	submissions_pendientes: number;
+	// F-2026-08-12-DESCUENTOS-TAB (Kevin 2026-08-12): submissions con
+	// descuento propuesto > 0 que requieren atencion del EC. Usado como
+	// badge de la pestana "Descuentos".
+	descuentos_pendientes: number;
 }
 
 // ============================================================================
@@ -156,13 +187,18 @@ export async function listSubmissions(opts: {
 	perPage?: number;
 	formId?: string;
 	estado?: 'pendiente' | 'aprobado' | 'rechazado';
+	// F-2026-08-12-DESCUENTOS-TAB (Kevin 2026-08-12 post-reunion): si true,
+	// devuelve solo submissions con descuento propuesto > 0. Usado por la
+	// pestana "Descuentos" del panel de pre-registros.
+	conDescuento?: boolean;
 } = {}) {
-	const { page = 1, perPage = 20, formId, estado } = opts;
+	const { page = 1, perPage = 20, formId, estado, conDescuento } = opts;
 	const params = new URLSearchParams();
 	params.set('page', String(page));
 	params.set('per_page', String(perPage));
 	if (formId) params.set('form_id', formId);
 	if (estado) params.set('estado', estado);
+	if (conDescuento) params.set('con_descuento', 'true');
 	return apiKyC.get<PaginatedResponse<PreRegistration>>(
 		`/pre-registrations/submissions?${params.toString()}`
 	);
@@ -197,4 +233,58 @@ export async function getPublicForm(slug: string) {
 
 export async function submitPublicForm(slug: string, data: PreRegistrationSubmit) {
 	return apiKyC.postPublic<PreRegistration>(`/pre-registrations/public/${slug}`, data);
+}
+
+// F-2026-08-11-CAMPOS-EC-MODALIDAD-FILE (Kevin 22:17): subir la carta firmada
+// directamente desde el wizard en vez de pegar un link externo. UX mejor:
+// el visitante elige el archivo de su maquina, ve el preview, y el sistema
+// lo sube a Cloudinary. Devuelve la URL publica que se guarda en cartaFirmadaUrl.
+export interface CartaFirmadaUploadResult {
+	url: string;
+	public_id: string;
+	resource_type: string;
+	mime_type: string;
+	size_bytes: number;
+}
+
+export async function uploadCartaFirmada(slug: string, file: File): Promise<CartaFirmadaUploadResult> {
+	const form = new FormData();
+	form.append('file', file);
+	// postFormData se encarga de: armar la URL completa, poner el Authorization
+	// si hay token, NO setear Content-Type (browser pone el boundary), y
+	// manejar errores con la misma logica que el resto del sistema.
+	return apiKyC.postFormData<CartaFirmadaUploadResult>(
+		`/pre-registrations/public/${encodeURIComponent(slug)}/upload-carta`,
+		form,
+		{ requireAuth: false }
+	);
+}
+
+// F-2026-08-11-CAMPOS-EC-RESOLUCION (Kevin 22:37): misma mecanica que la carta
+// firmada pero para la resolucion de BECA/DESCUENTO (NO es la resolucion del
+// programa, eso lo emite el admin). Es OPCIONAL: el estudiante puede incluirla
+// si ya la tiene a mano, o el admin la sube despues.
+export async function uploadResolucion(slug: string, file: File): Promise<CartaFirmadaUploadResult> {
+	const form = new FormData();
+	form.append('file', file);
+	return apiKyC.postFormData<CartaFirmadaUploadResult>(
+		`/pre-registrations/public/${encodeURIComponent(slug)}/upload-resolucion-beca`,
+		form,
+		{ requireAuth: false }
+	);
+}
+
+// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+// Foto o escaneo del TITULO PROFESIONAL. Solo se sube si el estudiante
+// respondio que NO es primera carrera (es_primer_carrera=false). El
+// encargado de educacion continua valida este documento desde el modal
+// de detalle de la submission en /app/pre-registros.
+export async function uploadTituloProfesional(slug: string, file: File): Promise<CartaFirmadaUploadResult> {
+	const form = new FormData();
+	form.append('file', file);
+	return apiKyC.postFormData<CartaFirmadaUploadResult>(
+		`/pre-registrations/public/${encodeURIComponent(slug)}/upload-titulo`,
+		form,
+		{ requireAuth: false }
+	);
 }

@@ -11,16 +11,63 @@
 	import Toggle from '$lib/components/ui/toggle.svelte';
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import { alert } from '$lib/utils';
-	import { CheckIcon } from '$lib/icons/outline';
+	import { CheckIcon, DocumentAddIcon } from '$lib/icons/outline';
 	import { onMount } from 'svelte';
+	import { userStore } from '$lib/stores/userStore';
+
+	// F-US-006-3TIPOS (2026-08-04): el tipo de programa define comportamiento,
+	// validaciones y visibilidad. Hay 3 tipos: proximo (próximo a iniciar),
+	// en_ejecucion (ya empezó) e historico (cerrado, solo archivo).
+	// Reemplaza el antiguo toggle binario Histórico/En-operación.
+	// NOTA: 'proximo' y 'en_ejecucion' comparten estructura operacional; lo
+	// que cambia entre ellos es el comportamiento de inscripciones (solo
+	// 'proximo' acepta nuevas inscripciones de estudiantes). El flag
+	// `es_historico` se deriva para mantener retrocompat con la lógica
+	// existente del form (validaciones, secciones condicionales).
+	type TipoPrograma = 'proximo' | 'en_ejecucion' | 'historico';
 
 	interface Props {
 		course?: Course | null;
+		// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): el wizard pasa el
+		// tipo preseleccionado para que el form se inicialice con el radio
+		// button correcto (proximo / en_ejecucion). Si no se pasa, default
+		// 'proximo' (igual que antes).
+		initialTipoPrograma?: 'proximo' | 'en_ejecucion' | 'historico';
 		onSuccess: () => void;
 		onCancel: () => void;
 	}
 
-	let { course = null, onSuccess, onCancel }: Props = $props();
+	// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): $props() DEBE ir
+	// ANTES de cualquier uso de las props, sino Svelte 5 produce un
+	// ReferenceError: Cannot access 're' (la prop renombrada) before
+	// initialization. Esto es lo que causaba el error en consola al
+	// intentar elegir un tipo de programa.
+	let {
+		course = null,
+		initialTipoPrograma = 'proximo',
+		onSuccess,
+		onCancel
+	}: Props = $props();
+
+	// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): si el wizard paso
+	// un initialTipoPrograma, lo respetamos. Si no, default 'proximo'.
+	let tipo_programa: TipoPrograma = $state(initialTipoPrograma);
+	let es_historico = $derived(tipo_programa === 'historico');
+
+
+	// F-EC-AUTOASIGNA-AVISO (2026-08-18, Kevin): "cuando un encargado de
+	// programa crea su programa ahi deberia salir que ya se asignara
+	// automaticamente a ese perfil".
+	//
+	// Ademas arregla una caja vacia enganosa: GET /users/ exige superadmin,
+	// asi que cuando un encargado abria el formulario la llamada daba 403, el
+	// catch se la comia y quedaba el cartel "No hay Encargados de Curso o
+	// Coordinadores registrados en el sistema" — que es falso, hay 8.
+	//
+	// El encargado no necesita elegir a nadie: el backend lo auto-asigna al
+	// crear (F-2026-08-12-EC-AUTOASIGNAR-CURSO). Se le muestra eso.
+	let rolActual = $derived(($userStore.role || '').toLowerCase());
+	let seAutoAsigna = $derived(rolActual === 'encargado_curso' || rolActual === 'coordinador');
 
 	let isEditMode = $derived(!!course);
 	let saving = $state(false);
@@ -28,6 +75,15 @@
 	let teachers: User[] = $state([]);
 	let availableEncargados: User[] = $state([]);
 	let selectedEncargadosIds: string[] = $state([]);
+
+	// F-HISTORICO (2026-07-31): resolución de respaldo (opcional, cualquier programa).
+	let resolucionFile: File | null = $state(null);
+	let subiendoResolucion = $state(false);
+	// F-2026-08-12-EC-RESOLUCION-OBLIGATORIA (Kevin 2026-08-12): para programas
+	// en ejecucion la resolucion es OBLIGATORIA. El form sube el PDF primero
+	// a POST /upload-resolucion-temp para obtener la URL, y la pasa en el
+	// payload de create_course. Asi el backend puede validar antes de crear.
+	let resolucionPdfUrl: string | null = $state(null);
 
 	// ISSUE-REFACTOR (UI): validación inline por campo (estilo DiscountForm)
 	// en vez de depender solo de alert() al fallar el submit.
@@ -39,6 +95,35 @@
 		discounts.filter((d: any) => d.activo === true || d.estado === 'Activo')
 	);
 
+	// F-DESCUENTO-PREVIEW (2026-08-05, Kevin): "% del descuento global aplicado
+	// al programa en tiempo real". Lee el `descuento_id` seleccionado en el Select
+	// y devuelve el porcentaje del catalogo. Si no hay descuento seleccionado,
+	// retorna 0. Se usa para mostrar el costo efectivo de cada modulo
+	// debajo del input de costo original.
+	let descuentoGlobalPct = $derived.by(() => {
+		if (!formData.descuento_id) return 0;
+		const d = activeDiscounts.find((x: any) => x._id === formData.descuento_id);
+		return d?.porcentaje ?? formData.descuento_curso ?? 0;
+	});
+
+	// F-DESCUENTO-PREVIEW: costo efectivo de un modulo con el descuento
+	// global aplicado. Si no hay descuento, retorna el costo original.
+	function costoConDescuento(costo: number | undefined): number {
+		const c = Number(costo) || 0;
+		if (descuentoGlobalPct <= 0) return c;
+		return Math.round(c * (1 - descuentoGlobalPct / 100) * 100) / 100;
+	}
+
+	// F-DESCUENTO-PREVIEW: ahorro total del programa (suma de los ahorros
+	// por modulo). Si no hay descuento, retorna 0.
+	let ahorroTotalPrograma = $derived.by(() => {
+		if (descuentoGlobalPct <= 0) return 0;
+		return (formData.modulos || []).reduce((acc, m) => {
+			const c = Number(m.costo) || 0;
+			return acc + (c - costoConDescuento(c));
+		}, 0);
+	});
+
 	let formData: CreateCourseRequest = $state({
 		codigo: '',
 		nombre_programa: '',
@@ -46,6 +131,10 @@
 		modalidad: 'presencial',
 		costo_total_interno: 0,
 		matricula_interno: 0,
+		matricula_primer_carrera: null as number | null,
+		matricula_profesional: null as number | null,
+		// P-AMBITO-FORMACION: lo resuelve el backend si no se manda.
+		ambito: null as string | null,
 		cargo_adicional_items: [],
 		cantidad_cuotas: 1,
 		descuento_curso: 0,
@@ -54,9 +143,52 @@
 		fecha_inicio: '',
 		fecha_fin: '',
 		activo: true,
-		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }],
-		requisitos: []
+		// F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): cada modulo lleva su
+		// estado_operacional (Pendiente/En Ejecucion/Ejecutado). Default
+		// 'Pendiente'. El usuario lo cambia manualmente con radio buttons.
+		modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '', estado_operacional: 'Pendiente' }],
+		requisitos: [],
+		es_historico: false
 	});
+
+	// ========================================================================
+	// P-AMBITO-FORMACION (2026-08-18, Kevin en la capacitacion)
+	// ========================================================================
+	// "El tema de educacion continua no lo veo necesario para los programas
+	// de profesionales (...) para los que no, como se evita eso."
+	//
+	// Un programa profesional (maestria, doctorado, y algunos diplomados) NO
+	// cobra matricula institucional: el costo ya esta dentro del programa.
+	// Uno de educacion continua SI, y diferenciada segun primera carrera o
+	// profesional.
+	//
+	// Ademas de esconder campos, esto arregla un bug de plata: los campos de
+	// matricula diferenciada VACIOS no significaban "sin matricula", sino
+	// "cobra el default global" (200 / 500 Bs). Y el campo "Matricula" que se
+	// veia arriba ni siquiera era el que el backend usaba para cobrar. Por eso
+	// abajo se mandan CEROS EXPLICITOS y nunca null.
+	const AMBITO_CONTINUA = 'educacion_continua';
+	const AMBITO_PROFESIONAL = 'profesional';
+
+	// Maestria y doctorado son siempre profesionales (Kevin, 2026-08-18), asi
+	// que ahi el selector ni se muestra. El diplomado es ambiguo — "hay
+	// diplomados uno educacion continua y el otro profesional" — y curso y
+	// taller son continua por defecto.
+	let ambitoForzadoProfesional = $derived(
+		formData.tipo_curso === 'maestría' || formData.tipo_curso === 'doctorado'
+	);
+
+	let ambitoEfectivo = $derived(
+		ambitoForzadoProfesional ? AMBITO_PROFESIONAL : (formData.ambito || AMBITO_CONTINUA)
+	);
+
+	// Educación continua: matrícula DIFERENCIADA según el alumno (200/500).
+	let cobraMatriculaDiferenciada = $derived(ambitoEfectivo === AMBITO_CONTINUA && !es_historico);
+	// Profesional: matrícula ÚNICA, igual para todos, la del programa.
+	// CORREGIDO (Kevin, 2026-08-18 noche): la primera versión escondía la
+	// matrícula en los profesionales asumiendo que no cobraban. Falso:
+	// MAES-GTAF-2026/1 cobra 1300 y DIPL-IA-2026 cobra 300, ambos profesionales.
+	let cobraMatriculaUnica = $derived(ambitoEfectivo === AMBITO_PROFESIONAL && !es_historico);
 
 	let prevCuotas = $state(1);
 	let prevCostoTotal = $state(0);
@@ -74,14 +206,21 @@
 
 	onMount(async () => {
 		try {
+			// F-FIX-403-USERS (2026-08-18, Kevin): `GET /users/` exige SUPERADMIN.
+			// Se pedia siempre, asi que con cualquier otro rol devolvia 403, el
+			// catch se lo tragaba y ademas ensuciaba la consola con
+			// "Se requiere rol de SUPERADMIN" en cada apertura del formulario.
+			// Ahora solo se pide cuando el usuario puede leerlo.
+			const puedeListarUsuarios = ($userStore.role || '').toLowerCase() === 'superadmin';
+
 			const [resDiscounts, resTeachers, resUsers] = await Promise.all([
 				discountService.getAll(1, 100),
 				userService.getTeachers(),
-				userService.getAll(1, 100)
+				puedeListarUsuarios ? userService.getAll(1, 100) : Promise.resolve({ data: [] } as any)
 			]);
 			discounts = resDiscounts.data;
 			teachers = resTeachers;
-			availableEncargados = resUsers.data.filter(u => u.rol === 'encargado_curso' || u.rol === 'coordinador' || u.role === 'encargado_curso' || u.role === 'coordinador');
+			availableEncargados = (resUsers.data ?? []).filter((u: any) => u.rol === 'encargado_curso' || u.rol === 'coordinador' || u.role === 'encargado_curso' || u.role === 'coordinador');
 		} catch (e) {
 			console.error('Error fetching data for course form', e);
 		}
@@ -99,6 +238,8 @@
 					modalidad: course.modalidad,
 					costo_total_interno: course.costo_total_interno,
 					matricula_interno: course.matricula_interno,
+					matricula_primer_carrera: course.matricula_primer_carrera ?? null,
+					matricula_profesional: course.matricula_profesional ?? null,
 					cargo_adicional_items: course.cargo_adicional_items
 						? course.cargo_adicional_items.map((it) => ({ ...it }))
 						: [],
@@ -106,8 +247,11 @@
 					descuento_curso: course.descuento_curso,
 					descuento_id: (course as any).descuento_id || '',
 					observacion: course.observacion,
-					fecha_inicio: course.fecha_inicio.split('T')[0],
-					fecha_fin: course.fecha_fin.split('T')[0],
+					// F-HISTORICO-AUTOSERVICIO-EXCEL-FIX (2026-08-04): los cursos
+					// historicos pueden no tener fecha_inicio/fin (o ser null).
+					// Proteger el split contra null/undefined para no romper el form.
+					fecha_inicio: course.fecha_inicio ? course.fecha_inicio.split('T')[0] : '',
+					fecha_fin: course.fecha_fin ? course.fecha_fin.split('T')[0] : '',
 					activo: course.activo,
 					modulos: course.modulos
 						? course.modulos.map((m) => ({ ...m, docente_id: m.docente_id || '' }))
@@ -116,8 +260,33 @@
 								costo: 0,
 								docente_id: ''
 							})),
-					requisitos: course.requisitos ? course.requisitos.map((r) => ({ ...r })) : []
+					requisitos: course.requisitos ? course.requisitos.map((r) => ({ ...r })) : [],
+					// F-HISTORICO: persistir el flag al editar
+					es_historico: (course as any).es_historico ?? false
 				};
+				es_historico = (course as any).es_historico ?? false;
+				// F-US-006-3TIPOS (2026-08-04): preseleccionar el tipo de
+				// programa según el estado del curso. Prioridad: si
+				// es_historico=True → histórico. Si no, calculamos por
+				// estado_calculado o estado persistido.
+				if ((course as any).es_historico) {
+					tipo_programa = 'historico';
+				} else {
+					const estadoCalc = (course as any).estado_calculado
+						|| (course as any).estado
+						|| 'en_ejecucion';
+					if (estadoCalc === 'programado') {
+						tipo_programa = 'proximo';
+					} else if (estadoCalc === 'en_ejecucion') {
+						tipo_programa = 'en_ejecucion';
+					} else if (estadoCalc === 'cerrado') {
+						// Cerrado que NO es histórico → lo mapeamos a
+						// histórico para reflejar la realidad operacional.
+						tipo_programa = 'historico';
+					} else {
+						tipo_programa = 'proximo';
+					}
+				}
 				prevCuotas = course.cantidad_cuotas;
 				prevCostoTotal = course.costo_total_interno;
 
@@ -130,6 +299,8 @@
 					modalidad: 'presencial',
 					costo_total_interno: 0,
 					matricula_interno: 0,
+					matricula_primer_carrera: null,
+					matricula_profesional: null,
 					cargo_adicional_items: [],
 					cantidad_cuotas: 1,
 					descuento_curso: 0,
@@ -139,8 +310,20 @@
 					fecha_fin: '',
 					activo: true,
 					modulos: [{ nombre: 'Módulo 1', costo: 0, docente_id: '' }],
-					requisitos: []
+					requisitos: [],
+					es_historico: false
 				};
+				es_historico = false;
+				// F-FIX-TIPO-PROGRAMA-SE-RESETEA (2026-08-18, Kevin): aca se
+				// forzaba `tipo_programa = 'proximo'` sin mirar lo que venia del
+				// wizard. Como el wizard pasa el tipo elegido por
+				// `initialTipoPrograma`, elegir "En ejecucion" abria el modal y
+				// este effect lo pisaba de vuelta a "Programado": habia que
+				// volver a seleccionarlo a mano en cada creacion.
+				//
+				// Ahora se respeta lo que eligio el usuario; 'proximo' queda
+				// solo como default cuando el form se abre sin wizard.
+				tipo_programa = initialTipoPrograma ?? 'proximo';
 				prevCuotas = 1;
 				prevCostoTotal = 0;
 
@@ -210,35 +393,44 @@
 		if (!formData.nombre_programa?.trim() || formData.nombre_programa.trim().length < 3) {
 			nuevosErrores.nombre_programa = 'El nombre del programa debe tener al menos 3 caracteres.';
 		}
-		if (!formData.fecha_inicio) {
-			nuevosErrores.fecha_inicio = 'La fecha de inicio es obligatoria.';
+		// F-HISTORICO: fechas opcionales para historicos (puede no haber registros
+		// exactos de inicio/fin de programas muy antiguos). Para programas en
+		// ejecucion o por ejecutarse, las fechas siguen siendo obligatorias.
+		if (!es_historico) {
+			if (!formData.fecha_inicio) {
+				nuevosErrores.fecha_inicio = 'La fecha de inicio es obligatoria.';
+			}
+			if (!formData.fecha_fin) {
+				nuevosErrores.fecha_fin = 'La fecha de fin es obligatoria.';
+			}
+			if (
+				formData.fecha_inicio &&
+				formData.fecha_fin &&
+				new Date(formData.fecha_fin) < new Date(formData.fecha_inicio)
+			) {
+				nuevosErrores.fecha_fin = 'La fecha de fin no puede ser anterior a la fecha de inicio.';
+			}
 		}
-		if (!formData.fecha_fin) {
-			nuevosErrores.fecha_fin = 'La fecha de fin es obligatoria.';
-		}
-		if (
-			formData.fecha_inicio &&
-			formData.fecha_fin &&
-			new Date(formData.fecha_fin) < new Date(formData.fecha_inicio)
-		) {
-			nuevosErrores.fecha_fin = 'La fecha de fin no puede ser anterior a la fecha de inicio.';
-		}
-		if (!formData.costo_total_interno || formData.costo_total_interno <= 0) {
-			nuevosErrores.costo_total_interno = 'El costo total interno debe ser mayor a 0.';
-		}
-		if (formData.matricula_interno === null || formData.matricula_interno === undefined || formData.matricula_interno < 0) {
-			nuevosErrores.matricula_interno = 'La matrícula interna no puede ser negativa.';
-		}
-		if (!formData.cantidad_cuotas || formData.cantidad_cuotas < 1) {
-			nuevosErrores.cantidad_cuotas = 'Debe haber al menos 1 módulo/cuota.';
-		}
-		if (formData.modulos?.some((m) => !m.nombre?.trim())) {
-			nuevosErrores.modulos = 'Todos los módulos deben tener un nombre.';
-		}
-		// ISSUE-P-CARGO-MULTIITEM: cada ítem de cargo adicional debe tener
-		// nombre (para que el estudiante sepa qué está pagando) y costo >= 0.
-		if (formData.cargo_adicional_items?.some((it) => !it.nombre?.trim())) {
-			nuevosErrores.cargo_adicional_items = 'Todos los ítems de cargo adicional deben tener un nombre.';
+		// F-HISTORICO: costo/matricula/cuotas/modulos son opcionales para historicos.
+		// Para programas en operacion real, se exigen.
+		if (!es_historico) {
+			if (!formData.costo_total_interno || formData.costo_total_interno <= 0) {
+				nuevosErrores.costo_total_interno = 'El costo total interno debe ser mayor a 0.';
+			}
+			if (formData.matricula_interno === null || formData.matricula_interno === undefined || formData.matricula_interno < 0) {
+				nuevosErrores.matricula_interno = 'La matrícula interna no puede ser negativa.';
+			}
+			if (!formData.cantidad_cuotas || formData.cantidad_cuotas < 1) {
+				nuevosErrores.cantidad_cuotas = 'Debe haber al menos 1 módulo/cuota.';
+			}
+			if (formData.modulos?.some((m) => !m.nombre?.trim())) {
+				nuevosErrores.modulos = 'Todos los módulos deben tener un nombre.';
+			}
+			// ISSUE-P-CARGO-MULTIITEM: cada ítem de cargo adicional debe tener
+			// nombre (para que el estudiante sepa qué está pagando) y costo >= 0.
+			if (formData.cargo_adicional_items?.some((it) => !it.nombre?.trim())) {
+				nuevosErrores.cargo_adicional_items = 'Todos los ítems de cargo adicional deben tener un nombre.';
+			}
 		}
 		if (selectedEncargadosIds.length > 0) {
 			// Validar localmente (aunque el backend también lo validará)
@@ -258,7 +450,87 @@
 
 		saving = true;
 		try {
-			const payload = { ...formData };
+			// F-2026-08-12-EC-RESOLUCION-OBLIGATORIA (Kevin 2026-08-12 post-reunion):
+			// para programas en ejecucion la resolucion es OBLIGATORIA. Subir
+			// el PDF al endpoint temporal ANTES de crear el curso, obtener la
+			// URL, y pasarla en el payload. Asi el backend puede validar.
+			if (resolucionFile) {
+				try {
+					subiendoResolucion = true;
+					const tempUpload = await courseService.uploadResolucionTemp(resolucionFile);
+					resolucionPdfUrl = tempUpload.url;
+				} catch (uploadErr: any) {
+					alert(
+						'error',
+						`No se pudo subir la resolución: ${uploadErr?.message || 'Error desconocido'}. El programa no se creó.`
+					);
+					subiendoResolucion = false;
+					saving = false;
+					return;
+				} finally {
+					subiendoResolucion = false;
+				}
+			}
+
+			// Se le hace `delete` de campos opcionales mas abajo, por eso el tipo laxo.
+			const payload: Record<string, any> = { ...formData };
+			// F-2026-08-12-EC-RESOLUCION-OBLIGATORIA: pasar la URL de la
+			// resolucion subida (o el valor que ya tenia en edicion).
+			payload.resolucion_pdf_url = resolucionPdfUrl || (formData as any).resolucion_pdf_url || null;
+			// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12): normalizar las
+			// matriculas diferenciadas. Si el admin dejo el campo vacio, el
+			// override es null → el backend usa el default global (200/500).
+			payload.matricula_primer_carrera = formData.matricula_primer_carrera || null;
+			payload.matricula_profesional = formData.matricula_profesional || null;
+			// F-HISTORICO (2026-07-31): sincronizar el flag desde el state local
+			// y vaciar los campos operacionales (costo, modulos, requisitos) que
+			// no aplican para programas historicos. Asi evitamos que el backend
+			// rechace por validaciones que ya relajamos en el schema.
+			payload.es_historico = es_historico;
+			if (es_historico) {
+				payload.costo_total_interno = 0;
+				payload.matricula_interno = 0;
+				payload.matricula_primer_carrera = null;
+				payload.matricula_profesional = null;
+				payload.cantidad_cuotas = 0;
+				payload.modulos = [];
+				payload.requisitos = [];
+				payload.cargo_adicional_items = [];
+				// FIX-F-2026-08-12-EC-ACTIVO-HISTORICO (Kevin 2026-08-12): antes
+				// poniamos `payload.activo = false` para historicos, lo que los
+				// hacia invisibles en el modal de "Editar Usuario" (que filtra
+				// activo=true) y por tanto no se podian re-asignar. Ahora los
+				// historicos quedan `activo=true` y se gestionan via el flag
+				// `es_historico`. El catalogo publico ya excluye historicos del
+				// listado "disponible para inscribirse" (ver
+				// `get_courses_disponibles_para_estudiante` en course_service).
+				payload.activo = true; // historico, pero `activo=true` para que sea visible/gestionable
+				// F-FIX-CREAR-PROGRAMA-422 (2026-08-09, Kevin): borrar fechas
+				// vacias para que el backend no rechace con 422 al validar
+				// "Input should be a valid datetime".
+				delete payload.fecha_inicio;
+				delete payload.fecha_fin;
+			}
+			// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): enviar
+			// estado_override al backend para que el calculo automatico de
+			// estado (programado/en_ejecucion/cerrado segun fechas) respete
+			// la eleccion del usuario. Sin esto, si el usuario elige
+			// "En ejecucion" pero las fechas dicen "programado", el curso
+			// queda como programado en vez de en_ejecucion.
+			if (!es_historico) {
+				if (tipo_programa === 'en_ejecucion') {
+					payload.estado_override = 'en_ejecucion';
+				} else if (tipo_programa === 'proximo') {
+					// 'proximo' = programado. Si el usuario eligio fechas futuras
+					// el calculo automatico ya dara 'programado'. Pero si eligio
+					// fechas pasadas, forzamos a 'programado' igual.
+					payload.estado_override = 'programado';
+				}
+			} else {
+				// Historico: estado_override = 'cerrado' para que el badge
+				// muestre "cerrado" aunque las fechas sean raras.
+				payload.estado_override = 'cerrado';
+			}
 			if (!payload.descuento_id) {
 				if (isEditMode) {
 					// En edición, enviar null explícito para remover descuento existente
@@ -272,30 +544,36 @@
 			// ISSUE-P-CARGO-MULTIITEM: descartar ítems vacíos (sin nombre o con
 			// costo 0 dejado a medio llenar) antes de enviar.
 			payload.cargo_adicional_items = (payload.cargo_adicional_items || []).filter(
-				(it) => it.nombre?.trim()
+				(it: any) => it.nombre?.trim()
 			);
 
 			// ISSUE-Q-DOCUMENTOS-KYC: descartar requisitos vacíos (sin descripción)
-			payload.requisitos = (payload.requisitos || []).filter((r) => r.descripcion?.trim());
+			payload.requisitos = (payload.requisitos || []).filter((r: any) => r.descripcion?.trim());
 
-			payload.modulos = payload.modulos!.map((m) => {
-				const mod = { ...m };
-				if (!mod.docente_id) {
-					// `docente_id` no es opcional en el tipo; se castea para poder
-					// omitirlo del payload cuando está vacío (comportamiento previo).
-					delete (mod as { docente_id?: string }).docente_id;
-				}
-				return mod;
-			});
+			if (!es_historico) {
+				payload.modulos = payload.modulos!.map((m: any) => {
+					const mod = { ...m };
+					if (!mod.docente_id) {
+						// `docente_id` no es opcional en el tipo; se castea para poder
+						// omitirlo del payload cuando está vacío (comportamiento previo).
+						delete (mod as { docente_id?: string }).docente_id;
+					}
+					return mod;
+				});
+			}
 
 			// ISSUE F: Verificador de congruencia financiera
-			const sumModulos = payload.modulos.reduce((acc, curr) => acc + Number(curr.costo), 0);
-			if (!autoCalculateModules && sumModulos !== payload.costo_total_interno) {
-				discrepancyMessage = `La suma manual de los módulos (Bs. ${sumModulos}) no coincide con el Costo Total (Bs. ${payload.costo_total_interno}). ¿Deseas guardar el programa con esta discrepancia?`;
-				pendingSubmitPayload = payload;
-				showDiscrepancyModal = true;
-				saving = false;
-				return;
+			// (Solo aplica a programas en operacion real; los historicos no
+			// tienen estructura financiera que validar.)
+			if (!es_historico) {
+				const sumModulos = (payload.modulos || []).reduce((acc: number, curr: any) => acc + Number(curr.costo), 0);
+				if (!autoCalculateModules && sumModulos !== payload.costo_total_interno) {
+					discrepancyMessage = `La suma manual de los módulos (Bs. ${sumModulos}) no coincide con el Costo Total (Bs. ${payload.costo_total_interno}). ¿Deseas guardar el programa con esta discrepancia?`;
+					pendingSubmitPayload = payload;
+					showDiscrepancyModal = true;
+					saving = false;
+					return;
+				}
 			}
 
 			await guardarCurso(payload);
@@ -320,16 +598,60 @@
 				savedCourse = await courseService.create(payload);
 				alert('success', 'Programa creado correctamente');
 			}
-			
-			// Asignar los encargados de curso seleccionados
-			if (savedCourse && savedCourse._id) {
+
+			// F-HISTORICO (2026-07-31): subir la resolución de respaldo si el
+			// usuario adjuntó un PDF en este submit. Lo hacemos DESPUÉS de
+			// guardar el curso porque el endpoint PUT /{id}/resolucion necesita
+			// el id del curso. La subida es opcional y tolerante a fallos
+			// (solo un warning, no rompe el flujo).
+			if (savedCourse && savedCourse._id && resolucionFile) {
+				try {
+					subiendoResolucion = true;
+					await courseService.subirResolucion(savedCourse._id, resolucionFile);
+					alert('success', 'Resolución de respaldo subida correctamente');
+				} catch (resErr: any) {
+					alert('warning', resErr?.message || 'El programa se guardó, pero la resolución no se pudo subir. Puedes reintentarlo desde la opción "Subir Resolución" del menú.');
+				} finally {
+					subiendoResolucion = false;
+					resolucionFile = null;
+				}
+			}
+
+			// Asignar los encargados de curso seleccionados.
+			//
+			// F-FIX-403-ENCARGADOS (2026-08-18, Kevin): esta llamada se hacía
+			// SIEMPRE, pero PUT /courses/{id}/encargados exige rol CPD. Cuando
+			// el que creaba el programa era un encargado o coordinador, el
+			// programa se guardaba bien y acto seguido saltaba un aviso de que
+			// no tenía permisos — confuso, porque el programa sí se había
+			// creado.
+			//
+			// Y era ademas innecesario: a ellos el backend ya los auto-asigna
+			// al crear (F-2026-08-12-EC-AUTOASIGNAR-CURSO). Encima la lista
+			// venía vacía, porque GET /users/ tambien les da 403.
+			//
+			// Se mantiene la llamada para CPD/admin/superadmin, incluso con la
+			// lista vacía: ahí una lista vacía significa "quitar a todos", que
+			// es una acción válida al editar.
+			// CORREGIDO (2026-08-18, segunda pasada): la condicion anterior
+			// miraba el ROL, y no alcanzaba. `GET /users/` exige SUPERADMIN, asi
+			// que la lista de encargados queda vacia para TODOS los demas roles
+			// — CPD y admin incluidos. Cualquiera de ellos seguia disparando el
+			// PUT y recibiendo el 403.
+			//
+			// La condicion correcta no depende del rol: si la lista nunca se
+			// pudo cargar, el usuario no pudo haber seleccionado a nadie, asi
+			// que no hay nada que mandar. Quien SI puede administrar encargados
+			// (superadmin) tiene la lista cargada, y ahi una seleccion vacia
+			// sigue significando "quitar a todos".
+			if (savedCourse && savedCourse._id && !es_historico && availableEncargados.length > 0) {
 				try {
 					await courseService.assignEncargados(savedCourse._id, selectedEncargadosIds);
 				} catch (err: any) {
-					alert('warning', err.message || 'El curso se guardó, pero hubo un error al asignar los encargados. Revisa el límite de 5 programas por usuario.');
+					alert('warning', err.message || 'El curso se guardó, pero hubo un error al asignar los encargados. Revisa el límite de 10 programas por usuario.');
 				}
 			}
-			
+
 			onSuccess();
 		} catch (e: any) {
 			alert('error', e.message || 'Error al guardar el curso');
@@ -355,7 +677,26 @@
 <form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 	<!-- SECCIÓN: Datos básicos -->
 	<Card variant="ghost" padding="none">
-		<Heading level="h4" class="mb-3">Datos Básicos</Heading>
+		<div class="mb-3 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
+			<Heading level="h4">Datos Básicos</Heading>
+
+			<!-- F-US-006-3TIPOS (2026-08-04): selector de tipo de programa
+			     (reemplaza el antiguo toggle binario Historico/En-operacion).
+			     Hay 3 tipos con comportamiento y validaciones distintas:
+			       - Proximo/Programado: aun no inicia, acepta inscripciones.
+			       - En ejecucion: ya empezo, NO acepta nuevas inscripciones
+			         de estudiantes. Admin/encargado anade rezagados.
+			       - Historico/Cerrado: solo archivo, todos los datos opcionales. -->
+			<Select
+				label="Tipo de Programa"
+				id="tipo_programa"
+				bind:value={tipo_programa}
+			>
+				<option value="proximo">Proximo / Programado (acepta inscripciones)</option>
+				<option value="en_ejecucion">En ejecucion (NO acepta nuevas inscripciones)</option>
+				<option value="historico">Historico / Cerrado (solo archivo, datos opcionales)</option>
+			</Select>
+		</div>
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 			<Input
 				label="Código"
@@ -400,12 +741,13 @@
 				{/each}
 			</Select>
 
+			<!-- F-HISTORICO: fechas opcionales para programas muy antiguos. -->
 			<Input
 				label="Fecha Inicio"
 				id="fecha_inicio"
 				type="date"
 				bind:value={formData.fecha_inicio}
-				required
+				required={!es_historico}
 				error={errors.fecha_inicio}
 			/>
 			<Input
@@ -413,17 +755,29 @@
 				id="fecha_fin"
 				type="date"
 				bind:value={formData.fecha_fin}
-				required
+				required={!es_historico}
 				error={errors.fecha_fin}
 			/>
 		</div>
+
+		<!-- F-HISTORICO: aviso amarillo explicando que el resto de secciones se oculta. -->
+		{#if es_historico}
+			<div class="mt-4 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+				<strong>Modo Histórico activo.</strong> Se omiten los datos operacionales
+				(docentes, módulos, pagos, requisitos, descuentos). Solo se guardan los
+				datos básicos del programa y, opcionalmente, la resolución de respaldo.
+			</div>
+		{/if}
 	</Card>
 
+	<!-- F-HISTORICO: las siguientes secciones se OCULTAN cuando es_historico=True.
+	     Un programa pasado no tiene operacion academica ni financiera que cargar. -->
+	{#if !es_historico}
 	<!-- SECCIÓN: Encargados de Curso -->
 	<Card variant="bordered" padding="md">
 		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">Gestión Académica</Heading>
 		<p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
-			Selecciona a los Encargados de Curso o Coordinadores que administrarán este programa. Recuerda que cada usuario puede administrar un máximo de 5 programas a la vez.
+			Selecciona a los Encargados de Curso o Coordinadores que administrarán este programa. Recuerda que cada usuario puede administrar un máximo de 10 programas a la vez.
 		</p>
 		
 		{#if availableEncargados.length > 0}
@@ -447,9 +801,19 @@
 					</label>
 				{/each}
 			</div>
+		{:else if seAutoAsigna}
+			<p class="text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 p-3 rounded-md border border-green-100 dark:border-green-800">
+				Este programa <strong>se asignará automáticamente a tu perfil</strong> al
+				crearlo, así que vas a poder gestionarlo enseguida. Si además tiene que
+				administrarlo otra persona, pedile a CPD que la agregue.
+			</p>
 		{:else}
-			<p class="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md border border-amber-100 dark:border-amber-800">
-				No hay Encargados de Curso o Coordinadores registrados en el sistema.
+			<!-- Solo el superadmin puede listar usuarios, asi que para el resto
+			     esta seccion nunca tuvo datos. Antes decia "no hay encargados
+			     registrados", que era falso y confundia. -->
+			<p class="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md border border-gray-200 dark:border-gray-700">
+				La asignación de encargados la gestiona el superadministrador. Si este
+				programa tiene que administrarlo otra persona, pedile que la agregue.
 			</p>
 		{/if}
 	</Card>
@@ -461,23 +825,123 @@
 			Precio único: aplica por igual a todos los estudiantes, sin importar su lugar de procedencia.
 		</p>
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-			<Input
-				label="Costo Total (Colegiatura)"
-				id="costo_total_interno"
-				type="number"
-				bind:value={formData.costo_total_interno}
-				required
-				error={errors.costo_total_interno}
-			/>
-			<Input
-				label="Matrícula"
-				id="matricula_interno"
-				type="number"
-				bind:value={formData.matricula_interno}
-				required
-				error={errors.matricula_interno}
-			/>
+			<div>
+				<Input
+					label="Costo Total (Colegiatura)"
+					id="costo_total_interno"
+					type="number"
+					bind:value={formData.costo_total_interno}
+					required
+					error={errors.costo_total_interno}
+				/>
+				<!-- F-DESCUENTO-PREVIEW: preview del costo con descuento global.
+				     Visible solo en modo Cálculo Auto (no en Manual). -->
+				{#if descuentoGlobalPct > 0 && autoCalculateModules && (formData.costo_total_interno || 0) > 0}
+					<p class="mt-1 whitespace-nowrap text-xs text-green-700 dark:text-green-400">
+						Con {descuentoGlobalPct}% descuento: <strong>Bs. {costoConDescuento(formData.costo_total_interno).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+					</p>
+				{/if}
+			</div>
+			<!-- P-AMBITO-FORMACION (2026-08-18): el campo "Matrícula"
+			     (matricula_interno) ya NO se pide. Era el campo que el
+			     encargado veía y completaba, pero el backend cobra con
+			     matricula_primer_carrera / matricula_profesional, así que lo
+			     que se escribía acá no tenía efecto sobre el cobro. Se
+			     mantiene en el modelo por retrocompatibilidad y lo setea el
+			     backend según el ámbito. -->
 		</div>
+
+		<!-- ================================================================
+		     P-AMBITO-FORMACION (2026-08-18, Kevin en la capacitación)
+		     ================================================================
+		     Antes acá había DOS bloques de matrícula compitiendo, y el que se
+		     veía arriba no era el que cobraba. Ahora hay uno solo, y solo
+		     aparece cuando corresponde: si el programa es profesional no se
+		     muestra nada, porque no lleva matrícula institucional.
+		-->
+		{#if !es_historico && !ambitoForzadoProfesional}
+			<div class="mt-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+				<p class="mb-2 text-xs font-semibold text-gray-900 dark:text-gray-100">
+					Tipo de programa
+				</p>
+				<div class="flex flex-col gap-2 sm:flex-row sm:gap-4">
+					<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+						<input
+							type="radio"
+							class="size-4 text-primary-600"
+							checked={ambitoEfectivo === AMBITO_CONTINUA}
+							onchange={() => (formData.ambito = AMBITO_CONTINUA)}
+						/>
+						Educación continua <span class="text-xs text-gray-500">(cobra matrícula)</span>
+					</label>
+					<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+						<input
+							type="radio"
+							class="size-4 text-primary-600"
+							checked={ambitoEfectivo === AMBITO_PROFESIONAL}
+							onchange={() => (formData.ambito = AMBITO_PROFESIONAL)}
+						/>
+						Profesional <span class="text-xs text-gray-500">(sin matrícula)</span>
+					</label>
+				</div>
+			</div>
+		{/if}
+
+		{#if cobraMatriculaUnica}
+			<div class="mt-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+				<p class="mb-2 text-xs font-semibold text-gray-900 dark:text-gray-100">
+					Matrícula del programa
+				</p>
+				<p class="mb-3 text-[11px] text-gray-600 dark:text-gray-400">
+					{#if ambitoForzadoProfesional}
+						Las maestrías y doctorados cobran una matrícula única, igual para todos
+						los estudiantes.
+					{:else}
+						Un programa profesional cobra una matrícula única, igual para todos los
+						estudiantes.
+					{/if}
+					Si no cobra matrícula, escribí 0.
+				</p>
+				<div class="max-w-xs">
+					<Input
+						label="Matrícula (Bs)"
+						id="matricula_interno"
+						type="number"
+						bind:value={formData.matricula_interno}
+						error={errors.matricula_interno}
+					/>
+				</div>
+			</div>
+		{/if}
+
+		{#if cobraMatriculaDiferenciada}
+			<div class="mt-3 rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-900/10 p-3">
+				<p class="mb-2 text-xs font-semibold text-indigo-900 dark:text-indigo-200">
+					Matrícula (educación continua)
+				</p>
+				<p class="mb-3 text-[11px] text-indigo-700 dark:text-indigo-300">
+					Es lo que paga el estudiante además del costo del programa. Si un monto
+					debe ser 0, escribí 0 — dejarlo vacío aplica el valor por defecto
+					(200 / 500 Bs), que no es lo mismo.
+				</p>
+				<div class="grid grid-cols-2 gap-3">
+					<Input
+						label="Primera carrera"
+						id="matricula_primer_carrera"
+						type="number"
+						bind:value={formData.matricula_primer_carrera}
+						placeholder="Default: 200"
+					/>
+					<Input
+						label="Ya es profesional"
+						id="matricula_profesional"
+						type="number"
+						bind:value={formData.matricula_profesional}
+						placeholder="Default: 500"
+					/>
+				</div>
+			</div>
+		{/if}
 	</Card>
 
 	<!-- SECCIÓN: Cargo adicional (ISSUE-P-CARGO-MULTIITEM, 2026-07-08) -->
@@ -689,6 +1153,17 @@
 									? 'bg-gray-100 text-gray-500 border-dashed dark:bg-gray-900'
 									: 'border-primary-300 font-semibold dark:border-primary-700'}
 							/>
+							<!-- F-DESCUENTO-PREVIEW (2026-08-05, Kevin): preview del costo
+							     con descuento global aplicado, visible SOLO en modo
+							     Cálculo Auto (no en modo Manual, donde el usuario edita
+							     libremente y el sistema no debe sugerirle valores).
+							     F-LOGICA-DESCUENTOS-MAX: el sistema SIEMPRE toma el
+							     descuento mayor, por eso el preview muestra ese monto. -->
+							{#if descuentoGlobalPct > 0 && autoCalculateModules}
+								<p class="mt-1 whitespace-nowrap text-xs text-green-700 dark:text-green-400">
+									Con {descuentoGlobalPct}% descuento: <strong>Bs. {costoConDescuento(formData.modulos[i].costo).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+								</p>
+							{/if}
 						</div>
 						<div class="w-full xl:w-2/5">
 							<Select label="Docente Titular (Opcional)" bind:value={formData.modulos[i].docente_id}>
@@ -698,6 +1173,29 @@
 								{/each}
 							</Select>
 						</div>
+						<!-- F-MAESTRIA-EN-EJECUCION (2026-08-05, Kevin): selector manual
+						     de estado operacional del modulo. Solo visible para
+						     programas en ejecucion (no para proximos ni historicos).
+						     Default 'Pendiente' si el modulo no se ha marcado. -->
+						{#if tipo_programa === 'en_ejecucion'}
+							<div class="w-full xl:w-3/5">
+								<label
+									for={`modulo_estado_op_${i}`}
+									class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200"
+								>
+									Estado del módulo en el cronograma
+								</label>
+								<select
+									id={`modulo_estado_op_${i}`}
+									bind:value={formData.modulos[i].estado_operacional}
+									class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+								>
+									<option value="Pendiente">⏳ Pendiente (aún no se inicia)</option>
+									<option value="En Ejecucion">🟡 En Ejecución (corriendo ahora)</option>
+									<option value="Ejecutado">✅ Ejecutado (ya finalizado)</option>
+								</select>
+							</div>
+						{/if}
 					</div>
 				{/each}
 			</div>
@@ -717,13 +1215,107 @@
 					Manual" para alterar los precios y no perder los cambios.
 				</p>
 			{/if}
+
+			<!-- F-DESCUENTO-PREVIEW (2026-08-05, Kevin): resumen del efecto del
+			     descuento global sobre el costo total del programa. Se muestra
+			     SOLO en modo Cálculo Auto (no en Manual, donde el usuario edita
+			     libremente). El descuento se aplica al inscribir (no se pisa el
+			     costo de los módulos). -->
+			{#if descuentoGlobalPct > 0 && autoCalculateModules}
+				<div
+					class="mt-3 rounded-md border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+				>
+					<div class="flex items-center gap-2 font-semibold">
+						<svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+							/></svg
+						>
+						Resumen con Descuento Global {descuentoGlobalPct}%
+					</div>
+					<div class="mt-1 grid grid-cols-3 gap-2 text-xs">
+						<div>
+							<div class="text-gray-600 dark:text-gray-400">Costo original</div>
+							<div class="font-semibold">Bs. {((formData.modulos || []).reduce((acc, m) => acc + (Number(m.costo) || 0), 0)).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+						</div>
+						<div>
+							<div class="text-gray-600 dark:text-gray-400">Ahorro total</div>
+							<div class="font-semibold text-green-700 dark:text-green-400">Bs. {ahorroTotalPrograma.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+						</div>
+						<div>
+							<div class="text-gray-600 dark:text-gray-400">Costo con descuento</div>
+							<div class="font-semibold">Bs. {(((formData.modulos || []).reduce((acc, m) => acc + (Number(m.costo) || 0), 0)) - ahorroTotalPrograma).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+						</div>
+					</div>
+				</div>
+			{/if}
 		</Card>
 	{/if}
 
 	<!-- SECCIÓN: Observación y estado -->
 	<Card variant="ghost" padding="none">
 		<TextArea label="Observación" id="observacion" bind:value={formData.observacion} rows={3} />
-		<Checkbox class="mt-4" id="activo" label="Curso Activo" bind:checked={formData.activo} />
+		{#if !es_historico}
+			<Checkbox class="mt-4" id="activo" label="Curso Activo" bind:checked={formData.activo} />
+		{/if}
+	</Card>
+	{/if}
+
+	<!-- F-HISTORICO (2026-07-31): Resolución de Respaldo.
+	     F-2026-08-12-EC-RESOLUCION-OBLIGATORIA (Kevin 2026-08-12 post-reunion):
+	     - Historico: opcional
+	     - Programado (proximo): opcional
+	     - En ejecucion: OBLIGATORIA (sin esto no se puede crear el programa)
+	     Se sube al crear o editar; tambien se puede subir mas tarde desde el
+	     menu desplegable del catalogo de programas. -->
+	<Card variant="bordered" padding="md">
+		<Heading level="h4" class="mb-3 text-primary-700 dark:text-dark-tertiary">
+			Resolución de Respaldo {tipo_programa === 'en_ejecucion' ? '(Obligatoria)' : '(Opcional)'}
+		</Heading>
+		<p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+			PDF de la resolución que respalda este programa (ej. resolución del Comité Académico,
+			resolución del Director, etc).
+			{#if tipo_programa === 'en_ejecucion'}
+				<strong class="text-red-600 dark:text-red-400">Es OBLIGATORIA para programas en ejecución.</strong>
+			{:else}
+				Es <strong>opcional</strong>: podés dejarlo en blanco y subirlo más tarde.
+			{/if}
+		</p>
+
+		{#if isEditMode && course && (course as any).resolucion_pdf_url}
+			<div class="mb-3 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20 p-2 text-sm text-green-800 dark:text-green-200">
+				<DocumentAddIcon class="size-5 shrink-0" />
+				<div class="flex-1">
+					<div class="font-semibold">Ya tenés una resolución cargada</div>
+					<a href={(course as any).resolucion_pdf_url} target="_blank" rel="noopener" class="text-xs underline break-all">
+						Ver PDF actual
+					</a>
+				</div>
+			</div>
+		{/if}
+
+		<label for="resolucion-pdf" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+			Subir nuevo PDF (reemplaza el actual)
+		</label>
+		<input
+			id="resolucion-pdf"
+			type="file"
+			accept="application/pdf"
+			class="block w-full text-sm text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md cursor-pointer bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+			onchange={(e) => {
+				const target = e.target as HTMLInputElement;
+				resolucionFile = target.files?.[0] || null;
+			}}
+		/>
+		{#if resolucionFile}
+			<p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+				Seleccionado: <strong>{resolucionFile.name}</strong> ({Math.round(resolucionFile.size / 1024)} KB).
+				Se subirá al guardar el programa.
+			</p>
+		{/if}
 	</Card>
 
 	<div class="flex justify-end gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">

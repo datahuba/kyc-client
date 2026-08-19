@@ -1,5 +1,11 @@
 import { apiKyC } from '$lib/config';
-import type { Enrollment, CreateEnrollmentRequest, UpdateEnrollmentRequest } from '$lib/interfaces';
+import type {
+	Enrollment,
+	CreateEnrollmentRequest,
+	UpdateEnrollmentRequest,
+	BulkEnrollmentRequest,
+	BulkEnrollmentResponse,
+} from '$lib/interfaces';
 
 class EnrollmentService {
 	async getAll(
@@ -37,6 +43,14 @@ class EnrollmentService {
 		return await apiKyC.post<Enrollment>('/enrollments/', data);
 	}
 
+	// F-INSCRIPCION-LOTE (2026-07-31): inscripción en lote. Hasta 200
+	// estudiantes a un mismo programa en una sola llamada. Devuelve
+	// desglose de éxitos/ya_inscritos/fallidos para que la UI muestre
+	// un resumen accionable.
+	async createBulk(data: BulkEnrollmentRequest): Promise<BulkEnrollmentResponse> {
+		return await apiKyC.post<BulkEnrollmentResponse>('/enrollments/bulk', data);
+	}
+
 	async update(id: string, data: UpdateEnrollmentRequest): Promise<Enrollment> {
 		// BUG PREEXISTENTE encontrado al verificar EnrollmentForm (ISSUE-REFACTOR):
 		// el backend expone PATCH /enrollments/{id}, pero este servicio llamaba a
@@ -50,8 +64,23 @@ class EnrollmentService {
 	}
 
 	async getByStudentId(studentId: string): Promise<Enrollment[]> {
-		//console.log("entre a traer pagos de students");
 		return await apiKyC.get<Enrollment[]>(`/enrollments/student/${studentId}`);
+	}
+
+	// F-CUENTAS-POR-COBRAR (2026-07-29): refrescar un enrollment individual
+	// después de iniciar/deshacer un módulo, sin volver a cargar toda la lista.
+	async getById(enrollmentId: string): Promise<Enrollment> {
+		return await apiKyC.get<Enrollment>(`/enrollments/${enrollmentId}`);
+	}
+
+	// F-087-CAL · Mis cursos activos para el dashboard del estudiante.
+	// Enriquece cada enrollment con metadata del curso + estado calculado del
+	// programa (F-080: programado | en_ejecucion | cerrado) para poder
+	// agruparlos y mostrar "Mis cursos en ejecución", "Por iniciar", etc.
+	async getMyCoursesResumen(): Promise<import('$lib/interfaces').MyCoursesResumen> {
+		return await apiKyC.get<import('$lib/interfaces').MyCoursesResumen>(
+			'/enrollments/me/cursos-resumen'
+		);
 	}
 
 	async getByCourseId(courseId: string): Promise<Enrollment[]> {

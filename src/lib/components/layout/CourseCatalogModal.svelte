@@ -4,6 +4,8 @@
 	import { courseService } from '$lib/services';
 	import type { Course } from '$lib/interfaces';
 	import { formatCurrency } from '$lib/utils';
+	import { userStore } from '$lib/stores/userStore';
+	import FormularioInscripcionModal from '$lib/features/enrollments/FormularioInscripcionModal.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -16,6 +18,25 @@
 	let loading = $state(false);
 	let loaded = $state(false);
 	let errorMsg = $state('');
+
+	// F-CATALOGO-INSCRIPCION (2026-07-30): modal de formulario de inscripción
+	// que se abre cuando el estudiante hace click en "Inscribirme".
+	let inscriptionCourse = $state<Course | null>(null);
+	let inscriptionOpen = $state(false);
+
+	let currentUser: any = $state(null);
+	userStore.subscribe((state) => {
+		currentUser = state.user;
+	});
+
+	// El botón "Inscribirme" solo aparece para estudiantes. Staff/admin no se
+	// inscriben a sí mismos (ellos inscriben a los estudiantes desde el panel).
+	const ROLES_QUE_SE_INSCRIBEN = new Set(['estudiante', 'student']);
+
+	const puedeInscribirse = $derived.by(() => {
+		const rol = currentUser?.rol || currentUser?.role;
+		return ROLES_QUE_SE_INSCRIBEN.has(rol);
+	});
 
 	async function loadCourses() {
 		if (loaded) return;
@@ -35,6 +56,22 @@
 	$effect(() => {
 		if (isOpen) loadCourses();
 	});
+
+	function handleInscribirme(course: Course, e: MouseEvent) {
+		e.stopPropagation();
+		// F-INSC-DESDE-CATALOGO (2026-07-30): el modal genera el PDF oficial
+		// de inscripción con los datos del estudiante pre-llenados. El
+		// estudiante lo descarga, firma, y lo entrega en secretaría junto
+		// con los requisitos. Luego el equipo de Cobranza/Encargado de
+		// Curso crea la inscripción en el sistema.
+		inscriptionCourse = course;
+		inscriptionOpen = true;
+	}
+
+	function closeInscription() {
+		inscriptionOpen = false;
+		inscriptionCourse = null;
+	}
 </script>
 
 <Modal {isOpen} title="Catálogo de Programas" {onClose} maxWidth="sm:max-w-3xl">
@@ -52,10 +89,10 @@
 		{:else}
 			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto pr-1">
 				{#each courses as course (course._id)}
-					<div class="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+					<div class="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col">
 						<div class="h-1.5 bg-gradient-to-r from-primary-600 to-primary-800"></div>
-						<div class="p-4">
-							<span class="inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 capitalize">
+						<div class="p-4 flex-1 flex flex-col">
+							<span class="inline-block self-start px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 capitalize">
 								{course.tipo_curso}
 							</span>
 							<h3 class="mt-2 text-sm font-bold text-gray-900 dark:text-white leading-snug line-clamp-2" title={course.nombre_programa}>
@@ -66,22 +103,34 @@
 								<span>·</span>
 								<span>{course.cantidad_cuotas} módulos</span>
 							</div>
-							<div class="mt-3 flex items-center justify-between pt-2 border-t border-gray-100 dark:border-dark-border">
-								<div class="text-xs">
-									<span class="block text-gray-400 dark:text-gray-500">Colegiatura</span>
-									<span class="font-bold text-primary-700 dark:text-primary-300">{formatCurrency(course.costo_total_interno || 0)}</span>
-								</div>
-								{#if course.cargo_adicional_items && course.cargo_adicional_items.length > 0}
-									<div class="text-xs text-right">
-										{#each course.cargo_adicional_items as item}
-											<div>
-												<span class="block text-gray-400 dark:text-gray-500">{item.nombre}</span>
-												<span class="font-bold text-gray-700 dark:text-gray-300">+{formatCurrency(item.costo)}</span>
-											</div>
-										{/each}
+							<div class="mt-3 pt-2 border-t border-gray-100 dark:border-dark-border">
+								<div class="flex items-center justify-between">
+									<div class="text-xs">
+										<span class="block text-gray-400 dark:text-gray-500">Colegiatura</span>
+										<span class="font-bold text-primary-700 dark:text-primary-300">{formatCurrency(course.costo_total_interno || 0)}</span>
 									</div>
-								{/if}
+									{#if course.cargo_adicional_items && course.cargo_adicional_items.length > 0}
+										<div class="text-xs text-right">
+											{#each course.cargo_adicional_items as item}
+												<div>
+													<span class="block text-gray-400 dark:text-gray-500">{item.nombre}</span>
+													<span class="font-bold text-gray-700 dark:text-gray-300">+{formatCurrency(item.costo)}</span>
+												</div>
+											{/each}
+										</div>
+									{/if}
+								</div>
 							</div>
+							<!-- F-CATALOGO-INSCRIPCION (2026-07-30): botón Inscribirme para estudiantes -->
+							{#if puedeInscribirse}
+								<button
+									type="button"
+									onclick={(e) => handleInscribirme(course, e)}
+									class="mt-3 w-full px-3 py-2 text-xs font-bold bg-primary-600 hover:bg-primary-700 text-white rounded-lg shadow-sm transition flex items-center justify-center gap-1.5"
+								>
+									<span>✍️</span> Inscribirme
+								</button>
+							{/if}
 						</div>
 					</div>
 				{/each}
@@ -89,3 +138,11 @@
 		{/if}
 	</div>
 </Modal>
+
+<!-- F-CATALOGO-INSCRIPCION: modal de formulario de inscripción oficial -->
+<FormularioInscripcionModal
+	isOpen={inscriptionOpen}
+	onClose={closeInscription}
+	programa={inscriptionCourse?.nombre_programa ?? ''}
+	student={currentUser}
+/>

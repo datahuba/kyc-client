@@ -2,9 +2,11 @@
 	import type { Student, Enrollment } from '$lib/interfaces';
 	import Button from '$lib/components/ui/button.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
+	import GestionModulosModal from '$lib/components/ui/GestionModulosModal.svelte';
 	import { formatCurrency } from '$lib/utils';
 	import { userStore } from '$lib/stores/userStore';
 	import { apiKyC } from '$lib/config/apiKyC.config'; // IMPORTACIÓN DEL CLIENTE ESTÁNDAR
+	import ResumenPagosEnrollment from '$lib/features/payments/ResumenPagosEnrollment.svelte'; // F-049: desglose por módulo + saldo a favor
 
 	interface Props {
 		isOpen: boolean;
@@ -40,6 +42,14 @@
 	let cajaConcepto = $state<string>('');
 	let cajaRemitente = $state<string>('');
 	let cajaLoading = $state(false);
+
+	// F-049: enrollment seleccionado para ver el resumen enriquecido de pagos
+	let selectedEnrollmentIdForResumen = $state<string | null>(null);
+
+	// F-MODAL-GESTION-MODULOS (2026-08-03, Kevin): modal centralizado de gestión
+	// de módulos, accesible también desde la ficha del estudiante.
+	let modulosModalOpen = $state(false);
+	let modulosModalEnrollment: Enrollment | null = $state(null);
 
 	// Obtener ID resiliente para MongoDB
 	const studentId = $derived(student?._id || student?.id);
@@ -249,6 +259,7 @@
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montos</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+							<th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Módulos</th>
 							{#if isFinanciero}
 								<th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones de Caja</th>
 							{/if}
@@ -256,7 +267,13 @@
 					</thead>
 					<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
 						{#each studentEnrollments as enrollment (enrollment._id)}
-							<tr>
+							<tr
+								class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors {selectedEnrollmentIdForResumen === (enrollment._id || enrollment.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}"
+								onclick={() => {
+									const eid = enrollment._id || enrollment.id || null;
+									selectedEnrollmentIdForResumen = selectedEnrollmentIdForResumen === eid ? null : eid;
+								}}
+							>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{new Date(enrollment.fecha_inscripcion).toLocaleDateString()}</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<div class="text-xs text-gray-500">Total: {formatCurrency(enrollment.total_a_pagar)}</div>
@@ -266,19 +283,33 @@
 									<span class={`font-medium ${enrollment.saldo_pendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(enrollment.saldo_pendiente)}</span>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
-									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{enrollment.estado}</span>
+									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : enrollment.estado === 'retirado' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800'}`}>{enrollment.estado}</span>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-center">
+									<button
+										type="button"
+										onclick={(e) => {
+											e.stopPropagation();
+											modulosModalEnrollment = enrollment;
+											modulosModalOpen = true;
+										}}
+										class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded transition-colors"
+									>
+										📚 Módulos
+									</button>
 								</td>
 								{#if isFinanciero}
 									<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
 										{#if enrollment.saldo_pendiente > 0}
-											<button 
-												type="button" 
-												onclick={() => { 
-													selectedEnrollmentForCaja = enrollment; 
-													cajaMonto = enrollment.saldo_pendiente; 
+											<button
+												type="button"
+												onclick={(e) => {
+													e.stopPropagation();
+													selectedEnrollmentForCaja = enrollment;
+													cajaMonto = enrollment.saldo_pendiente;
 													cajaConcepto = '';
 													cajaRemitente = student?.nombre || '';
-													showCajaForm = true; 
+													showCajaForm = true;
 												}}
 												class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
 											>
@@ -294,7 +325,39 @@
 					</tbody>
 				</table>
 			</div>
+
+			<!-- F-049: Panel de resumen enriquecido (click en una fila para mostrar) -->
+			{#if selectedEnrollmentIdForResumen}
+				<div class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+					<div class="flex items-center justify-between mb-3">
+						<h4 class="text-sm font-semibold text-gray-900 dark:text-white">
+							Resumen detallado de pagos
+						</h4>
+						<button
+							type="button"
+							onclick={() => (selectedEnrollmentIdForResumen = null)}
+							class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+						>
+							✕ Cerrar
+						</button>
+					</div>
+					{#key selectedEnrollmentIdForResumen}
+						<ResumenPagosEnrollment enrollmentId={selectedEnrollmentIdForResumen} />
+					{/key}
+				</div>
+			{/if}
 		{/if}
 		<div class="mt-6 flex justify-end"><Button variant="secondary" onclick={onClose}>Cerrar</Button></div>
 	</div>
 </Modal>
+
+<!-- F-MODAL-GESTION-MODULOS (2026-08-03, Kevin): modal de gestión de módulos,
+     accesible también desde la ficha del estudiante. -->
+<GestionModulosModal
+	isOpen={modulosModalOpen}
+	enrollment={modulosModalEnrollment}
+	onClose={() => {
+		modulosModalOpen = false;
+		modulosModalEnrollment = null;
+	}}
+/>

@@ -22,7 +22,7 @@
 	let showConfirm = $state(false);
 
 	// Evaluación de rol en Svelte 5
-	let currentRole = $derived($userStore.role || $userStore.user?.rol || '');
+	let currentRole = $derived($userStore.role || '');
 	let isUserStudent = $derived(currentRole === 'student' || currentRole === 'estudiante');
 
 	// Validaciones de negocio reactivas en tiempo real
@@ -77,6 +77,10 @@
 	}
 </script>
 
+
+<svelte:head>
+	<title>Cambiar Contraseña · KYC DataHub</title>
+</svelte:head>
 <div class="max-w-2xl mx-auto space-y-6">
 	<div class="flex items-center gap-3 mb-6">
 		<div class="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg text-primary-600 dark:text-primary-400">

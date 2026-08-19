@@ -4,6 +4,7 @@
 	import DropdownMenu from '$lib/components/ui/dropdownMenu.svelte';
 	import SwipeableCard from '$lib/components/ui/swipeableCard.svelte';
 	import LongPress from '$lib/components/ui/longPress.svelte';
+	import StaggeredList from '$lib/components/ui/staggeredList.svelte';
 
 	interface Props {
 		students: Student[];
@@ -112,8 +113,10 @@
 
 <!-- ISSUE-X-COMPACT: Tarjetas para móvil -->
 <div class="md:hidden space-y-3 animate-fade-in">
-	{#each students as student (student._id)}
-		<!-- MOBILE-004: Swipe horizontal revela acciones. MOBILE-006: Long-press abre menú contextual. -->
+	{#each students as student, i (student._id)}
+		<!-- MOBILE-004: Swipe horizontal revela acciones. MOBILE-006: Long-press abre menú contextual.
+		     MOBILE-003: las tarjetas entran escalonadas (30ms entre cada una) en vez de todas de golpe. -->
+		<StaggeredList index={i}>
 		<SwipeableCard
 			leftActions={onEdit ? [{ label: 'Editar', color: 'blue', onClick: () => onEdit?.(student) }] : []}
 			rightActions={onDelete ? [{ label: 'Eliminar', color: 'red', onClick: () => onDelete?.(student) }] : []}
@@ -170,5 +173,6 @@
 		</div>
 		</LongPress>
 		</SwipeableCard>
+		</StaggeredList>
 	{/each}
 </div>

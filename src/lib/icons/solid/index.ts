@@ -7,3 +7,4 @@ export { default as BriefcaseIcon } from './briefcaseIcon.svelte';
 export { default as LogoutIcon } from './logoutIcon.svelte';
 export { default as ShieldIcon } from './shieldIcon.svelte';
 export { default as CreditCardIcon } from './creditCardIcon.svelte';
+export { default as CalendarIcon } from './calendarIcon.svelte';  // F-080

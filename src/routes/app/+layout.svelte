@@ -13,30 +13,38 @@
 	let { children } = $props();
 	let sidebarOpen = $state(false);
 
-	// ISSUE-Q-PRE: bloquea la navegación del estudiante hasta que acepte
-	// el reglamento de Posgrado. Personal admin/docente siempre tiene
-	// terminos_aceptados=true desde el backend (no aplica a ellos).
+	// F-LOADING-AUTH (2026-07-30): mientras el userStore se inicializa
+	// (lee localStorage para restaurar sesión), mostramos un loading
+	// spinner en lugar del shell vacío. Sin esto, el SSR renderiza
+	// el shell y el usuario ve una pantalla blanca durante ~500ms
+	// antes de que el JS redirija a /auth/sign-in.
+	let authChecking = $state(true);
+
+	// ISSUE-Q-PRE: bloquea la navegación del usuario hasta que acepte
+	// el reglamento de Posgrado. Aplica a TODO usuario autenticado
+	// (estudiantes + personal admin/docente). El modal se muestra la
+	// primera vez que se loguea cada uno, y se persiste la aceptación.
 	const showTermsModal = $derived(
 		$userStore.isAuthenticated &&
-			$userStore.user?.user_type === 'student' &&
 			$userStore.user?.terminos_aceptados === false
 	);
 
 	onMount(() => {
 		// Basic auth check or restore
-		if (!$userStore.isAuthenticated) {
-			// Try to restore or redirect
-			userStore.init();
+		userStore.init();
+		// Pequeño delay para que el spinner sea visible (y no parpadee)
+		setTimeout(() => {
+			authChecking = false;
 			if (!$userStore.isAuthenticated) {
 				goto('/auth/sign-in');
 			}
-		}
+		}, 100);
 	});
 
 	// --- GUARDIÁN DE SEGURIDAD REACTIVO (Issue #7 - Control de Crossover) ---
 	$effect(() => {
 		const path = $page.url.pathname;
-		const role = String($userStore.user?.rol || $userStore.user?.role || '');
+		const role = String($userStore.user?.role || '');
 		const isAuthenticated = $userStore.isAuthenticated;
 
 		if (isAuthenticated) {
@@ -48,7 +56,15 @@
 					'/app/change-password',
 					'/app/enrollments',
 					'/app/payments',
-					'/app/classroom'
+					'/app/classroom',
+					// F-CERTIFICADOS (2026-07-29): Kevin pidió que Certificados esté
+					// disponible para TODOS los roles (estudiantes y staff). El
+					// estudiante emite el suyo, el staff lo ve para auditoría.
+					'/app/certificates',
+					// F-TRAMITES-SOLICITUD (2026-07-29): solicitudes de
+					// Convalidación, Tutoría, Readmisión y Titulación. El
+					// estudiante crea sus propias solicitudes.
+					'/app/requests'
 				];
 				
 				const isAllowed = allowedStudentPaths.some(allowedPath => path.startsWith(allowedPath));
@@ -64,7 +80,10 @@
 					'/app/dashboard',
 					'/app/profile',
 					'/app/change-password',
-					'/app/classroom'
+					'/app/classroom',
+					// F-CERTIFICADOS (2026-07-29): visible para todos los roles
+					// incluyendo docentes (auditoría de certificados).
+					'/app/certificates'
 				];
 				
 				const isAllowed = allowedDocentePaths.some(allowedPath => path.startsWith(allowedPath));
@@ -96,6 +115,16 @@
   en segundo plano en el mismo instante en que el usuario pase el puntero del mouse sobre 
   cualquier enlace o pestaña de navegación de Posgrado, simulando transiciones de 0ms.
 -->
+
+<!-- F-LOADING-AUTH (2026-07-30): mientras se verifica la sesiÃ³n, mostrar un
+     spinner en lugar del shell vacÃ­o. Visible por ~100ms antes del redirect
+     a /auth/sign-in. Mejora la UX percibida del primer paint. -->
+{#if authChecking}
+	<div class="flex flex-col items-center justify-center h-dvh bg-light-primary dark:bg-dark-background gap-3">
+		<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+		<p class="text-sm text-slate-500 dark:text-slate-400">Verificando sesiÃ³nâ€¦</p>
+	</div>
+{:else}
 <div class="flex h-dvh bg-light-primary dark:bg-dark-background transition-colors" data-sveltekit-preload-data="hover">
 	<Sidebar 
 		isOpen={sidebarOpen} 
@@ -124,11 +153,17 @@
 			</div>
 		{/if}
 
-		<main class="relative flex-1 overflow-y-auto p-4 sm:p-6">
+		<!-- F-2026-08-12-DESCUENTO-BECA-FIX-MOBILE-NAV: agregar pb-20 (mobile) y
+		     pb-6 (desktop) para que el contenido del main NO quede tapado por
+		     el BottomNav fixed (z-40, bottom-0, h-16 aprox) en mobile.
+		     En desktop el BottomNav se oculta con md:hidden, pero dejamos
+		     pb-6 para dar aire con el sidebar. -->
+		<main class="relative flex-1 overflow-y-auto p-4 pb-20 sm:p-6 md:pb-6">
 			{@render children?.()}
 		</main>
 		<BottomNav />
 	</div>
 </div>
+{/if}
 
 <TermsAcceptanceModal isOpen={showTermsModal} />

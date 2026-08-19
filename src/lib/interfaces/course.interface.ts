@@ -2,6 +2,16 @@ export interface Modulo {
 	docente_id: string;
 	nombre: string;
 	costo: number;
+	// Estado del módulo en el cronograma al cargar un programa que ya venía en
+	// ejecución. `CourseForm` lo bindea a un <select> (solo visible cuando
+	// `tipo_programa === 'en_ejecucion'`).
+	// F-FIX-ESTADO-OPERACIONAL (2026-08-16): durante un tiempo este campo era
+	// SOLO de frontend — el backend no lo declaraba y Pydantic v2 lo descartaba,
+	// así que lo elegido se perdía en silencio al guardar. Ya está declarado en
+	// `models/course.py` y `schemas/course.py`, y persiste correctamente.
+	estado_operacional?: 'Pendiente' | 'En Ejecucion' | 'Ejecutado' | null;
+	fecha_inicio?: string | null;
+	fecha_fin?: string | null;
 }
 
 // ISSUE-P-CARGO-MULTIITEM (2026-07-08): un ítem individual del cargo
@@ -13,6 +23,10 @@ export interface CargoAdicionalItem {
 
 export interface Course {
 	_id: string;
+	// Fallback defensivo de `._id`: varias vistas usan `c._id || c.id` porque
+	// segun el endpoint la API puede serializar el identificador de las dos
+	// formas. Declararlo evita el error de tipos sin borrar el fallback.
+	id?: string;
 	activo: boolean;
 	cantidad_cuotas: number;
 	codigo: string;
@@ -23,6 +37,14 @@ export interface Course {
 	fecha_inicio: string;
 	inscritos: string[];
 	matricula_interno: number;
+	// F-2026-08-12-DESCUENTO-BECA (Kevin 2026-08-12, reunion UAGRM):
+	// override por curso de la matricula diferenciada primer carrera vs
+	// profesional. Si son null, el backend usa los defaults globales
+	// (200 / 500 Bs).
+	// P-AMBITO-FORMACION (2026-08-18): 'educacion_continua' | 'profesional'.
+	ambito?: string | null;
+	matricula_primer_carrera?: number | null;
+	matricula_profesional?: number | null;
 	// ISSUE-P-CARGO-MULTIITEM (2026-07-08): precio único para todos los
 	// estudiantes. cargo_adicional_items es una lista de gastos
 	// complementarios opcionales al programa (ej. varios talleres
@@ -38,6 +60,17 @@ export interface Course {
 	// estudiante debe subir al inscribirse (ej. CV, fotocopia de CI). Se
 	// copian a Enrollment.requisitos con estado "pendiente" al inscribirse.
 	requisitos?: { descripcion: string }[];
+
+	// F-HISTORICO (2026-07-31): programa histórico = solo datos básicos + resolución.
+	// Si es True, NO requiere docentes/módulos/pagos (son opcionales).
+	es_historico?: boolean;
+
+	// F-080: PDF de la resolución que respalda el programa (opcional).
+	resolucion_pdf_url?: string | null;
+
+	// F-080: estado calculado por fechas (no persistido, lo agrega el backend
+	// en cada response). Ver schemas/course.py:CourseResponse.estado_calculado.
+	estado_calculado?: 'programado' | 'en_ejecucion' | 'cerrado';
 }
 
 export interface CreateCourseRequest {
@@ -47,6 +80,12 @@ export interface CreateCourseRequest {
 	modalidad: string;
 	costo_total_interno: number;
 	matricula_interno: number;
+	// F-2026-08-12-DESCUENTO-BECA: override de matricula para primer
+	// carrera y profesional. Si es null, el backend usa los defaults globales.
+	// P-AMBITO-FORMACION (2026-08-18): 'educacion_continua' | 'profesional'.
+	ambito?: string | null;
+	matricula_primer_carrera?: number | null;
+	matricula_profesional?: number | null;
 	cargo_adicional_items?: CargoAdicionalItem[];
 	cantidad_cuotas: number;
 	descuento_curso: number;
@@ -57,6 +96,15 @@ export interface CreateCourseRequest {
 	descuento_id?: string | null;
 	modulos?: Modulo[]; // <--- ¡Y aquí también!
 	requisitos?: { descripcion: string }[]; // ISSUE-Q-DOCUMENTOS-KYC
+
+	// F-HISTORICO (2026-07-31): true si es programa histórico.
+	es_historico?: boolean;
+	resolucion_pdf_url?: string | null;
+
+	// F-CREAR-PROGRAMA-EN-EJECUCION (2026-08-05, Kevin): override manual del
+	// estado calculado por fechas. Valores: 'programado' | 'en_ejecucion' |
+	// 'cerrado'. Si no se envia, el backend calcula segun fecha_inicio/fin.
+	estado_override?: 'programado' | 'en_ejecucion' | 'cerrado' | null;
 }
 
 export interface UpdateCourseRequest extends Partial<CreateCourseRequest> {
@@ -81,5 +129,11 @@ export interface CourseStudent {
 		total_pagado: number;
 		saldo_pendiente: number;
 		avance_pago: number;
+		// F-2026-08-22-PRE-REG-BADGE-DESCUENTO: el backend SI devuelve estos dos
+		// (ver services/course_service.py, objeto `financiero`), pero nunca se
+		// declararon acá. `descuento_personalizado` viene en % 0-100 (50.0 = 50%)
+		// y `descuento_origen` indica de dónde salió el descuento.
+		descuento_personalizado?: number | null;
+		descuento_origen?: 'vicerrectorado' | 'EC' | 'mixto' | null;
 	};
 }

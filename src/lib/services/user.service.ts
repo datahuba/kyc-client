@@ -49,10 +49,17 @@ class UserService {
 		return apiKyC.delete<User>(`/users/${id}`);
 	}
 
+	/**
+	 * F-FIX-CONTRATO-UPLOADCV (2026-08-16): la ruta era `/users/{id}/cv`, que
+	 * NO existe en el backend — el endpoint real es `/users/{id}/cv/upload`
+	 * (ver api/users.py). Toda subida de CV de docente devolvía 404: tanto la
+	 * del propio docente desde /app/profile como la que hace el staff desde
+	 * /app/teachers. Detectado auditando el contrato frontend↔backend.
+	 */
 	async uploadCV(id: string, file: File): Promise<User> {
 		const formData = new FormData();
 		formData.append('file', file);
-		return apiKyC.post<User>(`/users/${id}/cv`, formData);
+		return apiKyC.post<User>(`/users/${id}/cv/upload`, formData);
 	}
 }
 

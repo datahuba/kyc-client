@@ -17,5 +17,11 @@ RUN npm run build
 
 EXPOSE 3000
 
-CMD ["node", "build/index.js"]
+# F-FIX-NGINX-CONCURRENCY (2026-08-07, Kevin): server.js arranca 4 workers
+# de SvelteKit con SO_REUSEPORT. El kernel de Linux reparte las conexiones
+# entrantes entre los workers, dando 4x capacidad. Ver server.js para
+# detalles. Por default 4 workers, configurable con WEB_CONCURRENCY.
+ENV WEB_CONCURRENCY=4
+ENV PORT=3000
+CMD ["node", "server.js"]
 

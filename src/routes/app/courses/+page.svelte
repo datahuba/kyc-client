@@ -3,6 +3,7 @@
 	import { courseService } from '$lib/services';
 	import type { Course, CourseStudent } from '$lib/interfaces';
 	import { userStore } from '$lib/stores/userStore'; // <-- Importación del Store
+	import { STAFF_EC_COURSES } from '$lib/auth/roles'; // F-2026-08-11-EC-AUTOSERVICIO
 	import Button from '$lib/components/ui/button.svelte';
 	import Heading from '$lib/components/ui/heading.svelte';
 	import Card from '$lib/components/ui/card.svelte';
@@ -10,9 +11,14 @@
 	import ModalConfirm from '$lib/components/ui/modalConfirm.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
 	import ComunicadoModal from '$lib/features/courses/ComunicadoModal.svelte';
+	import CargaInicialModal from '$lib/features/courses/CargaInicialModal.svelte';
+	import CargarNotasModal from '$lib/features/courses/CargarNotasModal.svelte';
+	import AgregarEstudianteModal from '$lib/features/courses/AgregarEstudianteModal.svelte';
 	import TableSkeleton from '$lib/components/skeletons/TableSkeleton.svelte';
 	import CourseForm from '$lib/features/courses/CourseForm.svelte';
+	import CourseWizard from '$lib/features/courses/CourseWizard.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
+	import { exportToExcel } from '$lib/utils/excelExport';
 	import SearchInput from '$lib/components/ui/searchInput.svelte';
 	import { alert } from '$lib/utils';
 	import { PlusIcon, DotsVerticalIcon, DownloadIcon } from '$lib/icons/outline';
@@ -40,10 +46,42 @@
 
 	// Modal state
 	let isFormOpen = $state(false);
+	let isWizardOpen = $state(false); // F-HISTORICO-AUTOSERVICIO: wizard nuevo
 	let selectedCourse: Course | null = $state(null);
 	let showDeleteModal = $state(false);
 	let courseToDelete: Course | null = $state(null);
 	let deleteLoading = $state(false);
+
+	// F-HISTORICO (2026-07-31): modal dedicado para subir la resolución de
+	// respaldo desde el menú desplegable del catálogo (sin abrir el editor
+	// completo). Útil para programas ya creados a los que se les quiere
+	// añadir la resolución más tarde.
+	let showResolucionModal = $state(false);
+	let resolucionCourse: Course | null = $state(null);
+	let resolucionFile: File | null = $state(null);
+	let subiendoResolucion = $state(false);
+	function openResolucionModal(course: Course) {
+		resolucionCourse = course;
+		resolucionFile = null;
+		showResolucionModal = true;
+		openDropdownId = null;
+	}
+	async function handleSubirResolucion() {
+		if (!resolucionCourse || !resolucionFile) return;
+		subiendoResolucion = true;
+		try {
+			const updated = await courseService.subirResolucion(resolucionCourse._id, resolucionFile);
+			alert('success', `Resolución de respaldo subida al programa "${updated.nombre_programa}"`);
+			// Reflejar el cambio en la lista local
+			courses = courses.map((c) => (c._id === updated._id ? { ...c, resolucion_pdf_url: updated.resolucion_pdf_url } : c));
+			showResolucionModal = false;
+			resolucionFile = null;
+		} catch (e: any) {
+			alert('error', e?.message || 'No se pudo subir la resolución de respaldo');
+		} finally {
+			subiendoResolucion = false;
+		}
+	}
 
 	// Dropdown state
 	let openDropdownId: string | null = $state(null);
@@ -55,14 +93,54 @@
 	let selectedCourseStudents: Course | null = $state(null);
 
 	// ISSUE N: Control de Permisos Visuales
-	let currentRole = $derived(($userStore.role || $userStore.user?.rol || '').toLowerCase());
-	let canCreateCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
-	let canEditCourse = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
+	let currentRole = $derived(($userStore.role || '').toLowerCase());
+	// F-FIX-COORD-FINANCIERO-NO-ACADEMICO (2026-08-19, Kevin, mirando la
+	// tabla de permisos): "financiero no deberia crear programas ni editar,
+	// tampoco estudiantes". Su alcance es economico (ve todo, aprueba No
+	// Deudor), no gestion de contenido academico. El backend ya lo bloquea
+	// con 403 (require_gestion_academica); esto es solo para no mostrarle
+	// botones que le van a fallar.
+	let esCoordinadorFinanciero = $derived(
+		currentRole === 'coordinador' && $userStore.user?.subtipo_coordinador === 'financiero'
+	);
+	// F-2026-08-11-EC-AUTOSERVICIO: encargado_curso/coord pueden intentar
+	// crear programas. El backend rechaza con 403 si NO son historicos.
+	let canCreateCourse = $derived(STAFF_EC_COURSES.includes(currentRole) && !esCoordinadorFinanciero);
+	// F-EC-EDITAR-PROGRAMA (2026-08-18, Kevin en capacitacion): "tienen que
+	// tener una opcion aqui en programa que sea editar programas (...) para
+	// cambiar fecha, si hay que cambiar el nombre algun dato, si hay que
+	// seleccionar a los docentes". El backend YA lo permite desde FIX-ISSUE-258
+	// (api/courses.py update_course acepta EC/COORD y valida que el programa
+	// este en sus cursos_asignados, respondiendo 403 si no). Era solo el
+	// frontend escondiendo el boton, igual que pasaba con Programas en el
+	// sidebar. Si el EC intenta editar un programa ajeno, el backend lo corta.
+	let canEditCourse = $derived(STAFF_EC_COURSES.includes(currentRole) && !esCoordinadorFinanciero);
 	let canDeleteCourse = $derived(currentRole === 'superadmin');
 	// Comunicados: Encargado de Programa / Coordinador / CPD / Admin / Superadmin.
 	// (El Encargado solo a sus programas: lo valida el backend con 403.)
+	// El financiero SI puede enviar comunicados -- Kevin no lo nombro entre
+	// lo que hay que restringirle, y comunicar algo economico a los
+	// estudiantes de un programa entra dentro de su alcance.
 	let canSendComunicado = $derived(
 		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole)
+	);
+	// F-2026-08-12-EC-CARGA-INICIAL-VISIBILITY (Kevin 2026-08-12 post-reunion):
+	// el EC/COORDINADOR DEBE poder cargar estudiantes en programas historicos
+	// y en ejecucion de SUS cursos asignados. Antes la opcion del menu solo
+	// aparecia para CPD/ADMIN/SUPERADMIN (canEditCourse), lo que dejaba al EC
+	// sin la opcion "Carga Inicial de Estudiantes" en el menu de 3 puntos.
+	// El backend ya valida que el curso sea de los cursos_asignados del EC
+	// (enrollment.py valida curso_id in current_user.cursos_asignados para
+	// encargado_curso y coordinador). Por eso el frontend puede mostrar la
+	// opcion a EC/COORDINADOR sin riesgo: si intenta algo fuera de su
+	// scope, el backend rechaza con 403.
+	//
+	// F-FIX-COORD-FINANCIERO-NO-ACADEMICO (2026-08-19): tambien gatea
+	// "Cargar Notas de Modulos Ejecutados" (mismo criterio de visibilidad),
+	// asi que el financiero queda afuera de las dos.
+	let canCargaInicial = $derived(
+		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole) &&
+			!esCoordinadorFinanciero
 	);
 	let comunicadoOpen = $state(false);
 	let comunicadoCourseId = $state('');
@@ -71,6 +149,38 @@
 		comunicadoCourseId = course._id;
 		comunicadoPrograma = course.nombre_programa;
 		comunicadoOpen = true;
+		openDropdownId = null;
+	}
+
+	// F-US-006-3TIPOS-3A-FE (2026-08-04): modal de carga inicial de
+	// estudiantes para programas en_ejecucion o historicos.
+	let cargaInicialOpen = $state(false);
+	let cargaInicialCourse: Course | null = $state(null);
+	function openCargaInicial(course: Course) {
+		cargaInicialCourse = course;
+		cargaInicialOpen = true;
+		openDropdownId = null;
+	}
+
+	// F-NOTAS-MODULOS-EJECUTADOS (2026-08-18, decision de Kevin): carga
+	// aparte, solo de notas, para un programa que arranca a mitad de camino
+	// y ya tiene modulos dictados con calificacion.
+	let cargarNotasOpen = $state(false);
+	let cargarNotasCourse: Course | null = $state(null);
+	function openCargarNotas(course: Course) {
+		cargarNotasCourse = course;
+		cargarNotasOpen = true;
+		openDropdownId = null;
+	}
+
+	// F-US-006-3TIPOS-3B (2026-08-04): modal para agregar 1 estudiante a
+	// un programa en_ejecucion (lo incorpora a un modulo futuro). Caso:
+	// el estudiante llega tarde y el admin/encargado lo mete manualmente.
+	let agregarEstudianteOpen = $state(false);
+	let agregarEstudianteCourse: Course | null = $state(null);
+	function openAgregarEstudiante(course: Course) {
+		agregarEstudianteCourse = course;
+		agregarEstudianteOpen = true;
 		openDropdownId = null;
 	}
 
@@ -88,8 +198,26 @@
 			if (filters.modalidad !== 'all') filterParams.modalidad = filters.modalidad;
 
 			const response = await courseService.getAll(page, limit, filterParams);
-			
+
 			if (response && response.data) {
+				// F-EC-PROGRAMA-NUEVO-INVISIBLE (2026-08-18, Kevin en capacitacion):
+				// aca habia un segundo filtro en el cliente que comparaba cada
+				// curso contra `$userStore.user.cursos_asignados`. Ese dato es una
+				// copia guardada en el navegador desde el login, y NO se actualiza
+				// cuando el backend auto-asigna un curso recien creado
+				// (courses.py, F-2026-08-12-EC-AUTOASIGNAR-CURSO). Resultado: el
+				// encargado creaba un programa, el backend se lo asignaba bien en
+				// la base, pero esta linea lo escondia de la lista por comparar
+				// contra la lista vieja. Se veia en el Dashboard (que consulta al
+				// backend) y no en Programas. Recargar no ayudaba, porque el store
+				// se rehidrata del localStorage, no del servidor.
+				//
+				// El filtro del cliente ademas era redundante: el backend YA
+				// segmenta por cursos_asignados via filtro_cursos_por_rol
+				// (api/courses.py) usando el usuario fresco de la base, que es la
+				// fuente autoritativa. Y rompia la paginacion, porque totalItems
+				// seguia siendo el total del backend mientras el array se
+				// recortaba despues.
 				courses = response.data;
 				totalItems = response.meta.totalItems;
 				totalPages = response.meta.totalPages;
@@ -155,8 +283,9 @@
 	);
 
 	function handleCreate() {
-		selectedCourse = null;
-		isFormOpen = true;
+		// F-HISTORICO-AUTOSERVICIO (2026-08-04): ahora abre el wizard de 3 tipos
+		// en vez del CourseForm monolítico. El usuario elige el tipo primero.
+		isWizardOpen = true;
 	}
 
 	function handleEdit(course: Course) {
@@ -223,12 +352,81 @@
 			});
 		}
 
+		// F-HISTORICO (2026-07-31): opción para subir la resolución de respaldo
+		// del programa. Disponible para todos los programas (nuevos, en ejecución,
+		// históricos). El ícono es el mismo de un upload de documento.
+		if (canEditCourse) {
+			options.push({
+				label: (course as any).resolucion_pdf_url
+					? 'Reemplazar Resolución'
+					: 'Subir Resolución',
+				id: 'resolucion',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`,
+				action: () => openResolucionModal(course)
+			});
+		}
+
 		if (canSendComunicado) {
 			options.push({
 				label: 'Enviar Comunicado',
 				id: 'comunicado',
 				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>`,
 				action: () => openComunicado(course)
+			});
+		}
+
+		// F-US-006-3TIPOS-3A-FE: opcion para carga inicial de estudiantes.
+		// Solo aparece si el curso esta en_ejecucion o historico (los
+		// programados usan el flujo normal de inscripcion). El admin o
+		// encargado carga los carnets de los estudiantes que ya estaban
+		// en el programa.
+		// F-2026-08-12-EC-CARGA-INICIAL-VISIBILITY: ahora la opcion tambien
+		// aparece para EC/COORDINADOR (canCargaInicial). Antes solo aparecia
+		// para CPD/ADMIN/SUPERADMIN (canEditCourse), lo que dejaba al EC
+		// sin acceso a la opcion aunque el backend lo permitiera.
+		// F-2026-08-22-EC-CARGA-INICIAL-ESTADOS-FIX (Kevin 2026-08-22):
+		// la opcion antes solo aparecia en estados terminales (en_ejecucion,
+		// cerrado, historico). Eso dejaba al EC sin la opcion justo en el
+		// caso mas comun: un programa programado (recien creado, sin iniciar).
+		// La primera version del fix tenia typos: usaba 'activo' (que es un
+		// boolean, no un estado) y 'planificado' (typo, lo correcto es
+		// 'programado'). El enum EstadoPrograma tiene solo 3 valores:
+		// 'programado' | 'en_ejecucion' | 'cerrado'. Ahora la opcion aparece
+		// para cualquiera de los 3 estados reales (o si es historico). El
+		// backend sigue validando 403 si el curso no es del EC, asi que es
+		// seguro.
+		const estadoCalc = (course as any).estado_calculado || (course as any).estado;
+		if (canCargaInicial && ['programado', 'en_ejecucion', 'cerrado'].includes(estadoCalc) || (canCargaInicial && (course as any).es_historico)) {
+			options.push({
+				label: 'Carga Inicial de Estudiantes',
+				id: 'carga-inicial',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>`,
+				action: () => openCargaInicial(course)
+			});
+		}
+
+		// F-NOTAS-MODULOS-EJECUTADOS (2026-08-18): mismo criterio de visibilidad
+		// que la carga inicial -- si el encargado puede cargar estudiantes en
+		// este programa, tambien puede cargarles las notas de lo que ya cursaron.
+		if (canCargaInicial && ['programado', 'en_ejecucion', 'cerrado'].includes(estadoCalc) || (canCargaInicial && (course as any).es_historico)) {
+			options.push({
+				label: 'Cargar Notas de Módulos Ejecutados',
+				id: 'cargar-notas',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`,
+				action: () => openCargarNotas(course)
+			});
+		}
+
+		// F-US-006-3TIPOS-3B: agregar 1 estudiante a un modulo futuro del
+		// programa en_ejecucion. Caso: el estudiante llega tarde y el
+		// admin/encargado lo mete manualmente a un modulo donde todavia
+		// alcanza a cursar. Solo aplica a programas en_ejecucion.
+		if (canEditCourse && estadoCalc === 'en_ejecucion') {
+			options.push({
+				label: 'Agregar Estudiante',
+				id: 'agregar-estudiante',
+				icon: `<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>`,
+				action: () => openAgregarEstudiante(course)
 			});
 		}
 
@@ -252,36 +450,32 @@
             return;
         }
 
-        const headers = ["Estudiante", "CI", "Email", "Celular", "Estado", "Fecha Inscripcion", "Total", "Pagado", "Saldo"];
-        
+        // F-XXX (2026-07-29): XLSX en vez de CSV.
+        const columnDefs = [
+            { header: 'Estudiante', key: 'nombre', width: 30 },
+            { header: 'CI', key: 'carnet', width: 14 },
+            { header: 'Email', key: 'email', width: 28 },
+            { header: 'Celular', key: 'celular', width: 14 },
+            { header: 'Estado', key: 'estado', width: 14 },
+            { header: 'Fecha Inscripcion', key: 'fecha_inscripcion', width: 16 },
+            { header: 'Total', key: 'total_a_pagar', width: 12, format: 'currency' as const },
+            { header: 'Pagado', key: 'total_pagado', width: 12, format: 'currency' as const },
+            { header: 'Saldo', key: 'saldo_pendiente', width: 12, format: 'currency' as const },
+        ];
         try {
-            const rows = courseStudents.map(s => [
-                `"${s.nombre}"`,
-                s.carnet,
-                s.contacto.email,
-                s.contacto.celular,
-                s.inscripcion.estado,
-                formatDate(s.inscripcion.fecha_inscripcion),
-                s.financiero.total_a_pagar,
-                s.financiero.total_pagado,
-                s.financiero.saldo_pendiente
-            ]);
-
-            const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-            const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
-            
-            const year = new Date().getFullYear();
+            const rows = courseStudents.map((s: any) => ({
+                nombre: s.nombre,
+                carnet: s.carnet,
+                email: s.contacto?.email,
+                celular: s.contacto?.celular,
+                estado: s.inscripcion?.estado,
+                fecha_inscripcion: formatDate(s.inscripcion?.fecha_inscripcion),
+                total_a_pagar: s.financiero?.total_a_pagar,
+                total_pagado: s.financiero?.total_pagado,
+                saldo_pendiente: s.financiero?.saldo_pendiente,
+            }));
             const courseNameClean = (selectedCourseStudents?.nombre_programa || 'curso').replace(/\s+/g, '_');
-            const fileName = `Inscritos_${courseNameClean}_${year}.csv`;
-
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+            exportToExcel(rows, columnDefs, `Inscritos_${courseNameClean}`);
             
         } catch (error) {
             console.error("Error al exportar:", error);
@@ -291,18 +485,31 @@
 
 </script>
 
+
+<svelte:head>
+	<title>Programas · KYC DataHub</title>
+</svelte:head>
 <div class="space-y-6">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<Heading level="h1">Programas</Heading>
 		
 		<!-- ISSUE N: Ocultar botón Nuevo Programa si no tiene permisos -->
 		{#if canCreateCourse}
-			<Button onclick={handleCreate}>
-				{#snippet leftIcon()}
-					<PlusIcon class="size-5" />
-				{/snippet}
-				Nuevo Programa
-			</Button>
+			<div class="flex flex-col items-end gap-1">
+				<Button onclick={handleCreate}>
+					{#snippet leftIcon()}
+						<PlusIcon class="size-5" />
+					{/snippet}
+					Nuevo Programa
+				</Button>
+				<!-- F-FIX-FECHA-FIN-INVERTIDA (2026-08-18, Kevin): aca habia un aviso
+				     que decia que el encargado solo podia crear programas historicos
+				     "(fecha_fin ya paso)". Era el reflejo de una validacion del
+				     backend que estaba AL REVES: le exigia a un programa en ejecucion
+				     haber terminado en el pasado. Corregida esa validacion, el
+				     encargado crea cualquier tipo de programa, asi que el aviso ya no
+				     corresponde y solo confundia. -->
+			</div>
 		{/if}
 	</div>
 
@@ -400,7 +607,14 @@
 					{#each courses as course (course._id)}
 						<tr>
 							<td class="px-3 py-4 whitespace-nowrap">
-								<div class="text-sm font-medium text-gray-900 dark:text-white">{course.codigo}</div>
+								<div class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+									<span>{course.codigo}</span>
+									{#if (course as any).es_historico}
+										<span class="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800 dark:text-amber-200" title="F-HISTORICO: programa pasado o de registro retroactivo">
+											Histórico
+										</span>
+									{/if}
+								</div>
 								<div class="text-xs text-gray-500 dark:text-gray-400 max-w-[150px] truncate" title={course.nombre_programa}>{course.nombre_programa}</div>
 							</td>
 							<td class="px-3 py-4 whitespace-nowrap">
@@ -464,7 +678,14 @@
 				<Card>
 					<div class="flex items-center justify-between mb-4">
 						<div>
-							<h3 class="text-sm font-medium text-gray-900 dark:text-white">{course.nombre_programa}</h3>
+							<h3 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+								<span>{course.nombre_programa}</span>
+								{#if (course as any).es_historico}
+									<span class="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800 dark:text-amber-200" title="F-HISTORICO: programa pasado o de registro retroactivo">
+										Histórico
+									</span>
+								{/if}
+							</h3>
 							<p class="text-xs text-gray-500 dark:text-gray-400">{course.codigo}</p>
 						</div>
 						<div class="relative">
@@ -504,7 +725,7 @@
 		</div>
 	{/if}
 
-	<!-- Create/Edit Modal -->
+	<!-- Create/Edit Modal (legacy: usado para editar) -->
 	<Modal
 		isOpen={isFormOpen}
 		title={selectedCourse ? 'Editar Programa' : 'Nuevo Programa'}
@@ -517,6 +738,13 @@
 			onCancel={() => isFormOpen = false}
 		/>
 	</Modal>
+
+	<!-- F-HISTORICO-AUTOSERVICIO (2026-08-04): wizard de creación con 3 tipos -->
+	<CourseWizard
+		isOpen={isWizardOpen}
+		onClose={() => isWizardOpen = false}
+		onSuccess={handleFormSuccess}
+	/>
 
 	<ModalConfirm
 		isOpen={showDeleteModal}
@@ -535,6 +763,30 @@
 		courseId={comunicadoCourseId}
 		programa={comunicadoPrograma}
 		onClose={() => (comunicadoOpen = false)}
+	/>
+
+	<!-- F-US-006-3TIPOS-3A-FE: carga inicial de estudiantes para
+	     programas en_ejecucion o historicos -->
+	<CargaInicialModal
+		isOpen={cargaInicialOpen}
+		course={cargaInicialCourse}
+		onClose={() => (cargaInicialOpen = false)}
+		onSuccess={() => loadCourses()}
+	/>
+
+	<!-- F-NOTAS-MODULOS-EJECUTADOS: carga aparte, solo de notas -->
+	<CargarNotasModal
+		isOpen={cargarNotasOpen}
+		course={cargarNotasCourse}
+		onClose={() => (cargarNotasOpen = false)}
+	/>
+
+	<!-- F-US-006-3TIPOS-3B: agregar 1 estudiante a un modulo futuro -->
+	<AgregarEstudianteModal
+		isOpen={agregarEstudianteOpen}
+		course={agregarEstudianteCourse}
+		onClose={() => (agregarEstudianteOpen = false)}
+		onSuccess={() => loadCourses()}
 	/>
 
 	<!-- Course Students Modal -->
@@ -559,7 +811,7 @@
 					{#snippet leftIcon()}
 						<DownloadIcon class="size-4" />
 					{/snippet}
-					Descargar CSV
+					Descargar Excel
                 </Button>
             </div>
 			<div class="overflow-x-auto">
@@ -601,7 +853,28 @@
 									<div class="text-xs text-gray-400 mt-0.5">{formatDate(student.inscripcion.fecha_inscripcion)}</div>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
-									<div class="text-sm text-gray-900 dark:text-white">Total: {formatCurrency(student.financiero.total_a_pagar)}</div>
+									<div class="flex items-center gap-2 flex-wrap">
+										<span class="text-sm text-gray-900 dark:text-white">Total: {formatCurrency(student.financiero.total_a_pagar)}</span>
+										{#if student.financiero.descuento_personalizado}
+											<!-- F-2026-08-22-PRE-REG-BADGE-DESCUENTO: badge explicito
+											     para que el EC vea de un vistazo cuantos estudiantes
+											     tienen descuento aplicado y de que origen. -->
+											<span
+												class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold
+													{student.financiero.descuento_origen === 'vicerrectorado'
+														? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
+														: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}"
+												title={student.financiero.descuento_origen === 'vicerrectorado'
+													? 'Descuento de vicerrectorado (validado por el EC)'
+													: 'Descuento de Educación Continua'}
+											>
+												<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+												</svg>
+												{student.financiero.descuento_personalizado}% descuento
+											</span>
+										{/if}
+									</div>
 									<div class="text-xs text-green-600 dark:text-green-400">Pagado: {formatCurrency(student.financiero.total_pagado)}</div>
 									<div class="text-xs text-red-500 dark:text-red-400">Saldo: {formatCurrency(student.financiero.saldo_pendiente)}</div>
 									<div class="w-full bg-gray-200 rounded-full h-1.5 mt-2 dark:bg-dark-border">
@@ -615,5 +888,69 @@
 				</table>
 			</div>
 		{/if}
+	</Modal>
+
+	<!-- F-HISTORICO (2026-07-31): modal dedicado para subir la resolución de
+	     respaldo desde el menú desplegable del catálogo (sin abrir el editor
+	     completo). Funciona para programas nuevos, en ejecución o históricos. -->
+	<Modal
+		isOpen={showResolucionModal}
+		title="Subir Resolución de Respaldo"
+		onClose={() => { showResolucionModal = false; resolucionFile = null; }}
+		maxWidth="sm:max-w-lg"
+	>
+		<div class="space-y-4">
+			{#if resolucionCourse}
+				<div class="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
+					<div class="text-sm text-gray-600 dark:text-gray-300">Programa:</div>
+					<div class="font-semibold text-gray-900 dark:text-white">{resolucionCourse.nombre_programa}</div>
+					<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+						Código: {resolucionCourse.codigo}
+						{#if (resolucionCourse as any).es_historico}
+							<span class="ml-2 inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800 dark:text-amber-200">
+								Histórico
+							</span>
+						{/if}
+					</div>
+				</div>
+			{/if}
+
+			{#if resolucionCourse && (resolucionCourse as any).resolucion_pdf_url}
+				<div class="rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-3 text-sm text-green-800 dark:text-green-200">
+					<strong>Resolución actual:</strong>
+					<a href={(resolucionCourse as any).resolucion_pdf_url} target="_blank" rel="noopener" class="underline break-all ml-1">
+						Ver PDF
+					</a>
+					<div class="text-xs mt-1">Si subís un nuevo PDF, este será reemplazado.</div>
+				</div>
+			{/if}
+
+			<label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+				Seleccionar PDF
+			</label>
+			<input
+				type="file"
+				accept="application/pdf"
+				class="block w-full text-sm text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md cursor-pointer bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+				onchange={(e) => {
+					const target = e.target as HTMLInputElement;
+					resolucionFile = target.files?.[0] || null;
+				}}
+			/>
+			{#if resolucionFile}
+				<p class="text-xs text-gray-500 dark:text-gray-400">
+					Seleccionado: <strong>{resolucionFile.name}</strong> ({Math.round(resolucionFile.size / 1024)} KB)
+				</p>
+			{/if}
+
+			<div class="flex justify-end gap-3 pt-2">
+				<Button variant="secondary" onclick={() => { showResolucionModal = false; resolucionFile = null; }}>
+					Cancelar
+				</Button>
+				<Button onclick={handleSubirResolucion} loading={subiendoResolucion} disabled={!resolucionFile}>
+					Subir Resolución
+				</Button>
+			</div>
+		</div>
 	</Modal>
 </div>
