@@ -13,6 +13,7 @@
 		getCounters
 	} from '$lib/services/pre-registration.service';
 	import { courseService } from '$lib/services/course.service';
+	import { apiKyC } from '$lib/config/apiKyC.config';
 	import { userStore } from '$lib/stores/userStore';
 	import { STAFF_EC_FORMS } from '$lib/auth/roles'; // F-2026-08-11-EC-AUTOSERVICIO
 	import { alert } from '$lib/utils';
@@ -533,15 +534,7 @@
 		try {
 			const form = new FormData();
 			form.append('aprobado', 'true');
-			const res = await fetch(`/api/v1/students/${validatingTituloFor.studentId}/titulo/validar`, {
-				method: 'PUT',
-				body: form,
-				credentials: 'include',
-			});
-			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				throw new Error(err.detail || 'Error al validar');
-			}
+			await apiKyC.putFormData(`/students/${validatingTituloFor.studentId}/titulo/validar`, form);
 			alert('success', 'Título profesional verificado.');
 			showValidateTituloModal = false;
 			validatingTituloFor = null;
@@ -564,15 +557,7 @@
 			const form = new FormData();
 			form.append('aprobado', 'false');
 			form.append('motivo', tituloRejectMotivo.trim());
-			const res = await fetch(`/api/v1/students/${validatingTituloFor.studentId}/titulo/validar`, {
-				method: 'PUT',
-				body: form,
-				credentials: 'include',
-			});
-			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				throw new Error(err.detail || 'Error al rechazar');
-			}
+			await apiKyC.putFormData(`/students/${validatingTituloFor.studentId}/titulo/validar`, form);
 			alert('success', 'Título profesional rechazado.');
 			showValidateTituloModal = false;
 			validatingTituloFor = null;
@@ -613,17 +598,12 @@
 		descuentoRejectMotivo = '';
 		try {
 			// Fetch el student para obtener el estado actual del descuento.
-			const res = await fetch(`/api/v1/students/${sub.migrated_to_student_id}`, {
-				credentials: 'include',
-			});
-			if (res.ok) {
-				const student = await res.json();
-				validatingDescuentoFor = {
-					...validatingDescuentoFor,
-					estadoActual: student.descuento_vicerrectorado_estado || 'no_aplica',
-					motivoRechazo: student.descuento_vicerrectorado_motivo_rechazo || null,
-				};
-			}
+			const student = await apiKyC.get<any>(`/students/${sub.migrated_to_student_id}`);
+			validatingDescuentoFor = {
+				...validatingDescuentoFor,
+				estadoActual: student.descuento_vicerrectorado_estado || 'no_aplica',
+				motivoRechazo: student.descuento_vicerrectorado_motivo_rechazo || null,
+			};
 		} catch {
 			// Si falla el fetch, dejamos el estado por default (no_aplica).
 		} finally {
@@ -637,15 +617,7 @@
 		try {
 			const form = new FormData();
 			form.append('aprobado', 'true');
-			const res = await fetch(`/api/v1/students/${validatingDescuentoFor.studentId}/descuento-vicerrectorado/validar`, {
-				method: 'PUT',
-				body: form,
-				credentials: 'include',
-			});
-			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				throw new Error(err.detail || 'Error al validar el descuento');
-			}
+			await apiKyC.putFormData(`/students/${validatingDescuentoFor.studentId}/descuento-vicerrectorado/validar`, form);
 			alert('success', 'Descuento de vicerrectorado aprobado.');
 			showValidateDescuentoModal = false;
 			validatingDescuentoFor = null;
@@ -668,15 +640,7 @@
 			const form = new FormData();
 			form.append('aprobado', 'false');
 			form.append('motivo', descuentoRejectMotivo.trim());
-			const res = await fetch(`/api/v1/students/${validatingDescuentoFor.studentId}/descuento-vicerrectorado/validar`, {
-				method: 'PUT',
-				body: form,
-				credentials: 'include',
-			});
-			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				throw new Error(err.detail || 'Error al rechazar el descuento');
-			}
+			await apiKyC.putFormData(`/students/${validatingDescuentoFor.studentId}/descuento-vicerrectorado/validar`, form);
 			alert('success', 'Descuento de vicerrectorado rechazado. El estudiante sigue matriculado pero se cobra el módulo completo.');
 			showValidateDescuentoModal = false;
 			validatingDescuentoFor = null;
