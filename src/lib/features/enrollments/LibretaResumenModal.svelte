@@ -100,8 +100,150 @@
 		}
 	}
 
+	function esc(v: any): string {
+		return String(v || '')
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;');
+	}
+
 	function imprimir() {
-		window.print();
+		if (!enrollment) return;
+		const estudianteNombre = (enrollment as any).estudiante_nombre || '—';
+		const cursoNombre = (enrollment as any).curso_nombre || '—';
+		const estado = enrollment.estado || '—';
+		const fechaImpresion = new Date().toLocaleDateString('es-BO', {
+			day: '2-digit',
+			month: '2-digit',
+			year: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+
+		const filasHtml = pagos
+			.map(
+				(pago) => `
+			<tr>
+				<td>${esc(pago.concepto || '--')}${pago.numero_cuota ? ` (cuota ${pago.numero_cuota})` : ''}</td>
+				<td>${esc(pago.remitente || '--')}</td>
+				<td style="text-align: right; font-weight: bold;">${esc(formatCurrency(pago.cantidad_pago ?? 0))}</td>
+				<td>${esc(pago.numero_transaccion || (pago.metodo_pago === 'Caja' ? 'Caja' : '--'))}</td>
+				<td>${esc(fechaCorta(pago.fecha_comprobante || pago.created_at))}</td>
+				<td style="text-align: center;">${esc(pago.estado_pago || '--')}</td>
+			</tr>
+		`
+			)
+			.join('');
+
+		const totalAprobado = pagos
+			.filter((p) => p.estado_pago === 'Aprobado')
+			.reduce((sum, p) => sum + (p.cantidad_pago || 0), 0);
+
+		const html = `<!doctype html>
+<html lang="es">
+<head>
+	<meta charset="utf-8" />
+	<title>Resumen de Pagos - ${esc(estudianteNombre)}</title>
+	<style>
+		* { box-sizing: border-box; margin: 0; padding: 0; }
+		body { font-family: Arial, Helvetica, sans-serif; color: #111; padding: 25px; font-size: 12px; }
+		.header { text-align: center; margin-bottom: 18px; border-bottom: 2px solid #8a1f2f; padding-bottom: 10px; }
+		.header h1 { font-size: 15px; color: #8a1f2f; margin-bottom: 3px; font-weight: bold; text-transform: uppercase; }
+		.header h2 { font-size: 12px; color: #023273; font-weight: normal; margin-bottom: 2px; }
+		.header h3 { font-size: 11px; color: #555; font-style: italic; }
+		.info-box { display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; }
+		.info-col { flex: 1; }
+		.label { font-size: 10px; font-weight: bold; text-transform: uppercase; color: #64748b; margin-bottom: 2px; }
+		.value { font-size: 13px; font-weight: bold; color: #0f172a; }
+		.sub-value { font-size: 12px; font-weight: 600; color: #023273; margin-top: 2px; }
+		table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+		th { background: #f1f5f9; color: #334155; font-size: 10px; font-weight: bold; text-transform: uppercase; padding: 8px 10px; border: 1px solid #cbd5e1; text-align: left; }
+		th.text-right { text-align: right; }
+		th.text-center { text-align: center; }
+		td { padding: 7px 10px; border: 1px solid #cbd5e1; font-size: 11px; vertical-align: middle; }
+		.total-row td { font-weight: bold; background: #f8fafc; font-size: 12px; }
+		.footer { margin-top: 25px; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+		@media print {
+			body { padding: 10mm; }
+			@page { margin: 10mm; size: portrait; }
+		}
+	</style>
+</head>
+<body>
+	<div class="header">
+		<h1>Universidad Autónoma Gabriel René Moreno</h1>
+		<h2>Unidad de Postgrado de Contaduría Pública</h2>
+		<h3>Kardex / Resumen Económico de Pagos</h3>
+	</div>
+	<div class="info-box">
+		<div class="info-col">
+			<div class="label">Estudiante</div>
+			<div class="value">${esc(estudianteNombre)}</div>
+			<div class="label" style="margin-top: 6px;">Programa</div>
+			<div class="sub-value">${esc(cursoNombre)}</div>
+		</div>
+		<div class="info-col" style="text-align: right; max-width: 200px;">
+			<div class="label">Estado Inscripción</div>
+			<div class="value" style="color: #0284c7;">${esc(estado)}</div>
+			<div class="label" style="margin-top: 6px;">Fecha Emisión</div>
+			<div style="font-size: 11px; color: #64748b;">${esc(fechaImpresion)}</div>
+		</div>
+	</div>
+	<table>
+		<thead>
+			<tr>
+				<th>Concepto</th>
+				<th>Remitente</th>
+				<th class="text-right">Monto (Bs)</th>
+				<th>N° Comprobante</th>
+				<th>Fecha</th>
+				<th class="text-center">Estado</th>
+			</tr>
+		</thead>
+		<tbody>
+			${filasHtml || '<tr><td colspan="6" style="text-align:center; padding: 15px;">No hay pagos registrados</td></tr>'}
+			${
+				pagos.length > 0
+					? `
+			<tr class="total-row">
+				<td colspan="2" style="text-align: right; font-weight: bold;">TOTAL APROBADO:</td>
+				<td style="text-align: right; font-weight: bold; color: #008244;">${esc(formatCurrency(totalAprobado))}</td>
+				<td colspan="3"></td>
+			</tr>`
+					: ''
+			}
+		</tbody>
+	</table>
+	<div class="footer">
+		<span>KYC DataHub · Postgrado Contaduría Pública UAGRM</span>
+		<span>Documento de verificación oficial</span>
+	</div>
+</body>
+</html>`;
+
+		let iframe = document.getElementById('libreta-print-iframe') as HTMLIFrameElement;
+		if (!iframe) {
+			iframe = document.createElement('iframe');
+			iframe.id = 'libreta-print-iframe';
+			iframe.style.position = 'fixed';
+			iframe.style.right = '0';
+			iframe.style.bottom = '0';
+			iframe.style.width = '0';
+			iframe.style.height = '0';
+			iframe.style.border = 'none';
+			document.body.appendChild(iframe);
+		}
+
+		const doc = iframe.contentWindow?.document;
+		if (doc) {
+			doc.open();
+			doc.write(html);
+			doc.close();
+			setTimeout(() => {
+				iframe.contentWindow?.focus();
+				iframe.contentWindow?.print();
+			}, 250);
+		}
 	}
 </script>
 
