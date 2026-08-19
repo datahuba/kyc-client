@@ -227,7 +227,19 @@
      fondo blanco y texto negro. -->
 <style>
 	@media print {
-		:global(body *) {
+		/* F-FIX-PRINT-PAGINA-EN-BLANCO (2026-08-19): esta regla es CSS
+		   global (:global) y queda cargada en el bundle de la ruta
+		   mientras este componente exista ahí, INCLUSO con el modal
+		   cerrado ({#if isOpen} solo controla el montaje del markup, no la
+		   presencia del <style> en la hoja de estilos de la página). Antes
+		   escondía TODO `body *` sin condición: si alguien imprimía la
+		   página (Ctrl+P o el botón nativo del navegador) sin el modal
+		   abierto, `.libreta-imprimible` no existía en el DOM para
+		   revelarse de nuevo y la impresión salía completamente en blanco
+		   — visto en vivo en capacitación. Con `:has()` la regla de
+		   ocultar solo se activa si de verdad hay contenido imprimible en
+		   la página. */
+		:global(body:has(.libreta-imprimible) *) {
 			visibility: hidden;
 		}
 		:global(.libreta-imprimible),
