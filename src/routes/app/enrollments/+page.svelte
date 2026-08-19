@@ -1650,8 +1650,14 @@
 <style>
 	@media print {
 		/* Solo la libreta va al papel. El resto de la página (tabla de
-		   inscripciones, filtros, menús) se oculta. */
-		:global(body * ) {
+		   inscripciones, filtros, menús) se oculta.
+		   F-FIX-PRINT-PAGINA-EN-BLANCO (2026-08-19): `:has()` en vez de
+		   `body *` sin condición — si esta página se imprime sin el modal
+		   de Kardex abierto (Ctrl+P directo), `.libreta-imprimible` no
+		   existe para revelarse de nuevo y antes salía todo en blanco.
+		   Con `:has()` la regla de ocultar solo se activa si hay
+		   contenido imprimible real en la página. */
+		:global(body:has(.libreta-imprimible) *) {
 			visibility: hidden;
 		}
 		:global(.libreta-imprimible),
