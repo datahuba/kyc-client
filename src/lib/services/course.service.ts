@@ -144,6 +144,23 @@ class CourseService {
 	}
 
 	/**
+	 * F-NOTAS-MODULOS-EJECUTADOS (2026-08-18, decisión de Kevin): carga notas
+	 * de módulos YA EJECUTADOS desde un Excel aparte (CI + "Nota Modulo N"),
+	 * para estudiantes que YA ESTÁN inscritos en el curso. No crea
+	 * estudiantes ni inscripciones — para eso está la carga inicial.
+	 */
+	async cargarNotasModulosExcel(
+		courseId: string,
+		file: File
+	): Promise<{ actualizados: number; fallidos: { fila: number; carnet: string; motivo: string }[] }> {
+		const form = new FormData();
+		form.append('file', file);
+		return await apiKyC.post(`/courses/${courseId}/notas-modulos-excel`, form, {
+			customTimeout: 60000
+		});
+	}
+
+	/**
 	 * F-2026-08-12-EC-RESOLUCION-OBLIGATORIA (Kevin 2026-08-12 post-reunion):
 	 * sube un PDF de resolucion a cloudinary SIN asociarlo a ningun curso.
 	 * Devuelve la URL temporal. El frontend usa esa URL al crear el curso
