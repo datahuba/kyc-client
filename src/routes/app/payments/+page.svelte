@@ -155,6 +155,30 @@
 	// boton "Excel" de descarga. PERO no pueden crear/editar/eliminar pagos
 	// (esos botones siguen restringidos por canEditPayments mas abajo).
 	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae', 'encargado_curso', 'coordinador'].includes($userStore.role || ''));
+
+	// F-FIX-PAGOS-EC-EN-BLANCO (2026-08-18/19, Kevin: "hoy le sale en
+	// blanco"). Causa: `GET /students/` exige `require_staff` en el backend,
+	// que deliberadamente EXCLUYE a encargado_curso y coordinador ("Permite
+	// el acceso a: ADMIN, SUPERADMIN, MAE, CPD y COBRANZA" — ver
+	// api/dependencies.py). Pero `isStaff` en este archivo SI los incluye
+	// (para el resto de la pantalla, correctamente: list_payments SI les
+	// permite ver pagos de sus cursos desde F-FIX-RBAC-PAGOS-ENCARGADO,
+	// 2026-08-10).
+	//
+	// El onMount llamaba `studentService.getAll()` dentro de un
+	// `Promise.all` sin try/catch cada vez que `isStaff` era true. Para un
+	// encargado eso disparaba un 403 que tumbaba TODO el Promise.all antes
+	// de llegar a pedir los pagos — coursesList nunca se seteaba, loadPayments
+	// nunca corria, y la pantalla quedaba vacia sin ningun error visible para
+	// el usuario.
+	//
+	// Esta lista SOLO gatea esas dos llamadas a studentService.getAll(); el
+	// resto de la pantalla (filtros, toggle de vistas, boton Excel) sigue
+	// usando `isStaff` como corresponde, porque list_payments si los
+	// autoriza.
+	let puedeListarTodosLosEstudiantes = $derived(
+		['admin', 'superadmin', 'cpd', 'cobranza', 'mae'].includes($userStore.role || '')
+	);
 	// F-2026-08-22-EC-PAGOS-READONLY: solo los roles ECONOMICOS pueden crear,
 	// aprobar, rechazar, eliminar, subir comprobante, revertir pagos. EC y
 	// COORDINADOR quedan en modo SOLO LECTURA (solo pueden ver y descargar).
@@ -198,7 +222,7 @@
 	async function loadPayments() {
 		loading = true;
 		try {
-			if (isStaff && studentsList.length === 0) {
+			if (puedeListarTodosLosEstudiantes && studentsList.length === 0) {
 				const studentsRes = await studentService.getAll(1, 100);
 				studentsList = studentsRes.data;
 			}
@@ -417,7 +441,7 @@
 		initViewMode(); // FIX: restaurar viewMode desde localStorage solo si es staff
 		const results = await Promise.all([
 			courseService.getAll(1, 100),
-			isStaff ? studentService.getAll(1, 100) : Promise.resolve(null)
+			puedeListarTodosLosEstudiantes ? studentService.getAll(1, 100) : Promise.resolve(null)
 		]);
 		coursesList = results[0].data;
 		if (results[1]) studentsList = (results[1] as any).data;
@@ -986,18 +1010,26 @@
 				</div>
 			</div>
 
-			<div>
-				<select
-					bind:value={filters.estudiante_id}
-					onchange={handleFilterChange}
-					class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-				>
-					<option value="">Todos los estudiantes</option>
-					{#each studentsList as student (student._id)}
-						<option value={student._id}>{student.nombre}</option>
-					{/each}
-				</select>
-			</div>
+			{#if puedeListarTodosLosEstudiantes}
+				<div>
+					<select
+						bind:value={filters.estudiante_id}
+						onchange={handleFilterChange}
+						class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+					>
+						<option value="">Todos los estudiantes</option>
+						{#each studentsList as student (student._id)}
+							<option value={student._id}>{student.nombre}</option>
+						{/each}
+					</select>
+				</div>
+			{/if}
+			<!-- F-FIX-PAGOS-EC-EN-BLANCO: el encargado/coordinador no puede
+			     listar TODOS los estudiantes del sistema (require_staff los
+			     excluye), asi que no tienen el dropdown de arriba. Filtran por
+			     programa (ya disponible) y por texto libre (buscador de la
+			     parte superior de la pantalla), que alcanza para encontrar a
+			     un estudiante puntual dentro de sus propios cursos. -->
 		{/if}
 	</div>
 
