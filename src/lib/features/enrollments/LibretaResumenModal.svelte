@@ -249,7 +249,30 @@
 		   original. Verificado con una reproducción HTML aislada antes de
 		   subir esto: con la especificidad pareja (repitiendo la misma
 		   condición `:has()` también del lado de "mostrar"), la
-		   visibilidad computada da `visible` en vez de `hidden`. */
+		   visibilidad computada da `visible` en vez de `hidden`.
+
+		   FIX 2026-08-19 (sesión de la tarde): la impresión desde
+		   /app/certificates/requests (el flujo de certificados de No
+		   Deudor) seguía saliendo en blanco. La causa era que
+		   .libreta-imprimible usa position:absolute para "salir" del
+		   modal, pero TRES capas de overflow en ancestros recortaban el
+		   contenido:
+		   1. El layout wrapper <div class="overflow-hidden"> en
+		      /app/+layout.svelte — recorta todo lo que sale del viewport.
+		   2. El <main class="overflow-y-auto"> — contenedor scrolleable
+		      de la página.
+		   3. El body del Modal <div class="overflow-y-auto"> — el scroll
+		      del panel del modal.
+		   Además, los backdrops de los modales (position:fixed, inset:0)
+		   seguían pintándose en el contexto de impresión y tapaban el
+		   contenido aun con visibility:hidden (ocupan el viewport entero
+		   como elementos fijos).
+
+		   La solución fuerza overflow:visible en TODOS los ancestros del
+		   árbol cuando hay contenido imprimible, y oculta los backdrops
+		   con display:none para que ni siquiera participen del layout de
+		   impresión. Esto es seguro porque las reglas solo aplican
+		   dentro de @media print — la UI en pantalla no se ve afectada. */
 		:global(body:has(.libreta-imprimible) *) {
 			visibility: hidden;
 		}
@@ -267,9 +290,31 @@
 		:global(.no-print) {
 			display: none !important;
 		}
-		:global(.libreta-imprimible .overflow-x-auto) {
+
+		/* Neutralizar TODOS los overflow de ancestros que recortan el
+		   contenido absolutamente posicionado de .libreta-imprimible.
+		   Sin esto, position:absolute se posiciona contra el <main> que
+		   es el primer ancestro con position:relative, pero el contenido
+		   queda recortado por overflow-hidden/overflow-y-auto de las
+		   capas superiores del layout y del modal. */
+		:global(body:has(.libreta-imprimible) .overflow-hidden),
+		:global(body:has(.libreta-imprimible) .overflow-y-auto),
+		:global(body:has(.libreta-imprimible) .overflow-x-auto) {
 			overflow: visible !important;
 		}
+
+		/* Los backdrops de los modales son botones con position:fixed
+		   inset:0 — aun con visibility:hidden siguen forzando el
+		   viewport a su tamaño (un fixed de 100vw×100vh). Con
+		   display:none no participan del layout de impresión en
+		   absoluto. Se usa el selector del backdrop tal como lo genera
+		   modal.svelte: un <button> con las clases fixed e inset-0 y
+		   z-50, que es el que maneja el click para cerrar el modal. */
+		:global(body:has(.libreta-imprimible) > .fixed),
+		:global(body:has(.libreta-imprimible) .backdrop-blur-sm) {
+			display: none !important;
+		}
+
 		:global(.libreta-imprimible),
 		:global(.libreta-imprimible *) {
 			background: #fff !important;
