@@ -102,6 +102,12 @@ const staffAcademicGroup: NavigationGroup = {
 		// F-MODAL-GESTION-MODULOS (2026-08-03, Kevin): vista centralizada de
 		// gestión de módulos. Accesible desde el sidebar Académico.
 		{ type: 'item', name: 'Módulos', href: '/app/academico/modulos', icon: BookIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'cobranza', 'encargado_curso', 'coordinador'], loginTypes: ['admin'] },
+		// F-COORD-ACADEMICO-SUPERVISION (2026-08-19, Kevin): "pantalla de mis
+		// Encargados de Curso supervisados + estado academico consolidado de
+		// sus programas". No se le muestra a encargado_curso -- ya ve sus
+		// propios programas en Programas; esta vista consolida VARIOS
+		// programas de un coordinador, que es lo que faltaba.
+		{ type: 'item', name: 'Supervisión Académica', href: '/app/academico/supervision', icon: AcademicCapIcon, roles: ['admin', 'superadmin', 'cpd', 'mae', 'coordinador'], loginTypes: ['admin'] },
 		// F-EC-SIDEBAR-PROGRAMAS (2026-08-18, Kevin en capacitacion): "a todos
 		// los encargados hay que darles el acceso a programas desde el
 		// slidebar y no solo desde el Dashboard". Programas era el UNICO item
