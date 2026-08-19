@@ -67,6 +67,10 @@ export interface CertificateRequestCreate {
 	enrollment_id: string;
 	hasta_modulo_n?: number | null;
 	motivo: string;
+	// F-CERT-COMPROBANTE-OBLIGATORIO (2026-08-18): obligatorio para 'no_deudor',
+	// ignorado para 'notas' (no tiene arancel). Se sube ANTES vía
+	// POST /certificates/requests/upload-comprobante-temp.
+	comprobante_url?: string | null;
 }
 
 export interface CertificateRequestListResponse {
