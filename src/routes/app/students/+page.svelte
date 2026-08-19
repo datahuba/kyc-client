@@ -81,7 +81,17 @@
 	// Permisos Visuales Granulares
 	let currentRole = $derived($userStore.role || '');
 	let isSuperAdmin = $derived(currentRole === 'superadmin');
-	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
+	// F-FIX-COORD-FINANCIERO-NO-ACADEMICO (2026-08-19, Kevin): "financiero no
+	// deberia crear programas ni editar, tampoco estudiantes". El backend ya
+	// lo bloquea (require_gestion_academica en create_student/create_enrollment);
+	// esto es para no mostrarle un boton que le va a fallar.
+	let esCoordinadorFinanciero = $derived(
+		currentRole.toLowerCase() === 'coordinador' && $userStore.user?.subtipo_coordinador === 'financiero'
+	);
+	let canCreateStudent = $derived(
+		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole) &&
+			!esCoordinadorFinanciero
+	);
 	// F-FIX-STUDENT-EDIT-PERMISSIONS (2026-08-11, Kevin): antes canEditStudent
 	// solo permitía ['superadmin', 'admin', 'cpd'] pero el backend (require_cpd)
 	// también solo esos. El problema: Lisa/encargado_curso y coordinadores
@@ -91,7 +101,10 @@
 	// handleEdit() chequea este flag antes de abrir el form (defense in depth).
 	let canEditStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 	let canVerifyTitle = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
-	let canEnrollStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
+	let canEnrollStudent = $derived(
+		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole) &&
+			!esCoordinadorFinanciero
+	);
 
 	let isAllSelected = $derived(
 		students.length > 0 && students.every(s => selectedStudentIds.includes(s._id))

@@ -94,9 +94,18 @@
 
 	// ISSUE N: Control de Permisos Visuales
 	let currentRole = $derived(($userStore.role || '').toLowerCase());
+	// F-FIX-COORD-FINANCIERO-NO-ACADEMICO (2026-08-19, Kevin, mirando la
+	// tabla de permisos): "financiero no deberia crear programas ni editar,
+	// tampoco estudiantes". Su alcance es economico (ve todo, aprueba No
+	// Deudor), no gestion de contenido academico. El backend ya lo bloquea
+	// con 403 (require_gestion_academica); esto es solo para no mostrarle
+	// botones que le van a fallar.
+	let esCoordinadorFinanciero = $derived(
+		currentRole === 'coordinador' && $userStore.user?.subtipo_coordinador === 'financiero'
+	);
 	// F-2026-08-11-EC-AUTOSERVICIO: encargado_curso/coord pueden intentar
 	// crear programas. El backend rechaza con 403 si NO son historicos.
-	let canCreateCourse = $derived(STAFF_EC_COURSES.includes(currentRole));
+	let canCreateCourse = $derived(STAFF_EC_COURSES.includes(currentRole) && !esCoordinadorFinanciero);
 	// F-EC-EDITAR-PROGRAMA (2026-08-18, Kevin en capacitacion): "tienen que
 	// tener una opcion aqui en programa que sea editar programas (...) para
 	// cambiar fecha, si hay que cambiar el nombre algun dato, si hay que
@@ -105,10 +114,13 @@
 	// este en sus cursos_asignados, respondiendo 403 si no). Era solo el
 	// frontend escondiendo el boton, igual que pasaba con Programas en el
 	// sidebar. Si el EC intenta editar un programa ajeno, el backend lo corta.
-	let canEditCourse = $derived(STAFF_EC_COURSES.includes(currentRole));
+	let canEditCourse = $derived(STAFF_EC_COURSES.includes(currentRole) && !esCoordinadorFinanciero);
 	let canDeleteCourse = $derived(currentRole === 'superadmin');
 	// Comunicados: Encargado de Programa / Coordinador / CPD / Admin / Superadmin.
 	// (El Encargado solo a sus programas: lo valida el backend con 403.)
+	// El financiero SI puede enviar comunicados -- Kevin no lo nombro entre
+	// lo que hay que restringirle, y comunicar algo economico a los
+	// estudiantes de un programa entra dentro de su alcance.
 	let canSendComunicado = $derived(
 		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole)
 	);
@@ -122,8 +134,13 @@
 	// encargado_curso y coordinador). Por eso el frontend puede mostrar la
 	// opcion a EC/COORDINADOR sin riesgo: si intenta algo fuera de su
 	// scope, el backend rechaza con 403.
+	//
+	// F-FIX-COORD-FINANCIERO-NO-ACADEMICO (2026-08-19): tambien gatea
+	// "Cargar Notas de Modulos Ejecutados" (mismo criterio de visibilidad),
+	// asi que el financiero queda afuera de las dos.
 	let canCargaInicial = $derived(
-		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole)
+		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole) &&
+			!esCoordinadorFinanciero
 	);
 	let comunicadoOpen = $state(false);
 	let comunicadoCourseId = $state('');
