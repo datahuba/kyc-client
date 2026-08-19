@@ -65,14 +65,22 @@ interface Props {
 	// encargados de los de educación continua y los de profesionales, así
 	// sabemos cuál es cuál".
 	//
-	// Cada encargado maneja UN solo tipo de programa, así que su ámbito
-	// determina el de los programas que crea y el formulario deja de
-	// preguntárselo. Además define qué campos de matrícula ve: los de
-	// educación continua son diferenciados por alumno (200/500), los de
-	// programas profesionales son una matrícula única.
-	let requiereAmbito = $derived(
-		formData.role === 'encargado_curso' || formData.role === 'coordinador'
-	);
+	// Cada ENCARGADO DE CURSO maneja UN solo tipo de programa, así que su
+	// ámbito determina el de los programas que crea y el formulario deja de
+	// preguntárselo. Además define qué campos de matrícula ve.
+	//
+	// CORREGIDO (2026-08-19, Kevin): el COORDINADOR NO entra en esta regla.
+	// "el coordinador debería poder ver todo lo económico (...) los
+	// coordinadores ven los resúmenes de todo dependientes de su área, en
+	// este caso hablamos de finanzas" — el "área" de un coordinador
+	// financiero es lo económico en sí, transversal a TODOS los programas,
+	// no un ámbito de formación en particular. Pedirle que elija
+	// "educación continua" o "profesional" para poder crear su cuenta no
+	// tiene sentido y lo bloqueaba en el alta. Si un coordinador llega a
+	// crear un programa, `resolver_ambito()` en el backend igual resuelve
+	// el ámbito por el tipo de curso o por selección explícita en el
+	// formulario del programa — no depende de que la cuenta lo tenga fijo.
+	let requiereAmbito = $derived(formData.role === 'encargado_curso');
 	// Cobranza también puede asignarse a programas, pero es OPCIONAL: si no se
 	// marca ninguno, ve/gestiona todos los pagos (comportamiento general);
 	// si se marcan, queda segmentado a esos programas (ISSUE-P-SEGMENTACION).
