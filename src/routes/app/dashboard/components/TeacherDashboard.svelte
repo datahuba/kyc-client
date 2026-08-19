@@ -7,6 +7,7 @@
 	import { alert } from '$lib/utils';
 	import type { Course, Enrollment, Student } from '$lib/interfaces';
 	import { exportToExcel } from '$lib/utils/excelExport';
+	import * as XLSX from 'xlsx';
 
 	let loading = $state(true);
     let myModules: any[] = $state([]); 
@@ -276,50 +277,61 @@
 		exportToExcel(rows, columnDefs, `Planilla_${activeModule.curso_codigo}_Modulo${activeModule.modulo_index}`);
 	}
 
-	function importCSV(event: Event) {
+	async function importFile(event: Event) {
 		const target = event.target as HTMLInputElement;
 		const file = target.files?.[0];
 		if (!file) return;
 
-		const reader = new FileReader();
-		reader.onload = (e) => {
-			const text = e.target?.result as string;
-			const rows = text.split(/\r?\n/).map(row => row.split(','));
+		try {
+			const buffer = await file.arrayBuffer();
+			const workbook = XLSX.read(buffer, { type: 'array' });
+			const firstSheetName = workbook.SheetNames[0];
+			if (!firstSheetName) {
+				alert('warning', 'El archivo no contiene hojas con datos.');
+				return;
+			}
+			const sheet = workbook.Sheets[firstSheetName];
+			const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 			
 			let importedCount = 0;
 			for (let i = 1; i < rows.length; i++) {
 				const row = rows[i];
-				if (row.length >= 4) {
-					const registroStr = row[1]?.replace(/"/g, '').trim();
-					const ciStr = row[2]?.replace(/"/g, '').trim();
-					const notaStr = row[3]?.replace(/"/g, '').trim();
-					
-					if (notaStr !== '') {
-						const notaNum = Number(notaStr);
-						if (!isNaN(notaNum) && notaNum >= 0 && notaNum <= 100) {
-							const enrollmentMatch = moduleEnrollments.find(enr => {
-								const st = students[enr.estudiante_id];
-								return st?.registro === registroStr || st?.carnet === ciStr;
-							});
+				if (!row || row.length === 0) continue;
 
-							if (enrollmentMatch) {
-								calificacionInputs[enrollmentMatch._id] = notaNum;
-								importedCount++;
-							}
+				// Columnas esperadas de "Exportar Planilla":
+				// [0] Estudiante, [1] Registro, [2] CI, [3] Calificacion
+				const registroStr = row[1] !== undefined ? String(row[1]).replace(/"/g, '').trim() : '';
+				const ciStr = row[2] !== undefined ? String(row[2]).replace(/"/g, '').trim() : '';
+				const notaRaw = row[3];
+				
+				if (notaRaw !== undefined && notaRaw !== null && String(notaRaw).trim() !== '') {
+					const notaNum = Number(notaRaw);
+					if (!isNaN(notaNum) && notaNum >= 0 && notaNum <= 100) {
+						const enrollmentMatch = moduleEnrollments.find(enr => {
+							const st = students[enr.estudiante_id];
+							return (registroStr && st?.registro === registroStr) || 
+							       (ciStr && st?.carnet === ciStr) ||
+							       (registroStr && st?.carnet === registroStr);
+						});
+
+						if (enrollmentMatch) {
+							calificacionInputs[enrollmentMatch._id] = notaNum;
+							importedCount++;
 						}
 					}
 				}
 			}
 
 			if (importedCount > 0) {
-				alert('success', `Se cargaron ${importedCount} notas en pantalla. Por favor, revisa y haz clic en "Guardar Todo".`);
+				alert('success', `Se cargaron ${importedCount} notas del archivo (${file.name}). Haz clic en "Guardar Todo" para guardarlas.`);
 			} else {
-				alert('warning', 'No se encontraron notas válidas que coincidan con los registros de los estudiantes.');
+				alert('warning', 'No se encontraron notas válidas en el archivo que coincidan con los estudiantes del curso.');
 			}
-			
+		} catch (err: any) {
+			alert('error', 'Error al leer el archivo. Asegúrate de subir un archivo Excel (.xlsx, .xls) o CSV válido.');
+		} finally {
 			target.value = '';
-		};
-		reader.readAsText(file);
+		}
 	}
 
 	function getStudentStatus(enrollment: Enrollment, moduleIndexBase0: number) {
@@ -422,8 +434,8 @@
 							Exportar Planilla
 						</Button>
 
-						<input type="file" id="csv-upload" accept=".csv" class="hidden" onchange={importCSV} />
-						<Button variant="secondary" class="text-sm py-1.5" onclick={() => document.getElementById('csv-upload')?.click()}>
+						<input type="file" id="excel-upload" accept=".xlsx,.xls,.csv" class="hidden" onchange={importFile} />
+						<Button variant="secondary" class="text-sm py-1.5" onclick={() => document.getElementById('excel-upload')?.click()}>
 							{#snippet leftIcon()}
 								<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
