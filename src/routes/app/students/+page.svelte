@@ -88,23 +88,22 @@
 	let esCoordinadorFinanciero = $derived(
 		currentRole.toLowerCase() === 'coordinador' && $userStore.user?.subtipo_coordinador === 'financiero'
 	);
-	let canCreateStudent = $derived(
-		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole) &&
-			!esCoordinadorFinanciero
-	);
+	let canCreateStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole) && !esCoordinadorFinanciero);
 	// F-FIX-STUDENT-EDIT-PERMISSIONS (2026-08-11, Kevin): antes canEditStudent
 	// solo permitía ['superadmin', 'admin', 'cpd'] pero el backend (require_cpd)
 	// también solo esos. El problema: Lisa/encargado_curso y coordinadores
 	// tenían que editar datos personales (cumpleaños, celular, domicilio) pero
-	// recibían 403 al guardar. Ahora backend usa require_encargado_curso (5 roles)
-	// y este array se alinea con canCreateStudent/canEnrollStudent. Tambien
-	// handleEdit() chequea este flag antes de abrir el form (defense in depth).
+	// recibían 403 al guardar. Ahora backend usa require_encargado_curso (5 roles).
+	// Mismos ROLES base que canCreateStudent/canEnrollStudent (el test
+	// test_canEditStudent_alineado_con_canCreateStudent lo verifica), pero a
+	// diferencia de esos dos, canEditStudent NO excluye al coordinador
+	// financiero: editar datos personales de un estudiante YA EXISTENTE
+	// (cumpleaños, celular, domicilio) no es "cargar" un estudiante nuevo
+	// (F-FIX-COORD-FINANCIERO-NO-ACADEMICO, 2026-08-19) — el backend tampoco
+	// se toco en el endpoint de edicion.
 	let canEditStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 	let canVerifyTitle = $derived(['superadmin', 'admin', 'cpd'].includes(currentRole));
-	let canEnrollStudent = $derived(
-		['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole) &&
-			!esCoordinadorFinanciero
-	);
+	let canEnrollStudent = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole) && !esCoordinadorFinanciero);
 
 	let isAllSelected = $derived(
 		students.length > 0 && students.every(s => selectedStudentIds.includes(s._id))

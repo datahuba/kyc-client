@@ -87,7 +87,7 @@
 	<!-- Bottom Sheet (mobile) / Modal (desktop) -->
 	<div
 		bind:this={sheetRef}
-		class="fixed z-50 bg-white dark:bg-dark-surface shadow-2xl flex flex-col
+		class="modal-sheet fixed z-50 bg-white dark:bg-dark-surface shadow-2xl flex flex-col
 			inset-x-0 bottom-0 max-h-[92dvh] rounded-t-3xl
 			sm:inset-auto sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:max-h-[85vh] sm:w-full
 			{maxWidth}"
@@ -139,4 +139,23 @@
 <style>
 	.scrollbar-hide::-webkit-scrollbar { display: none; }
 	.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+	/* El panel del modal usa `transform: translate(...)` (centrado en
+	   desktop) y `transform: translateY(...)` (drag-to-dismiss en mobile).
+	   Un ancestro con `transform` crea un nuevo containing block para
+	   descendientes `position: absolute` — así que el contenido marcado
+	   `.libreta-imprimible` (usado para imprimir Kardex/comprobantes desde
+	   dentro de un modal) terminaba posicionándose respecto al panel
+	   (que en desktop está centrado a mitad de pantalla) en vez de
+	   respecto a la página, dejando un espacio en blanco enorme antes del
+	   contenido al imprimir. Neutralizar transform/position acá deja que
+	   `.libreta-imprimible` se posicione contra el siguiente ancestro
+	   posicionado real (el body), que es lo que se espera al imprimir. */
+	@media print {
+		:global(.modal-sheet) {
+			position: static !important;
+			transform: none !important;
+			inset: auto !important;
+		}
+	}
 </style>
