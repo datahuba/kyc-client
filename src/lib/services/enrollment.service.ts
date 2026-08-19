@@ -109,6 +109,21 @@ class EnrollmentService {
 		);
 	}
 
+	async bulkUpdateModuloNotasDocente(
+		items: { enrollment_id: string; modulo_index: number; nota: number }[],
+		cursoId?: string,
+		moduloNombre?: string
+	): Promise<{ total_solicitados: number; exitosos: number; fallidos: number; resultados: any[] }> {
+		return await apiKyC.post(
+			'/enrollments/modulos/bulk-notas-docente',
+			{
+				items,
+				curso_id: cursoId || undefined,
+				modulo_nombre: moduloNombre || undefined
+			}
+		);
+	}
+
 	// === ISSUE-Q-NOTA-BORRADOR: CPD valida o rechaza el borrador subido por el docente ===
 	async validarNotaModulo(enrollmentId: string, moduloIndex: number): Promise<Enrollment> {
 		return await apiKyC.post<Enrollment>(

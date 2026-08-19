@@ -139,71 +139,70 @@
 	}
 
 	async function saveAllCalificaciones() {
+		if (!activeModule) return;
 		savingAll = true;
-		let successCount = 0;
-		let failCount = 0;
-		const failedIds: string[] = [];
 
-		// F-047 FIX: usar Promise.allSettled para que un fallo no aborte los demás
-		// y poder reintentar las que fallaron.
-		const promesas = moduleEnrollments
+		const moduloIndex = activeModule.modulo_index - 1;
+		const itemsToSave = moduleEnrollments
 			.filter(e => {
 				const nota = calificacionInputs[e._id];
-				return nota !== '' && nota !== null && nota !== undefined;
+				return nota !== '' && nota !== null && nota !== undefined && !isNaN(Number(nota)) && Number(nota) >= 0 && Number(nota) <= 100;
 			})
-			.map(async (enrollment) => {
-				const result = await saveCalificacion(enrollment._id, false);
-				if (result) {
-					successCount++;
-				} else {
-					failCount++;
-					failedIds.push(enrollment._id);
-				}
-			});
+			.map(e => ({
+				enrollment_id: e._id,
+				modulo_index: moduloIndex,
+				nota: Number(calificacionInputs[e._id])
+			}));
 
-		await Promise.allSettled(promesas);
-
-		savingAll = false;
-		if (successCount > 0) {
-			alert('success', `Se guardaron ${successCount} calificaciones exitosamente.`);
-			// F-047: limpiar el draft si todo se guardó OK
-			if (failCount === 0 && activeModule) {
-				clearDraft(activeModule.curso_id, activeModule.modulo_index);
-			}
+		if (itemsToSave.length === 0) {
+			savingAll = false;
+			alert('warning', 'No hay calificaciones válidas ingresadas para guardar.');
+			return;
 		}
-		if (failCount > 0) {
-			alert(
-				'error',
-				`Hubo problemas guardando ${failCount} calificaciones. El draft se mantiene. Usa "Reintentar fallidas" para volver a intentarlo.`
+
+		try {
+			const res = await enrollmentService.bulkUpdateModuloNotasDocente(
+				itemsToSave,
+				activeModule.curso_id,
+				activeModule.modulo_nombre
 			);
+
+			// Actualizar estado local de los enrollments exitosos
+			if (res.resultados) {
+				for (const r of res.resultados) {
+					if (r.exito) {
+						const enr = moduleEnrollments.find(e => e._id === r.enrollment_id);
+						if (enr && enr.modulos && enr.modulos[moduloIndex]) {
+							enr.modulos[moduloIndex].nota_borrador = r.nota_guardada;
+							enr.modulos[moduloIndex].estado_validacion_nota = 'pendiente_validacion';
+						}
+					}
+				}
+				moduleEnrollments = [...moduleEnrollments];
+			}
+
+			if (res.exitosos > 0) {
+				alert('success', `Se guardaron ${res.exitosos} calificaciones exitosamente en un solo envío.`);
+				if (res.fallidos === 0) {
+					clearDraft(activeModule.curso_id, activeModule.modulo_index);
+				}
+			}
+
+			if (res.fallidos > 0) {
+				alert(
+					'error',
+					`Hubo problemas guardando ${res.fallidos} calificaciones. El draft se mantiene. Usa "Reintentar pendientes" para volver a intentarlo.`
+				);
+			}
+		} catch (error: any) {
+			alert('error', error?.message || 'Error al guardar las calificaciones en lote.');
+		} finally {
+			savingAll = false;
 		}
 	}
 
 	async function retryFailed() {
-		// Reintenta solo las que fallaron en el último saveAllCalificaciones
-		// (identificadas por tener un valor en calificacionInputs pero no en BD)
-		// Simplificado: reintenta todas las que tienen valor en input
-		savingAll = true;
-		let successCount = 0;
-		let failCount = 0;
-
-		for (const enrollment of moduleEnrollments) {
-			const nota = calificacionInputs[enrollment._id];
-			if (nota !== '' && nota !== null && nota !== undefined) {
-				const realIndex = activeModule!.modulo_index - 1;
-				const notaEnBD = enrollment.modulos?.[realIndex]?.nota;
-				// Solo reintentar si el valor en input difiere del de BD
-				if (Number(nota) !== notaEnBD) {
-					const result = await saveCalificacion(enrollment._id, false);
-					if (result) successCount++;
-					else failCount++;
-				}
-			}
-		}
-
-		savingAll = false;
-		if (successCount > 0) alert('success', `Reintentadas: ${successCount} guardadas.`);
-		if (failCount > 0) alert('error', `Aún ${failCount} con problemas.`);
+		return saveAllCalificaciones();
 	}
 
 	// ─── DRAFT en localStorage (F-047) ─────────────────────────────────────
