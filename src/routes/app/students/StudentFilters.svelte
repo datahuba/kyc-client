@@ -7,6 +7,7 @@
 		activo: string;
 		estado_titulo: string;
 		curso_id: string;
+		tipo_estudiante?: string;
 		allCourses: Course[];
 		onSearchInput: () => void;
 		onFilterChange: () => void;
@@ -17,20 +18,33 @@
 		activo = $bindable(),
 		estado_titulo = $bindable(),
 		curso_id = $bindable(),
+		tipo_estudiante = $bindable('all'),
 		allCourses,
 		onSearchInput,
 		onFilterChange
 	}: Props = $props();
 </script>
 
-<div class="grid grid-cols-1 md:grid-cols-5 gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-	<div class="md:col-span-2">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+	<div class="sm:col-span-2">
 		<label for="search" class="sr-only">Buscar</label>
 		<SearchInput
 			bind:value={q}
 			placeholder="Buscar por nombre, CI, registro..."
 			onInput={() => onSearchInput()}
 		/>
+	</div>
+
+	<div>
+		<select
+			bind:value={tipo_estudiante}
+			onchange={onFilterChange}
+			class="block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+		>
+			<option value="all">Todos los perfiles</option>
+			<option value="pregrado">Pregrado (EC)</option>
+			<option value="posgrado">Posgrado (Profesional)</option>
+		</select>
 	</div>
 	
 	<div>

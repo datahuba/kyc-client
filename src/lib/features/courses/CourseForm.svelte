@@ -261,6 +261,8 @@
 								docente_id: ''
 							})),
 					requisitos: course.requisitos ? course.requisitos.map((r) => ({ ...r })) : [],
+					// P-AMBITO-FORMACION: persistir ámbito
+					ambito: (course as any).ambito || (course.tipo_curso === 'maestría' || course.tipo_curso === 'doctorado' ? 'profesional' : 'educacion_continua'),
 					// F-HISTORICO: persistir el flag al editar
 					es_historico: (course as any).es_historico ?? false
 				};
@@ -474,6 +476,8 @@
 
 			// Se le hace `delete` de campos opcionales mas abajo, por eso el tipo laxo.
 			const payload: Record<string, any> = { ...formData };
+			// P-AMBITO-FORMACION: enviar ámbito resuelto
+			payload.ambito = ambitoEfectivo;
 			// F-2026-08-12-EC-RESOLUCION-OBLIGATORIA: pasar la URL de la
 			// resolucion subida (o el valor que ya tenia en edicion).
 			payload.resolucion_pdf_url = resolucionPdfUrl || (formData as any).resolucion_pdf_url || null;
@@ -729,6 +733,30 @@
 					<option value={tipo_curso.value}>{tipo_curso.label}</option>
 				{/each}
 			</Select>
+
+			{#if formData.tipo_curso === 'diplomado'}
+				<div class="sm:col-span-2">
+					<label for="ambito_diplomado" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+						Nivel del Diplomado (Ámbito)
+					</label>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+						<label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all {formData.ambito === 'educacion_continua' || (!formData.ambito) ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20 text-primary-900 dark:text-primary-200 ring-1 ring-primary-500' : 'border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface'}">
+							<input type="radio" name="ambito_diplomado" value="educacion_continua" bind:group={formData.ambito} class="mt-0.5 text-primary-600 focus:ring-primary-500" />
+							<div>
+								<p class="text-sm font-semibold">Diplomado Pregrado (Educación Continua)</p>
+								<p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Modalidad de graduación / pregrado. No exige título profesional.</p>
+							</div>
+						</label>
+						<label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all {formData.ambito === 'profesional' ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20 text-primary-900 dark:text-primary-200 ring-1 ring-primary-500' : 'border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface'}">
+							<input type="radio" name="ambito_diplomado" value="profesional" bind:group={formData.ambito} class="mt-0.5 text-primary-600 focus:ring-primary-500" />
+							<div>
+								<p class="text-sm font-semibold">Diplomado Posgrado (Profesional)</p>
+								<p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Para graduados y titulados. Exige Título en Provisión Nacional.</p>
+							</div>
+						</label>
+					</div>
+				</div>
+			{/if}
 
 			<Select label="Modalidad" bind:value={formData.modalidad} required>
 				<option value="">Seleccione una modalidad</option>

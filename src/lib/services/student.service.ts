@@ -19,6 +19,7 @@ class StudentService {
 			activo?: boolean;
 			estado_titulo?: string;
 			curso_id?: string;
+			tipo_estudiante?: string;
 		}
 	): Promise<PaginatedResponse<Student>> {
 		const params = new URLSearchParams({
@@ -30,6 +31,7 @@ class StudentService {
 		if (filters?.activo !== undefined) params.append('activo', filters.activo.toString());
 		if (filters?.estado_titulo) params.append('estado_titulo', filters.estado_titulo);
 		if (filters?.curso_id) params.append('curso_id', filters.curso_id);
+		if (filters?.tipo_estudiante && filters.tipo_estudiante !== 'all') params.append('tipo_estudiante', filters.tipo_estudiante);
 
 		return await apiKyC.get<PaginatedResponse<Student>>(`/students/?${params.toString()}`);
 	}

@@ -71,6 +71,7 @@
 	// Filters
 	let filters = $state({
 		q: '',
+		tipo_estudiante: 'all',
 		activo: 'all',
 		estado_titulo: 'all',
 		curso_id: ''
@@ -150,6 +151,7 @@
 			if (filters.activo !== 'all') filterParams.activo = filters.activo === 'true';
 			if (filters.estado_titulo !== 'all') filterParams.estado_titulo = filters.estado_titulo;
 			if (filters.curso_id) filterParams.curso_id = filters.curso_id;
+			if (filters.tipo_estudiante && filters.tipo_estudiante !== 'all') filterParams.tipo_estudiante = filters.tipo_estudiante;
 
 			const response = await studentService.getAll(page, limit, filterParams);
 			
@@ -175,11 +177,11 @@
 
 	// ISS-004: empty state contextual con limpieza de filtros
 	let hasActiveStudentFilters = $derived(
-		!!(filters.q || filters.activo !== 'all' || filters.estado_titulo !== 'all' || filters.curso_id)
+		!!(filters.q || filters.activo !== 'all' || filters.estado_titulo !== 'all' || filters.curso_id || filters.tipo_estudiante !== 'all')
 	);
 
 	function clearStudentFilters() {
-		filters = { q: '', activo: 'all', estado_titulo: 'all', curso_id: '' };
+		filters = { q: '', tipo_estudiante: 'all', activo: 'all', estado_titulo: 'all', curso_id: '' };
 		page = 1;
 		loadStudents();
 	}
@@ -623,6 +625,7 @@
 	<!-- Componente de Filtros Modularizado -->
 	<StudentFilters
 		bind:q={filters.q}
+		bind:tipo_estudiante={filters.tipo_estudiante}
 		bind:activo={filters.activo}
 		bind:estado_titulo={filters.estado_titulo}
 		bind:curso_id={filters.curso_id}

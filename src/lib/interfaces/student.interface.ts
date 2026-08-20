@@ -48,6 +48,17 @@ export interface Student {
 	cv_estado?: 'pendiente' | 'verificado' | 'rechazado';
 	cv_motivo_rechazo?: string | null;
 	titulo?: Titulo | null;
+	// P-AMBITO-FORMACION: tipo de perfil del estudiante
+	tipo_estudiante?: 'pregrado' | 'posgrado' | string;
+	es_primer_carrera?: boolean;
+	registro_universitario?: string | null;
+	avance_academico_codigo?: number | null;
+	formulario_descuento_numero?: number | null;
+	carrera_codigo?: string | null;
+	descuento_porcentaje?: number | null;
+	modalidad?: string | null;
+	carta_firmada_url?: string | null;
+	resolucion_url?: string | null;
 	// Datos oficiales UAGRM
 	sexo?: string | null;
 	estado_civil?: string | null;

@@ -43,6 +43,13 @@
 	// ISSUE-A-VERIFICACION: no bloqueante, solo informativo
 	let resendingVerification = $state(false);
 
+	// P-AMBITO-FORMACION (2026-08-20): detección de estudiante de pregrado (diplomado continuo)
+	// vs posgraduante profesional para adaptar requisitos documentales e interfaz.
+	let esEstudiantePregrado = $derived(
+		profileData?.tipo_estudiante === 'pregrado' ||
+		(!profileData?.tipo_estudiante && (profileData?.registro_universitario || profileData?.avance_academico_codigo || profileData?.carrera_codigo || profileData?.es_primer_carrera !== false))
+	);
+
 	// Carga de Título Profesional desde el perfil. A diferencia de CV/Carnet/Afiliación,
 	// el título lleva metadata (nombre, número, año, universidad) que el backend exige,
 	// por eso se captura en un modal en vez de una subida directa de archivo.
@@ -568,6 +575,16 @@
 								</div>
 								<span class="hidden sm:inline">•</span>
 								<div class="flex items-center gap-1.5 text-sm">
+									<span class={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+										esEstudiantePregrado
+											? 'bg-sky-400/25 text-sky-100 border border-sky-300/30'
+											: 'bg-indigo-400/25 text-indigo-100 border border-indigo-300/30'
+									}`}>
+										{esEstudiantePregrado ? '🎓 Pregrado · Educación Continua' : '🏛️ Posgrado · Profesional'}
+									</span>
+								</div>
+								<span class="hidden sm:inline">•</span>
+								<div class="flex items-center gap-1.5 text-sm">
 									<span class={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
 										profileData.activo 
 											? 'bg-light-success/20 text-white border border-white/20' 
@@ -779,20 +796,53 @@
 						{/if}
 					</Card>
 
-					<!-- ISSUE-Q-DOCUMENTOS-GENERAL (2026-07-09): documentos generales del
-					     estudiante (CV, Carnet, Afiliación). Opcionales, iguales para
-					     TODOS los perfiles de estudiante, independientes del curso. -->
+					<!-- ISSUE-Q-DOCUMENTOS-GENERAL: documentos generales del estudiante.
+					     P-AMBITO-FORMACION (2026-08-20, Kevin): Pregrado (Educación Continua)
+					     solo requiere CI y Formulario. NO se le pide Título Profesional ni Afiliación. -->
 					<Card>
 						{#snippet header()}
-							<Heading level="h4" class="text-lg font-semibold">Mis Documentos</Heading>
+							<div class="flex items-center justify-between">
+								<Heading level="h4" class="text-lg font-semibold">Mis Documentos</Heading>
+								{#if esEstudiantePregrado}
+									<span class="rounded-full bg-sky-100 dark:bg-sky-900/30 px-2.5 py-0.5 text-xs font-semibold text-sky-800 dark:text-sky-300">
+										Requisitos Pregrado
+									</span>
+								{/if}
+							</div>
 						{/snippet}
 
-						<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-							Sube tus documentos personales (opcional). Formatos permitidos: PDF o imagen.
-						</p>
+						{#if esEstudiantePregrado}
+							<div class="mb-4 rounded-xl border border-sky-200 dark:border-sky-800/40 bg-sky-50/70 dark:bg-sky-950/20 p-3.5 flex items-start gap-3">
+								<div class="p-1.5 rounded-lg bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 shrink-0">
+									<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+									</svg>
+								</div>
+								<div>
+									<h5 class="text-xs font-bold text-sky-900 dark:text-sky-200">Requisitos de Diplomado Continuo (Pregrado)</h5>
+									<p class="text-xs text-sky-800/80 dark:text-sky-300/80 mt-0.5 leading-relaxed">
+										Para tu programa de pregrado solo necesitas registrar tu <strong>Carnet de Identidad</strong> y el <strong>Formulario de Admisión</strong>. No es necesario presentar Título Profesional ni certificaciones de colegiatura.
+									</p>
+								</div>
+							</div>
+						{:else}
+							<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+								Sube tus documentos personales y título profesional oficial. Formatos permitidos: PDF o imagen.
+							</p>
+						{/if}
 
 						<div class="space-y-3">
-							{#each [{ tipo: 'cv', label: 'Curriculum Vitae (CV)', url: profileData.cv_url, estado: profileData.cv_estado, motivo: profileData.cv_motivo_rechazo }, { tipo: 'ci', label: 'Carnet de Identidad', url: profileData.carnet_url, estado: profileData.carnet_estado, motivo: profileData.carnet_motivo_rechazo }, { tipo: 'afiliacion', label: 'Certificado de Afiliación (Colegio o convenios)', url: profileData.afiliacion_url, estado: profileData.afiliacion_estado, motivo: profileData.afiliacion_motivo_rechazo }] as doc}
+							{#each (esEstudiantePregrado
+								? [
+									{ tipo: 'ci', label: 'Carnet de Identidad (Obligatorio)', url: profileData.carnet_url, estado: profileData.carnet_estado, motivo: profileData.carnet_motivo_rechazo },
+									{ tipo: 'cv', label: 'Curriculum Vitae (Opcional)', url: profileData.cv_url, estado: profileData.cv_estado, motivo: profileData.cv_motivo_rechazo }
+								]
+								: [
+									{ tipo: 'cv', label: 'Curriculum Vitae (CV)', url: profileData.cv_url, estado: profileData.cv_estado, motivo: profileData.cv_motivo_rechazo },
+									{ tipo: 'ci', label: 'Carnet de Identidad', url: profileData.carnet_url, estado: profileData.carnet_estado, motivo: profileData.carnet_motivo_rechazo },
+									{ tipo: 'afiliacion', label: 'Certificado de Afiliación (Colegio o convenios)', url: profileData.afiliacion_url, estado: profileData.afiliacion_estado, motivo: profileData.afiliacion_motivo_rechazo }
+								]
+							) as doc}
 								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-dark-border pb-3 last:border-b-0 last:pb-0">
 									<div class="min-w-0">
 										<p class="text-sm font-medium text-gray-900 dark:text-white">{doc.label}</p>
@@ -839,41 +889,43 @@
 								</div>
 							{/each}
 
-							<!-- Título Profesional: lleva metadata, se sube desde un modal -->
-							<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-dark-border pb-3 last:border-b-0 last:pb-0">
-								<div class="min-w-0">
-									<p class="text-sm font-medium text-gray-900 dark:text-white">Título Profesional</p>
-									<div class="mt-1 flex flex-wrap items-center gap-2">
-										{#if profileData.titulo?.titulo_url || profileData.titulo?.url}
-											{#if profileData.titulo.estado === 'verificado'}
-												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-success/15 text-light-success dark:bg-dark-success/20 dark:text-dark-success">Verificado</span>
-											{:else if profileData.titulo.estado === 'rechazado'}
-												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-error/15 text-light-error dark:bg-dark-error/20 dark:text-dark-error">Rechazado</span>
+							<!-- Título Profesional: solo requerido para posgraduantes / profesionales -->
+							{#if !esEstudiantePregrado}
+								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-dark-border pb-3 last:border-b-0 last:pb-0">
+									<div class="min-w-0">
+										<p class="text-sm font-medium text-gray-900 dark:text-white">Título Profesional (Provisión Nacional)</p>
+										<div class="mt-1 flex flex-wrap items-center gap-2">
+											{#if profileData.titulo?.titulo_url || profileData.titulo?.url}
+												{#if profileData.titulo.estado === 'verificado'}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-success/15 text-light-success dark:bg-dark-success/20 dark:text-dark-success">Verificado</span>
+												{:else if profileData.titulo.estado === 'rechazado'}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-light-error/15 text-light-error dark:bg-dark-error/20 dark:text-dark-error">Rechazado</span>
+												{:else}
+													<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">Archivo Subido</span>
+												{/if}
+												<a href={profileData.titulo.titulo_url || profileData.titulo.url} target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-light-secondary dark:text-dark-secondary hover:underline">Ver documento</a>
 											{:else}
-												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">Archivo Subido</span>
+												<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Sin subir</span>
 											{/if}
-											<a href={profileData.titulo.titulo_url || profileData.titulo.url} target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-light-secondary dark:text-dark-secondary hover:underline">Ver documento</a>
-										{:else}
-											<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Sin subir</span>
+										</div>
+										{#if profileData.titulo?.estado === 'rechazado' && profileData.titulo?.motivo_rechazo}
+											<p class="mt-1 text-xs text-light-error dark:text-dark-error">Motivo: {profileData.titulo.motivo_rechazo}</p>
 										{/if}
 									</div>
-									{#if profileData.titulo?.estado === 'rechazado' && profileData.titulo?.motivo_rechazo}
-										<p class="mt-1 text-xs text-light-error dark:text-dark-error">Motivo: {profileData.titulo.motivo_rechazo}</p>
+									{#if profileData.titulo?.estado !== 'verificado'}
+										<div class="shrink-0">
+											<button
+												type="button"
+												onclick={abrirModalTitulo}
+												class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-light-secondary dark:bg-dark-secondary hover:bg-light-secondary_d dark:hover:bg-dark-secondary_d rounded-lg transition-colors"
+											>
+												<DocumentAddIcon class="h-4 w-4" />
+												<span>{profileData.titulo?.titulo_url || profileData.titulo?.url ? 'Reemplazar Archivo' : 'Subir Título'}</span>
+											</button>
+										</div>
 									{/if}
 								</div>
-								{#if profileData.titulo?.estado !== 'verificado'}
-									<div class="shrink-0">
-										<button
-											type="button"
-											onclick={abrirModalTitulo}
-											class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-light-secondary dark:bg-dark-secondary hover:bg-light-secondary_d dark:hover:bg-dark-secondary_d rounded-lg transition-colors"
-										>
-											<DocumentAddIcon class="h-4 w-4" />
-											<span>{profileData.titulo?.titulo_url || profileData.titulo?.url ? 'Reemplazar Archivo' : 'Subir Título'}</span>
-										</button>
-									</div>
-								{/if}
-							</div>
+							{/if}
 						</div>
 					</Card>
 

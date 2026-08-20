@@ -38,6 +38,12 @@
 	let currentRole = $derived($userStore.role || '');
 	let canUploadAndVerify = $derived(['superadmin', 'admin', 'cpd', 'encargado_curso', 'coordinador'].includes(currentRole));
 
+	// P-AMBITO-FORMACION: Pregrado (Educación Continua) vs Posgrado (Profesional)
+	let esPregrado = $derived(
+		student?.tipo_estudiante === 'pregrado' ||
+		(!student?.tipo_estudiante && (student?.registro_universitario || student?.avance_academico_codigo || student?.carrera_codigo || student?.es_primer_carrera !== false))
+	);
+
 	// ISSUE-P-RECORDATORIO-PAGO (2026-07-08, reunión de postgrado contaduría):
 	// Cobranza necesita poder enviar un recordatorio de pago manual desde el
 	// perfil del estudiante. El backend (require_cobranza) también permite
@@ -290,9 +296,15 @@
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Email</label>
 				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white truncate" title={student.email}>{student.email}</p>
 			</div>
+			<div>
+				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Perfil Académico</label>
+				<span class={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${esPregrado ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300' : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'}`}>
+					{esPregrado ? '🎓 Pregrado (Educación Continua)' : '🏛️ Posgrado (Profesional)'}
+				</span>
+			</div>
 			<div class="lg:col-span-2">
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Domicilio</label>
-				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">{student.domicilio}</p>
+				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">{student.domicilio || '—'}</p>
 			</div>
 			<div>
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</label>
@@ -311,17 +323,30 @@
 			</div>
 			<div>
 				<Heading level="h4" class="text-lg font-semibold text-gray-900 dark:text-white">Información Académica</Heading>
-				<p class="text-sm text-gray-500 dark:text-gray-400">Registro y carrera</p>
+				<p class="text-sm text-gray-500 dark:text-gray-400">Registro, programa y avance</p>
 			</div>
 		</div>
-		<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+		<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
 			<div>
-				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Registro</label>
+				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Registro Postgrado</label>
 				<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">{student.registro}</p>
 			</div>
-			
+			{#if esPregrado}
+				<div>
+					<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Reg. Universitario (Pregrado)</label>
+					<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">{student.registro_universitario || student.registro}</p>
+				</div>
+				<div>
+					<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Código de Carrera</label>
+					<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">{student.carrera_codigo || '—'}</p>
+				</div>
+				<div>
+					<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Avance Académico</label>
+					<p class="mt-1 text-base font-medium text-gray-900 dark:text-white">{student.avance_academico_codigo ? `${student.avance_academico_codigo} créditos/módulos` : '—'}</p>
+				</div>
+			{/if}
 
-			<div class="md:col-span-2">
+			<div class="md:col-span-2 lg:col-span-4">
 				<label class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Curso / Programa</label>
 				{#if loadingCourses}
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Cargando cursos...</p>
@@ -469,16 +494,30 @@
 		<!-- Title -->
 		<div class="p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
 			<div class="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-gray-700">
-				<div class="rounded-lg bg-purple-50 p-2 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400">
+				<div class="rounded-lg {esPregrado ? 'bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400' : 'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400'} p-2">
 					<AcademicCapIcon class="size-6" />
 				</div>
 				<div>
-					<Heading level="h4" class="text-lg font-semibold text-gray-900 dark:text-white">Título Profesional</Heading>
-					<p class="text-sm text-gray-500 dark:text-gray-400">Verificación de grado</p>
+					<Heading level="h4" class="text-lg font-semibold text-gray-900 dark:text-white">
+						{esPregrado ? 'Perfil de Educación Continua' : 'Título Profesional'}
+					</Heading>
+					<p class="text-sm text-gray-500 dark:text-gray-400">
+						{esPregrado ? 'Requisitos de pregrado' : 'Verificación de grado'}
+					</p>
 				</div>
 			</div>
 
-			{#if !student.titulo}
+			{#if esPregrado}
+				<div class="text-center py-8 px-4 rounded-xl border border-sky-100 dark:border-sky-800/30 bg-sky-50/50 dark:bg-sky-950/20">
+					<div class="inline-flex p-3 rounded-full bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 mb-3">
+						<AcademicCapIcon class="size-8" />
+					</div>
+					<h5 class="text-sm font-semibold text-gray-900 dark:text-white">Sin requisito de Título Profesional</h5>
+					<p class="mt-1.5 text-xs text-gray-600 dark:text-gray-300 max-w-sm mx-auto">
+						Este estudiante cursa un programa de <strong>Educación Continua / Pregrado</strong>. No requiere presentación de Título en Provisión Nacional ni certificación de colegiatura.
+					</p>
+				</div>
+			{:else if !student.titulo}
 				<div class="text-center py-8">
 					<p class="text-gray-500">No hay información de título registrada.</p>
 					{#if canUploadAndVerify}
