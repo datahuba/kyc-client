@@ -2,21 +2,33 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { onMount } from 'svelte';
+	import { dev } from '$app/environment';
 	import { initTheme } from '$lib/stores/themeStore';
 	import Splash from '$lib/components/ui/splash.svelte';
 	import { setupPageTransitions } from '$lib/utils/pageTransitions';
 
 	let { children } = $props();
 
+	setupPageTransitions();
+
 	onMount(() => {
 		initTheme();
-		setupPageTransitions();
+
+		// En modo desarrollo local, desregistrar cualquier Service Worker remanente
+		// para que no intercepte los bundles ni el WebSocket HMR de Vite
+		if (dev && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+			navigator.serviceWorker.getRegistrations().then((registrations) => {
+				for (const reg of registrations) {
+					reg.unregister();
+				}
+			});
+		}
 
 		// F-SW-AUTORELOAD (2026-07-30): cuando el Service Worker se actualiza y
 		// toma el control (controllerchange), recargamos la página para que
 		// el cliente use el bundle nuevo. Sin esto, el usuario podría seguir
 		// viendo la versión vieja de los JS en cache hasta que cierre la pestaña.
-		if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+		if (!dev && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 			let isReloading = false;
 			navigator.serviceWorker.addEventListener('controllerchange', () => {
 				if (isReloading) return;

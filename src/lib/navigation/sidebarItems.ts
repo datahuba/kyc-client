@@ -124,7 +124,7 @@ const staffFinancialGroup: NavigationGroup = {
 	type: 'group',
 	name: 'Financiero',
 	icon: CreditCardIcon,
-	roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador'],
+	roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador', 'encargado_curso'],
 	loginTypes: ['admin'],
 	children: [
 		{ type: 'item', name: 'Cuentas por Cobrar', href: '/app/reports/cuentas-por-cobrar', icon: ChartBarIcon, roles: ['admin', 'superadmin', 'mae', 'cpd', 'cobranza', 'coordinador', 'encargado_curso'], loginTypes: ['admin'] },

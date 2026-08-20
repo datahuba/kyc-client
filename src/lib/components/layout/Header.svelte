@@ -8,6 +8,7 @@
 	import { page } from '$app/stores';
 	import { onMount, onDestroy, untrack } from 'svelte';
 	import { apiKyC } from '$lib/config/apiKyC.config';
+	import { API_CONFIG } from '$lib/config/api.config';
 	import { fly } from 'svelte/transition';
 
 	interface Props {
@@ -275,7 +276,7 @@
 			// BUG-SSE-002 FIX (2026-08-12, Kevin): la URL debe ser SOLO
 			// /api/v1/notifications/stream. El doble /api/api/v1/ que estaba
 			// antes era incorrecto y daba 404 en nginx.
-			const url = `/api/v1/notifications/stream?ticket=${encodeURIComponent(ticket)}`;
+			const url = `${API_CONFIG.BASE_URL}/api/v1/notifications/stream?ticket=${encodeURIComponent(ticket)}`;
 
 			notificationEventSource = new EventSource(url, { withCredentials: true });
 
