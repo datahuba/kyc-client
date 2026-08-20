@@ -43,11 +43,12 @@
 	// ISSUE-A-VERIFICACION: no bloqueante, solo informativo
 	let resendingVerification = $state(false);
 
-	// P-AMBITO-FORMACION (2026-08-20): detección de estudiante de pregrado (diplomado continuo)
-	// vs posgraduante profesional para adaptar requisitos documentales e interfaz.
+	// P-AMBITO-FORMACION: Diferenciación de perfil de Pregrado vs Posgrado
+	// En Postgrado UAGRM, un estudiante es Pregrado ÚNICAMENTE si tiene RU, código de carrera,
+	// avance académico o formulario de descuento (diplomados continuos de modalidad de graduación).
 	let esEstudiantePregrado = $derived(
 		profileData?.tipo_estudiante === 'pregrado' ||
-		(!profileData?.tipo_estudiante && (profileData?.registro_universitario || profileData?.avance_academico_codigo || profileData?.carrera_codigo || profileData?.es_primer_carrera !== false))
+		(!profileData?.tipo_estudiante && !!(profileData?.registro_universitario || profileData?.avance_academico_codigo || profileData?.carrera_codigo || profileData?.formulario_descuento_numero))
 	);
 
 	// Carga de Título Profesional desde el perfil. A diferencia de CV/Carnet/Afiliación,

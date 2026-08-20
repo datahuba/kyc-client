@@ -41,7 +41,7 @@
 	// P-AMBITO-FORMACION: Pregrado (Educación Continua) vs Posgrado (Profesional)
 	let esPregrado = $derived(
 		student?.tipo_estudiante === 'pregrado' ||
-		(!student?.tipo_estudiante && (student?.registro_universitario || student?.avance_academico_codigo || student?.carrera_codigo || student?.es_primer_carrera !== false))
+		(!student?.tipo_estudiante && !!(student?.registro_universitario || student?.avance_academico_codigo || student?.carrera_codigo || student?.formulario_descuento_numero))
 	);
 
 	// ISSUE-P-RECORDATORIO-PAGO (2026-07-08, reunión de postgrado contaduría):

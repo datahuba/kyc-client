@@ -77,11 +77,11 @@
 							<div class="ml-3 min-w-0">
 								<div class="flex items-center gap-1.5 min-w-0">
 									<span class="text-sm font-medium text-gray-900 dark:text-white truncate" title={student.nombre}>{student.nombre}</span>
-									{#if student.tipo_estudiante === 'pregrado' || student.registro_universitario || student.avance_academico_codigo}
+									{#if student.tipo_estudiante === 'pregrado' || student.registro_universitario || student.avance_academico_codigo || student.carrera_codigo}
 										<span class="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
 											Pregrado
 										</span>
-									{:else if student.tipo_estudiante === 'posgrado' || (student.titulo && student.titulo.numero_titulo) || student.es_primer_carrera === false}
+									{:else}
 										<span class="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
 											Posgrado
 										</span>
@@ -149,11 +149,11 @@
 					<div class="ml-3 min-w-0">
 						<div class="flex items-center gap-1.5 min-w-0">
 							<span class="text-sm font-semibold text-gray-900 dark:text-white truncate" title={student.nombre}>{student.nombre}</span>
-							{#if student.tipo_estudiante === 'pregrado' || student.registro_universitario || student.avance_academico_codigo}
+							{#if student.tipo_estudiante === 'pregrado' || student.registro_universitario || student.avance_academico_codigo || student.carrera_codigo}
 								<span class="shrink-0 px-1.5 py-0.2 text-[9px] font-semibold rounded bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
 									Pregrado
 								</span>
-							{:else if student.tipo_estudiante === 'posgrado' || (student.titulo && student.titulo.numero_titulo) || student.es_primer_carrera === false}
+							{:else}
 								<span class="shrink-0 px-1.5 py-0.2 text-[9px] font-semibold rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
 									Posgrado
 								</span>
