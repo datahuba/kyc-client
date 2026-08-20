@@ -1127,90 +1127,12 @@
 						     sección usaba un borde y un fondo distinto y parecían
 						     dos componentes de apps diferentes.
 						     ============================================================ -->
-						<section class="mb-4">
-							<div class="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
-								<div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-dark-border">
-									<div class="flex items-center gap-2.5 min-w-0">
-										<FileTextIcon class="w-5 h-5 shrink-0 text-primary-600 dark:text-primary-400" />
-										<h4 class="text-sm font-semibold text-light-black dark:text-dark-white truncate">
-											Certificado de notas
-										</h4>
-									</div>
-									<span class="shrink-0 rounded-full bg-light-success/10 dark:bg-dark-success/20 px-3 py-1 text-xs font-medium text-light-success dark:text-dark-success">
-										Sin costo
-									</span>
-								</div>
-
-								<div class="p-4">
-									{#if notasYaEmitido}
-										<div class="flex items-start gap-3">
-											<CircleCheckIcon class="w-5 h-5 shrink-0 mt-0.5 text-light-success dark:text-dark-success" />
-											<div class="flex-1 min-w-0">
-												<p class="text-sm font-medium text-light-black dark:text-dark-white">
-													Listo · Folio {notasYaEmitido.folio}
-												</p>
-												<p class="text-xs text-light-four dark:text-dark-four mt-0.5">
-													Emitido el {formatDate(notasYaEmitido.emitido_en)}
-												</p>
-											</div>
-											<Button variant="primary" size="sm" loading={downloadingId === notasYaEmitido.id} onclick={() => descargarPdf(notasYaEmitido)} ariaLabel="Descargar certificado de notas folio {notasYaEmitido.folio}">
-												<DownloadIcon class="w-4 h-4 mr-1.5" />Descargar
-											</Button>
-										</div>
-									{:else if isNotasSolicitudActiva(enrollment)}
-										{@const solNotas = isNotasSolicitudActiva(enrollment)}
-										<div class="flex flex-wrap items-start justify-between gap-3">
-											<div class="min-w-0 flex-1">
-												<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {estadoBadgeClass(solNotas!.estado)}">
-													{estadoLabel(solNotas!.estado)}
-												</span>
-												<p class="text-sm text-light-black dark:text-dark-white mt-2">
-													Solicitado el {formatDate(solNotas!.created_at)}.
-												</p>
-												{#if solNotas!.estado === 'rechazada' && solNotas!.motivo_rechazo}
-													<p class="text-xs text-light-error dark:text-dark-error mt-1">
-														<strong>Motivo:</strong> {solNotas!.motivo_rechazo}
-													</p>
-												{:else}
-													<p class="text-xs text-light-four dark:text-dark-four mt-1">
-														Coordinación tiene que aprobarlo antes de que puedas descargarlo.
-													</p>
-												{/if}
-											</div>
-											{#if solNotas!.estado === 'pendiente' || solNotas!.estado === 'en_revision'}
-												<Button variant="ghost" size="sm" loading={cancellingRequestId === solNotas!.id} onclick={() => cancelarMiSolicitud(solNotas!)} ariaLabel="Cancelar solicitud de certificado de notas">
-													Cancelar
-												</Button>
-											{/if}
-										</div>
-									{:else}
-										<div class="flex flex-wrap items-center justify-between gap-3">
-											<p class="text-sm text-light-four dark:text-dark-four min-w-0 flex-1">
-												Acredita las notas que obtuviste en el programa.
-											</p>
-											<Button variant="primary" size="md" loading={emittingNotas[eid]} onclick={() => solicitarNotas(enrollment)} ariaLabel="Solicitar certificado de notas">
-												Solicitar
-											</Button>
-										</div>
-									{/if}
-								</div>
-							</div>
-						</section>
-
 						<!-- ============================================================
-						     SECCIÓN 2: Certificado de No Deudor
+						     SECCIÓN 1: Certificado de No Deudor
 						     F-CERT-NO-DEUDOR-COBRO + F-CERT-UX-ESTUDIANTE (2026-08-17).
-
-						     Dos arreglos de fondo, no solo estéticos:
-						       1. El ARANCEL se muestra ANTES de solicitar. Antes el
-						          estudiante se enteraba del costo en el aviso posterior
-						          a haber creado la solicitud — o sea que se le cobraba
-						          sin avisarle.
-						       2. Se explican los TRES PASOS antes de solicitar. Sin eso
-						          el estudiante pedía, se lo aprobaban, y no entendía por
-						          qué no aparecía el botón de descarga.
+						     Primera opción disponible para los estudiantes.
 						     ============================================================ -->
-						<section>
+						<section class="mb-5">
 							<div class="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
 								<div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-dark-border">
 									<div class="flex items-center gap-2.5 min-w-0">
@@ -1490,6 +1412,81 @@
 												</p>
 											{/if}
 										{/if}
+									{/if}
+								</div>
+							</div>
+						</section>
+
+						<!-- ============================================================
+						     SECCIÓN 2: Certificado de Notas (En desarrollo)
+						     F-CERT-NOTAS-EN-DESARROLLO (2026-08-20, Kevin): colocado como
+						     segunda opción y marcado en desarrollo.
+						     ============================================================ -->
+						<section>
+							<div class="rounded-xl border border-gray-200 dark:border-dark-border bg-white/70 dark:bg-dark-surface/70 overflow-hidden">
+								<div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-dark-border bg-gray-50/50 dark:bg-dark-background/40">
+									<div class="flex items-center gap-2.5 min-w-0">
+										<FileTextIcon class="w-5 h-5 shrink-0 text-gray-400 dark:text-gray-500" />
+										<h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate">
+											Certificado de notas
+										</h4>
+									</div>
+									<span class="shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/30 px-3 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300">
+										En desarrollo
+									</span>
+								</div>
+
+								<div class="p-4">
+									{#if notasYaEmitido}
+										<div class="flex items-start gap-3">
+											<CircleCheckIcon class="w-5 h-5 shrink-0 mt-0.5 text-light-success dark:text-dark-success" />
+											<div class="flex-1 min-w-0">
+												<p class="text-sm font-medium text-light-black dark:text-dark-white">
+													Listo · Folio {notasYaEmitido.folio}
+												</p>
+												<p class="text-xs text-light-four dark:text-dark-four mt-0.5">
+													Emitido el {formatDate(notasYaEmitido.emitido_en)}
+												</p>
+											</div>
+											<Button variant="primary" size="sm" loading={downloadingId === notasYaEmitido.id} onclick={() => descargarPdf(notasYaEmitido)} ariaLabel="Descargar certificado de notas folio {notasYaEmitido.folio}">
+												<DownloadIcon class="w-4 h-4 mr-1.5" />Descargar
+											</Button>
+										</div>
+									{:else if isNotasSolicitudActiva(enrollment)}
+										{@const solNotas = isNotasSolicitudActiva(enrollment)}
+										<div class="flex flex-wrap items-start justify-between gap-3">
+											<div class="min-w-0 flex-1">
+												<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {estadoBadgeClass(solNotas!.estado)}">
+													{estadoLabel(solNotas!.estado)}
+												</span>
+												<p class="text-sm text-light-black dark:text-dark-white mt-2">
+													Solicitado el {formatDate(solNotas!.created_at)}.
+												</p>
+												{#if solNotas!.estado === 'rechazada' && solNotas!.motivo_rechazo}
+													<p class="text-xs text-light-error dark:text-dark-error mt-1">
+														<strong>Motivo:</strong> {solNotas!.motivo_rechazo}
+													</p>
+												{:else}
+													<p class="text-xs text-light-four dark:text-dark-four mt-1">
+														Coordinación tiene que aprobarlo antes de que puedas descargarlo.
+													</p>
+												{/if}
+											</div>
+											{#if solNotas!.estado === 'pendiente' || solNotas!.estado === 'en_revision'}
+												<Button variant="ghost" size="sm" loading={cancellingRequestId === solNotas!.id} onclick={() => cancelarMiSolicitud(solNotas!)} ariaLabel="Cancelar solicitud de certificado de notas">
+													Cancelar
+												</Button>
+											{/if}
+										</div>
+									{:else}
+										<div class="flex flex-wrap items-center justify-between gap-3">
+											<p class="text-sm text-gray-500 dark:text-gray-400 min-w-0 flex-1">
+												La emisión y solicitud digital del Certificado de Notas se encuentra actualmente en desarrollo. Próximamente estará disponible en línea.
+											</p>
+											<Button variant="ghost" size="sm" disabled={true} ariaLabel="Certificado de notas en desarrollo">
+												Próximamente
+											</Button>
+										</div>
 									{/if}
 								</div>
 							</div>
