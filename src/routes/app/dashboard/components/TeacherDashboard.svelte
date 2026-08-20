@@ -365,20 +365,26 @@
 		try {
 			const buffer = await file.arrayBuffer();
 			const workbook = XLSX.read(buffer, { type: 'array' });
-			const firstSheetName = workbook.SheetNames[0];
-			if (!firstSheetName) {
+			// Buscar la mejor hoja (priorizar 'NOTAS', 'CALIFICACIONES', 'EVALUACIONES' o la primera disponible)
+			const sheetName = workbook.SheetNames.find(n => {
+				const low = normalizeText(n);
+				return low.includes('nota') || low.includes('calific') || low.includes('evalua') || low.includes('registro');
+			}) || workbook.SheetNames[0];
+
+			if (!sheetName) {
 				alert('warning', 'El archivo no contiene hojas con datos.');
 				return;
 			}
-			const sheet = workbook.Sheets[firstSheetName];
+			const sheet = workbook.Sheets[sheetName];
 			const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 			if (rows.length === 0) {
 				alert('warning', 'El archivo está vacío.');
 				return;
 			}
 
-			// 1. Detectar si hay fila de cabecera
+			// 1. Detectar si hay fila de cabecera (escaneando hasta 20 filas)
 			let headerRowIndex = -1;
+			let startRow = 0;
 			let colRegistro = -1;
 			let colCI = -1;
 			let colApellidos = -1;
@@ -386,38 +392,71 @@
 			let colNombreCompleto = -1;
 			let colNota = -1;
 
-			for (let i = 0; i < Math.min(rows.length, 10); i++) {
+			for (let i = 0; i < Math.min(rows.length, 20); i++) {
 				const row = rows[i];
 				if (!row || row.length === 0) continue;
-				const rowStrings = row.map(c => normalizeText(String(c ?? '')));
+				const nextRow = (i + 1 < rows.length) ? rows[i + 1] : [];
 				
-				const hasNameOrCI = rowStrings.some(s => 
-					s.includes('apellido') || s.includes('nombre') || s.includes('estudiante') || 
-					s.includes('alumno') || s.includes('ci') || s.includes('carnet') || s.includes('registro')
-				);
-				const hasGrade = rowStrings.some(s => 
-					s.includes('total') || s.includes('nota') || s.includes('calificacion') || 
-					s.includes('final') || s.includes('100')
-				);
+				const rowStrings = row.map(c => normalizeText(String(c ?? '')));
+				const nextRowStrings = (nextRow || []).map(c => normalizeText(String(c ?? '')));
 
-				if (hasNameOrCI || hasGrade) {
-					headerRowIndex = i;
-					rowStrings.forEach((str, colIdx) => {
-						if (str.includes('registro') || str === 'reg') colRegistro = colIdx;
-						else if (str.includes('ci') || str.includes('carnet') || str.includes('cedula') || str.includes('documento')) colCI = colIdx;
-						else if (str.includes('apellido')) colApellidos = colIdx;
-						else if (str.includes('nombre') && !str.includes('completo')) colNombres = colIdx;
-						else if (str.includes('estudiante') || str.includes('alumno') || str.includes('nombre completo')) colNombreCompleto = colIdx;
-						
+				// Combinar fila i y fila i+1 para detectar encabezados en 2 líneas combinadas
+				const combinedStrings: string[] = [];
+				const maxCols = Math.max(rowStrings.length, nextRowStrings.length);
+				for (let c = 0; c < maxCols; c++) {
+					const s1 = rowStrings[c] || '';
+					const s2 = nextRowStrings[c] || '';
+					combinedStrings.push(`${s1} ${s2}`.trim());
+				}
+
+				for (const [isComb, list] of [[false, rowStrings], [true, combinedStrings]] as const) {
+					let tempColReg = -1;
+					let tempColCI = -1;
+					let tempColAp = -1;
+					let tempColNom = -1;
+					let tempColFull = -1;
+					let tempColNota = -1;
+
+					list.forEach((str, colIdx) => {
+						if (!str) return;
+						if (str.includes('registro') || str === 'reg' || str.includes('matricula')) tempColReg = colIdx;
+						else if (str.includes('ci') || str.includes('carnet') || str.includes('cedula') || str.includes('documento') || str.includes('identidad')) tempColCI = colIdx;
+						else if (str.includes('apellido y nombre') || str.includes('nombres y apellidos') || str.includes('postgraduante') || str.includes('estudiante') || str.includes('alumno')) tempColFull = colIdx;
+						else if (str.includes('apellido')) tempColAp = colIdx;
+						else if (str.includes('nombre') && !str.includes('completo')) tempColNom = colIdx;
+
 						if (str.includes('total') || str.includes('nota') || str.includes('calificacion') || str.includes('final') || str.includes('100')) {
-							colNota = colIdx;
+							tempColNota = colIdx;
 						}
 					});
-					break;
+
+					const hasIdent = (tempColReg >= 0 || tempColCI >= 0 || tempColFull >= 0 || (tempColAp >= 0 && tempColNom >= 0));
+					if (hasIdent && tempColNota >= 0) {
+						headerRowIndex = i;
+						startRow = isComb ? i + 2 : i + 1;
+						colRegistro = tempColReg;
+						colCI = tempColCI;
+						colApellidos = tempColAp;
+						colNombres = tempColNom;
+						colNombreCompleto = tempColFull;
+						colNota = tempColNota;
+						break;
+					}
 				}
+				if (headerRowIndex >= 0) break;
 			}
 
-			const startRow = headerRowIndex >= 0 ? headerRowIndex + 1 : 0;
+			if (startRow === 0 && headerRowIndex < 0) {
+				startRow = 1;
+			}
+
+			const cleanCell = (v: any) => {
+				if (v === null || v === undefined) return '';
+				const s = String(v).trim();
+				if (s.toUpperCase().includes('#REF!') || s.toUpperCase().includes('#N/A') || s.toUpperCase() === 'NULL') return '';
+				return s;
+			};
+
 			let importedCount = 0;
 
 			for (let i = startRow; i < rows.length; i++) {
@@ -427,21 +466,27 @@
 				// Construir candidato de estudiante
 				const candidate: { registro?: string; ci?: string; fullName?: string; apellidos?: string; nombres?: string } = {};
 
-				if (colRegistro >= 0 && row[colRegistro] !== undefined) candidate.registro = String(row[colRegistro]);
-				if (colCI >= 0 && row[colCI] !== undefined) candidate.ci = String(row[colCI]);
-				if (colApellidos >= 0 && row[colApellidos] !== undefined) candidate.apellidos = String(row[colApellidos]);
-				if (colNombres >= 0 && row[colNombres] !== undefined) candidate.nombres = String(row[colNombres]);
-				if (colNombreCompleto >= 0 && row[colNombreCompleto] !== undefined) candidate.fullName = String(row[colNombreCompleto]);
+				if (colRegistro >= 0 && row[colRegistro] !== undefined) candidate.registro = cleanCell(row[colRegistro]);
+				if (colCI >= 0 && row[colCI] !== undefined) candidate.ci = cleanCell(row[colCI]);
+				if (colApellidos >= 0 && row[colApellidos] !== undefined) candidate.apellidos = cleanCell(row[colApellidos]);
+				if (colNombres >= 0 && row[colNombres] !== undefined) candidate.nombres = cleanCell(row[colNombres]);
+				if (colNombreCompleto >= 0 && row[colNombreCompleto] !== undefined) candidate.fullName = cleanCell(row[colNombreCompleto]);
 
 				// Si no se detectaron columnas específicas por encabezado, usar posición por defecto
 				if (colRegistro < 0 && colCI < 0 && colApellidos < 0 && colNombres < 0 && colNombreCompleto < 0) {
 					if (row.length >= 4) {
-						candidate.fullName = String(row[0] ?? '');
-						candidate.registro = String(row[1] ?? '');
-						candidate.ci = String(row[2] ?? '');
+						candidate.fullName = cleanCell(row[0]);
+						candidate.registro = cleanCell(row[1]);
+						candidate.ci = cleanCell(row[2]);
 					} else if (row.length >= 2) {
-						candidate.fullName = String(row[0] ?? '');
+						candidate.fullName = cleanCell(row[0]);
 					}
+				}
+
+				// Si la fila es un encabezado repetido o un pie de página
+				const fullNameUpper = (candidate.fullName || `${candidate.nombres || ''} ${candidate.apellidos || ''}`).toUpperCase();
+				if (fullNameUpper && (fullNameUpper.includes('OBSERV') || fullNameUpper.includes('PROMEDIO') || fullNameUpper.includes('FIRMA') || fullNameUpper.includes('RESPONSABLE') || fullNameUpper.includes('TOTAL'))) {
+					continue;
 				}
 
 				// Extraer nota
@@ -449,7 +494,6 @@
 				if (colNota >= 0 && row[colNota] !== undefined) {
 					notaNum = extractNota(row[colNota]);
 				} else {
-					// Buscar en las celdas de derecha a izquierda un valor de nota
 					for (let c = row.length - 1; c >= 0; c--) {
 						const val = extractNota(row[c]);
 						if (val !== null) {
