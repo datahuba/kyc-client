@@ -35,6 +35,10 @@ export interface EnrollmentCxC {
 	estado: string;
 	total_a_pagar: number;
 	total_pagado: number;
+	recaudacion_efectiva: number;
+	total_devengado: number;
+	cxc_devengada: number;
+	proyeccion_futura: number;
 	saldo_estimado: number;
 	saldo_a_la_fecha: number;
 	modulos: ModuloCxC[];
@@ -45,11 +49,19 @@ export interface CursoCxC {
 	curso_nombre: string;
 	curso_codigo: string | null;
 	cantidad_estudiantes: number;
+	recaudacion_efectiva: number;
+	total_devengado: number;
+	cxc_devengada: number;
+	proyeccion_futura: number;
 	total_estimado: number;
 	total_a_la_fecha: number;
 }
 
 export interface CxCResumen {
+	recaudacion_efectiva: number;
+	total_devengado: number;
+	cxc_devengada: number;
+	proyeccion_futura: number;
 	total_estimado: number;
 	total_a_la_fecha: number;
 	total_modulos_iniciados: number;
@@ -62,6 +74,10 @@ export interface CxCResumen {
 }
 
 export interface CxCResumenReducido {
+	recaudacion_efectiva: number;
+	total_devengado: number;
+	cxc_devengada: number;
+	proyeccion_futura: number;
 	total_estimado: number;
 	total_a_la_fecha: number;
 	diferencia: number;

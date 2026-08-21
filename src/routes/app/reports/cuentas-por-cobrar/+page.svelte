@@ -155,12 +155,10 @@
 				<Heading level="h1" weight="bold" color="primary">
 					{#snippet children()}
 						<h1 class="text-2xl sm:text-3xl font-bold text-primary-700 dark:text-primary-300">
-							Cuentas por Cobrar
+							Estado Financiero y Cuentas por Cobrar
 						</h1>
-						<p class="text-sm text-light-four dark:text-dark-four mt-1 max-w-2xl">
-							<b>CxC a la Fecha</b> = saldo de los módulos que ya están en curso.
-							<b>CxC Estimada</b> = todos los módulos del programa.
-							Se excluyen pasivos, abandonados, retirados y programas finalizados.
+						<p class="text-xs sm:text-sm text-light-four dark:text-dark-four mt-1 max-w-3xl leading-relaxed">
+							<b>Principio de Devengado:</b> La <b>CxC Devengada Exigible</b> refleja únicamente la cartera en mora de matrículas y módulos <i>ya dictados o en ejecución</i>. La <b>Proyección Futura</b> corresponde a módulos programados que <i>aún no han iniciado</i>.
 						</p>
 					{/snippet}
 				</Heading>
@@ -198,41 +196,63 @@
 				description="No hay datos para mostrar."
 			/>
 		{:else}
-			<!-- Tarjetas resumen -->
-			<section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-				<Card variant="bordered" padding="md">
-					<p class="text-xs uppercase font-semibold text-light-four dark:text-dark-four tracking-wider">
-						CxC a la Fecha (real)
+			<!-- Tarjetas resumen (Capas Contables 2026-08-21) -->
+			<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+				<!-- Capa 1: Recaudación Real -->
+				<div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/50 shadow-sm">
+					<p class="text-[11px] uppercase font-extrabold text-emerald-700 dark:text-emerald-400 tracking-wider flex items-center gap-1.5">
+						<span class="size-2 rounded-full bg-emerald-500"></span>
+						Recaudación Real (Cobrado)
 					</p>
-					<p class="text-2xl font-extrabold text-primary-700 dark:text-primary-300 mt-1 tabular-nums">
-						{formatCurrency(resumen.total_a_la_fecha)}
+					<p class="text-2xl font-black text-emerald-800 dark:text-emerald-200 mt-1 tabular-nums">
+						{formatCurrency(resumen.recaudacion_efectiva || 0)}
 					</p>
-					<p class="text-xs text-light-four dark:text-dark-four mt-1">
-						{resumen.total_modulos_iniciados} módulo{resumen.total_modulos_iniciados === 1 ? '' : 's'} en curso
+					<p class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
+						Ingresos efectivamente aprobados
 					</p>
-				</Card>
-				<Card variant="bordered" padding="md">
-					<p class="text-xs uppercase font-semibold text-light-four dark:text-dark-four tracking-wider">
-						CxC Estimada (total)
+				</div>
+
+				<!-- Capa 2: CxC Devengada Exigible (Mora) -->
+				<div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 shadow-sm">
+					<p class="text-[11px] uppercase font-extrabold text-amber-700 dark:text-amber-400 tracking-wider flex items-center gap-1.5">
+						<span class="size-2 rounded-full bg-amber-500"></span>
+						CxC Devengada (Exigible)
 					</p>
-					<p class="text-2xl font-extrabold text-light-black dark:text-dark-white mt-1 tabular-nums">
-						{formatCurrency(resumen.total_estimado)}
+					<p class="text-2xl font-black text-amber-800 dark:text-amber-200 mt-1 tabular-nums">
+						{formatCurrency(resumen.cxc_devengada || resumen.total_a_la_fecha || 0)}
 					</p>
-					<p class="text-xs text-light-four dark:text-dark-four mt-1">
-						{resumen.cantidad_enrollments} inscripciones en {resumen.cantidad_cursos} programas
+					<p class="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-semibold">
+						{resumen.total_modulos_iniciados} módulo{resumen.total_modulos_iniciados === 1 ? '' : 's'} en curso / dictados
 					</p>
-				</Card>
-				<Card variant="bordered" padding="md">
-					<p class="text-xs uppercase font-semibold text-light-four dark:text-dark-four tracking-wider">
-						Por devengar (futuro)
+				</div>
+
+				<!-- Capa 3: Proyección Futura No Devengada -->
+				<div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-900/50 shadow-sm">
+					<p class="text-[11px] uppercase font-extrabold text-blue-700 dark:text-blue-400 tracking-wider flex items-center gap-1.5">
+						<span class="size-2 rounded-full bg-blue-500"></span>
+						Proyección Futura (No Devengado)
 					</p>
-					<p class="text-2xl font-extrabold text-light-warning dark:text-dark-warning mt-1 tabular-nums">
-						{formatCurrency(Math.max(0, resumen.total_estimado - resumen.total_a_la_fecha))}
+					<p class="text-2xl font-black text-blue-800 dark:text-blue-200 mt-1 tabular-nums">
+						{formatCurrency(resumen.proyeccion_futura || 0)}
 					</p>
-					<p class="text-xs text-light-four dark:text-dark-four mt-1">
-						{resumen.total_modulos_no_iniciados} módulo{resumen.total_modulos_no_iniciados === 1 ? '' : 's'} aún sin iniciar
+					<p class="text-[11px] text-blue-600 dark:text-blue-400 mt-1">
+						{resumen.total_modulos_no_iniciados} módulo{resumen.total_modulos_no_iniciados === 1 ? '' : 's'} aún por iniciar
 					</p>
-				</Card>
+				</div>
+
+				<!-- Compromiso Total -->
+				<div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+					<p class="text-[11px] uppercase font-extrabold text-slate-600 dark:text-slate-400 tracking-wider flex items-center gap-1.5">
+						<span class="size-2 rounded-full bg-slate-400"></span>
+						Compromiso Total Contratos
+					</p>
+					<p class="text-2xl font-black text-slate-800 dark:text-slate-100 mt-1 tabular-nums">
+						{formatCurrency(resumen.total_estimado || 0)}
+					</p>
+					<p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+						{resumen.cantidad_enrollments} alumnos en {resumen.cantidad_cursos} programas
+					</p>
+				</div>
 			</section>
 
 			<!-- Desglose por curso -->
@@ -271,12 +291,12 @@
 											</p>
 										</div>
 										<div class="text-right shrink-0">
-											<p class="text-xs text-light-four dark:text-dark-four">CxC a la Fecha</p>
-											<p class="text-base font-bold text-primary-700 dark:text-primary-300 tabular-nums">
-												{formatCurrency(curso.total_a_la_fecha)}
+											<p class="text-xs font-semibold text-amber-800 dark:text-amber-300">CxC Devengada Exigible</p>
+											<p class="text-base font-black text-amber-900 dark:text-amber-200 tabular-nums">
+												{formatCurrency(curso.cxc_devengada ?? curso.total_a_la_fecha ?? 0)}
 											</p>
 											<p class="text-[10px] text-light-four dark:text-dark-four tabular-nums">
-												de {formatCurrency(curso.total_estimado)} est.
+												Recaudado: {formatCurrency(curso.recaudacion_efectiva ?? 0)} · Futuro: {formatCurrency(curso.proyeccion_futura ?? 0)}
 											</p>
 										</div>
 										<svg
@@ -291,13 +311,14 @@
 								{#if isExpanded}
 									<!-- Tabla de estudiantes del curso -->
 									<div class="overflow-x-auto -mx-4 sm:mx-0">
-										<table class="w-full text-sm min-w-[640px]">
+										<table class="w-full text-sm min-w-[720px]">
 											<thead class="bg-gray-50 dark:bg-dark-background text-light-four dark:text-dark-four">
 												<tr>
 													<th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">Estudiante</th>
 													<th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">Estado</th>
-													<th class="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider">CxC Estimada</th>
-													<th class="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider">CxC a la Fecha</th>
+													<th class="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider">Recaudado (Real)</th>
+													<th class="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider">CxC Devengada (Mora)</th>
+													<th class="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider">Proyección Futura</th>
 													<th class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider">Acciones</th>
 												</tr>
 											</thead>
@@ -305,7 +326,7 @@
 												{#each detalleCurso as d (d.enrollment_id)}
 													<tr class="border-t border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-background/30">
 														<td class="px-3 py-2 text-light-black dark:text-dark-white">
-															{d.estudiante_nombre}
+															<span class="font-bold">{d.estudiante_nombre}</span>
 															<p class="text-[10px] text-light-four dark:text-dark-four">
 																Reg: {d.estudiante_registro || '—'}
 															</p>
@@ -313,11 +334,14 @@
 														<td class="px-3 py-2 text-light-four dark:text-dark-four text-xs">
 															{d.estado}
 														</td>
-														<td class="px-3 py-2 text-right tabular-nums text-light-black dark:text-dark-white">
-															{formatCurrency(d.saldo_estimado)}
+														<td class="px-3 py-2 text-right tabular-nums text-emerald-700 dark:text-emerald-400 font-medium">
+															{formatCurrency(d.recaudacion_efectiva ?? d.total_pagado ?? 0)}
 														</td>
-														<td class="px-3 py-2 text-right tabular-nums font-semibold text-primary-700 dark:text-primary-300">
-															{formatCurrency(d.saldo_a_la_fecha)}
+														<td class="px-3 py-2 text-right tabular-nums font-bold text-amber-800 dark:text-amber-300">
+															{formatCurrency(d.cxc_devengada ?? d.saldo_a_la_fecha ?? 0)}
+														</td>
+														<td class="px-3 py-2 text-right tabular-nums text-blue-700 dark:text-blue-400">
+															{formatCurrency(d.proyeccion_futura ?? 0)}
 														</td>
 														<td class="px-3 py-2 text-center">
 															<Button
