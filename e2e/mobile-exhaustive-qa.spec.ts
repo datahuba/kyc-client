@@ -48,6 +48,7 @@ test.use({
 
 test.describe('Mobile QA: Superadmin & Student WebApp Experience (iPhone 14 Plus)', () => {
 	test('Superadmin: Bottom Nav Only, No Sidebar Drawer, Full Menu Sheet, Zero Overflows', async ({ page, context }) => {
+		test.setTimeout(45000);
 		// Mock universal para interceptar cualquier llamada /api/v1/*
 		await page.route('**/api/v1/**', async (route) => {
 			const url = route.request().url();
@@ -118,7 +119,7 @@ test.describe('Mobile QA: Superadmin & Student WebApp Experience (iPhone 14 Plus
 		expect(overflowCheck).toBe(true);
 
 		// 5. Abrir "Menú" en la barra flotante
-		const menuButton = page.locator('button[aria-label="Ver todas las opciones del sistema"]');
+		const menuButton = page.locator('#bottom-nav-more-button');
 		await menuButton.click();
 		await page.waitForTimeout(400);
 

@@ -196,7 +196,8 @@
 		<!-- Botón "Menú Completo / Más" -->
 		<button
 			type="button"
-			onclick={isMoreMenuOpen ? closeMore : openMore}
+			id="bottom-nav-more-button"
+			onclick={(e) => { e.preventDefault(); e.stopPropagation(); hapticTap(); isMoreMenuOpen ? closeMore() : openMore(); }}
 			class="relative flex flex-col items-center justify-center flex-1 h-full py-1 group transition-all duration-200 active:scale-90"
 			aria-label="Ver todas las opciones del sistema"
 			aria-expanded={isMoreMenuOpen}
