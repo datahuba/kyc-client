@@ -48,27 +48,34 @@ test.use({
 
 test.describe('Mobile QA: Superadmin & Student WebApp Experience (iPhone 14 Plus)', () => {
 	test('Superadmin: Bottom Nav Only, No Sidebar Drawer, Full Menu Sheet, Zero Overflows', async ({ page, context }) => {
-		// Mock universal para cualquier URL con auth/me
-		await page.route((url) => url.href.includes('auth/me'), async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify(superadminData)
-			});
-		});
-		await page.route((url) => url.href.includes('notifications'), async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify({ count: 0, alerts: [], ticket: 'dummy-ticket' })
-			});
-		});
-		await page.route((url) => url.href.includes('reports') || url.href.includes('payments') || url.href.includes('enrollments'), async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify([])
-			});
+		// Mock universal para interceptar cualquier llamada /api/v1/*
+		await page.route('**/api/v1/**', async (route) => {
+			const url = route.request().url();
+			if (url.includes('/auth/me')) {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify(superadminData)
+				});
+			} else if (url.includes('/notifications')) {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify({ count: 0, alerts: [], ticket: 'dummy-ticket' })
+				});
+			} else if (url.includes('/reports/')) {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify({ total_ingresos: 45000, total_estudiantes: 128, total_cursos: 14 })
+				});
+			} else {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify([])
+				});
+			}
 		});
 
 		// Configurar Storage State
@@ -85,7 +92,10 @@ test.describe('Mobile QA: Superadmin & Student WebApp Experience (iPhone 14 Plus
 		);
 
 		await page.goto('/app/dashboard');
-		await page.waitForLoadState('networkidle');
+		
+		// Esperar que se oculte el splash screen y se monte la interfaz
+		const bottomNav = page.locator('nav').filter({ hasText: 'Inicio' });
+		await expect(bottomNav).toBeVisible({ timeout: 15000 });
 
 		// 1. Sidebar desktop debe estar completamente oculto
 		const sidebar = page.locator('aside');
@@ -97,68 +107,66 @@ test.describe('Mobile QA: Superadmin & Student WebApp Experience (iPhone 14 Plus
 		const hamburger = page.locator('header button[aria-label="Abrir menú lateral"]');
 		await expect(hamburger).toHaveCount(0);
 
-		// 3. Floating Bottom Bar debe estar visible con tabs
-		const bottomNav = page.locator('nav').filter({ hasText: 'Inicio' });
-		await expect(bottomNav).toBeVisible();
-
-		// 4. Captura de pantalla del Dashboard Superadmin
+		// 3. Captura de pantalla del Dashboard Superadmin
+		await page.waitForTimeout(500);
 		await page.screenshot({ path: `${QA_SHOT_DIR}/01-superadmin-dashboard-iphone14plus.png` });
 
-		// 5. Verificar que no haya desborde horizontal (scrollWidth <= clientWidth)
+		// 4. Verificar que no haya desborde horizontal (scrollWidth <= clientWidth)
 		const overflowCheck = await page.evaluate(() => {
 			return document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2;
 		});
 		expect(overflowCheck).toBe(true);
 
-		// 6. Abrir "Menú" en la barra flotante
-		const menuButton = page.getByRole('button', { name: /Ver todas las opciones|Menú/i });
+		// 5. Abrir "Menú" en la barra flotante
+		const menuButton = page.locator('button[aria-label="Ver todas las opciones del sistema"]');
 		await menuButton.click();
-		await page.waitForTimeout(300);
+		await page.waitForTimeout(400);
 
-		// 7. Verificar que el Bottom Sheet esté visible
+		// 6. Verificar que el Bottom Sheet esté visible
 		const menuDialog = page.getByRole('dialog', { name: /Menú completo de navegación/i });
 		await expect(menuDialog).toBeVisible();
 
 		// Captura del Bottom Sheet abierto
 		await page.screenshot({ path: `${QA_SHOT_DIR}/02-superadmin-bottomsheet-iphone14plus.png` });
 
-		// 8. Probar búsqueda en el Bottom Sheet
+		// 7. Probar búsqueda en el Bottom Sheet
 		const searchInput = menuDialog.locator('input[placeholder*="Buscar módulo"]');
 		await searchInput.fill('Usuarios');
-		await page.waitForTimeout(200);
+		await page.waitForTimeout(300);
 
 		await expect(menuDialog.getByText('Usuarios')).toBeVisible();
 		await page.screenshot({ path: `${QA_SHOT_DIR}/03-superadmin-bottomsheet-search.png` });
 
-		// 9. Cerrar Bottom Sheet
+		// 8. Cerrar Bottom Sheet
 		const closeButton = menuDialog.getByRole('button', { name: 'Cerrar menú' });
 		await closeButton.click();
-		await page.waitForTimeout(200);
+		await page.waitForTimeout(300);
 		await expect(menuDialog).toBeHidden();
 	});
 
 	test('Student: Mobile App Experience, Touch Quick Actions, Balance Card, Safe Insets', async ({ page, context }) => {
-		// Mock universal para cualquier URL con auth/me
-		await page.route((url) => url.href.includes('auth/me'), async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify(studentData)
-			});
-		});
-		await page.route((url) => url.href.includes('notifications'), async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify({ count: 0, alerts: [], ticket: 'dummy-ticket' })
-			});
-		});
-		await page.route((url) => url.href.includes('reports') || url.href.includes('payments') || url.href.includes('enrollments') || url.href.includes('courses'), async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify([])
-			});
+		// Mock universal para interceptar cualquier llamada /api/v1/*
+		await page.route('**/api/v1/**', async (route) => {
+			const url = route.request().url();
+			if (url.includes('/auth/me')) {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify(studentData)
+				});
+			} else if (url.includes('/notifications')) {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify({ count: 0, alerts: [], ticket: 'dummy-ticket' })
+				});
+			} else {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify([])
+				});
+			}
 		});
 
 		// Configurar Storage State
@@ -176,7 +184,10 @@ test.describe('Mobile QA: Superadmin & Student WebApp Experience (iPhone 14 Plus
 		);
 
 		await page.goto('/app/dashboard');
-		await page.waitForLoadState('networkidle');
+		
+		// Esperar que se monte el dashboard estudiantil
+		const bottomNav = page.locator('nav').filter({ hasText: 'Inicio' });
+		await expect(bottomNav).toBeVisible({ timeout: 15000 });
 
 		// 1. Sidebar desktop no debe ser visible
 		const sidebar = page.locator('aside');
@@ -184,23 +195,20 @@ test.describe('Mobile QA: Superadmin & Student WebApp Experience (iPhone 14 Plus
 			await expect(sidebar).toBeHidden();
 		}
 
-		// 2. Floating Bottom Bar visible
-		const bottomNav = page.locator('nav').filter({ hasText: 'Inicio' });
-		await expect(bottomNav).toBeVisible();
-
-		// 3. Captura del Dashboard Estudiantil
+		// 2. Captura del Dashboard Estudiantil
+		await page.waitForTimeout(500);
 		await page.screenshot({ path: `${QA_SHOT_DIR}/04-student-dashboard-iphone14plus.png` });
 
-		// 4. Verificar overflow horizontal en Student Dashboard
+		// 3. Verificar overflow horizontal en Student Dashboard
 		const overflowCheck = await page.evaluate(() => {
 			return document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2;
 		});
 		expect(overflowCheck).toBe(true);
 
-		// 5. Navegar a Mis Pagos vía Bottom Tab
-		const pagosTab = page.locator('a[href="/app/payments"]');
+		// 4. Navegar a Mis Pagos vía Bottom Tab
+		const pagosTab = bottomNav.locator('a[href="/app/payments"]');
 		await pagosTab.click();
-		await page.waitForLoadState('networkidle');
+		await page.waitForTimeout(600);
 
 		await page.screenshot({ path: `${QA_SHOT_DIR}/05-student-payments-iphone14plus.png` });
 	});

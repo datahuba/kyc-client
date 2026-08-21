@@ -120,8 +120,8 @@
 	let cursosAsignadosUsuario = $derived($userStore.user?.cursos_asignados ?? []);
 	let coursesListFiltrada = $derived(
 		cursosAsignadosUsuario.length > 0
-			? coursesList.filter((c) => cursosAsignadosUsuario.includes(c._id))
-			: coursesList
+			? (coursesList || []).filter((c) => cursosAsignadosUsuario.includes(c._id))
+			: (coursesList || [])
 	);
 
 	// State Modals
@@ -156,40 +156,15 @@
 	// (esos botones siguen restringidos por canEditPayments mas abajo).
 	let isStaff = $derived(['admin', 'superadmin', 'cpd', 'cobranza', 'mae', 'encargado_curso', 'coordinador'].includes($userStore.role || ''));
 
-	// F-FIX-PAGOS-EC-EN-BLANCO (2026-08-18/19, Kevin: "hoy le sale en
-	// blanco"). Causa: `GET /students/` exige `require_staff` en el backend,
-	// que deliberadamente EXCLUYE a encargado_curso y coordinador ("Permite
-	// el acceso a: ADMIN, SUPERADMIN, MAE, CPD y COBRANZA" — ver
-	// api/dependencies.py). Pero `isStaff` en este archivo SI los incluye
-	// (para el resto de la pantalla, correctamente: list_payments SI les
-	// permite ver pagos de sus cursos desde F-FIX-RBAC-PAGOS-ENCARGADO,
-	// 2026-08-10).
-	//
-	// El onMount llamaba `studentService.getAll()` dentro de un
-	// `Promise.all` sin try/catch cada vez que `isStaff` era true. Para un
-	// encargado eso disparaba un 403 que tumbaba TODO el Promise.all antes
-	// de llegar a pedir los pagos — coursesList nunca se seteaba, loadPayments
-	// nunca corria, y la pantalla quedaba vacia sin ningun error visible para
-	// el usuario.
-	//
-	// Esta lista SOLO gatea esas dos llamadas a studentService.getAll(); el
-	// resto de la pantalla (filtros, toggle de vistas, boton Excel) sigue
-	// usando `isStaff` como corresponde, porque list_payments si los
-	// autoriza.
 	let puedeListarTodosLosEstudiantes = $derived(
 		['admin', 'superadmin', 'cpd', 'cobranza', 'mae'].includes($userStore.role || '')
 	);
-	// F-2026-08-22-EC-PAGOS-READONLY: solo los roles ECONOMICOS pueden crear,
-	// aprobar, rechazar, eliminar, subir comprobante, revertir pagos. EC y
-	// COORDINADOR quedan en modo SOLO LECTURA (solo pueden ver y descargar).
 	let canEditPayments = $derived(['admin', 'superadmin', 'cpd', 'cobranza'].includes($userStore.role || ''));
 	let coursesMap = $derived(
-		coursesList.reduce((acc, c) => ({ ...acc, [c._id]: c }), {} as Record<string, typeof coursesList[0]>)
+		(coursesList || []).reduce((acc, c) => ({ ...acc, [c._id]: c }), {} as Record<string, typeof coursesList[0]>)
 	);
-	// F-COBRANZA-033: mapa de estudiantes por ID para resolver el nombre en
-	// el modal de detalle cuando verificado_por es "SISTEMA (auto-aprobación)".
 	let studentsMap = $derived(
-		studentsList.reduce((acc, s) => ({ ...acc, [s._id]: s }), {} as Record<string, typeof studentsList[0]>)
+		(studentsList || []).reduce((acc, s) => ({ ...acc, [s._id]: s }), {} as Record<string, typeof studentsList[0]>)
 	);
 
 	// F-COBRANZA-033: helper que parsea `verificado_por` y devuelve una
@@ -222,13 +197,13 @@
 	async function loadPayments() {
 		loading = true;
 		try {
-			if (puedeListarTodosLosEstudiantes && studentsList.length === 0) {
+			if (puedeListarTodosLosEstudiantes && (studentsList || []).length === 0) {
 				const studentsRes = await studentService.getAll(1, 100);
-				studentsList = studentsRes.data;
+				studentsList = studentsRes?.data ?? (Array.isArray(studentsRes) ? studentsRes : []);
 			}
-			if (coursesList.length === 0) {
+			if ((coursesList || []).length === 0) {
 				const coursesRes = await courseService.getAll(1, 100);
-				coursesList = coursesRes.data;
+				coursesList = coursesRes?.data ?? (Array.isArray(coursesRes) ? coursesRes : []);
 			}
 
 			const filterParams: any = {};
