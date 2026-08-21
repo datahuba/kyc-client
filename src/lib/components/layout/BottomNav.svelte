@@ -171,6 +171,7 @@
 	<nav class="pointer-events-auto flex items-center justify-around h-16 px-1 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-[0_8px_30px_rgb(0,0,0,0.15)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.6)] ring-1 ring-black/5 dark:ring-white/5 transition-all">
 		{#each primaryTabs as item (item.href)}
 			{@const active = isTabActive(item.href)}
+			{@const TabIcon = item.icon}
 			<a
 				href={item.href}
 				onclick={() => { hapticTap(); if (isMoreMenuOpen) closeMore(); }}
@@ -183,8 +184,7 @@
 						in:fade={{ duration: 150 }}
 					></div>
 				{/if}
-				<svelte:component
-					this={item.icon}
+				<TabIcon
 					class={`relative size-5.5 transition-transform duration-200 ${active ? 'text-primary-700 dark:text-primary-400 scale-105' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}`}
 				/>
 				<span class={`relative text-[10px] tracking-tight leading-none mt-1 transition-colors duration-200 truncate max-w-[60px] ${active ? 'text-primary-700 dark:text-primary-400 font-bold' : 'text-slate-500 dark:text-slate-400 font-medium'}`}>
@@ -312,6 +312,7 @@
 						<div class="grid grid-cols-2 gap-2">
 							{#each group.items as item (item.href)}
 								{@const active = isTabActive(item.href)}
+								{@const ItemIcon = item.icon}
 								<a
 									href={item.href}
 									target={item.external ? (item.target ?? '_blank') : undefined}
@@ -320,7 +321,7 @@
 									class={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all active:scale-95 ${active ? 'bg-primary-50 dark:bg-primary-950/60 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300 font-bold' : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-100 dark:border-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
 								>
 									<div class={`p-2 rounded-lg shrink-0 ${active ? 'bg-primary-700 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 shadow-sm'}`}>
-										<svelte:component this={item.icon} class="size-4.5" />
+										<ItemIcon class="size-4.5" />
 									</div>
 									<span class="text-xs font-semibold leading-tight line-clamp-2 flex-1">
 										{item.name}

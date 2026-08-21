@@ -338,25 +338,15 @@
   - Versión desktop intacta (todos los iconos + breadcrumb)
 -->
 <header
-	class="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-x-3 border-b border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl px-3 sm:gap-x-4 sm:px-6 lg:px-8 transition-colors"
+	class="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-x-3 border-b border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl px-3 sm:gap-x-4 sm:px-6 lg:px-8 transition-colors"
 	style="padding-top: env(safe-area-inset-top, 0px); margin-top: max(0px, env(safe-area-inset-top, 0px));"
 >
-	<!-- Mobile: hamburger button (md:hidden) -->
-	<button
-		type="button"
-		class="md:hidden -ml-1 p-2 text-gray-700 dark:text-gray-200 active:scale-90 transition-transform rounded-lg active:bg-gray-100 dark:active:bg-gray-800"
-		onclick={onOpenSidebar}
-		aria-label="Abrir menú lateral"
-	>
-		<Menu2Icon class="size-6" />
-	</button>
-
-	<!-- Mobile: logo UAGRM mini + título contextual (md:hidden) -->
-	<div class="md:hidden flex items-center gap-2 min-w-0 flex-1">
-		<img src="/images/logo_uagrm_fondo_blanco.jpg" alt="UAGRM" class="h-7 w-7 shrink-0 rounded-md object-contain bg-white ring-1 ring-gray-200 dark:ring-gray-700" />
+	<!-- Mobile: logo UAGRM + título contextual (md:hidden) -->
+	<div class="md:hidden flex items-center gap-2.5 min-w-0 flex-1">
+		<img src="/images/logo_uagrm_fondo_blanco.jpg" alt="UAGRM" class="h-8 w-8 shrink-0 rounded-lg object-contain bg-white p-0.5 shadow-sm ring-1 ring-gray-200 dark:ring-gray-700" />
 		<div class="flex flex-col leading-tight min-w-0">
-			<span class="text-sm font-bold text-gray-900 dark:text-white truncate">{contextualTitle}</span>
-			<span class="text-[10px] font-medium text-gray-500 dark:text-gray-400 truncate">{getUserTypeLabel()}</span>
+			<span class="text-sm font-extrabold text-gray-900 dark:text-white truncate tracking-tight">{contextualTitle}</span>
+			<span class="text-[10px] font-semibold text-primary-700 dark:text-primary-400 truncate uppercase tracking-wider">{getUserTypeLabel()}</span>
 		</div>
 	</div>
 
