@@ -129,7 +129,7 @@
 
 	let staffFilterStudent = $state('');
 	let staffFilterCourse = $state('');
-	let staffFilterTipo = $state<'todos' | 'notas' | 'no_deudor'>('todos');
+	let staffFilterTipo = $state<'todos' | 'notas' | 'no_deudor' | 'alumno_regular'>('todos');
 	let staffFilterAnio = $state<number | null>(null);
 	let staffFilterFolio = $state('');
 	let staffStudents: Student[] = $state([]);
@@ -828,8 +828,9 @@
 							class="w-full rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-light-black dark:text-dark-white px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
 						>
 							<option value="todos">— Todos —</option>
-							<option value="notas">Certificado de Notas</option>
+							<option value="notas">Certificado de Notas (Paquete Compuesto)</option>
 							<option value="no_deudor">Certificado de No Deudor</option>
+							<option value="alumno_regular">Certificado de Alumno Regular</option>
 						</select>
 					</div>
 

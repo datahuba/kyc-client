@@ -14,7 +14,7 @@
  *   - cancelada: el estudiante la canceló
  */
 
-export type CertificateRequestTipo = 'notas' | 'no_deudor';
+export type CertificateRequestTipo = 'notas' | 'no_deudor' | 'alumno_regular';
 export type CertificateRequestEstado =
 	| 'pendiente'
 	| 'en_revision'

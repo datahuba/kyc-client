@@ -6,7 +6,7 @@
  * /app/certificates y los componentes hijos.
  */
 
-export type TipoCertificado = 'notas' | 'no_deudor';
+export type TipoCertificado = 'notas' | 'no_deudor' | 'alumno_regular';
 
 export interface CertificateModulo {
 	nombre: string;

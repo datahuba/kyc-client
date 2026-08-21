@@ -179,8 +179,9 @@
 	}
 
 	function tipoLabel(tipo: string, hastaN?: number | null): string {
-		if (tipo === 'notas') return 'Certificado de Notas';
-		if (tipo === 'no_deudor') return `No Deudor (hasta Módulo ${hastaN ?? '?'})`;
+		if (tipo === 'notas') return 'Certificado de Notas (Paquete Compuesto - Bs 150)';
+		if (tipo === 'no_deudor') return `No Deudor (hasta Módulo ${hastaN ?? '?'}) - Bs 150`;
+		if (tipo === 'alumno_regular') return 'Alumno Regular - Bs 50';
 		return tipo;
 	}
 
@@ -641,10 +642,10 @@
 			{/if}
 
 			<!-- ============================================================
-			     F-CERT-NO-DEUDOR-COBRO (2026-08-17): bloque económico.
-			     Solo para 'no_deudor', que es el único con arancel.
+			     F-TARIFARIO-OFICIAL (2026-08-21): bloque económico.
+			     Aplica a cualquier solicitud que tenga arancel.
 			     ============================================================ -->
-			{#if selectedRequest.tipo === 'no_deudor'}
+			{#if selectedRequest.monto && selectedRequest.monto > 0}
 				<div class="rounded-lg border border-gray-200 dark:border-dark-border p-3 space-y-3">
 					<div class="flex flex-wrap items-center justify-between gap-2">
 						<div>
@@ -774,23 +775,21 @@
 					Cerrar
 				</Button>
 				{#if canApprove(selectedRequest) && (selectedRequest.estado === 'pendiente' || selectedRequest.estado === 'en_revision')}
-					{#if selectedRequest.tipo === 'no_deudor'}
-						<!-- El tratamiento lo elige quien aprueba, no el estudiante:
-						     es el que conoce el título real y el que firma. Arranca
-						     vacío porque los de diplomado continuo no llevan. -->
-						<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-							<span class="whitespace-nowrap">Tratamiento</span>
-							<select
-								bind:value={tratamientoElegido}
-								class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-dark-border dark:bg-dark-background dark:text-gray-100"
-							>
-								<option value="">Sin tratamiento</option>
-								{#each TRATAMIENTOS as t (t)}
-									<option value={t}>{t}</option>
-								{/each}
-							</select>
-						</label>
-					{/if}
+					<!-- El tratamiento lo elige quien aprueba, no el estudiante:
+					     es el que conoce el título real y el que firma. Arranca
+					     vacío porque los de diplomado continuo no llevan. -->
+					<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+						<span class="whitespace-nowrap">Tratamiento</span>
+						<select
+							bind:value={tratamientoElegido}
+							class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-dark-border dark:bg-dark-background dark:text-gray-100"
+						>
+							<option value="">Sin tratamiento</option>
+							{#each TRATAMIENTOS as t (t)}
+								<option value={t}>{t}</option>
+							{/each}
+						</select>
+					</label>
 					<Button
 						variant="destructive"
 						size="sm"
