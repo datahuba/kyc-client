@@ -376,9 +376,9 @@
 				</div>
 			{:else}
 				<div class="space-y-3">
-					{#each latestEnrollments.slice(0, 3) as enr (enr._id)}
-						{@const isOpen = expandedEnrollments.has(enr._id)}
-						{@const nombre = coursesMap[enr.curso_id]?.nombre_programa || 'Curso Académico'}
+					{#each latestEnrollments.slice(0, 3) as enr (enr._id || (enr as any).id)}
+						{@const isOpen = expandedEnrollments.has(enr._id || (enr as any).id)}
+						{@const nombre = coursesMap[enr.curso_id]?.nombre_programa || (enr as any).curso_nombre || (enr as any).programa_nombre || 'Programa de Posgrado'}
 						<div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden transition-all">
 							<!-- Cabecera de la Tarjeta Táctil -->
 							<button
