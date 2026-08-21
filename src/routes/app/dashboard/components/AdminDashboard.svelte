@@ -83,6 +83,8 @@
 		ingreso_colegiatura: number;
 		total_ingresos: number;
 		por_cobrar: number;
+		cxc_devengada?: number;
+		proyeccion_futura?: number;
 	}
 	let courseBreakdown: CourseBreakdown[] = [];
 	let groupedByType: Record<string, CourseBreakdown[]> = {};
@@ -230,9 +232,16 @@
 		     de tamaño para que entren en una misma línea". -->
 		{#if verResumenEconomico && resumenEconomico}
 			<div>
-				<div class="flex items-center justify-between mb-3">
-					<h2 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Resumen Económico General</h2>
-					<a href="/app/reports" class="text-xs sm:text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">Ver reportes</a>
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-1">
+					<div>
+						<h2 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
+							{esSegmentado ? 'Resumen Económico (Mis Programas Asignados)' : 'Resumen Económico General'}
+						</h2>
+						<p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+							{esSegmentado ? 'Resumen financiero limitado a los programas académicos bajo tu gestión.' : 'Resumen financiero consolidado de todos los programas del sistema.'}
+						</p>
+					</div>
+					<a href="/app/reports/cuentas-por-cobrar" class="text-xs sm:text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform shrink-0">Ver informe contable</a>
 				</div>
 
 				<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -275,15 +284,22 @@
 						</div>
 					</div>
 
-					<!-- Por Cobrar -->
-					<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 flex items-center justify-between min-w-0 border border-gray-100 dark:border-gray-700">
+					<!-- CxC Devengada Exigible (Principio de Devengado 2026-08-21) -->
+					<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 flex items-center justify-between min-w-0 border border-amber-200/80 dark:border-amber-900/50">
 						<div class="flex-1 min-w-0 mr-3">
-							<p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Por Cobrar</p>
-							<p class="text-lg sm:text-xl font-extrabold text-orange-600 dark:text-orange-400 mt-1 truncate" title={formatCurrency(resumenEconomico.por_cobrar)}>
-								{formatCurrency(resumenEconomico.por_cobrar)}
+							<p class="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider truncate" title="Deuda mora de matrículas y módulos dictados o en ejecución">
+								CxC Devengada (Exigible)
 							</p>
+							<p class="text-lg sm:text-xl font-extrabold text-amber-800 dark:text-amber-200 mt-1 truncate" title={formatCurrency(resumenEconomico.cxc_devengada ?? resumenEconomico.por_cobrar ?? 0)}>
+								{formatCurrency(resumenEconomico.cxc_devengada ?? resumenEconomico.por_cobrar ?? 0)}
+							</p>
+							{#if resumenEconomico.proyeccion_futura != null}
+								<p class="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 truncate" title="Módulos futuros aún no iniciados">
+									Futuro: {formatCurrency(resumenEconomico.proyeccion_futura)}
+								</p>
+							{/if}
 						</div>
-						<div class="p-3 bg-orange-500 rounded-xl text-white shrink-0 shadow-sm">
+						<div class="p-3 bg-amber-500 rounded-xl text-white shrink-0 shadow-sm">
 							<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 						</div>
 					</div>
@@ -423,9 +439,12 @@
 														<p class="text-xs uppercase tracking-wider text-gray-700 dark:text-gray-300 font-semibold">Total Ingresos</p>
 														<p class="text-base font-bold text-green-600 dark:text-green-400 font-mono mt-1">{formatCurrency(course.total_ingresos)}</p>
 													</div>
-													<div class="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-3">
-														<p class="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">Por Cobrar</p>
-														<p class="text-base font-bold text-orange-600 dark:text-orange-400 font-mono mt-1">{formatCurrency(course.por_cobrar)}</p>
+													<div class="bg-amber-50/50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200/50 dark:border-amber-900/30">
+														<p class="text-xs uppercase tracking-wider text-amber-700 dark:text-amber-400 font-semibold" title="Deuda devengada exigible de módulos dictados o en curso">CxC Devengada</p>
+														<p class="text-base font-bold text-amber-800 dark:text-amber-300 font-mono mt-1">{formatCurrency(course.cxc_devengada ?? course.por_cobrar ?? 0)}</p>
+														{#if course.proyeccion_futura != null}
+															<p class="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 truncate" title="Módulos futuros no iniciados">Futuro: {formatCurrency(course.proyeccion_futura)}</p>
+														{/if}
 													</div>
 												</div>
 											{/if}
