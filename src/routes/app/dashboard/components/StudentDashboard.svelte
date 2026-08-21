@@ -110,7 +110,7 @@
 			loading = true;
 			try {
 				const [misInscripciones, profileRes, cursosDisponiblesRes, myRequestsRes] = await Promise.all([
-					apiKyC.get<Enrollment[]>('/enrollments/my').catch(() => []),
+					apiKyC.get<Enrollment[]>('/enrollments/me').catch(() => []),
 					apiKyC.get<any>('/students/me').catch(() => null),
 					apiKyC.get<any[]>('/courses/disponibles').catch(() => []),
 					apiKyC.get<any[]>('/enrollment-requests/my').catch(() => [])
