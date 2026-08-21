@@ -51,6 +51,29 @@
 		(!profileData?.tipo_estudiante && !!(profileData?.registro_universitario || profileData?.avance_academico_codigo || profileData?.carrera_codigo || profileData?.formulario_descuento_numero))
 	);
 
+	// Checklist de datos y documentos requeridos para el alumno
+	let missingPersonalFields = $derived.by(() => {
+		if (!profileData) return [];
+		const missing: string[] = [];
+		if (!profileData.celular || !String(profileData.celular).trim()) missing.push('Número de celular');
+		if (!profileData.domicilio || !String(profileData.domicilio).trim()) missing.push('Dirección de domicilio');
+		if (!profileData.fecha_nacimiento) missing.push('Fecha de nacimiento');
+		if (!profileData.carnet || !String(profileData.carnet).trim()) missing.push('Cédula de Identidad');
+		return missing;
+	});
+
+	let missingDocuments = $derived.by(() => {
+		if (!profileData) return [];
+		const missing: string[] = [];
+		if (!profileData.carnet_url) missing.push('Fotocopia de Carnet de Identidad');
+		if (!profileData.cv_url && !esEstudiantePregrado) missing.push('Curriculum Vitae (CV)');
+		const tieneTitulo = profileData.titulo?.titulo_url || (profileData.titulo as any)?.url;
+		if (!tieneTitulo && !esEstudiantePregrado) missing.push('Título Profesional');
+		return missing;
+	});
+
+	let todoPerfilCompleto = $derived(missingPersonalFields.length === 0 && missingDocuments.length === 0);
+
 	// Carga de Título Profesional desde el perfil. A diferencia de CV/Carnet/Afiliación,
 	// el título lleva metadata (nombre, número, año, universidad) que el backend exige,
 	// por eso se captura en un modal en vez de una subida directa de archivo.
@@ -603,6 +626,78 @@
 			<div class="grid gap-6 lg:grid-cols-3">
 				<!-- Columna Principal -->
 				<div class="lg:col-span-2 space-y-6">
+					<!-- Tarjeta de Estado / Checklist de Verificación de Perfil -->
+					{#if todoPerfilCompleto}
+						<div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200 shadow-sm flex items-center gap-3.5">
+							<div class="size-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+								<CheckIcon class="size-6" />
+							</div>
+							<div>
+								<h3 class="text-sm font-extrabold text-emerald-950 dark:text-emerald-100">Perfil y Documentación 100% Completos</h3>
+								<p class="text-xs text-emerald-800/80 dark:text-emerald-300/80 mt-0.5">
+									Tus datos personales y requisitos de admisión están al día y listos para trámites.
+								</p>
+							</div>
+						</div>
+					{:else}
+						<div class="p-4 sm:p-5 rounded-2xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-950 dark:text-amber-100 shadow-sm space-y-3">
+							<div class="flex items-center justify-between gap-3">
+								<div class="flex items-center gap-2.5">
+									<div class="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 shrink-0">
+										<ExclamationCircleIcon class="size-5" />
+									</div>
+									<div>
+										<h3 class="text-sm font-extrabold">Estado de tu Perfil y Requisitos</h3>
+										<p class="text-xs text-amber-800 dark:text-amber-300">Completa los campos y documentos faltantes para habilitar tus certificados e inscripciones.</p>
+									</div>
+								</div>
+								{#if missingPersonalFields.length > 0 && !editMode}
+									<button
+										type="button"
+										onclick={startEdit}
+										class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-colors shadow-sm whitespace-nowrap shrink-0"
+									>
+										Completar Datos
+									</button>
+								{/if}
+							</div>
+
+							<div class="grid gap-2 sm:grid-cols-2 pt-2 border-t border-amber-200/60 dark:border-amber-800/40 text-xs">
+								<!-- Datos Personales -->
+								<div class="p-3 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-amber-200/40 dark:border-amber-800/30">
+									<span class="font-bold block mb-1 text-slate-800 dark:text-slate-200">
+										{missingPersonalFields.length === 0 ? '✅ Datos Personales Al Día' : '⚠️ Datos Personales Pendientes'}
+									</span>
+									{#if missingPersonalFields.length > 0}
+										<ul class="list-disc list-inside space-y-0.5 text-amber-900 dark:text-amber-200">
+											{#each missingPersonalFields as item}
+												<li>{item}</li>
+											{/each}
+										</ul>
+									{:else}
+										<p class="text-emerald-700 dark:text-emerald-400">Todos los datos personales registrados.</p>
+									{/if}
+								</div>
+
+								<!-- Documentos de Admisión -->
+								<div class="p-3 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-amber-200/40 dark:border-amber-800/30">
+									<span class="font-bold block mb-1 text-slate-800 dark:text-slate-200">
+										{missingDocuments.length === 0 ? '✅ Requisitos de Admisión Subidos' : '📄 Documentos Pendientes'}
+									</span>
+									{#if missingDocuments.length > 0}
+										<ul class="list-disc list-inside space-y-0.5 text-amber-900 dark:text-amber-200">
+											{#each missingDocuments as doc}
+												<li>{doc}</li>
+											{/each}
+										</ul>
+									{:else}
+										<p class="text-emerald-700 dark:text-emerald-400">Documentación de admisión al día.</p>
+									{/if}
+								</div>
+							</div>
+						</div>
+					{/if}
+
 					<!-- Información Personal -->
 					<Card>
 						{#snippet header()}
