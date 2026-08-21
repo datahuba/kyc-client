@@ -260,7 +260,9 @@
 			</a>
 
 			<a
-				href="/app/classroom"
+				href="https://virtual.uagrm.edu.bo/postgrado/login/index.php"
+				target="_blank"
+				rel="noopener noreferrer"
 				class="flex flex-col items-center justify-center p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-md active:scale-95 transition-all text-center group"
 			>
 				<div class="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform mb-1.5">
@@ -270,7 +272,9 @@
 			</a>
 
 			<a
-				href="/app/enrollments"
+				href="https://perfil.uagrm.edu.bo/estudiantes/default.php"
+				target="_blank"
+				rel="noopener noreferrer"
 				class="flex flex-col items-center justify-center p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-md active:scale-95 transition-all text-center group"
 			>
 				<div class="size-11 rounded-2xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-105 transition-transform mb-1.5">
