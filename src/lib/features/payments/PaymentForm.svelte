@@ -49,14 +49,14 @@
 	// de la unidad). Se muestra fija (solo lectura) y se autocompleta.
 	let cuentaInstitucional = $state<{ numero_cuenta?: string; banco?: string; titular?: string; tipo_cuenta?: string } | null>(null);
 
-	// Seguro para evitar auto-relleno infinito (UX FIX)
+	let isStaff = $derived(
+		['admin', 'superadmin', 'cobranza', 'cpd', 'encargado_curso', 'coordinador'].includes(
+			($userStore.role || '').toLowerCase()
+		)
+	);
+
 	let lastAutoFilledId = $state('');
 
-	const metodosDisponibles = ['Transferencia', 'Depósito', 'Caja'];
-	// Reunión postgrado 2026-07-09: separar Bancos y Cooperativas (mucha gente
-	// paga por cooperativa). Se quitaron las billeteras móviles (Yape/Yolo/Altoke)
-	// porque, según se aclaró, un pago por banca móvil se registra igual como
-	// transferencia/depósito bancario, no como una categoría aparte.
 	const bancosDisponibles = [
 		'Banco Unión',
 		'Banco Nacional de Bolivia (BNB)',
@@ -84,14 +84,21 @@
 		'Cooperativa Progreso'
 	];
 
-
 	let isMatriculaPagada = $derived(
 		selectedEnrollmentId
 			? !!enrollments.find((e) => e._id === selectedEnrollmentId)?.matricula_pagada
 			: false
 	);
 
-	let requiereBancoYVoucher = $derived(metodoPago !== 'Caja');
+	let metodosDisponibles = $derived(
+		isStaff
+			? ['Transferencia', 'Depósito', 'Caja', 'Migración / Saldo Inicial']
+			: ['Transferencia', 'Depósito', 'Caja']
+	);
+
+	let requiereBancoYVoucher = $derived(
+		metodoPago !== 'Caja' && metodoPago !== 'Migración / Saldo Inicial'
+	);
 
 	// Selector de cuotas a pagar (reunión postgrado 2026-07-09): el estudiante
 	// elige CUÁNTO pagar (1 cuota, 2 cuotas, ..., o pago completo) y el monto se
@@ -311,11 +318,15 @@
 				payload.fecha_comprobante = fechaComprobante;
 				payload.cuenta_destino = cuentaDestino;
 			} else {
-				payload.numero_transaccion = `CAJA-${Date.now()}`;
-				payload.remitente = $userStore.user?.nombre || 'Caja Física';
-				payload.banco = 'Caja UAGRM';
-				payload.fecha_comprobante = new Date().toISOString().split('T')[0];
-				payload.cuenta_destino = 'Caja Central';
+				const esMigracion = metodoPago === 'Migración / Saldo Inicial';
+				payload.numero_transaccion = transactionNumber || (esMigracion ? `HIST-${Date.now()}` : `CAJA-${Date.now()}`);
+				payload.remitente = remitente || $userStore.user?.nombre || (esMigracion ? 'Registro Histórico' : 'Caja Física');
+				payload.banco = banco || (esMigracion ? 'Registro Histórico UAGRM' : 'Caja UAGRM');
+				payload.fecha_comprobante = fechaComprobante || new Date().toISOString().split('T')[0];
+				payload.cuenta_destino = cuentaDestino || (esMigracion ? 'Cuenta Histórica' : 'Caja Central');
+				if (file) {
+					payload.file = file;
+				}
 			}
 
 			await paymentService.create(payload);
@@ -530,7 +541,7 @@
 
 			<div class="flex-[2] space-y-1">
 				<label for="comprobante" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-					Archivo del Comprobante
+					Archivo del Comprobante <span class="text-red-500">*</span>
 				</label>
 				<FileUpload
 					id="comprobante"
@@ -540,6 +551,19 @@
 					label="Subir Imagen o PDF"
 				/>
 			</div>
+		</div>
+	{:else}
+		<div class="animate-fade-in space-y-1">
+			<label for="comprobante_opcional" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+				Respaldo Físico / Escaneo (Opcional)
+			</label>
+			<FileUpload
+				id="comprobante_opcional"
+				accept="image/*,application/pdf"
+				{file}
+				onFileSelect={(f) => (file = f)}
+				label="Adjuntar Escaneo o Recibo (Opcional)"
+			/>
 		</div>
 	{/if}
 
@@ -553,7 +577,11 @@
 					<CheckIcon class="size-5" />
 				{/if}
 			{/snippet}
-			{requiereBancoYVoucher ? 'Subir Comprobante' : 'Registrar Pago en Caja'}
+			{requiereBancoYVoucher
+				? 'Subir Comprobante'
+				: metodoPago === 'Migración / Saldo Inicial'
+					? 'Registrar Pago Histórico'
+					: 'Registrar Pago en Caja'}
 		</Button>
 	</div>
 </form>

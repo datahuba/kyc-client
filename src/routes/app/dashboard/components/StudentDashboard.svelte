@@ -37,20 +37,23 @@
 	// Objeto derivado que detalla el estado de cada documento para el mensaje
 	let docStatus = $derived.by(() => {
 		const u = studentProfile || ($userStore.user as any);
-		if (!u) return { completo: false, items: [] as { label: string; estado: string; verificado: boolean }[] };
+		if (!u) return { completo: false, items: [] as { label: string; estado: string; verificado: boolean; obligatorio: boolean }[] };
 
 		const cvState = resolveDocStatus(u.cv_url, u.cv_estado);
 		const carnetState = resolveDocStatus(u.carnet_url, u.carnet_estado);
 		const afiliacionState = resolveDocStatus(u.afiliacion_url, u.afiliacion_estado);
 		const tituloState = resolveDocStatus(u.titulo?.titulo_url || (u.titulo as any)?.url, u.titulo?.estado);
 
+		const esPregrado = u.es_primer_carrera ?? u.es_estudiante_interno ?? false;
+
 		const items = [
-			{ label: 'Curriculum Vitae (CV)', estado: cvState, verificado: cvState === 'verificado' },
-			{ label: 'Carnet de Identidad', estado: carnetState, verificado: carnetState === 'verificado' },
-			{ label: 'Certificado de Afiliación', estado: afiliacionState, verificado: afiliacionState === 'verificado' },
-			{ label: 'Título Profesional', estado: tituloState, verificado: tituloState === 'verificado' }
+			{ label: 'Carnet de Identidad', estado: carnetState, verificado: carnetState === 'verificado', obligatorio: true },
+			{ label: 'Curriculum Vitae (CV)', estado: cvState, verificado: cvState === 'verificado', obligatorio: !esPregrado },
+			{ label: 'Certificado de Afiliación', estado: afiliacionState, verificado: afiliacionState === 'verificado', obligatorio: !esPregrado },
+			{ label: 'Título Profesional', estado: tituloState, verificado: tituloState === 'verificado', obligatorio: !esPregrado }
 		];
-		return { completo: items.every(i => i.verificado), items };
+		const obligatorios = items.filter((i) => i.obligatorio);
+		return { completo: obligatorios.every((i) => i.verificado), items };
 	});
 	let documentosCompletos = $derived(docStatus.completo);
 
@@ -259,7 +262,7 @@
 									No puedes solicitar inscripción a nuevos programas hasta que los siguientes documentos estén verificados por el CPD.
 								</p>
 								<ul class="space-y-1.5">
-									{#each docStatus.items as item}
+									{#each docStatus.items.filter((i) => i.obligatorio) as item}
 										<li class="flex items-center gap-2 text-xs">
 											{#if item.verificado}
 												<span class="inline-flex items-center justify-center size-4 rounded-full bg-green-500/20 text-green-600 dark:text-green-400 shrink-0">
