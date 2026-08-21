@@ -4,16 +4,33 @@ import { mkdirSync } from 'fs';
 const SHOT_DIR = 'C:/Users/Usuario/Documents/PROYECTO KYC/.mavis/v2/assets/2026/07/17';
 mkdirSync(SHOT_DIR, { recursive: true });
 
-const TOKEN =
-	'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTRiYTg1NGQ4NzJjZDMzZDRiNDliYWYiLCJ1c2VyX3R5cGUiOiJ1c2VyIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg0NDA4MjY0fQ.am1cf9XOXakN5GI5XKTpfJ9DXzvrW9_PXEjUw-9Dmak';
+const STUDENT_TOKEN =
+	'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2N2I3ZjFlMjljNjkwZDU2MzVlOTExMTEiLCJ1c2VyX3R5cGUiOiJzdHVkZW50Iiwicm9sZSI6InN0dWRlbnQiLCJleHAiOjE3ODk4NzY2ODR9.8MpwnRbwRuvfknjeR7qbict1PhoqLbaQTE_wLM01BiM';
 
-const userData = {
-	_id: '6a4ba854d872cd33d4b49baf',
-	username: 'admin_test',
-	email: 'admin_test@datahuba.com',
-	role: 'admin',
+const studentData = {
+	_id: '67b7f1e29c690d5635e91111',
+	username: 'estudiante_test',
+	email: 'estudiante@uagrm.edu.bo',
+	role: 'student',
+	user_type: 'student',
 	activo: true,
-	nombre: 'Admin Test'
+	nombre: 'Juan Perez Estudiante',
+	terminos_aceptados: true,
+	perfil_completado: true
+};
+
+const ADMIN_TOKEN =
+	'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2N2I3ZjFlMjljNjkwZDU2MzVlOTIyMjIiLCJ1c2VyX3R5cGUiOiJ1c2VyIiwicm9sZSI6InN1cGVyYWRtaW4iLCJleHAiOjE3ODk4NzY2ODR9.Eub4vXniB-Ll-AzaYu4djGJJ4atc8rPVhUJsydViTpU';
+
+const adminData = {
+	_id: '67b7f1e29c690d5635e92222',
+	username: 'admin_test',
+	email: 'admin@uagrm.edu.bo',
+	role: 'superadmin',
+	user_type: 'user',
+	activo: true,
+	nombre: 'Administrador General',
+	terminos_aceptados: true
 };
 
 test.use({
@@ -28,27 +45,26 @@ test.use({
 test('captura mobile', async ({ page, context }) => {
 	test.setTimeout(240000);
 
-	// Inyectar localStorage en CADA navegación antes que se cargue cualquier script
+	// 1) Capturar vistas de estudiante
 	await context.addInitScript(
 		({ t, u }) => {
 			try {
-				localStorage.setItem('auth_token', t);
-				localStorage.setItem('auth_token_expiry', String(Date.now() + 23 * 60 * 60 * 1000));
-				localStorage.setItem('user_data', JSON.stringify(u));
+				localStorage.setItem('kyc-auth_token', t);
+				localStorage.setItem('kyc-auth_token_expiry', String(Date.now() + 23 * 60 * 60 * 1000));
+				localStorage.setItem('kyc-user_data', JSON.stringify(u));
+				localStorage.setItem('kyc-academic_role', 'student');
+				localStorage.setItem('kyc-login_type', 'academic');
 			} catch (e) {}
 		},
-		{ t: TOKEN, u: userData }
+		{ t: STUDENT_TOKEN, u: studentData }
 	);
 
-	const PAGES = [
-		{ name: '02-dashboard', path: '/app/dashboard' },
-		{ name: '03-payments', path: '/app/payments' },
-		{ name: '04-enrollments', path: '/app/enrollments' },
-		{ name: '05-courses', path: '/app/courses' },
-		{ name: '06-students', path: '/app/students' },
-		{ name: '07-discounts', path: '/app/discounts' },
-		{ name: '08-change-password', path: '/app/change-password' },
-		{ name: '09-profile', path: '/app/profile' }
+	const STUDENT_PAGES = [
+		{ name: 'student-01-dashboard', path: '/app/dashboard' },
+		{ name: 'student-02-payments', path: '/app/payments' },
+		{ name: 'student-03-enrollments', path: '/app/enrollments' },
+		{ name: 'student-04-certificates', path: '/app/certificates' },
+		{ name: 'student-05-profile', path: '/app/profile' }
 	];
 
 	// 1) Capturar pantalla de login sin sesión
@@ -58,7 +74,7 @@ test('captura mobile', async ({ page, context }) => {
 	console.log('OK: 01-signin');
 
 	// 2) Para cada página, navegar (con addInitScript inyectando sesión antes)
-	for (const p of PAGES) {
+	for (const p of STUDENT_PAGES) {
 		const url = `https://postgrado.datahuba.com${p.path}`;
 		try {
 			await page.goto(url, { waitUntil: 'networkidle', timeout: 20000 });

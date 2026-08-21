@@ -235,56 +235,56 @@
 					<a href="/app/reports" class="text-xs sm:text-sm text-primary-600 hover:text-primary-500 hover:scale-105 transition-transform">Ver reportes</a>
 				</div>
 
-				<div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
+				<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
 					<!-- Ingreso por Matrícula -->
-					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 flex items-center justify-between min-w-0">
-						<div class="flex-1 min-w-0 mr-2">
-							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Ingreso por Matrícula</p>
-							<p class="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(resumenEconomico.ingreso_matricula)}>
+					<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 flex items-center justify-between min-w-0 border border-gray-100 dark:border-gray-700">
+						<div class="flex-1 min-w-0 mr-3">
+							<p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ingreso por Matrícula</p>
+							<p class="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(resumenEconomico.ingreso_matricula)}>
 								{formatCurrency(resumenEconomico.ingreso_matricula)}
 							</p>
 						</div>
-						<div class="p-2.5 bg-uagrm-blue rounded-full text-white shrink-0">
-							<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
+						<div class="p-3 bg-uagrm-blue rounded-xl text-white shrink-0 shadow-sm">
+							<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
 						</div>
 					</div>
 
 					<!-- Ingreso por Colegiatura -->
-					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 flex items-center justify-between min-w-0">
-						<div class="flex-1 min-w-0 mr-2">
-							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Ingreso por Colegiatura</p>
-							<p class="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(resumenEconomico.ingreso_colegiatura)}>
+					<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 flex items-center justify-between min-w-0 border border-gray-100 dark:border-gray-700">
+						<div class="flex-1 min-w-0 mr-3">
+							<p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ingreso por Colegiatura</p>
+							<p class="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white mt-1 truncate" title={formatCurrency(resumenEconomico.ingreso_colegiatura)}>
 								{formatCurrency(resumenEconomico.ingreso_colegiatura)}
 							</p>
 						</div>
-						<div class="p-2.5 bg-primary-600 rounded-full text-white shrink-0">
-							<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+						<div class="p-3 bg-primary-600 rounded-xl text-white shrink-0 shadow-sm">
+							<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
 						</div>
 					</div>
 
 					<!-- Total Ingresos -->
-					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 flex items-center justify-between min-w-0">
-						<div class="flex-1 min-w-0 mr-2">
-							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Ingresos</p>
-							<p class="text-lg sm:text-xl font-bold text-green-600 dark:text-green-400 mt-1 truncate" title={formatCurrency(resumenEconomico.total_ingresos)}>
+					<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 flex items-center justify-between min-w-0 border border-gray-100 dark:border-gray-700">
+						<div class="flex-1 min-w-0 mr-3">
+							<p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Ingresos</p>
+							<p class="text-lg sm:text-xl font-extrabold text-green-600 dark:text-green-400 mt-1 truncate" title={formatCurrency(resumenEconomico.total_ingresos)}>
 								{formatCurrency(resumenEconomico.total_ingresos)}
 							</p>
 						</div>
-						<div class="p-2.5 bg-green-600 rounded-full text-white shrink-0">
-							<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+						<div class="p-3 bg-green-600 rounded-xl text-white shrink-0 shadow-sm">
+							<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 						</div>
 					</div>
 
 					<!-- Por Cobrar -->
-					<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 flex items-center justify-between min-w-0">
-						<div class="flex-1 min-w-0 mr-2">
-							<p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Por Cobrar</p>
-							<p class="text-lg sm:text-xl font-bold text-orange-600 dark:text-orange-400 mt-1 truncate" title={formatCurrency(resumenEconomico.por_cobrar)}>
+					<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 flex items-center justify-between min-w-0 border border-gray-100 dark:border-gray-700">
+						<div class="flex-1 min-w-0 mr-3">
+							<p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Por Cobrar</p>
+							<p class="text-lg sm:text-xl font-extrabold text-orange-600 dark:text-orange-400 mt-1 truncate" title={formatCurrency(resumenEconomico.por_cobrar)}>
 								{formatCurrency(resumenEconomico.por_cobrar)}
 							</p>
 						</div>
-						<div class="p-2.5 bg-orange-500 rounded-full text-white shrink-0">
-							<svg class="size-5 sm:size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+						<div class="p-3 bg-orange-500 rounded-xl text-white shrink-0 shadow-sm">
+							<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 						</div>
 					</div>
 				</div>

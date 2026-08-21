@@ -127,6 +127,12 @@
 		padding-bottom: env(safe-area-inset-bottom, 0px) !important;
 	}
 
+	html, body {
+		max-width: 100vw;
+		overflow-x: hidden;
+		-webkit-text-size-adjust: 100%;
+	}
+
 	/* Main Scroll: espaciado inferior para evitar recortes del Home Indicator de iOS.
 	   NOTA: se usa `:where()` para que la specificity sea 0, y las utility classes
 	   del <main> (pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-6) ganen
@@ -134,6 +140,8 @@
 	   no tape el contenido en mobile. */
 	:where(main) {
 		padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+		max-width: 100vw;
+		overflow-x: hidden;
 	}
 
 	@media (min-width: 1024px) {

@@ -125,12 +125,12 @@
 		<p class="text-sm text-slate-500 dark:text-slate-400">Verificando sesiÃ³nâ€¦</p>
 	</div>
 {:else}
-<div class="flex h-dvh bg-light-primary dark:bg-dark-background transition-colors" data-sveltekit-preload-data="hover">
+<div class="flex h-dvh bg-light-primary dark:bg-dark-background transition-colors overflow-x-hidden w-full max-w-full" data-sveltekit-preload-data="hover">
 	<Sidebar 
 		isOpen={sidebarOpen} 
 		onClose={() => sidebarOpen = false} 
 	/>
-	<div class="relative flex flex-1 flex-col overflow-hidden transition-all duration-300">
+	<div class="relative flex flex-1 flex-col overflow-hidden min-w-0 w-full max-w-full transition-all duration-300">
 		<Watermark />
 		<Header onOpenSidebar={() => sidebarOpen = true} />
 
@@ -158,7 +158,7 @@
 		     el BottomNav fixed (z-40, bottom-0, h-16 aprox) en mobile.
 		     En desktop el BottomNav se oculta con md:hidden, pero dejamos
 		     pb-6 para dar aire con el sidebar. -->
-		<main class="relative flex-1 overflow-y-auto p-4 pb-20 sm:p-6 md:pb-6">
+		<main class="relative flex-1 overflow-y-auto p-3.5 pb-28 sm:p-6 md:pb-6">
 			{@render children?.()}
 		</main>
 		<BottomNav />
