@@ -3,6 +3,7 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import Modal from '$lib/components/ui/modal.svelte';
 	import GestionModulosModal from '$lib/components/ui/GestionModulosModal.svelte';
+	import ReincorporarModal from '$lib/features/enrollments/ReincorporarModal.svelte';
 	import { formatCurrency } from '$lib/utils';
 	import { userStore } from '$lib/stores/userStore';
 	import { apiKyC } from '$lib/config/apiKyC.config'; // IMPORTACIÓN DEL CLIENTE ESTÁNDAR
@@ -50,6 +51,10 @@
 	// de módulos, accesible también desde la ficha del estudiante.
 	let modulosModalOpen = $state(false);
 	let modulosModalEnrollment: Enrollment | null = $state(null);
+
+	// F-REINCORPORACION (2026-08-22): modal de reincorporación
+	let reincorporarModalOpen = $state(false);
+	let reincorporarEnrollment: Enrollment | null = $state(null);
 
 	// Obtener ID resiliente para MongoDB
 	const studentId = $derived(student?._id || student?.id);
@@ -285,7 +290,7 @@
 								<td class="px-6 py-4 whitespace-nowrap">
 									<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${enrollment.estado === 'activo' ? 'bg-green-100 text-green-800' : enrollment.estado === 'retirado' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800'}`}>{enrollment.estado}</span>
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-center">
+								<td class="px-6 py-4 whitespace-nowrap text-center space-x-1.5">
 									<button
 										type="button"
 										onclick={(e) => {
@@ -297,6 +302,20 @@
 									>
 										📚 Módulos
 									</button>
+									{#if enrollment.estado === 'suspendido' || enrollment.estado === 'retirado' || enrollment.estado === 'inactivo'}
+										<button
+											type="button"
+											onclick={(e) => {
+												e.stopPropagation();
+												reincorporarEnrollment = enrollment;
+												reincorporarModalOpen = true;
+											}}
+											class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded transition-colors"
+											title="Reincorporar a una nueva edición del programa"
+										>
+											🔄 Reincorporar
+										</button>
+									{/if}
 								</td>
 								{#if isFinanciero}
 									<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
@@ -361,3 +380,19 @@
 		modulosModalEnrollment = null;
 	}}
 />
+
+<!-- F-REINCORPORACION (Kevin 2026-08-22): modal de reincorporación a nueva edición -->
+<ReincorporarModal
+	isOpen={reincorporarModalOpen}
+	enrollment={reincorporarEnrollment}
+	{student}
+	onClose={() => {
+		reincorporarModalOpen = false;
+		reincorporarEnrollment = null;
+	}}
+	onSuccess={() => {
+		if (studentId) fetchFinancialSummary(studentId);
+		onClose();
+	}}
+/>
+

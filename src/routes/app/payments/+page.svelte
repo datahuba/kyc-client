@@ -14,6 +14,7 @@
 	import AddPagoByStaffModal from '$lib/features/payments/AddPagoByStaffModal.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import SearchInput from '$lib/components/ui/searchInput.svelte';
+	import PullToRefresh from '$lib/components/ui/pullToRefresh.svelte';
 	import { Pagination } from '$lib/components/ui';
 	import UploadComprobanteModal from '$lib/features/payments/UploadComprobanteModal.svelte';
 	import { 
@@ -1012,6 +1013,7 @@
 
 	<!-- F-074: Toggle entre vista Lista (actual) y vista Matriz (estilo Excel de Sandra) -->
 	{#if viewMode === 'lista'}
+	<PullToRefresh onRefresh={loadPayments}>
 	{#if loading && payments.length === 0}
 		<TableSkeleton columns={11} rows={10} />
 	{:else}
@@ -1200,6 +1202,7 @@
 			onLimitChange={handleLimitChange}
 		/>
 	{/if}
+	</PullToRefresh>
 
 	<!-- ============================================================== -->
 	<!-- F-074 (2026-07-23): VISTA MATRIZ (estilo Excel de Sandra)      -->

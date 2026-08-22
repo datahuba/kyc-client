@@ -39,6 +39,35 @@
 	// Catálogo de cursos para el select
 	let cursos = $state<any[]>([]);
 
+	// Previsualización y Plantillas UAGRM
+	let previsualizarEmail = $state(false);
+
+	const plantillasInstitucionales = [
+		{
+			id: 'pago',
+			label: '💳 Recordatorio de Pago',
+			titulo: 'Recordatorio Importante de Pago de Cuota / Matrícula',
+			contenido: 'Estimados estudiantes:\n\nSe les recuerda que la fecha límite para la regularización de pagos del presente módulo se encuentra próxima a vencer.\n\nPor favor, ingresen a la plataforma en la sección "Mis Pagos" para consultar su estado de cuenta o subir su comprobante de depósito/transferencia bancaria.'
+		},
+		{
+			id: 'inicio',
+			label: '📅 Inicio de Módulo',
+			titulo: 'Inicio del Próximo Módulo y Horarios de Clases',
+			contenido: 'Estimados posgraduantes:\n\nLes damos una cordial bienvenida al inicio de este nuevo módulo académico.\n\nLas sesiones sincrónicas se desarrollarán en los días y horarios fijados en el Aula Virtual. Se recomienda revisar el material didáctico y la guía del docente.'
+		},
+		{
+			id: 'evaluacion',
+			label: '📝 Evaluaciones y Cierre',
+			titulo: 'Cierre de Módulo y Entrega de Evaluaciones',
+			contenido: 'Estimados estudiantes:\n\nLes informamos que la fecha límite para la entrega de trabajos finales y actividades evaluativas del módulo en curso concluye este fin de semana.\n\nLes solicitamos verificar la subida correcta de sus entregables en el Aula Virtual.'
+		}
+	];
+
+	function aplicarPlantilla(p: typeof plantillasInstitucionales[0]) {
+		formTitulo = p.titulo;
+		formContenido = p.contenido;
+	}
+
 	// Adjuntos pendientes (subir después de publicar, o subo al crear?)
 	// Por simplicidad: el contenido del comunicado se guarda primero con
 	// adjuntos vacíos, y los adjuntos se suben a Cloudinary por separado
@@ -327,11 +356,39 @@
 				</button>
 			</header>
 			<div class="p-6 space-y-4 overflow-y-auto flex-1">
+				<!-- Plantillas Institucionales Rápidas -->
+				<div>
+					<span class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+						⚡ Plantillas Rápidas UAGRM
+					</span>
+					<div class="flex flex-wrap gap-2">
+						{#each plantillasInstitucionales as p}
+							<button
+								type="button"
+								onclick={() => aplicarPlantilla(p)}
+								class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-primary-50 hover:text-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300 border border-gray-200 dark:border-gray-600 transition-colors"
+							>
+								{p.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+
 				<!-- Título -->
 				<div>
-					<label for="titulo" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-						Título <span class="text-red-500">*</span>
-					</label>
+					<div class="flex justify-between items-center mb-1.5">
+						<label for="titulo" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+							Título <span class="text-red-500">*</span>
+						</label>
+						<button
+							type="button"
+							onclick={() => previsualizarEmail = !previsualizarEmail}
+							class="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
+						>
+							<EyeIcon class="size-3.5" />
+							{previsualizarEmail ? 'Ocultar Vista Previa' : 'Previsualizar Correo UAGRM'}
+						</button>
+					</div>
 					<input
 						id="titulo"
 						type="text"
@@ -341,6 +398,36 @@
 						class="w-full px-3.5 py-2.5 rounded-lg border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all"
 					/>
 				</div>
+
+				<!-- Previsualización en Vivo de Plantilla Institucional -->
+				{#if previsualizarEmail}
+					<div class="rounded-xl border-2 border-primary-200 dark:border-primary-900/60 bg-gray-50 dark:bg-gray-950/40 p-4 transition-all">
+						<span class="block text-[10px] font-bold uppercase tracking-widest text-primary-600 dark:text-primary-400 mb-2">
+							👁️ Vista Previa del Correo Institucional
+						</span>
+						<div class="max-w-md mx-auto rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900 shadow-sm text-xs text-gray-800 dark:text-gray-200">
+							<div class="bg-[#8a1f2f] text-white p-3.5 text-center">
+								<p class="font-bold text-sm">Escuela de Posgrado · UAGRM</p>
+								<p class="text-[11px] text-[#f3d2d7]">Contaduría Pública</p>
+							</div>
+							<div class="p-4 space-y-3">
+								<h4 class="text-sm font-bold text-[#8a1f2f] dark:text-red-400">{formTitulo || 'Asunto del Comunicado'}</h4>
+								<p class="text-gray-600 dark:text-gray-400">Hola <strong>Lic. Estudiante de Posgrado</strong>,</p>
+								<div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border-l-4 border-[#8a1f2f] whitespace-pre-line text-[11px] leading-relaxed">
+									{formContenido || 'Aquí se mostrará el cuerpo del mensaje redactado...'}
+								</div>
+								<div class="text-center pt-2">
+									<span class="inline-block bg-[#8a1f2f] text-white font-bold px-4 py-2 rounded-lg text-xs">
+										Ingresar al Portal
+									</span>
+								</div>
+								<p class="text-[10px] text-gray-400 text-center pt-2">
+									Unidad de Postgrado · UAGRM
+								</p>
+							</div>
+						</div>
+					</div>
+				{/if}
 
 				<!-- Contenido -->
 				<div>

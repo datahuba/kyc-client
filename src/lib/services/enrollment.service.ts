@@ -202,6 +202,15 @@ class EnrollmentService {
 			{ motivo }
 		);
 	}
+
+	// F-REINCORPORACION (Kevin 2026-08-22): reincorporar estudiante a una nueva versión/edición
+	async reincorporar(
+		enrollmentId: string,
+		data: { nuevo_curso_id: string; modulo_inicio: number; observaciones?: string }
+	): Promise<Enrollment> {
+		return await apiKyC.post<Enrollment>(`/enrollments/${enrollmentId}/reincorporar`, data);
+	}
 }
 
 export const enrollmentService = new EnrollmentService();
+

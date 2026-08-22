@@ -28,6 +28,7 @@
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
 	import Skeleton from '$lib/components/ui/skeleton.svelte';
 	import EnrollmentForm from '$lib/features/enrollments/EnrollmentForm.svelte';
+	import ReincorporarModal from '$lib/features/enrollments/ReincorporarModal.svelte';
 	import EmptyState from '$lib/components/ui/emptyState.svelte';
 	import SearchInput from '$lib/components/ui/searchInput.svelte';
 	import { PlusIcon, DotsVerticalIcon } from '$lib/icons/outline';
@@ -68,6 +69,15 @@
 	// F-MODULOS-MODAL (2026-07-31): modal centralizado de gestión de módulos
 	// (reemplaza los botones Iniciar/Revertir del kardex).
 	let isModulosModalOpen: boolean = $state(false);
+
+	// F-REINCORPORACION (2026-08-22): modal de reincorporación a nueva edición
+	let isReincorporarModalOpen: boolean = $state(false);
+	let reincorporarEnrollment: Enrollment | null = $state(null);
+
+	function openReincorporarModal(enrollment: Enrollment) {
+		reincorporarEnrollment = enrollment;
+		isReincorporarModalOpen = true;
+	}
 
 	// F-COBRANZA-041 (2026-07-22): resumen de inscritos (total/activos/pasivos)
 	// se movió al Dashboard. Se eliminó la carga acá. Endpoint sigue existiendo.
@@ -711,6 +721,16 @@
 				id: 'reactivate',
 				icon: `<svg class="size-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>`,
 				action: () => handleReactivate(enrollment)
+			});
+		}
+
+		// F-REINCORPORACION (Kevin 2026-08-22): reincorporación a nueva versión/edición
+		if (canEditEnrollment && (estadoActual === 'suspendido' || estadoActual === 'retirado' || estadoActual === 'inactivo')) {
+			options.push({
+				label: 'Reincorporar a Nueva Edición',
+				id: 'reincorporar',
+				icon: `<svg class="size-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>`,
+				action: () => openReincorporarModal(enrollment)
 			});
 		}
 
@@ -1631,6 +1651,20 @@
 		onUpdated={(updated) => {
 			selectedKardex = updated;
 			enrollments = enrollments.map((e) => (e._id === updated._id ? updated : e));
+		}}
+	/>
+
+	<!-- F-REINCORPORACION (Kevin 2026-08-22): modal de reincorporación a nueva edición -->
+	<ReincorporarModal
+		isOpen={isReincorporarModalOpen}
+		enrollment={reincorporarEnrollment}
+		student={reincorporarEnrollment ? studentsMap[typeof reincorporarEnrollment.estudiante_id === 'string' ? reincorporarEnrollment.estudiante_id : (reincorporarEnrollment.estudiante_id as any)?.id || (reincorporarEnrollment.estudiante_id as any)?._id] : null}
+		onClose={() => {
+			isReincorporarModalOpen = false;
+			reincorporarEnrollment = null;
+		}}
+		onSuccess={() => {
+			loadData();
 		}}
 	/>
 </div>
