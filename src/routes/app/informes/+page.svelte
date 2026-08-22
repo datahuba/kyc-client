@@ -314,7 +314,7 @@
 								<th class="px-2 py-2 text-center font-bold">C.I.</th>
 								<th class="px-2 py-2 text-center font-bold">Estado</th>
 								<th class="px-2 py-2 text-center font-bold">Fecha</th>
-								<th class="px-2 py-2 text-center font-bold">N° Boleta</th>
+								<th class="px-2 py-2 text-center font-bold">N° Transacción / Voucher</th>
 								<th class="px-2 py-2 text-right font-bold">Importe Bs.</th>
 								<th class="px-2 py-2 text-right font-bold">Pendiente</th>
 								<th class="px-2 py-2 text-center font-bold">Beca</th>
@@ -347,7 +347,15 @@
 										{r.fecha_pago ? formatFechaPago(r.fecha_pago) : '—'}
 									</td>
 									<td class="px-2 py-2 text-center font-mono text-xs text-gray-700 dark:text-gray-300">
-										{r.numero_boleta || '—'}
+										{#if r.numero_boleta}
+											<span class="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold" title="N° Transacción / Voucher: {r.numero_boleta}">
+												{r.numero_boleta}
+											</span>
+										{:else if r.estado_pago === 'PAGADO' || r.estado_pago === 'PARCIAL'}
+											<span class="text-gray-500 dark:text-gray-400">Caja (Ventanilla)</span>
+										{:else}
+											<span class="text-gray-400">—</span>
+										{/if}
 									</td>
 									<td class="px-2 py-2 text-right font-semibold text-gray-900 dark:text-white">
 										{r.importe.toFixed(2)}

@@ -1559,6 +1559,18 @@
 														—
 													{/if}
 												</div>
+												<!-- N° Transacción / Voucher -->
+												<div class="text-[9px] font-mono whitespace-nowrap px-1 py-0.2 rounded mt-0.5">
+													{#if pago.numero_transaccion}
+														<span class="text-blue-700 dark:text-blue-300 font-semibold" title="N° Transacción: {pago.numero_transaccion}">
+															N° {pago.numero_transaccion}
+														</span>
+													{:else if (pago.metodo_pago || '').toLowerCase().includes('caja') || (pago.banco || '').toLowerCase().includes('caja')}
+														<span class="text-gray-500 dark:text-gray-400">Caja (Ventanilla)</span>
+													{:else}
+														<span class="text-amber-600 dark:text-amber-400">Sin N° Voucher</span>
+													{/if}
+												</div>
 												<!-- Fecha + estado -->
 												<div class="text-[9px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
 													{pago.fecha_comprobante ? new Date(pago.fecha_comprobante).toLocaleDateString('es-BO', {day: '2-digit', month: 'short'}) :
