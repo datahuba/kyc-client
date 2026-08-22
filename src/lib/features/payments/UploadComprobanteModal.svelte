@@ -157,7 +157,7 @@
 					<div>
 						<span class="text-gray-500 dark:text-gray-400">Nº Transacción:</span>
 						<span class="ml-1 font-mono text-xs text-gray-900 dark:text-white">
-							{payment.numero_transaccion ?? 'S/N'}
+							{payment.numero_transaccion || (['caja', 'efectivo', 'ventanilla'].some(m => (payment.metodo_pago || '').toLowerCase().includes(m)) ? 'Caja (Ventanilla)' : 'Sin N° Voucher')}
 						</span>
 					</div>
 				</div>

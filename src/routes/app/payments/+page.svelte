@@ -1828,7 +1828,9 @@
 					
 					<div>
 						<label for="numeroTransaccion" class="block text-xs font-medium text-gray-900 uppercase">Nº Transacción</label>
-						<p class="text-sm font-mono text-gray-500 dark:text-white mt-1" id="numeroTransaccion">{selectedPayment.numero_transaccion || 'S/N'}</p>
+						<p class="text-sm font-mono text-gray-500 dark:text-white mt-1" id="numeroTransaccion">
+							{selectedPayment?.numero_transaccion || (['caja', 'efectivo', 'ventanilla'].some(m => (selectedPayment?.metodo_pago || '').toLowerCase().includes(m)) ? 'Caja (Ventanilla)' : 'Sin N° Voucher')}
+						</p>
 					</div>
 					<div>
 						<label for="estado" class="block text-xs font-medium text-gray-900 uppercase">Estado General</label>
