@@ -368,6 +368,15 @@
 											</span>
 										{/if}
 									</td>
+									<td class="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
+										{#if r.monto_pendiente && r.monto_pendiente > 0.01}
+											<span class="font-semibold text-amber-600 dark:text-amber-400">
+												{r.monto_pendiente.toFixed(2)}
+											</span>
+										{:else}
+											<span class="text-gray-400">-</span>
+										{/if}
+									</td>
 									<td class="px-2 py-2 text-center text-xs">
 										{#if r.beca}
 											<span
